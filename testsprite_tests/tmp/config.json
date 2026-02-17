@@ -1,0 +1,17 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "backend",
+  "localEndpoint": "http://localhost:3000/",
+  "serverPort": 35419,
+  "executionArgs": {
+    "projectName": "bardo",
+    "projectPath": "/home/armando/bardo",
+    "testIds": [],
+    "additionalInstruction": "The server is an MCP (Model Context Protocol) server running on port 3000. Authentication uses API keys configured via BARDO_API_KEYS_JSON env var. The .env file contains API keys. The MCP endpoint is at /mcp and expects JSON-RPC formatted requests. For MCP tool calls, you need to first create a session via POST /mcp with a proper JSON-RPC initialize request, then use the returned mcp-session-id header for subsequent requests. API key can be passed via x-api-key header.",
+    "envs": {
+      "API_KEY": "sk-user-Z-h_g_8SqWUIzNTv61W28cfX9p9Zx8EiblIve2Od_OGBt2BDXuZmVQzCL3O8XVk-e1CcGk8R1dB60Q5ZsO_Ijh7qcYVYLREGXDgqNn-aEYPbQN8lThzvjwZQX-05pMz4Wh4"
+    }
+  },
+  "proxy": "http://4fe5488e-8a08-400a-ae49-bfd7d938fa98:oCZ8awO3VpPbBn8mAoYxhR6MCPIoHmhA@tun.testsprite.com:8080"
+}

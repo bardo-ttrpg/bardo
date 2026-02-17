@@ -1,0 +1,5 @@
+{
+  "biome.lsp.bin": "./node_modules/@biomejs/cli-linux-x64/biome",
+  "biome.requireConfiguration": true,
+  "biome.suggestInstallingGlobally": false
+}

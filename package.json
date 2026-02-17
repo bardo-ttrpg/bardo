@@ -3,7 +3,19 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "start": "bun run index.ts",
+    "biome:check": "bunx biome check .",
+    "biome:write": "bunx biome check --write ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
+    "@biomejs/biome": "2.4.1",
+    "@testsprite/testsprite-mcp": "^0.0.23",
     "@types/bun": "latest"
   },
   "peerDependencies": {
