@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import PricingToggle from "./pricing-toggle";
+import PricingToggle, { type BillingPeriod } from "./pricing-toggle";
 
 export const metadata: Metadata = {
 	title: "Pricing",
@@ -33,7 +33,15 @@ const faqs = [
 	},
 ] as const;
 
-export default function PricingPage() {
+type PricingPageProps = {
+	searchParams: Promise<{ billing?: string }>;
+};
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+	const resolvedSearchParams = await searchParams;
+	const billingPeriod: BillingPeriod =
+		resolvedSearchParams.billing === "yearly" ? "yearly" : "monthly";
+
 	return (
 		<div className="mx-auto max-w-7xl px-4 sm:px-6">
 			{/* ── Hero ── */}
@@ -50,9 +58,9 @@ export default function PricingPage() {
 				</p>
 			</section>
 
-			{/* ── Tier cards (client — has billing toggle) ── */}
+			{/* ── Tier cards with URL-driven monthly/yearly toggle ── */}
 			<section className="py-16">
-				<PricingToggle />
+				<PricingToggle billingPeriod={billingPeriod} />
 			</section>
 
 			{/* ── FAQ ── */}

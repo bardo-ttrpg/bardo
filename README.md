@@ -25,6 +25,13 @@ Run MCP only:
 bun run dev:mcp
 ```
 
+Run Convex dev worker (from `website/docs`):
+
+```bash
+cd website/docs
+bunx convex dev
+```
+
 Run website only:
 
 ```bash
@@ -61,6 +68,29 @@ BARDO_AUTH_MODE=required
 BARDO_ALLOW_QUERY_API_KEY=false
 ```
 
+## Orchestrated Turn API (Custom)
+
+Bardo now exposes a non-default REST orchestration layer on top of MCP:
+
+- `POST /api/v1/turns/resolve`
+
+This endpoint runs an opinionated workflow (`initialize` -> `player_action` ->
+optional `world_sync` -> optional `state_get`) and returns a single JSON
+response with `workflowId`.
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/turns/resolve \
+  -H "content-type: application/json" \
+  -H "x-api-key: user_key_1" \
+  -d '{
+    "action": "I travel to Ironhaven and ask for work.",
+    "transcript": "I am Captain Halvar. Welcome to Ironhaven.",
+    "includeState": true
+  }'
+```
+
 ## Quality checks
 
 ```bash
@@ -70,8 +100,46 @@ bun run check
 bun run biome:check
 ```
 
+## Route profiling (agent-browser)
+
+Run the Bun/Bunx route profiler (requires local dev server on `:3001`):
+
+```bash
+bun run profile:routes -- / /pricing /mpc-docs
+```
+
+Optional env overrides:
+
+```bash
+BASE_URL=http://127.0.0.1:3001 \
+CHROMIUM_EXECUTABLE_PATH=~/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome \
+bun run profile:routes
+```
+
 ## Greptile integration
 
 - Repository-level Greptile policy is defined in `greptile.json`.
 - Install/enable the Greptile GitHub app for this repository in your Greptile workspace.
 - PRs should resolve high-signal security/performance findings before merge.
+- Trigger review by commenting `@greptile` on the PR.
+
+## Codex PR review trigger
+
+- Trigger Codex review by commenting `@codex` on the PR.
+
+## Codex CLI Playwright MCP
+
+This repository includes project-local Codex MCP config at `.codex/config.toml`:
+
+```toml
+[mcp_servers.playwright]
+command = "bunx"
+args = ["@playwright/mcp@latest"]
+```
+
+Validate from repo root:
+
+```bash
+codex mcp list
+codex mcp get playwright
+```

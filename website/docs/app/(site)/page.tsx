@@ -7,6 +7,7 @@ import {
 	RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import AmbientParticles from "@/components/ambient-particles";
 import LazyDottedMap from "@/components/lazy-dotted-map";
 import LazyFileTree from "@/components/lazy-file-tree";
 import LazyHeroVideoDialog from "@/components/lazy-hero-video-dialog";
@@ -315,6 +316,7 @@ const worldMarkers: MapMarker[] = [
 export default function LandingPage() {
 	return (
 		<div>
+			<AmbientParticles />
 			{/* ════════════════════════════════════════
 			    HERO
 			════════════════════════════════════════ */}
@@ -442,7 +444,7 @@ export default function LandingPage() {
 									"Long campaigns collapse under their own complexity",
 								].map((item) => (
 									<li key={item} className="flex items-start gap-3">
-										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground/40">
+										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground/60">
 											✕
 										</span>
 										<span className="text-sm text-muted-foreground">
@@ -465,7 +467,7 @@ export default function LandingPage() {
 									"The longer you play, the richer the world gets",
 								].map((item) => (
 									<li key={item} className="flex items-start gap-3">
-										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-green-400/70">
+										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-green-700 dark:text-green-400/70">
 											✓
 										</span>
 										<span className="text-sm text-foreground">{item}</span>

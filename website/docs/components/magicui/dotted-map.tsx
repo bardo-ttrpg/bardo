@@ -1,7 +1,8 @@
 "use client";
 
 import DottedMapLib from "dotted-map";
-import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface LocationInfo {
@@ -18,27 +19,54 @@ export interface MapMarker {
 
 interface DottedMapProps {
 	markers?: MapMarker[];
-	dotColor?: string;
-	markerColor?: string;
 }
 
-export default function DottedMap({
-	markers = [],
-	dotColor = "#ffffff18",
-	markerColor = "#ffffff",
-}: DottedMapProps) {
-	const [activeIndex, setActiveIndex] = useState<number | null>(null);
+/**
+ * Module-level SVG cache. The DottedMapLib computation is expensive (~200–500 ms
+ * on a mid-range device). We lazily compute each variant once and reuse it for all
+ * subsequent renders and theme switches.
+ */
+let _lib: InstanceType<typeof DottedMapLib> | null = null;
+let _svgDark: string | null = null;
+let _svgLight: string | null = null;
 
-	// Memoize the expensive map generation — only recomputes when dotColor changes
-	const svgMap = useMemo(() => {
-		const map = new DottedMapLib({ height: 100, grid: "diagonal" });
-		return map.getSVG({
+function getLib() {
+	if (!_lib) {
+		_lib = new DottedMapLib({ height: 80, grid: "diagonal" });
+	}
+	return _lib;
+}
+
+function getMapSvg(dark: boolean): string {
+	if (dark) {
+		if (!_svgDark) {
+			_svgDark = getLib().getSVG({
+				radius: 0.22,
+				color: "#ffffff15",
+				shape: "circle",
+				backgroundColor: "transparent",
+			});
+		}
+		return _svgDark;
+	}
+	if (!_svgLight) {
+		_svgLight = getLib().getSVG({
 			radius: 0.22,
-			color: dotColor,
+			color: "#00000018",
 			shape: "circle",
 			backgroundColor: "transparent",
 		});
-	}, [dotColor]);
+	}
+	return _svgLight;
+}
+
+export default function DottedMap({ markers = [] }: DottedMapProps) {
+	const [activeIndex, setActiveIndex] = useState<number | null>(null);
+	const { resolvedTheme } = useTheme();
+
+	const isDark = resolvedTheme !== "light";
+	const svgMap = getMapSvg(isDark);
+	const markerColor = isDark ? "#ffffff" : "#000000";
 
 	const projectPoint = (lat: number, lng: number) => ({
 		x: (lng + 180) * (800 / 360),
@@ -132,7 +160,7 @@ export default function DottedMap({
 					<div
 						className={cn(
 							"pointer-events-none absolute z-20 w-52 border border-border bg-card px-4 py-3",
-							"shadow-[0_0_0_1px_rgba(255,255,255,0.04)]",
+							"shadow-[0_0_0_1px_rgba(128,128,128,0.08)]",
 						)}
 						style={{
 							left: `${Math.max(13, Math.min(87, tipLeft))}%`,

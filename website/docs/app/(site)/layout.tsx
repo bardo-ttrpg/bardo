@@ -1,9 +1,19 @@
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import SpinningText from "@/components/magicui/spinning-text";
+import OptionalClerkProvider from "@/components/optional-clerk-provider";
+import ThemeToggle from "@/components/theme-toggle";
+import { isClerkAuthConfigured } from "@/lib/clerk-config";
+
+const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
+	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+	secretKey: process.env.CLERK_SECRET_KEY,
+	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
+});
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
-	const content = (
+	const body = (
 		<div className="min-h-screen text-foreground">
 			{/* ── Header ── */}
 			<header className="sticky top-0 z-50 border-b border-border bg-background">
@@ -37,23 +47,57 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						>
 							Pricing
 						</Link>
-					</nav>
-
-					<div className="flex items-center gap-4">
 						<Link
-							href="/sign-in"
+							href="/legal"
 							prefetch={false}
 							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
 						>
-							Log in
+							Legal
 						</Link>
-						<Link
-							href="/sign-up"
-							prefetch={false}
-							className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-						>
-							Sign up ↗
-						</Link>
+					</nav>
+
+					<div className="flex items-center gap-3">
+						{IS_CLERK_CONFIGURED ? (
+							<>
+								<SignedOut>
+									<Link
+										href="/sign-in"
+										prefetch={false}
+										className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+									>
+										Log in
+									</Link>
+									<Link
+										href="/sign-up"
+										prefetch={false}
+										className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+									>
+										Sign up ↗
+									</Link>
+								</SignedOut>
+								<SignedIn>
+									<UserButton afterSignOutUrl="/" />
+								</SignedIn>
+							</>
+						) : (
+							<>
+								<Link
+									href="/sign-in"
+									prefetch={false}
+									className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+								>
+									Log in
+								</Link>
+								<Link
+									href="/sign-up"
+									prefetch={false}
+									className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+								>
+									Sign up ↗
+								</Link>
+							</>
+						)}
+						<ThemeToggle />
 					</div>
 				</div>
 			</header>
@@ -75,6 +119,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 									{ label: "Docs", href: "/mpc-docs" },
 									{ label: "Dashboard", href: "/dashboard" },
 									{ label: "Pricing", href: "/pricing" },
+									{ label: "Legal", href: "/legal" },
 									{ label: "Sign up", href: "/sign-up" },
 								].map(({ label, href }) => (
 									<li key={label}>
@@ -147,21 +192,32 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						<span className="font-mono text-[11px] text-muted-foreground">
 							© {new Date().getFullYear()} Bardo — MCP-driven TTRPG operations
 						</span>
-						<div style={{ fontSize: "20px" }}>
-							<SpinningText
-								radius={5}
-								fontSize={0.85}
-								duration={20}
-								className="text-white/80"
-							>
-								{"MCP · TTRPG · MARKDOWN · WORLDS · SESSION · STATE · "}
-							</SpinningText>
-						</div>
+						<span className="font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/70">
+							MCP · TTRPG · MARKDOWN · WORLDS · SESSION · STATE
+						</span>
 					</div>
 				</div>
 			</footer>
 		</div>
 	);
 
-	return content;
+	const themedBody = (
+		<ThemeProvider
+			attribute="class"
+			defaultTheme="dark"
+			themes={["dark", "light"]}
+			disableTransitionOnChange
+		>
+			{body}
+		</ThemeProvider>
+	);
+
+	if (!IS_CLERK_CONFIGURED) {
+		return themedBody;
+	}
+	return (
+		<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
+			{themedBody}
+		</OptionalClerkProvider>
+	);
 }
