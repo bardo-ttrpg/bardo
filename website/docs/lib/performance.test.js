@@ -8,6 +8,9 @@ describe("shouldEnableAmbientEffects", () => {
 				prefersReducedMotion: true,
 				saveData: false,
 				viewportWidth: 1440,
+				hardwareConcurrency: 8,
+				deviceMemory: 8,
+				isHeadlessBrowser: false,
 			}),
 		).toBe(false);
 	});
@@ -18,6 +21,9 @@ describe("shouldEnableAmbientEffects", () => {
 				prefersReducedMotion: false,
 				saveData: true,
 				viewportWidth: 1440,
+				hardwareConcurrency: 8,
+				deviceMemory: 8,
+				isHeadlessBrowser: false,
 			}),
 		).toBe(false);
 		expect(
@@ -25,16 +31,55 @@ describe("shouldEnableAmbientEffects", () => {
 				prefersReducedMotion: false,
 				saveData: false,
 				viewportWidth: 640,
+				hardwareConcurrency: 8,
+				deviceMemory: 8,
+				isHeadlessBrowser: false,
 			}),
 		).toBe(false);
 	});
 
-	test("enables ambient effects when motion is allowed, no save-data, and viewport is wide", () => {
+	test("disables ambient effects on low-end or headless environments", () => {
+		expect(
+			shouldEnableAmbientEffects({
+				prefersReducedMotion: false,
+				saveData: false,
+				viewportWidth: 1440,
+				hardwareConcurrency: 4,
+				deviceMemory: 8,
+				isHeadlessBrowser: false,
+			}),
+		).toBe(false);
+		expect(
+			shouldEnableAmbientEffects({
+				prefersReducedMotion: false,
+				saveData: false,
+				viewportWidth: 1440,
+				hardwareConcurrency: 8,
+				deviceMemory: 4,
+				isHeadlessBrowser: false,
+			}),
+		).toBe(false);
+		expect(
+			shouldEnableAmbientEffects({
+				prefersReducedMotion: false,
+				saveData: false,
+				viewportWidth: 1440,
+				hardwareConcurrency: 8,
+				deviceMemory: 8,
+				isHeadlessBrowser: true,
+			}),
+		).toBe(false);
+	});
+
+	test("enables ambient effects when motion is allowed and device budget is sufficient", () => {
 		expect(
 			shouldEnableAmbientEffects({
 				prefersReducedMotion: false,
 				saveData: false,
 				viewportWidth: 1024,
+				hardwareConcurrency: 8,
+				deviceMemory: 8,
+				isHeadlessBrowser: false,
 			}),
 		).toBe(true);
 	});

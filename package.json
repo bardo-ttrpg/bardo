@@ -15,12 +15,14 @@
 		"check": "turbo run check",
 		"biome:check": "biome check .",
 		"biome:write": "biome check --write .",
+		"profile:routes": "bash scripts/agent-browser-route-profile.sh",
 		"dev:website": "turbo run dev --filter=website",
 		"dev:docs": "turbo run dev --filter=website",
 		"dev:mcp": "turbo run dev --filter=mcp"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.1",
+		"agent-browser": "^0.12.0",
 		"turbo": "^2.5.8",
 		"typescript": "^5.7.3"
 	}

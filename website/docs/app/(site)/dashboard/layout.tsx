@@ -1,22 +1,17 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 import ConvexClientProvider from "@/components/convex-provider";
-import { isClerkPublishableKeyConfigured } from "@/lib/clerk-config";
+import { isClerkAuthConfigured } from "@/lib/clerk-config";
 
-const IS_CLERK_CONFIGURED = isClerkPublishableKeyConfigured(
-	process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-);
+const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
+	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+	secretKey: process.env.CLERK_SECRET_KEY,
+	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
+});
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-	const content = (
+	return (
 		<ConvexClientProvider useClerk={IS_CLERK_CONFIGURED}>
 			{children}
 		</ConvexClientProvider>
 	);
-
-	if (!IS_CLERK_CONFIGURED) {
-		return content;
-	}
-
-	return <ClerkProvider>{content}</ClerkProvider>;
 }

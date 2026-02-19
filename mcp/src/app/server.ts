@@ -10,6 +10,7 @@ import {
 } from "./middleware/request-guards";
 import { handleHealthRequest } from "./routes/health";
 import { handleMcpRequest } from "./routes/mcp";
+import { handleResolveTurnRequest } from "./routes/turns-orchestrator";
 
 type ServerOptions = {
 	port?: number;
@@ -35,12 +36,14 @@ export function createHttpServer({
 		idleTimeout: 0,
 		async fetch(request, bunServer) {
 			const url = new URL(request.url);
+			const isMcpRoute = url.pathname === "/mcp";
+			const isTurnsApiRoute = url.pathname === "/api/v1/turns/resolve";
 
 			if (url.pathname === "/health") {
 				return handleHealthRequest();
 			}
 
-			if (url.pathname !== "/mcp") {
+			if (!isMcpRoute && !isTurnsApiRoute) {
 				return withCors(new Response("Not Found", { status: 404 }));
 			}
 
@@ -87,7 +90,22 @@ export function createHttpServer({
 					);
 				}
 
-				return await handleMcpRequest(request, auth, sessionStore);
+				if (isMcpRoute) {
+					return await handleMcpRequest(request, auth, sessionStore);
+				}
+
+				if (request.method !== "POST") {
+					return withCors(
+						new Response("Method Not Allowed", {
+							status: 405,
+							headers: {
+								allow: "POST, OPTIONS",
+							},
+						}),
+					);
+				}
+
+				return await handleResolveTurnRequest(request, auth);
 			} catch (error) {
 				console.error("Unhandled /mcp error:", error);
 				return jsonRpcError(500, -32603, "Internal server error");

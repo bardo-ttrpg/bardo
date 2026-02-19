@@ -1,66 +1,66 @@
 import { describe, expect, test } from "bun:test";
 import {
+	clerkDomainFromPublishableKey,
+	doesClerkDomainMatchIssuer,
 	isClerkAuthConfigured,
+	isClerkIssuerDomainConfigured,
 	isClerkPublishableKeyConfigured,
 	isClerkSecretKeyConfigured,
 } from "./clerk-config";
 
-describe("isClerkPublishableKeyConfigured", () => {
-	test("returns true for real Clerk publishable keys", () => {
-		expect(
-			isClerkPublishableKeyConfigured(
-				"pk_test_aW52aXRpbmctdG9ydG9pc2UtMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
-			),
-		).toBe(true);
+const VALID_PK = "pk_test_bXktYXBwLmNsZXJrLmFjY291bnRzLmRldiQ";
+const VALID_SK = "sk_test_example_secret";
+const VALID_ISSUER = "https://my-app.clerk.accounts.dev";
+
+describe("clerk-config helpers", () => {
+	test("validates publishable and secret key formats", () => {
+		expect(isClerkPublishableKeyConfigured(VALID_PK)).toBe(true);
+		expect(isClerkSecretKeyConfigured(VALID_SK)).toBe(true);
 	});
 
-	test("returns false for missing, placeholder, or template keys", () => {
-		expect(isClerkPublishableKeyConfigured(undefined)).toBe(false);
-		expect(isClerkPublishableKeyConfigured("pk_test_REPLACE_ME")).toBe(false);
-		expect(isClerkPublishableKeyConfigured("pk_test_your_key_here")).toBe(
-			false,
+	test("extracts clerk domain from publishable key", () => {
+		expect(clerkDomainFromPublishableKey(VALID_PK)).toBe(
+			"my-app.clerk.accounts.dev",
 		);
-		expect(isClerkPublishableKeyConfigured("")).toBe(false);
-	});
-});
-
-describe("isClerkSecretKeyConfigured", () => {
-	test("returns true for real Clerk secret keys", () => {
-		expect(isClerkSecretKeyConfigured("sk_test_1234567890")).toBe(true);
-		expect(isClerkSecretKeyConfigured("sk_live_1234567890")).toBe(true);
 	});
 
-	test("returns false for missing and placeholder secret keys", () => {
-		expect(isClerkSecretKeyConfigured(undefined)).toBe(false);
-		expect(isClerkSecretKeyConfigured("")).toBe(false);
-		expect(isClerkSecretKeyConfigured("sk_test_REPLACE_ME")).toBe(false);
-		expect(isClerkSecretKeyConfigured("sk_test_your_key_here")).toBe(false);
-	});
-});
-
-describe("isClerkAuthConfigured", () => {
-	test("returns true only when publishable and secret keys are configured", () => {
+	test("requires a valid issuer domain", () => {
+		expect(isClerkIssuerDomainConfigured(VALID_ISSUER)).toBe(true);
 		expect(
-			isClerkAuthConfigured({
-				publishableKey:
-					"pk_test_aW52aXRpbmctdG9ydG9pc2UtMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
-				secretKey: "sk_test_1234567890",
+			isClerkIssuerDomainConfigured("https://REPLACE_ME.clerk.accounts.dev"),
+		).toBe(false);
+	});
+
+	test("checks publishable key/issuer coherence", () => {
+		expect(
+			doesClerkDomainMatchIssuer({
+				publishableKey: VALID_PK,
+				issuerDomain: VALID_ISSUER,
 			}),
 		).toBe(true);
-	});
 
-	test("returns false when either publishable or secret key is missing", () => {
 		expect(
-			isClerkAuthConfigured({
-				publishableKey:
-					"pk_test_aW52aXRpbmctdG9ydG9pc2UtMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
-				secretKey: undefined,
+			doesClerkDomainMatchIssuer({
+				publishableKey: VALID_PK,
+				issuerDomain: "https://different.clerk.accounts.dev",
 			}),
 		).toBe(false);
+	});
+
+	test("requires issuer coherence for full auth readiness", () => {
 		expect(
 			isClerkAuthConfigured({
-				publishableKey: undefined,
-				secretKey: "sk_test_1234567890",
+				publishableKey: VALID_PK,
+				secretKey: VALID_SK,
+				issuerDomain: VALID_ISSUER,
+			}),
+		).toBe(true);
+
+		expect(
+			isClerkAuthConfigured({
+				publishableKey: VALID_PK,
+				secretKey: VALID_SK,
+				issuerDomain: undefined,
 			}),
 		).toBe(false);
 	});

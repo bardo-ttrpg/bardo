@@ -1,9 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
-/* ── Crosshair marker ── */
 function X({ className = "" }: { className?: string }) {
 	return (
 		<span
@@ -14,6 +10,8 @@ function X({ className = "" }: { className?: string }) {
 		</span>
 	);
 }
+
+export type BillingPeriod = "monthly" | "yearly";
 
 const tiers = [
 	{
@@ -27,7 +25,7 @@ const tiers = [
 		features: [
 			"1 active campaign",
 			"100 MCP calls / month",
-			"All core MCP tools",
+			"Core MCP tools",
 			"Markdown-first storage",
 			"Community support",
 		],
@@ -42,11 +40,10 @@ const tiers = [
 		ctaHref: "/sign-up",
 		features: [
 			"Unlimited campaigns",
-			"1 000 MCP calls / month",
-			"All core MCP tools",
-			"Markdown-first storage",
+			"1,000 MCP calls / month",
+			"Core MCP tools",
 			"Priority support",
-			"Early access to new tools",
+			"Early tool access",
 		],
 	},
 	{
@@ -59,9 +56,8 @@ const tiers = [
 		ctaHref: "/sign-up",
 		features: [
 			"Unlimited campaigns",
-			"10 000 MCP calls / month",
-			"All core MCP tools",
-			"Markdown-first storage",
+			"10,000 MCP calls / month",
+			"Core MCP tools",
 			"Team access",
 			"SLA support",
 			"API access",
@@ -69,21 +65,20 @@ const tiers = [
 	},
 ] as const;
 
-export default function PricingToggle() {
-	const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
-		"monthly",
-	);
+export default function PricingToggle({
+	billingPeriod,
+}: {
+	billingPeriod: BillingPeriod;
+}) {
 	const yearly = billingPeriod === "yearly";
 
 	return (
 		<>
-			{/* Toggle */}
 			<div className="mb-12 flex items-center justify-center">
-				<div className="inline-flex border border-border bg-background p-1">
-					<button
-						type="button"
-						aria-pressed={!yearly}
-						onClick={() => setBillingPeriod("monthly")}
+				<div className="inline-flex items-center border border-border p-1">
+					<Link
+						href="/pricing?billing=monthly"
+						aria-current={!yearly ? "page" : undefined}
 						className={[
 							"px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
 							!yearly
@@ -92,28 +87,26 @@ export default function PricingToggle() {
 						].join(" ")}
 					>
 						Monthly
-					</button>
-					<button
-						type="button"
-						aria-pressed={yearly}
-						onClick={() => setBillingPeriod("yearly")}
+					</Link>
+					<Link
+						href="/pricing?billing=yearly"
+						aria-current={yearly ? "page" : undefined}
 						className={[
-							"ml-1 flex items-center gap-2 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
+							"ml-1 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
 							yearly
 								? "bg-foreground text-background"
 								: "text-muted-foreground hover:text-foreground",
 						].join(" ")}
 					>
 						Yearly
-						<span className="border border-green-400/40 px-1.5 py-0.5 font-mono text-[9px] text-green-400/80">
-							Save up to 31%
-						</span>
-					</button>
+					</Link>
+					<span className="ml-2 border border-green-400/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-green-400/80">
+						Save up to 31%
+					</span>
 				</div>
 			</div>
 
-			{/* Cards */}
-			<div className="relative grid grid-cols-1 gap-0 sm:grid-cols-3">
+			<div className="relative grid grid-cols-1 sm:grid-cols-3">
 				{tiers.map((tier, i) => {
 					const price = yearly ? tier.yearly : tier.monthly;
 					const perLabel = yearly ? "/ yr" : "/ mo";
@@ -160,12 +153,14 @@ export default function PricingToggle() {
 							</p>
 
 							<ul className="mb-8 space-y-2.5">
-								{tier.features.map((f) => (
-									<li key={f} className="flex items-start gap-2.5">
+								{tier.features.map((feature) => (
+									<li key={feature} className="flex items-start gap-2.5">
 										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-green-400/70">
 											✓
 										</span>
-										<span className="text-sm text-muted-foreground">{f}</span>
+										<span className="text-sm text-muted-foreground">
+											{feature}
+										</span>
 									</li>
 								))}
 							</ul>
