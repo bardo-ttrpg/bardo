@@ -1,5 +1,4 @@
 import {
-	ClerkProvider,
 	SignedIn,
 	SignedOut,
 	SignInButton,
@@ -9,13 +8,14 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import SpinningText from "@/components/magicui/spinning-text";
+import { isClerkPublishableKeyConfigured } from "@/lib/clerk-config";
 
 export const dynamic = "force-dynamic";
 
-const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 /** Only use Clerk when a real (non-placeholder) key is configured */
-const IS_CLERK_CONFIGURED =
-	CLERK_KEY.startsWith("pk_") && !CLERK_KEY.includes("_your_");
+const IS_CLERK_CONFIGURED = isClerkPublishableKeyConfigured(
+	process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+);
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const content = (
@@ -202,9 +202,5 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 		</div>
 	);
 
-	return IS_CLERK_CONFIGURED ? (
-		<ClerkProvider>{content}</ClerkProvider>
-	) : (
-		content
-	);
+	return content;
 }
