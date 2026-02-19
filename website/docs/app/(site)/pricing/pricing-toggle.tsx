@@ -70,51 +70,46 @@ const tiers = [
 ] as const;
 
 export default function PricingToggle() {
-	const [yearly, setYearly] = useState(false);
+	const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
+		"monthly",
+	);
+	const yearly = billingPeriod === "yearly";
 
 	return (
 		<>
 			{/* Toggle */}
-			<div className="mb-12 flex items-center justify-center gap-3">
-				<button
-					type="button"
-					onClick={() => setYearly(false)}
-					className={`font-mono text-[11px] uppercase tracking-widest transition-colors ${
-						!yearly
-							? "text-foreground"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					Monthly
-				</button>
-				<button
-					type="button"
-					onClick={() => setYearly((v) => !v)}
-					aria-label="Toggle billing period"
-					className={`relative h-5 w-9 border border-border transition-colors ${
-						yearly ? "bg-foreground/10" : ""
-					}`}
-				>
-					<span
-						className={`absolute top-0.5 h-4 w-4 border border-border bg-foreground transition-transform ${
-							yearly ? "translate-x-4" : "translate-x-0"
-						}`}
-					/>
-				</button>
-				<button
-					type="button"
-					onClick={() => setYearly(true)}
-					className={`flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest transition-colors ${
-						yearly
-							? "text-foreground"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					Yearly
-					<span className="border border-green-400/40 px-1.5 py-0.5 font-mono text-[9px] text-green-400/80">
-						Save 30%
-					</span>
-				</button>
+			<div className="mb-12 flex items-center justify-center">
+				<div className="inline-flex border border-border bg-background p-1">
+					<button
+						type="button"
+						aria-pressed={!yearly}
+						onClick={() => setBillingPeriod("monthly")}
+						className={[
+							"px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
+							!yearly
+								? "bg-foreground text-background"
+								: "text-muted-foreground hover:text-foreground",
+						].join(" ")}
+					>
+						Monthly
+					</button>
+					<button
+						type="button"
+						aria-pressed={yearly}
+						onClick={() => setBillingPeriod("yearly")}
+						className={[
+							"ml-1 flex items-center gap-2 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
+							yearly
+								? "bg-foreground text-background"
+								: "text-muted-foreground hover:text-foreground",
+						].join(" ")}
+					>
+						Yearly
+						<span className="border border-green-400/40 px-1.5 py-0.5 font-mono text-[9px] text-green-400/80">
+							Save up to 31%
+						</span>
+					</button>
+				</div>
 			</div>
 
 			{/* Cards */}

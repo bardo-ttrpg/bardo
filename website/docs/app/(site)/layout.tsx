@@ -1,21 +1,6 @@
-import {
-	SignedIn,
-	SignedOut,
-	SignInButton,
-	SignUpButton,
-	UserButton,
-} from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import SpinningText from "@/components/magicui/spinning-text";
-import { isClerkPublishableKeyConfigured } from "@/lib/clerk-config";
-
-export const dynamic = "force-dynamic";
-
-/** Only use Clerk when a real (non-placeholder) key is configured */
-const IS_CLERK_CONFIGURED = isClerkPublishableKeyConfigured(
-	process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-);
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const content = (
@@ -33,6 +18,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 					<nav className="hidden items-center gap-7 sm:flex">
 						<Link
 							href="/mpc-docs"
+							prefetch={false}
 							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
 						>
 							Docs
@@ -44,55 +30,30 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						>
 							Dashboard
 						</Link>
+						<Link
+							href="/pricing"
+							prefetch={false}
+							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+						>
+							Pricing
+						</Link>
 					</nav>
 
 					<div className="flex items-center gap-4">
-						{IS_CLERK_CONFIGURED ? (
-							<>
-								<SignedOut>
-									<SignInButton
-										mode="redirect"
-										fallbackRedirectUrl="/dashboard"
-									>
-										<button
-											type="button"
-											className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-										>
-											Log in
-										</button>
-									</SignInButton>
-									<SignUpButton
-										mode="redirect"
-										fallbackRedirectUrl="/dashboard"
-									>
-										<button
-											type="button"
-											className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-										>
-											Sign up ↗
-										</button>
-									</SignUpButton>
-								</SignedOut>
-								<SignedIn>
-									<UserButton afterSignOutUrl="/" />
-								</SignedIn>
-							</>
-						) : (
-							<>
-								<Link
-									href="/sign-in"
-									className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-								>
-									Log in
-								</Link>
-								<Link
-									href="/sign-up"
-									className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-								>
-									Sign up ↗
-								</Link>
-							</>
-						)}
+						<Link
+							href="/sign-in"
+							prefetch={false}
+							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+						>
+							Log in
+						</Link>
+						<Link
+							href="/sign-up"
+							prefetch={false}
+							className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+						>
+							Sign up ↗
+						</Link>
 					</div>
 				</div>
 			</header>

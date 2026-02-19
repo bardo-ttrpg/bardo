@@ -1,10 +1,7 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import AmbientParticles from "@/components/ambient-particles";
-import ConvexClientProvider from "@/components/convex-provider";
-import { isClerkPublishableKeyConfigured } from "@/lib/clerk-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,18 +21,6 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-	const isClerkConfigured = isClerkPublishableKeyConfigured(
-		process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-	);
-	const app = (
-		<ConvexClientProvider useClerk={isClerkConfigured}>
-			{/* Deferred ambient particles for lower first-load cost */}
-			<AmbientParticles />
-			{/* All site content — z-1 above particles, transparent so particles show through */}
-			<div className="relative z-[1]">{children}</div>
-		</ConvexClientProvider>
-	);
-
 	return (
 		<html
 			lang="en"
@@ -43,7 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 			className={`${geistSans.variable} ${geistMono.variable}`}
 		>
 			<body className="font-sans">
-				{isClerkConfigured ? <ClerkProvider>{app}</ClerkProvider> : app}
+				{/* Deferred ambient particles for lower first-load cost */}
+				<AmbientParticles />
+				{/* All site content — z-1 above particles, transparent so particles show through */}
+				<div className="relative z-[1]">{children}</div>
 			</body>
 		</html>
 	);
