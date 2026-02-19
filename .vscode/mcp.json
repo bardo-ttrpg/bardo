@@ -1,8 +1,8 @@
 {
-  "servers": {
-    "bardo": {
-      "type": "http",
-      "url": "http://localhost:3000/mcp"
-    }
-  }
+	"servers": {
+		"bardo": {
+			"type": "http",
+			"url": "http://localhost:3000/mcp"
+		}
+	}
 }

@@ -1,0 +1,26 @@
+---
+title: Getting Started
+description: Connect Bardo to your agent and run your first campaign loop.
+---
+
+# Getting Started
+
+## 1. Connect your MCP client
+
+Use any MCP-capable AI client and connect it to your running Bardo MCP server endpoint.
+
+## 2. Prepare a local workspace
+
+Initialize a campaign workspace with the expected subdirectories and markdown files.
+
+## 3. Run the setup loop
+
+Call `init` first, then use `player_action` for gameplay turns.
+
+## 4. Keep canon synced
+
+When narration introduces proper names, call `world_sync` so new entities are persisted before reuse.
+
+## 5. Use direct controls when needed
+
+Use `markdown_read`, `markdown_upsert`, `state_get`, and `state_set` for advanced state management.

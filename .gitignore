@@ -1,5 +1,6 @@
 # dependencies (bun install)
 node_modules
+**/node_modules
 package-lock.json
 pnpm-lock.yaml
 
@@ -7,6 +8,10 @@ pnpm-lock.yaml
 out
 dist
 *.tgz
+website/docs/.next
+.turbo
+**/.next
+**/.turbo
 
 # code coverage
 coverage

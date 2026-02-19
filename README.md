@@ -1,15 +1,50 @@
-# bardo
+# bardo monorepo
 
-To install dependencies:
+This repository is organized as a Turborepo workspace with two packages:
+
+- `website/docs`: Next.js website package (Turbopack dev server on port `3001`)
+- `mcp`: Bun-based Bardo MCP server (port `3000`)
+
+## Install
 
 ```bash
 bun install
 ```
 
-To run:
+## Development
+
+Run both packages:
 
 ```bash
-bun run index.ts
+bun run dev
 ```
 
-This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Run MCP only:
+
+```bash
+bun run dev:mcp
+```
+
+Run website only:
+
+```bash
+bun run dev:website
+```
+
+## Website auth setup (Clerk)
+
+Copy `website/docs/.env.example` values into your local env and set real Clerk keys:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+CLERK_SECRET_KEY=...
+```
+
+## Quality checks
+
+```bash
+bun run lint
+bun run typecheck
+bun run check
+bun run biome:check
+```
