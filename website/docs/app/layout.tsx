@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
-import ConvexClientProvider from "@/components/convex-provider";
-import Particles from "@/components/magicui/particles";
+import AmbientParticles from "@/components/ambient-particles";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,19 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 			className={`${geistSans.variable} ${geistMono.variable}`}
 		>
 			<body className="font-sans">
-				<ConvexClientProvider>
-					{/* Fixed ambient particles — z-0 in root stacking context */}
-					<Particles
-						className="fixed inset-0 z-0 pointer-events-none"
-						quantity={100}
-						staticity={40}
-						ease={60}
-						size={0.3}
-						color="#ffffff"
-					/>
-					{/* All site content — z-1 above particles, transparent so particles show through */}
-					<div className="relative z-[1]">{children}</div>
-				</ConvexClientProvider>
+				{/* Deferred ambient particles for lower first-load cost */}
+				<AmbientParticles />
+				{/* All site content — z-1 above particles, transparent so particles show through */}
+				<div className="relative z-[1]">{children}</div>
 			</body>
 		</html>
 	);

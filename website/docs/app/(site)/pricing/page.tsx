@@ -56,7 +56,7 @@ export default function PricingPage() {
 			</section>
 
 			{/* ── FAQ ── */}
-			<section className="relative border border-border">
+			<section className="relative border border-border [contain-intrinsic-size:600px] [content-visibility:auto]">
 				<X className="-left-[5px] -top-[8px]" />
 				<X className="-right-[5px] -top-[8px]" />
 				<X className="-bottom-[8px] -left-[5px]" />

@@ -8,13 +8,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import LazyDottedMap from "@/components/lazy-dotted-map";
+import LazyFileTree from "@/components/lazy-file-tree";
+import LazyHeroVideoDialog from "@/components/lazy-hero-video-dialog";
+import LazyNumberTicker from "@/components/lazy-number-ticker";
 import LazyTerminal from "@/components/lazy-terminal";
+import LazyTextReveal from "@/components/lazy-text-reveal";
 import type { MapMarker } from "@/components/magicui/dotted-map";
 import type { FileTreeRoot } from "@/components/magicui/file-tree";
-import { FileTree } from "@/components/magicui/file-tree";
-import HeroVideoDialog from "@/components/magicui/hero-video-dialog";
-import NumberTicker from "@/components/magicui/number-ticker";
-import { TextReveal } from "@/components/magicui/text-reveal";
 
 /* ── Crosshair marker — text-base, offsets tuned for 16 px font ── */
 function X({ className = "" }: { className?: string }) {
@@ -380,7 +380,7 @@ export default function LandingPage() {
 						{/* MCP tools — col 0, row 0 */}
 						<div className="border-b border-r border-border px-6 py-8 sm:border-b-0 sm:px-8">
 							<p className="mb-1 font-mono text-3xl font-bold text-foreground">
-								<NumberTicker value={7} />
+								<LazyNumberTicker value={7} />
 							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								MCP tools
@@ -389,7 +389,7 @@ export default function LandingPage() {
 						{/* State persistent — col 1, row 0 */}
 						<div className="border-b border-border px-6 py-8 sm:border-b-0 sm:border-r sm:px-8">
 							<p className="mb-1 font-mono text-3xl font-bold text-foreground">
-								<NumberTicker value={100} suffix="%" />
+								<LazyNumberTicker value={100} suffix="%" />
 							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								State persistent
@@ -407,7 +407,7 @@ export default function LandingPage() {
 						{/* Agents supported — col 1, row 1 (mobile) / col 3 sm */}
 						<div className="px-6 py-8 sm:px-8">
 							<p className="mb-1 font-mono text-3xl font-bold text-foreground">
-								<NumberTicker value={8} />
+								<LazyNumberTicker value={8} />
 							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								Agents supported
@@ -517,7 +517,7 @@ export default function LandingPage() {
 							<X className="-right-[5px] -top-[8px]" />
 							<X className="-bottom-[8px] -left-[5px]" />
 							<X className="-right-[5px] -bottom-[8px]" />
-							<FileTree
+							<LazyFileTree
 								root={bardoWorkspace}
 								defaultSelectedId="musashi"
 								className="h-full"
@@ -593,14 +593,14 @@ export default function LandingPage() {
 						</h2>
 					</div>
 					<div className="relative">
-						<HeroVideoDialog
+						<LazyHeroVideoDialog
 							className="block dark:hidden"
 							animationStyle="from-center"
 							videoSrc="https://www.youtube.com/embed/qh3NGpYRG3I?si=4rb-zSdDkVK9qxxb"
 							thumbnailSrc="https://startup-template-sage.vercel.app/hero-light.png"
 							thumbnailAlt="Bardo demo video"
 						/>
-						<HeroVideoDialog
+						<LazyHeroVideoDialog
 							className="hidden dark:block"
 							animationStyle="from-center"
 							videoSrc="https://www.youtube.com/embed/qh3NGpYRG3I?si=4rb-zSdDkVK9qxxb"
@@ -748,7 +748,7 @@ export default function LandingPage() {
 			════════════════════════════════════════ */}
 			<section className="border-y border-border">
 				<div className="mx-auto max-w-5xl">
-					<TextReveal
+					<LazyTextReveal
 						text="Bardo gives your AI agent the memory, the tools, and the discipline to run tabletop campaigns that persist across sessions, agents, and machines — without losing a single plot thread."
 						className="h-[160vh]"
 					/>

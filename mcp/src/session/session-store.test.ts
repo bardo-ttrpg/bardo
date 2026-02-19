@@ -39,4 +39,26 @@ describe("SessionStore", () => {
 		expect(store.get("s1", 1199)).toBeUndefined();
 		expect(store.get("s2", 1199)).toBeDefined();
 	});
+
+	test("sweepExpired only evicts entries that existed at sweep start", () => {
+		let store: SessionStore | null = null;
+		let inserted = false;
+		store = new SessionStore({
+			sessionTtlMs: 1000,
+			onEvictSession: () => {
+				if (!store) return;
+				if (inserted) return;
+				inserted = true;
+				// This entry is already expired, but it should not be processed
+				// until a subsequent sweep.
+				store.set("late", createSession(), -2000);
+			},
+		});
+
+		store.set("s1", createSession(), 0);
+		const removed = store.sweepExpired(2000);
+
+		expect(removed).toBe(1);
+		expect(store.sweepExpired(2000)).toBe(1);
+	});
 });
