@@ -60,7 +60,6 @@ export default function HeroVideoDialog({
 					alt={thumbnailAlt}
 					width={1600}
 					height={900}
-					unoptimized
 					className="h-auto w-full border border-border transition-all duration-200 group-hover:brightness-75"
 				/>
 				{/* Play button */}

@@ -1,17 +1,25 @@
 "use client";
 
-import { useInView } from "framer-motion";
-import { useRef } from "react";
-import BardoTerminal from "@/components/bardo-terminal";
+import dynamic from "next/dynamic";
+import { useOnceInView } from "./use-once-in-view";
+
+const BardoTerminal = dynamic(() => import("@/components/bardo-terminal"), {
+	ssr: false,
+});
 
 export default function LazyTerminal() {
-	const ref = useRef<HTMLDivElement>(null);
-	// Trigger once when the container is 80px into the viewport
-	const isInView = useInView(ref, { once: true, margin: "-80px" });
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("180px 0px");
 
 	return (
 		<div ref={ref} className="min-h-[520px]">
-			{isInView && <BardoTerminal />}
+			{isInView ? (
+				<BardoTerminal />
+			) : (
+				<div
+					className="h-[520px] w-full animate-pulse border border-border bg-muted/10"
+					aria-hidden
+				/>
+			)}
 		</div>
 	);
 }

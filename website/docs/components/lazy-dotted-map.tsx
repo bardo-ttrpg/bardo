@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { MapMarker } from "@/components/magicui/dotted-map";
+import { useOnceInView } from "./use-once-in-view";
 
 // next/dynamic with ssr:false must live in a Client Component
 const DottedMapInner = dynamic(
@@ -15,5 +16,18 @@ const DottedMapInner = dynamic(
 );
 
 export default function LazyDottedMap({ markers }: { markers?: MapMarker[] }) {
-	return <DottedMapInner markers={markers} />;
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("220px 0px");
+
+	return (
+		<div ref={ref} className="min-h-[320px]">
+			{isInView ? (
+				<DottedMapInner markers={markers} />
+			) : (
+				<div
+					className="h-[320px] w-full animate-pulse bg-muted/10"
+					aria-hidden
+				/>
+			)}
+		</div>
+	);
 }
