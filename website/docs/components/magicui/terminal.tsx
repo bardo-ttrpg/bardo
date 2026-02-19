@@ -1,8 +1,9 @@
 "use client";
 
+import { type MotionProps, motion } from "framer-motion";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { motion, type MotionProps } from "framer-motion";
-import React, { useEffect, useRef, useState } from "react";
 
 interface AnimatedSpanProps extends MotionProps {
 	children: React.ReactNode;

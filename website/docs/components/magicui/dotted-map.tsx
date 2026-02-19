@@ -1,8 +1,8 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import DottedMapLib from "dotted-map";
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export interface LocationInfo {
 	name: string;
@@ -45,12 +45,10 @@ export default function DottedMap({
 		y: (90 - lat) * (400 / 180),
 	});
 
-	const activeMarker =
-		activeIndex !== null ? markers[activeIndex] : undefined;
-	const activePos =
-		activeIndex !== null && markers[activeIndex]
-			? projectPoint(markers[activeIndex]!.lat, markers[activeIndex]!.lng)
-			: null;
+	const activeMarker = activeIndex !== null ? markers[activeIndex] : undefined;
+	const activePos = activeMarker
+		? projectPoint(activeMarker.lat, activeMarker.lng)
+		: null;
 
 	// Tooltip position as percentage within the 800×400 viewBox
 	const tipLeft = activePos ? (activePos.x / 800) * 100 : 50;
@@ -61,12 +59,9 @@ export default function DottedMap({
 	return (
 		/* Outer scroll wrapper for mobile */
 		<div className="overflow-x-auto">
-			<div
-				className="relative"
-				style={{ minWidth: 600 }}
-				onMouseLeave={() => setActiveIndex(null)}
-			>
+			<div className="relative" style={{ minWidth: 600 }}>
 				{/* Dotted background map */}
+				{/* biome-ignore lint/performance/noImgElement: data URI rendering for generated map SVG */}
 				<img
 					src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMap)}`}
 					className="h-full w-full select-none pointer-events-none [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)]"
@@ -78,21 +73,37 @@ export default function DottedMap({
 				<svg
 					viewBox="0 0 800 400"
 					className="absolute inset-0 h-full w-full select-none"
+					role="img"
+					aria-label="Interactive world map markers"
+					onMouseLeave={() => setActiveIndex(null)}
 				>
+					<title>Interactive world map markers</title>
 					{markers.map((marker, i) => {
 						const { x, y } = projectPoint(marker.lat, marker.lng);
 						const isActive = i === activeIndex;
+						const markerKey = `${marker.lat}:${marker.lng}:${marker.location?.name ?? "marker"}`;
 						return (
-							<g
-								key={i}
-								className="cursor-pointer"
-								onClick={() =>
-									setActiveIndex(isActive ? null : i)
-								}
-								onMouseEnter={() => setActiveIndex(i)}
-							>
-								{/* Invisible hit area */}
-								<circle cx={x} cy={y} r={14} fill="transparent" />
+							<g key={markerKey}>
+								{/* Invisible hit area / accessible trigger */}
+								{/* biome-ignore lint/a11y/useSemanticElements: SVG markers require circle interactions to preserve map geometry */}
+								<circle
+									cx={x}
+									cy={y}
+									r={14}
+									fill="transparent"
+									className="cursor-pointer"
+									role="button"
+									tabIndex={0}
+									aria-label={marker.location?.name ?? "Map marker"}
+									onClick={() => setActiveIndex(isActive ? null : i)}
+									onMouseEnter={() => setActiveIndex(i)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter" || event.key === " ") {
+											event.preventDefault();
+											setActiveIndex(isActive ? null : i);
+										}
+									}}
+								/>
 								{/* Outer glow */}
 								<circle
 									cx={x}

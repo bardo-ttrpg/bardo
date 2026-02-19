@@ -4,6 +4,10 @@ import {
 	AUTH_HEADER,
 	PROJECT_ROOT,
 } from "../../domain/config/constants";
+import {
+	SECURITY_POLICY,
+	type SecurityPolicy,
+} from "../../domain/config/security";
 import type { AuthContext, Session } from "../../types/contracts";
 import { corsHeaders } from "./cors";
 
@@ -23,8 +27,11 @@ function tryParseObject(raw: string): Record<string, unknown> | null {
 	}
 }
 
-function parseApiKeyMapFromEnv(): Map<string, string> {
-	const raw = Bun.env.BARDO_API_KEYS_JSON?.trim();
+export function parseApiKeyMapFromEnv(
+	env: Record<string, string | undefined> = Bun.env,
+	projectRoot = PROJECT_ROOT,
+): Map<string, string> {
+	const raw = env.BARDO_API_KEYS_JSON?.trim();
 	if (!raw) {
 		return new Map();
 	}
@@ -54,7 +61,7 @@ function parseApiKeyMapFromEnv(): Map<string, string> {
 		if (!key || typeof value !== "string" || !value.trim()) {
 			continue;
 		}
-		map.set(key, path.resolve(PROJECT_ROOT, value));
+		map.set(key, path.resolve(projectRoot, value));
 	}
 
 	return map;
@@ -73,7 +80,10 @@ function isLocalhostRequest(request: Request): boolean {
 	}
 }
 
-function resolveDefaultApiKeyContext(request: Request): AuthContext | null {
+function resolveDefaultApiKeyContext(
+	request: Request,
+	map: Map<string, string>,
+): AuthContext | null {
 	const defaultApiKey = Bun.env.BARDO_DEFAULT_API_KEY?.trim();
 	if (!defaultApiKey) {
 		return null;
@@ -85,10 +95,10 @@ function resolveDefaultApiKeyContext(request: Request): AuthContext | null {
 		return null;
 	}
 
-	const mappedPath = apiKeyMap.get(defaultApiKey);
+	const mappedPath = map.get(defaultApiKey);
 	if (!mappedPath) {
 		console.error(
-			`BARDO_DEFAULT_API_KEY is set but not found in BARDO_API_KEYS_JSON: ${defaultApiKey}`,
+			"BARDO_DEFAULT_API_KEY is set but not present in BARDO_API_KEYS_JSON.",
 		);
 		return null;
 	}
@@ -96,7 +106,10 @@ function resolveDefaultApiKeyContext(request: Request): AuthContext | null {
 	return { apiKey: defaultApiKey, campaignBasePath: mappedPath };
 }
 
-function readApiKey(request: Request): string | null {
+function readApiKey(
+	request: Request,
+	allowQueryApiKey: boolean,
+): string | null {
 	const keyFromHeader = request.headers.get(AUTH_HEADER)?.trim();
 	if (keyFromHeader) {
 		return keyFromHeader;
@@ -107,11 +120,13 @@ function readApiKey(request: Request): string | null {
 		return authHeader.slice(AUTH_BEARER_PREFIX.length).trim() || null;
 	}
 
-	const apiKeyFromQuery = new URL(request.url).searchParams
-		.get("apiKey")
-		?.trim();
-	if (apiKeyFromQuery) {
-		return apiKeyFromQuery;
+	if (allowQueryApiKey) {
+		const apiKeyFromQuery = new URL(request.url).searchParams
+			.get("apiKey")
+			?.trim();
+		if (apiKeyFromQuery) {
+			return apiKeyFromQuery;
+		}
 	}
 
 	return null;
@@ -127,68 +142,103 @@ function authError(status: number, message: string): Response {
 	});
 }
 
+function missingApiKeyMessage(allowQueryApiKey: boolean): string {
+	return allowQueryApiKey
+		? "Missing API key for new session. Send x-api-key, Authorization: Bearer <key>, or use /mcp?apiKey=<key>."
+		: "Missing API key for new session. Send x-api-key or Authorization: Bearer <key>.";
+}
+
+type AuthenticatorDeps = {
+	apiKeyMap: Map<string, string>;
+	policy: SecurityPolicy;
+	projectRoot: string;
+};
+
+export function createAuthenticator({
+	apiKeyMap,
+	policy,
+	projectRoot,
+}: AuthenticatorDeps) {
+	return function authenticateRequest(
+		request: Request,
+		sessions: Map<string, Session>,
+	): AuthContext | Response {
+		if (policy.authMode === "required" && apiKeyMap.size === 0) {
+			return authError(
+				503,
+				"Authentication is required but BARDO_API_KEYS_JSON is not configured.",
+			);
+		}
+
+		if (apiKeyMap.size === 0) {
+			return { apiKey: null, campaignBasePath: projectRoot };
+		}
+
+		const sessionId = request.headers.get("mcp-session-id");
+		const existingSession = sessionId ? sessions.get(sessionId) : undefined;
+		const apiKey = readApiKey(request, policy.allowQueryApiKey);
+
+		if (sessionId && !existingSession && !apiKey) {
+			return authError(404, "Session not found.");
+		}
+
+		if (existingSession) {
+			if (existingSession.apiKey === null) {
+				return authError(
+					403,
+					"Legacy unauthenticated session detected. Reconnect to create a new authenticated session.",
+				);
+			}
+
+			if (!apiKey) {
+				return {
+					apiKey: existingSession.apiKey,
+					campaignBasePath: existingSession.campaignBasePath,
+				};
+			}
+
+			const mappedPath = apiKeyMap.get(apiKey);
+			if (!mappedPath) {
+				return authError(403, "Invalid API key.");
+			}
+
+			if (
+				existingSession.apiKey !== apiKey ||
+				existingSession.campaignBasePath !== mappedPath
+			) {
+				return authError(403, "Session does not belong to this API key.");
+			}
+
+			return { apiKey, campaignBasePath: mappedPath };
+		}
+
+		if (!apiKey) {
+			const defaultContext = resolveDefaultApiKeyContext(request, apiKeyMap);
+			if (defaultContext) {
+				return defaultContext;
+			}
+
+			return authError(401, missingApiKeyMessage(policy.allowQueryApiKey));
+		}
+
+		const campaignBasePath = apiKeyMap.get(apiKey);
+		if (!campaignBasePath) {
+			return authError(403, "Invalid API key.");
+		}
+
+		return { apiKey, campaignBasePath };
+	};
+}
+
+const runtimeAuthenticator = createAuthenticator({
+	apiKeyMap,
+	policy: SECURITY_POLICY,
+	projectRoot: PROJECT_ROOT,
+});
+
 export function authenticateRequest(
 	request: Request,
 	sessions: Map<string, Session>,
 ): AuthContext | Response {
-	if (apiKeyMap.size === 0) {
-		return { apiKey: null, campaignBasePath: PROJECT_ROOT };
-	}
-
-	const sessionId = request.headers.get("mcp-session-id");
-	const existingSession = sessionId ? sessions.get(sessionId) : undefined;
-	const apiKey = readApiKey(request);
-
-	if (sessionId && !existingSession && !apiKey) {
-		return authError(404, "Session not found.");
-	}
-
-	if (existingSession) {
-		if (existingSession.apiKey === null) {
-			return authError(
-				403,
-				"Legacy unauthenticated session detected. Reconnect to create a new authenticated session.",
-			);
-		}
-
-		if (!apiKey) {
-			return {
-				apiKey: existingSession.apiKey,
-				campaignBasePath: existingSession.campaignBasePath,
-			};
-		}
-
-		const mappedPath = apiKeyMap.get(apiKey);
-		if (!mappedPath) {
-			return authError(403, "Invalid API key.");
-		}
-
-		if (
-			existingSession.apiKey !== apiKey ||
-			existingSession.campaignBasePath !== mappedPath
-		) {
-			return authError(403, "Session does not belong to this API key.");
-		}
-
-		return { apiKey, campaignBasePath: mappedPath };
-	}
-
-	if (!apiKey) {
-		const defaultContext = resolveDefaultApiKeyContext(request);
-		if (defaultContext) {
-			return defaultContext;
-		}
-
-		return authError(
-			401,
-			"Missing API key for new session. Send x-api-key, Authorization: Bearer <key>, or use /mcp?apiKey=<key>.",
-		);
-	}
-
-	const campaignBasePath = apiKeyMap.get(apiKey);
-	if (!campaignBasePath) {
-		return authError(403, "Invalid API key.");
-	}
-
-	return { apiKey, campaignBasePath };
+	return runtimeAuthenticator(request, sessions);
 }

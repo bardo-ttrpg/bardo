@@ -1,7 +1,12 @@
 "use client";
 
+import {
+	type MotionProps,
+	motion,
+	type Transition,
+	type Variants,
+} from "framer-motion";
 import { cn } from "@/lib/utils";
-import { motion, type MotionProps, type Transition, type Variants } from "framer-motion";
 
 interface SpinningTextProps extends MotionProps {
 	children: string;

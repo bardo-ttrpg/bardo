@@ -80,8 +80,12 @@ export default function PricingPage() {
 								.filter(Boolean)
 								.join(" ")}
 						>
-							<h3 className="mb-3 text-sm font-semibold text-foreground">{q}</h3>
-							<p className="text-sm leading-relaxed text-muted-foreground">{a}</p>
+							<h3 className="mb-3 text-sm font-semibold text-foreground">
+								{q}
+							</h3>
+							<p className="text-sm leading-relaxed text-muted-foreground">
+								{a}
+							</p>
 						</div>
 					))}
 				</div>

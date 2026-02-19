@@ -1,20 +1,20 @@
+import {
+	CheckSquare,
+	Database,
+	FileText,
+	Layers,
+	PlayCircle,
+	RefreshCw,
+} from "lucide-react";
 import Link from "next/link";
-import LazyTerminal from "@/components/lazy-terminal";
 import LazyDottedMap from "@/components/lazy-dotted-map";
+import LazyTerminal from "@/components/lazy-terminal";
+import type { MapMarker } from "@/components/magicui/dotted-map";
+import type { FileTreeRoot } from "@/components/magicui/file-tree";
+import { FileTree } from "@/components/magicui/file-tree";
 import HeroVideoDialog from "@/components/magicui/hero-video-dialog";
 import NumberTicker from "@/components/magicui/number-ticker";
 import { TextReveal } from "@/components/magicui/text-reveal";
-import { FileTree } from "@/components/magicui/file-tree";
-import type { MapMarker } from "@/components/magicui/dotted-map";
-import type { FileTreeRoot } from "@/components/magicui/file-tree";
-import {
-	Database,
-	Layers,
-	CheckSquare,
-	RefreshCw,
-	PlayCircle,
-	FileText,
-} from "lucide-react";
 
 /* ── Crosshair marker — text-base, offsets tuned for 16 px font ── */
 function X({ className = "" }: { className?: string }) {
@@ -85,54 +85,99 @@ const features = [
 ];
 
 const workflow = [
-	{ n: "01", text: "Install Bardo and connect it to your agent via MCP config" },
+	{
+		n: "01",
+		text: "Install Bardo and connect it to your agent via MCP config",
+	},
 	{ n: "02", text: "Run `bardo init` in your campaign workspace folder" },
-	{ n: "03", text: "Your agent reads world.md, state.md, and quests.md to load context" },
-	{ n: "04", text: "Play sessions that auto-persist state — resume anytime, forever" },
+	{
+		n: "03",
+		text: "Your agent reads world.md, state.md, and quests.md to load context",
+	},
+	{
+		n: "04",
+		text: "Play sessions that auto-persist state — resume anytime, forever",
+	},
 ];
 
 const bardoWorkspace: FileTreeRoot = {
 	name: "./the-iron-duchy/",
 	note: "← bardo init creates this",
 	children: [
-		{ id: "world", name: "world.md", type: "file", note: "master world document" },
-		{ id: "session", name: "session.md", type: "file", note: "current session state" },
 		{
-			id: "rules", name: "rules", type: "folder",
+			id: "world",
+			name: "world.md",
+			type: "file",
+			note: "master world document",
+		},
+		{
+			id: "session",
+			name: "session.md",
+			type: "file",
+			note: "current session state",
+		},
+		{
+			id: "rules",
+			name: "rules",
+			type: "folder",
 			children: [
-				{ id: "rules-system", name: "system.md", type: "file", note: "ruleset & house rules" },
+				{
+					id: "rules-system",
+					name: "system.md",
+					type: "file",
+					note: "ruleset & house rules",
+				},
 			],
 		},
 		{
-			id: "npcs", name: "npcs", type: "folder",
+			id: "npcs",
+			name: "npcs",
+			type: "folder",
 			children: [
 				{ id: "npc-halvar", name: "guard-captain-halvar.md", type: "file" },
 				{ id: "npc-iara", name: "merchant-iara.md", type: "file" },
 			],
 		},
 		{
-			id: "party", name: "party", type: "folder",
+			id: "party",
+			name: "party",
+			type: "folder",
 			children: [
-				{ id: "musashi", name: "Musashi.md", type: "file", highlight: true, note: "fighter 6 · STR +4" },
+				{
+					id: "musashi",
+					name: "Musashi.md",
+					type: "file",
+					highlight: true,
+					note: "fighter 6 · STR +4",
+				},
 				{ id: "zara", name: "Zara.md", type: "file" },
-				{ id: "party-state", name: "state.md", type: "file", note: "gold, conditions, relations" },
+				{
+					id: "party-state",
+					name: "state.md",
+					type: "file",
+					note: "gold, conditions, relations",
+				},
 			],
 		},
 		{
-			id: "items", name: "items", type: "folder",
-			children: [
-				{ id: "inventory", name: "inventory.md", type: "file" },
-			],
+			id: "items",
+			name: "items",
+			type: "folder",
+			children: [{ id: "inventory", name: "inventory.md", type: "file" }],
 		},
 		{
-			id: "locations", name: "locations", type: "folder",
+			id: "locations",
+			name: "locations",
+			type: "folder",
 			children: [
 				{ id: "loc-ironhaven", name: "ironhaven.md", type: "file" },
 				{ id: "loc-mine", name: "the-old-mine.md", type: "file" },
 			],
 		},
 		{
-			id: "quests", name: "quests", type: "folder",
+			id: "quests",
+			name: "quests",
+			type: "folder",
 			children: [
 				{ id: "quest-main", name: "main-quest.md", type: "file" },
 				{ id: "quest-side", name: "side-quests.md", type: "file" },
@@ -143,52 +188,124 @@ const bardoWorkspace: FileTreeRoot = {
 
 const worldMarkers: MapMarker[] = [
 	{
-		lat: 37.7, lng: -122.4,
-		location: { name: "The Ember Citadel", type: "Fantasy · City-State", description: "A volcanic fortress perched on an eternal caldera. Its Forge Masters craft living metal for the empire's armies." },
+		lat: 37.7,
+		lng: -122.4,
+		location: {
+			name: "The Ember Citadel",
+			type: "Fantasy · City-State",
+			description:
+				"A volcanic fortress perched on an eternal caldera. Its Forge Masters craft living metal for the empire's armies.",
+		},
 	},
 	{
-		lat: 51.5, lng: -0.1,
-		location: { name: "Misthollow", type: "Fantasy · Port City", description: "Perpetual fog shrouds this merchant city. Thieves' guilds and trading consortiums operate as one shadowed body." },
+		lat: 51.5,
+		lng: -0.1,
+		location: {
+			name: "Misthollow",
+			type: "Fantasy · Port City",
+			description:
+				"Perpetual fog shrouds this merchant city. Thieves' guilds and trading consortiums operate as one shadowed body.",
+		},
 	},
 	{
-		lat: 35.6, lng: 139.7,
-		location: { name: "Crystal Spire", type: "Sci-Fi · Megacity", description: "A towering techno-arcane metropolis where ancient ley-lines power quantum processors. Population: 40 million." },
+		lat: 35.6,
+		lng: 139.7,
+		location: {
+			name: "Crystal Spire",
+			type: "Sci-Fi · Megacity",
+			description:
+				"A towering techno-arcane metropolis where ancient ley-lines power quantum processors. Population: 40 million.",
+		},
 	},
 	{
-		lat: -33.8, lng: 151.2,
-		location: { name: "Sunken Harbor", type: "Fantasy · Coastal City", description: "Half this city lies beneath the waves. Merfolk diplomats and surface traders negotiate at the tide-line each dawn." },
+		lat: -33.8,
+		lng: 151.2,
+		location: {
+			name: "Sunken Harbor",
+			type: "Fantasy · Coastal City",
+			description:
+				"Half this city lies beneath the waves. Merfolk diplomats and surface traders negotiate at the tide-line each dawn.",
+		},
 	},
 	{
-		lat: 40.7, lng: -74.0,
-		location: { name: "Irongate", type: "Fantasy · Fortress City", description: "The last stronghold between the Withered Lands and civilization. Its three walls have never been breached." },
+		lat: 40.7,
+		lng: -74.0,
+		location: {
+			name: "Irongate",
+			type: "Fantasy · Fortress City",
+			description:
+				"The last stronghold between the Withered Lands and civilization. Its three walls have never been breached.",
+		},
 	},
 	{
-		lat: 52.5, lng: 13.4,
-		location: { name: "The Iron Archives", type: "Investigation · Library City", description: "Every secret ever written is stored here. The Archivist-Priests sell information — and silence — at steep prices." },
+		lat: 52.5,
+		lng: 13.4,
+		location: {
+			name: "The Iron Archives",
+			type: "Investigation · Library City",
+			description:
+				"Every secret ever written is stored here. The Archivist-Priests sell information — and silence — at steep prices.",
+		},
 	},
 	{
-		lat: 48.8, lng: 2.3,
-		location: { name: "Court of Veils", type: "Investigation · Intrigue", description: "A city of masked nobility and shifting allegiances. No one shows their true face. Assassination is an art form." },
+		lat: 48.8,
+		lng: 2.3,
+		location: {
+			name: "Court of Veils",
+			type: "Investigation · Intrigue",
+			description:
+				"A city of masked nobility and shifting allegiances. No one shows their true face. Assassination is an art form.",
+		},
 	},
 	{
-		lat: 19.4, lng: -99.1,
-		location: { name: "Temple of Echoes", type: "Fantasy · Ancient Ruin", description: "Built upon the bones of seven forgotten civilizations. The lowest level is still unexplored — nothing that descends returns the same." },
+		lat: 19.4,
+		lng: -99.1,
+		location: {
+			name: "Temple of Echoes",
+			type: "Fantasy · Ancient Ruin",
+			description:
+				"Built upon the bones of seven forgotten civilizations. The lowest level is still unexplored — nothing that descends returns the same.",
+		},
 	},
 	{
-		lat: -23.5, lng: -46.6,
-		location: { name: "Neon Sprawl", type: "Sci-Fi · Megacity", description: "A lawless corporate megacity where your augmentations determine your social class. The rain never stops here." },
+		lat: -23.5,
+		lng: -46.6,
+		location: {
+			name: "Neon Sprawl",
+			type: "Sci-Fi · Megacity",
+			description:
+				"A lawless corporate megacity where your augmentations determine your social class. The rain never stops here.",
+		},
 	},
 	{
-		lat: 55.7, lng: 37.6,
-		location: { name: "Frost Throne", type: "Fantasy · Empire Seat", description: "Capital of the Ice Dominion. The Frost Council has ruled for 400 years — by keeping everyone too cold to rebel." },
+		lat: 55.7,
+		lng: 37.6,
+		location: {
+			name: "Frost Throne",
+			type: "Fantasy · Empire Seat",
+			description:
+				"Capital of the Ice Dominion. The Frost Council has ruled for 400 years — by keeping everyone too cold to rebel.",
+		},
 	},
 	{
-		lat: 1.3, lng: 103.8,
-		location: { name: "Nexus Point", type: "Sci-Fi · Trade Hub", description: "Where the trade routes of three galactic empires intersect. Every species, every faction, every danger — all in one station." },
+		lat: 1.3,
+		lng: 103.8,
+		location: {
+			name: "Nexus Point",
+			type: "Sci-Fi · Trade Hub",
+			description:
+				"Where the trade routes of three galactic empires intersect. Every species, every faction, every danger — all in one station.",
+		},
 	},
 	{
-		lat: 28.6, lng: 77.2,
-		location: { name: "The Eternal Market", type: "Fantasy · Trade City", description: "A market that has never closed in recorded history. You can buy anything here — passage to another plane included." },
+		lat: 28.6,
+		lng: 77.2,
+		location: {
+			name: "The Eternal Market",
+			type: "Fantasy · Trade City",
+			description:
+				"A market that has never closed in recorded history. You can buy anything here — passage to another plane included.",
+		},
 	},
 ];
 
@@ -226,8 +343,8 @@ export default function LandingPage() {
 					<div className="py-10 md:pl-10">
 						<p className="mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
 							Bardo is an MCP toolbox that gives any AI agent a structured,
-							state-aware GM process for tabletop RPGs. Stop re-explaining
-							your world every session. Start building campaigns that persist.
+							state-aware GM process for tabletop RPGs. Stop re-explaining your
+							world every session. Start building campaigns that persist.
 						</p>
 						<div className="flex flex-wrap gap-3">
 							<Link
@@ -280,7 +397,9 @@ export default function LandingPage() {
 						</div>
 						{/* TTRPG systems — col 0, row 1 (mobile) / col 2 sm */}
 						<div className="border-r border-border px-6 py-8 sm:px-8">
-							<p className="mb-1 font-mono text-3xl font-bold text-foreground">∞</p>
+							<p className="mb-1 font-mono text-3xl font-bold text-foreground">
+								∞
+							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								TTRPG systems
 							</p>
@@ -326,7 +445,9 @@ export default function LandingPage() {
 										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground/40">
 											✕
 										</span>
-										<span className="text-sm text-muted-foreground">{item}</span>
+										<span className="text-sm text-muted-foreground">
+											{item}
+										</span>
 									</li>
 								))}
 							</ul>
@@ -367,10 +488,18 @@ export default function LandingPage() {
 								One command. Full campaign structure.
 							</h2>
 							<p className="mb-6 text-sm leading-relaxed text-muted-foreground">
-								Run <code className="border border-border px-1.5 py-0.5 font-mono text-xs text-foreground">bardo init</code> in any folder and Bardo creates the entire workspace scaffold — directories for NPCs, party members, locations, quests, items, and world lore. Everything in plain markdown.
+								Run{" "}
+								<code className="border border-border px-1.5 py-0.5 font-mono text-xs text-foreground">
+									bardo init
+								</code>{" "}
+								in any folder and Bardo creates the entire workspace scaffold —
+								directories for NPCs, party members, locations, quests, items,
+								and world lore. Everything in plain markdown.
 							</p>
 							<p className="mb-6 text-sm leading-relaxed text-muted-foreground">
-								Edit your files directly in any editor. Use Git to version your campaign. Drop in any markdown you write and your agent will incorporate it into the next session automatically.
+								Edit your files directly in any editor. Use Git to version your
+								campaign. Drop in any markdown you write and your agent will
+								incorporate it into the next session automatically.
 							</p>
 							<div className="border border-border bg-card/40 p-4">
 								<p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -388,7 +517,11 @@ export default function LandingPage() {
 							<X className="-right-[5px] -top-[8px]" />
 							<X className="-bottom-[8px] -left-[5px]" />
 							<X className="-right-[5px] -bottom-[8px]" />
-							<FileTree root={bardoWorkspace} defaultSelectedId="musashi" className="h-full" />
+							<FileTree
+								root={bardoWorkspace}
+								defaultSelectedId="musashi"
+								className="h-full"
+							/>
 						</div>
 					</div>
 				</section>
@@ -413,17 +546,34 @@ export default function LandingPage() {
 						<div className="hidden md:flex md:flex-col md:justify-end">
 							<ul className="space-y-2">
 								{[
-									{ tool: "state-get", desc: "Fetch any character or world object" },
-									{ tool: "player-action", desc: "Structured roll with modifier + DC" },
-									{ tool: "world-sync", desc: "Persist changes to markdown files" },
-									{ tool: "markdown-read", desc: "Load world, state, and quest files" },
-									{ tool: "markdown-upsert", desc: "Write new lore and session notes" },
+									{
+										tool: "state-get",
+										desc: "Fetch any character or world object",
+									},
+									{
+										tool: "player-action",
+										desc: "Structured roll with modifier + DC",
+									},
+									{
+										tool: "world-sync",
+										desc: "Persist changes to markdown files",
+									},
+									{
+										tool: "markdown-read",
+										desc: "Load world, state, and quest files",
+									},
+									{
+										tool: "markdown-upsert",
+										desc: "Write new lore and session notes",
+									},
 								].map(({ tool, desc }) => (
 									<li key={tool} className="flex items-center gap-3">
 										<code className="shrink-0 border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
 											{tool}
 										</code>
-										<span className="text-xs text-muted-foreground">{desc}</span>
+										<span className="text-xs text-muted-foreground">
+											{desc}
+										</span>
 									</li>
 								))}
 							</ul>
@@ -484,7 +634,9 @@ export default function LandingPage() {
 								{agents.map((agent) => (
 									<li key={agent} className="flex items-center gap-2.5">
 										<span className="h-px w-3 shrink-0 bg-muted-foreground/40" />
-										<span className="text-sm text-muted-foreground">{agent}</span>
+										<span className="text-sm text-muted-foreground">
+											{agent}
+										</span>
 									</li>
 								))}
 							</ul>
@@ -500,9 +652,9 @@ export default function LandingPage() {
 								System-agnostic.
 							</h2>
 							<p className="text-sm leading-relaxed text-muted-foreground">
-								Explicit state handling and predictable narrative synchronization
-								through markdown-first tooling. No more ad-hoc prompting.
-								No more lost campaigns.
+								Explicit state handling and predictable narrative
+								synchronization through markdown-first tooling. No more ad-hoc
+								prompting. No more lost campaigns.
 							</p>
 						</div>
 					</div>
@@ -581,7 +733,9 @@ export default function LandingPage() {
 									<span className="mb-3 block font-mono text-[11px] text-muted-foreground/60">
 										{n}
 									</span>
-									<p className="text-sm leading-relaxed text-foreground">{text}</p>
+									<p className="text-sm leading-relaxed text-foreground">
+										{text}
+									</p>
 								</div>
 							))}
 						</div>

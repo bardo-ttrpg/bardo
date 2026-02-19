@@ -1,7 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
 
 interface ParticlesProps {
 	className?: string;
@@ -22,7 +22,7 @@ function hexToRgb(hex: string): [number, number, number] {
 			.map((c) => c + c)
 			.join("");
 	const r = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-	return r && r[1] && r[2] && r[3]
+	return r?.[1] && r[2] && r[3]
 		? [parseInt(r[1], 16), parseInt(r[2], 16), parseInt(r[3], 16)]
 		: [255, 255, 255];
 }
@@ -60,9 +60,9 @@ export default function Particles({
 	const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
 	const rgb = hexToRgb(color);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: init is intentionally re-registered on color changes only.
 	useEffect(() => {
-		if (canvasRef.current)
-			ctx.current = canvasRef.current.getContext("2d");
+		if (canvasRef.current) ctx.current = canvasRef.current.getContext("2d");
 		init();
 		window.addEventListener("resize", init);
 		return () => {
@@ -132,12 +132,7 @@ export default function Particles({
 
 	function tick() {
 		if (!ctx.current) return;
-		ctx.current.clearRect(
-			0,
-			0,
-			canvasSize.current.w,
-			canvasSize.current.h,
-		);
+		ctx.current.clearRect(0, 0, canvasSize.current.w, canvasSize.current.h);
 		for (let i = circles.current.length - 1; i >= 0; i--) {
 			const c = circles.current[i];
 			if (!c) continue;

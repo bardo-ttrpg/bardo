@@ -1,0 +1,76 @@
+export type AuthMode = "optional" | "required";
+
+export type SecurityPolicy = {
+	authMode: AuthMode;
+	allowQueryApiKey: boolean;
+	maxRequestBytes: number;
+	sessionTtlMs: number;
+	rateLimitWindowMs: number;
+	rateLimitMaxRequests: number;
+};
+
+const DEFAULTS = {
+	maxRequestBytes: 1_048_576,
+	sessionTtlMs: 3_600_000,
+	rateLimitWindowMs: 60_000,
+	rateLimitMaxRequests: 120,
+} as const;
+
+function parsePositiveInteger(
+	value: string | undefined,
+	fallback: number,
+): number {
+	if (!value) return fallback;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+	return Math.floor(parsed);
+}
+
+function resolveAuthMode(
+	env: Record<string, string | undefined>,
+	isProduction: boolean,
+): AuthMode {
+	const rawMode = env.BARDO_AUTH_MODE?.trim().toLowerCase();
+	if (rawMode === "optional" || rawMode === "required") {
+		return rawMode;
+	}
+	return isProduction ? "required" : "optional";
+}
+
+function resolveQueryApiKeyPolicy(
+	env: Record<string, string | undefined>,
+	isProduction: boolean,
+): boolean {
+	const rawValue = env.BARDO_ALLOW_QUERY_API_KEY?.trim().toLowerCase();
+	if (rawValue === "true") return true;
+	if (rawValue === "false") return false;
+	return !isProduction;
+}
+
+export function resolveSecurityPolicy(
+	env: Record<string, string | undefined>,
+): SecurityPolicy {
+	const isProduction = env.NODE_ENV === "production";
+	return {
+		authMode: resolveAuthMode(env, isProduction),
+		allowQueryApiKey: resolveQueryApiKeyPolicy(env, isProduction),
+		maxRequestBytes: parsePositiveInteger(
+			env.BARDO_MAX_REQUEST_BYTES,
+			DEFAULTS.maxRequestBytes,
+		),
+		sessionTtlMs: parsePositiveInteger(
+			env.BARDO_SESSION_TTL_MS,
+			DEFAULTS.sessionTtlMs,
+		),
+		rateLimitWindowMs: parsePositiveInteger(
+			env.BARDO_RATE_LIMIT_WINDOW_MS,
+			DEFAULTS.rateLimitWindowMs,
+		),
+		rateLimitMaxRequests: parsePositiveInteger(
+			env.BARDO_RATE_LIMIT_MAX_REQUESTS,
+			DEFAULTS.rateLimitMaxRequests,
+		),
+	};
+}
+
+export const SECURITY_POLICY = resolveSecurityPolicy(Bun.env);

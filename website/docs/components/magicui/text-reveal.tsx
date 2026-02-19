@@ -1,13 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import {
-	motion,
 	type MotionValue,
+	motion,
 	useScroll,
 	useTransform,
 } from "framer-motion";
 import { type FC, type ReactNode, useRef } from "react";
+import { cn } from "@/lib/utils";
 
 interface TextRevealProps {
 	text: string;
@@ -27,7 +27,11 @@ export const TextReveal: FC<TextRevealProps> = ({ text, className }) => {
 						const start = i / words.length;
 						const end = start + 1 / words.length;
 						return (
-							<Word key={i} progress={scrollYProgress} range={[start, end]}>
+							<Word
+								key={`${word}-${start.toFixed(4)}`}
+								progress={scrollYProgress}
+								range={[start, end]}
+							>
 								{word}
 							</Word>
 						);

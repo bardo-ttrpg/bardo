@@ -134,12 +134,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 								Agents
 							</p>
 							<ul className="space-y-3">
-								{[
-									"Claude Code",
-									"Cursor",
-									"Cline",
-									"OpenCode",
-								].map((a) => (
+								{["Claude Code", "Cursor", "Cline", "OpenCode"].map((a) => (
 									<li
 										key={a}
 										className="font-mono text-xs text-muted-foreground"
@@ -189,8 +184,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 					{/* Bottom bar */}
 					<div className="flex items-center justify-between px-6 py-5 sm:px-8">
 						<span className="font-mono text-[11px] text-muted-foreground">
-							© {new Date().getFullYear()} Bardo — MCP-driven TTRPG
-							operations
+							© {new Date().getFullYear()} Bardo — MCP-driven TTRPG operations
 						</span>
 						<div style={{ fontSize: "20px" }}>
 							<SpinningText

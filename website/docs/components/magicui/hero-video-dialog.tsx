@@ -1,16 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { XIcon } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface HeroVideoDialogProps {
-	animationStyle?:
-		| "from-bottom"
-		| "from-center"
-		| "from-top"
-		| "fade";
+	animationStyle?: "from-bottom" | "from-center" | "from-top" | "fade";
 	videoSrc: string;
 	thumbnailSrc: string;
 	thumbnailAlt?: string;
@@ -53,22 +50,24 @@ export default function HeroVideoDialog({
 	return (
 		<div className={cn("relative", className)}>
 			{/* Thumbnail */}
-			<div
-				className="group relative cursor-pointer"
+			<button
+				type="button"
+				className="group relative block w-full cursor-pointer text-left"
 				onClick={() => setOpen(true)}
 			>
-				<img
+				<Image
 					src={thumbnailSrc}
 					alt={thumbnailAlt}
-					className="w-full border border-border transition-all duration-200 group-hover:brightness-75"
+					width={1600}
+					height={900}
+					unoptimized
+					className="h-auto w-full border border-border transition-all duration-200 group-hover:brightness-75"
 				/>
 				{/* Play button */}
 				<div className="absolute inset-0 flex items-center justify-center">
 					<div className="flex h-16 w-16 scale-90 items-center justify-center border border-white/30 bg-black/60 backdrop-blur-sm transition-all duration-200 group-hover:scale-100 group-hover:bg-black/80">
-						<svg
-							className="ml-1 h-6 w-6 fill-white"
-							viewBox="0 0 24 24"
-						>
+						<svg className="ml-1 h-6 w-6 fill-white" viewBox="0 0 24 24">
+							<title>Play video</title>
 							<path d="M8 5v14l11-7z" />
 						</svg>
 					</div>
@@ -79,7 +78,7 @@ export default function HeroVideoDialog({
 						/ Watch demo
 					</span>
 				</div>
-			</div>
+			</button>
 
 			{/* Modal */}
 			<AnimatePresence>
@@ -98,6 +97,7 @@ export default function HeroVideoDialog({
 							onClick={(e) => e.stopPropagation()}
 						>
 							<button
+								type="button"
 								className="absolute -top-12 right-0 flex h-8 w-8 items-center justify-center border border-white/20 bg-black/60 text-white backdrop-blur-sm"
 								onClick={() => setOpen(false)}
 							>
@@ -106,6 +106,7 @@ export default function HeroVideoDialog({
 							<div className="size-full overflow-hidden border border-white/20">
 								<iframe
 									src={videoSrc}
+									title="Bardo product demo video"
 									className="size-full"
 									allowFullScreen
 									allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

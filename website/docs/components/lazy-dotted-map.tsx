@@ -14,10 +14,6 @@ const DottedMapInner = dynamic(
 	},
 );
 
-export default function LazyDottedMap({
-	markers,
-}: {
-	markers?: MapMarker[];
-}) {
+export default function LazyDottedMap({ markers }: { markers?: MapMarker[] }) {
 	return <DottedMapInner markers={markers} />;
 }

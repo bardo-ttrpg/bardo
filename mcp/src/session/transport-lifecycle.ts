@@ -31,7 +31,7 @@ export async function createAndHandleSessionRequest(
 				transport,
 			});
 			console.log(
-				`Session initialized: ${sessionId} apiKey=${auth.apiKey ?? "none"} root=${auth.campaignBasePath}`,
+				`Session initialized: ${sessionId} auth=${auth.apiKey ? "api-key" : "anonymous"}`,
 			);
 		},
 		onsessionclosed: (sessionId) => {

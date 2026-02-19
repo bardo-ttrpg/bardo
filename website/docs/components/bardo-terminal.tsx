@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatedSpan, Terminal, TypingAnimation } from "@/components/magicui/terminal";
+import { AnimatedSpan, Terminal } from "@/components/magicui/terminal";
 
 export default function BardoTerminal() {
 	return (
@@ -30,7 +30,7 @@ export default function BardoTerminal() {
 			</AnimatedSpan>
 			<AnimatedSpan delay={2.1}>
 				<span>
-					<span className="text-foreground/50">GM  </span>
+					<span className="text-foreground/50">GM </span>
 					<span className="text-foreground/90">
 						"You arrive at the gates of Ironhaven at dusk.
 					</span>
@@ -45,7 +45,7 @@ export default function BardoTerminal() {
 			{/* Player action */}
 			<AnimatedSpan delay={3.0}>
 				<span>
-					<span className="text-foreground/50">You  </span>
+					<span className="text-foreground/50">You </span>
 					<span className="text-foreground/90">
 						"Zara steps forward and tries to bribe the guard."
 					</span>
@@ -71,7 +71,7 @@ export default function BardoTerminal() {
 			{/* GM response */}
 			<AnimatedSpan delay={5.5}>
 				<span>
-					<span className="text-foreground/50">GM  </span>
+					<span className="text-foreground/50">GM </span>
 					<span className="text-foreground/90">
 						"The guard pockets the coins and waves you through."
 					</span>

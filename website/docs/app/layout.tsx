@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
-import Particles from "@/components/magicui/particles";
 import ConvexClientProvider from "@/components/convex-provider";
+import Particles from "@/components/magicui/particles";
 import "./globals.css";
 
 const geistSans = Geist({

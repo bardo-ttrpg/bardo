@@ -54,8 +54,10 @@ export function buildBillingBackfillPatch(
 	if (fields.plan === undefined) patch.plan = resolved.plan;
 	if (fields.creditsTotal === undefined)
 		patch.creditsTotal = resolved.creditsTotal;
-	if (fields.creditsUsed === undefined) patch.creditsUsed = resolved.creditsUsed;
-	if (fields.periodStart === undefined) patch.periodStart = resolved.periodStart;
+	if (fields.creditsUsed === undefined)
+		patch.creditsUsed = resolved.creditsUsed;
+	if (fields.periodStart === undefined)
+		patch.periodStart = resolved.periodStart;
 	if (fields.mcpCallsTotal === undefined)
 		patch.mcpCallsTotal = resolved.mcpCallsTotal;
 	if (fields.mcpCallsThisPeriod === undefined)

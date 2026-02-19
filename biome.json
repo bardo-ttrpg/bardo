@@ -45,6 +45,30 @@
 			"assist": {
 				"enabled": false
 			}
+		},
+		{
+			"includes": ["website/docs/convex/_generated/**"],
+			"formatter": {
+				"enabled": false
+			},
+			"linter": {
+				"enabled": false
+			},
+			"assist": {
+				"enabled": false
+			}
+		},
+		{
+			"includes": ["website/docs/app/globals.css"],
+			"formatter": {
+				"enabled": false
+			},
+			"linter": {
+				"enabled": false
+			},
+			"assist": {
+				"enabled": false
+			}
 		}
 	]
 }

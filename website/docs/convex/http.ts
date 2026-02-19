@@ -1,19 +1,20 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { clerkIdFromIdentity } from "../lib/convex-auth";
 import { api } from "./_generated/api";
+import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
 http.route({
 	path: "/track-mcp",
 	method: "POST",
-	handler: httpAction(async (ctx, request) => {
-		const body = await request.json();
-		const { clerkId } = body as { clerkId: string };
+	handler: httpAction(async (ctx) => {
+		const identity = await ctx.auth.getUserIdentity();
+		const clerkId = clerkIdFromIdentity(identity);
 
 		if (!clerkId) {
-			return new Response(JSON.stringify({ error: "clerkId required" }), {
-				status: 400,
+			return new Response(JSON.stringify({ error: "Unauthorized" }), {
+				status: 401,
 				headers: { "Content-Type": "application/json" },
 			});
 		}

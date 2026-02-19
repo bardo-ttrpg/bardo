@@ -1,67 +1,40 @@
-import { Webhook } from "svix";
-import { headers } from "next/headers";
+import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { ConvexHttpClient } from "convex/browser";
+import type { NextRequest } from "next/server";
 import { api } from "@/convex/_generated/api";
+import {
+	normalizeClerkUserPayload,
+	shouldSkipWebhookEvent,
+} from "@/lib/clerk-webhook";
 
-const convex = new ConvexHttpClient(
-	process.env.NEXT_PUBLIC_CONVEX_URL ?? "",
-);
+export const runtime = "nodejs";
 
-const UPSERT_USER = api.users.upsertUser as Parameters<
-	ConvexHttpClient["mutation"]
->[0];
+const UPSERT_USER = api.users.upsertUser;
 
-export async function POST(req: Request) {
-	const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
-	if (!webhookSecret) {
-		return new Response("Webhook secret not configured", { status: 500 });
+export async function POST(req: NextRequest) {
+	const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+	if (!convexUrl) {
+		return new Response("Convex URL not configured", { status: 500 });
 	}
 
-	const headerPayload = await headers();
-	const svixId = headerPayload.get("svix-id");
-	const svixTimestamp = headerPayload.get("svix-timestamp");
-	const svixSignature = headerPayload.get("svix-signature");
-
-	if (!svixId || !svixTimestamp || !svixSignature) {
-		return new Response("Missing svix headers", { status: 400 });
-	}
-
-	const payload = await req.text();
-	const wh = new Webhook(webhookSecret);
-
-	let event: { type: string; data: Record<string, unknown> };
+	let event: Awaited<ReturnType<typeof verifyWebhook>>;
 	try {
-		event = wh.verify(payload, {
-			"svix-id": svixId,
-			"svix-timestamp": svixTimestamp,
-			"svix-signature": svixSignature,
-		}) as typeof event;
+		event = await verifyWebhook(req);
 	} catch {
 		return new Response("Invalid webhook signature", { status: 400 });
 	}
 
-	if (event.type === "user.created" || event.type === "user.updated") {
-		const data = event.data;
-		const emailAddresses = data.email_addresses as Array<{
-			id: string;
-			email_address: string;
-		}>;
-		const primaryEmailId = data.primary_email_address_id as string | null;
-		const primaryEmail = primaryEmailId
-			? (emailAddresses?.find((e) => e.id === primaryEmailId)
-					?.email_address ?? null)
-			: null;
+	const eventId = req.headers.get("svix-id");
+	if (eventId && shouldSkipWebhookEvent(eventId)) {
+		return new Response("Duplicate event", { status: 200 });
+	}
 
-		await convex.mutation(UPSERT_USER, {
-			clerkId: data.id as string,
-			email: primaryEmail,
-			imageUrl: (data.image_url as string | null) ?? null,
-			name:
-				[data.first_name as string, data.last_name as string]
-					.filter(Boolean)
-					.join(" ")
-					.trim() || null,
-		});
+	if (event.type === "user.created" || event.type === "user.updated") {
+		const convex = new ConvexHttpClient(convexUrl);
+		const payload = normalizeClerkUserPayload(
+			event.data as unknown as Record<string, unknown>,
+		);
+		await convex.mutation(UPSERT_USER, payload);
 	}
 
 	return new Response("OK", { status: 200 });

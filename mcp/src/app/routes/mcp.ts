@@ -14,6 +14,7 @@ async function handleMcpPost(
 		if (!existing) {
 			return jsonRpcError(404, -32000, "Session not found");
 		}
+		sessionStore.touch(existingSessionId);
 		return withCors(await existing.transport.handleRequest(request));
 	}
 
@@ -35,6 +36,7 @@ async function handleMcpGetOrDelete(
 	if (!existing) {
 		return jsonRpcError(404, -32000, "Session not found");
 	}
+	sessionStore.touch(sessionId);
 
 	return withCors(await existing.transport.handleRequest(request));
 }

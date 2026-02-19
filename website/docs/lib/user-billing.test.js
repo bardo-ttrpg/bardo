@@ -1,8 +1,5 @@
 import { expect, test } from "bun:test";
-import {
-	buildBillingBackfillPatch,
-	resolveBillingState,
-} from "./user-billing";
+import { buildBillingBackfillPatch, resolveBillingState } from "./user-billing";
 
 test("resolveBillingState falls back to free-tier defaults for legacy users", () => {
 	const now = 1_700_000_000_000;

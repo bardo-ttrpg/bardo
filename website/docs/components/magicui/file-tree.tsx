@@ -1,14 +1,8 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import {
-	ChevronRight,
-	File,
-	FileText,
-	Folder,
-	FolderOpen,
-} from "lucide-react";
+import { ChevronRight, File, FileText, Folder, FolderOpen } from "lucide-react";
 import { createContext, useContext, useState } from "react";
+import { cn } from "@/lib/utils";
 
 /* ── Context ── */
 interface TreeContextValue {
@@ -31,13 +25,7 @@ export interface FileTreeNode {
 }
 
 /* ── File node ── */
-function FileNode({
-	node,
-	depth,
-}: {
-	node: FileTreeNode;
-	depth: number;
-}) {
+function FileNode({ node, depth }: { node: FileTreeNode; depth: number }) {
 	const { selectedId, setSelectedId } = useContext(TreeCtx);
 	const isSelected = selectedId === node.id || node.highlight;
 	const isMd = node.name.endsWith(".md");
