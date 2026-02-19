@@ -53,9 +53,16 @@ export class SessionStore {
 	sweepExpired(now = Date.now()): number {
 		if (this.sessionTtlMs <= 0) return 0;
 
-		let removed = 0;
+		const expiredSessionIds: string[] = [];
 		for (const [sessionId, expiresAt] of this.sessionExpiry.entries()) {
-			if (now >= expiresAt && this.delete(sessionId)) {
+			if (now >= expiresAt) {
+				expiredSessionIds.push(sessionId);
+			}
+		}
+
+		let removed = 0;
+		for (const sessionId of expiredSessionIds) {
+			if (this.delete(sessionId)) {
 				removed += 1;
 			}
 		}

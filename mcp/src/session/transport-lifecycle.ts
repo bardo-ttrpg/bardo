@@ -3,23 +3,39 @@ import { createMcpServer } from "../mcp/create-mcp-server";
 import type { AuthContext } from "../types/contracts";
 import type { SessionStore } from "./session-store";
 
+export function createSessionFinalizer(
+	sessionStore: Pick<SessionStore, "delete">,
+	closeServer: () => Promise<void> | void,
+): (sessionId?: string | null) => void {
+	const deletedSessionIds = new Set<string>();
+	let closed = false;
+
+	return (sessionId?: string | null) => {
+		if (sessionId && !deletedSessionIds.has(sessionId)) {
+			deletedSessionIds.add(sessionId);
+			sessionStore.delete(sessionId);
+		}
+
+		if (closed) return;
+		closed = true;
+		void closeServer();
+	};
+}
+
 export async function createAndHandleSessionRequest(
 	request: Request,
 	auth: AuthContext,
 	sessionStore: SessionStore,
 ): Promise<Response> {
 	const server = createMcpServer(auth);
-	let closed = false;
-
-	const closeServerOnce = async () => {
-		if (closed) return;
-		closed = true;
+	const closeServer = async () => {
 		try {
 			await server.close();
 		} catch (error) {
 			console.error("Error while closing MCP session server:", error);
 		}
 	};
+	const finalizeSession = createSessionFinalizer(sessionStore, closeServer);
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => crypto.randomUUID(),
@@ -35,18 +51,13 @@ export async function createAndHandleSessionRequest(
 			);
 		},
 		onsessionclosed: (sessionId) => {
-			sessionStore.delete(sessionId);
-			void closeServerOnce();
+			finalizeSession(sessionId);
 			console.log(`Session closed: ${sessionId}`);
 		},
 	});
 
 	transport.onclose = () => {
-		const sessionId = transport.sessionId;
-		if (sessionId) {
-			sessionStore.delete(sessionId);
-		}
-		void closeServerOnce();
+		finalizeSession(transport.sessionId);
 	};
 
 	await server.connect(transport);

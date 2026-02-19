@@ -31,7 +31,14 @@ export function resolvePathInsideRoot(
 	rootPath: string,
 	relativePath: string,
 ): string {
-	const normalized = relativePath.replaceAll("\\", "/").trim();
+	let decodedPath = relativePath;
+	try {
+		decodedPath = decodeURIComponent(relativePath);
+	} catch {
+		throw new Error("Path contains invalid URL encoding");
+	}
+
+	const normalized = decodedPath.replaceAll("\\", "/").trim();
 	if (!normalized || normalized.startsWith("/")) {
 		throw new Error("Path must be a non-empty relative path");
 	}
