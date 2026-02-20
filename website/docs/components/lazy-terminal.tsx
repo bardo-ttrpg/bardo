@@ -8,7 +8,7 @@ const BardoTerminal = dynamic(() => import("@/components/bardo-terminal"), {
 });
 
 export default function LazyTerminal() {
-	const { ref, isInView } = useOnceInView<HTMLDivElement>("180px 0px");
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("420px 0px");
 
 	return (
 		<div ref={ref} className="min-h-[520px]">
@@ -16,7 +16,7 @@ export default function LazyTerminal() {
 				<BardoTerminal />
 			) : (
 				<div
-					className="h-[520px] w-full animate-pulse border border-border bg-muted/10"
+					className="h-[520px] w-full animate-pulse border border-border bg-linear-to-br from-muted/5 via-muted/10 to-muted/5"
 					aria-hidden
 				/>
 			)}

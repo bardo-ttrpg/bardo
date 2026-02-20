@@ -11,6 +11,7 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.sessionTtlMs).toBe(3_600_000);
 		expect(policy.rateLimitMaxRequests).toBe(120);
 		expect(policy.rateLimitWindowMs).toBe(60_000);
+		expect(policy.rateLimitFailClosed).toBe(false);
 	});
 
 	test("defaults to required auth and disables query API keys in production", () => {
@@ -29,6 +30,7 @@ describe("resolveSecurityPolicy", () => {
 			BARDO_SESSION_TTL_MS: "5000",
 			BARDO_RATE_LIMIT_MAX_REQUESTS: "12",
 			BARDO_RATE_LIMIT_WINDOW_MS: "2000",
+			BARDO_RATE_LIMIT_FAIL_CLOSED: "true",
 		});
 
 		expect(policy.authMode).toBe("optional");
@@ -37,5 +39,6 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.sessionTtlMs).toBe(5000);
 		expect(policy.rateLimitMaxRequests).toBe(12);
 		expect(policy.rateLimitWindowMs).toBe(2000);
+		expect(policy.rateLimitFailClosed).toBe(true);
 	});
 });

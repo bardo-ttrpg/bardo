@@ -4,12 +4,14 @@
  *
  * THIS CODE IS AUTOMATICALLY GENERATED.
  *
- * To regenerate, run `bunx convex dev`.
+ * To regenerate, run `npx convex dev`.
  * @module
  */
 
 import type * as http from "../http.js";
 import type * as users from "../users.js";
+import type * as users_handlers from "../users/handlers.js";
+import type * as users_shared from "../users/shared.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +22,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   http: typeof http;
   users: typeof users;
+  "users/handlers": typeof users_handlers;
+  "users/shared": typeof users_shared;
 }>;
 
 /**

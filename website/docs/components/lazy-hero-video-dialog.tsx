@@ -8,6 +8,7 @@ interface HeroVideoDialogProps {
 	animationStyle?: "from-bottom" | "from-center" | "from-top" | "fade";
 	videoSrc: string;
 	thumbnailSrc: string;
+	darkThumbnailSrc?: string;
 	thumbnailAlt?: string;
 	className?: string;
 }
@@ -20,14 +21,17 @@ const HeroVideoDialog = dynamic(
 );
 
 export default function LazyHeroVideoDialog(props: HeroVideoDialogProps) {
-	const { ref, isInView } = useOnceInView<HTMLDivElement>("180px 0px");
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("420px 0px");
 
 	return (
 		<div ref={ref} className={cn("relative", props.className)}>
 			{isInView ? (
 				<HeroVideoDialog {...props} />
 			) : (
-				<div className="aspect-video w-full border border-border bg-muted/10" />
+				<div
+					className="aspect-video w-full border border-border bg-linear-to-br from-muted/5 via-muted/10 to-muted/5"
+					aria-hidden
+				/>
 			)}
 		</div>
 	);

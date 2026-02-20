@@ -11,6 +11,7 @@ function createPolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 		sessionTtlMs: 3_600_000,
 		rateLimitMaxRequests: 120,
 		rateLimitWindowMs: 60_000,
+		rateLimitFailClosed: false,
 		...overrides,
 	};
 }

@@ -6,6 +6,7 @@
 
 /* Dark-first: true black / white monochrome */
 :root {
+	color-scheme: dark;
 	--radius: 0rem;
 	--background: oklch(0.04 0 0);
 	--foreground: oklch(0.97 0 0);
@@ -37,6 +38,7 @@
 
 /* Light variant */
 .light {
+	color-scheme: light;
 	--background: oklch(0.99 0 0);
 	--foreground: oklch(0.10 0 0);
 	--card: oklch(0.97 0 0);
@@ -58,6 +60,7 @@
 }
 
 .dark {
+	color-scheme: dark;
 	--background: oklch(0.04 0 0);
 	--foreground: oklch(0.97 0 0);
 	--card: oklch(0.07 0 0);
@@ -142,14 +145,60 @@
 }
 
 @layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
 	* {
 		@apply border-border outline-ring/50;
 	}
 	body {
 		@apply bg-background text-foreground antialiased;
+		text-rendering: optimizeLegibility;
 	}
-	a {
-		@apply text-inherit no-underline;
+	:where(
+			a,
+			button,
+			input,
+			select,
+			textarea,
+			[role="button"],
+			[tabindex]
+		):focus-visible {
+		outline: 2px solid oklch(0.76 0 0);
+		outline-offset: 2px;
 	}
 }
 
+.skip-link {
+	position: fixed;
+	top: 0.5rem;
+	left: 0.5rem;
+	z-index: 60;
+	transform: translateY(-160%);
+	border: 1px solid var(--color-border);
+	background: var(--color-card);
+	padding: 0.5rem 0.75rem;
+	font-family: var(--font-geist-mono), ui-monospace, monospace;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.14em;
+	transition: transform 0.18s ease;
+}
+
+.skip-link:focus-visible {
+	transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

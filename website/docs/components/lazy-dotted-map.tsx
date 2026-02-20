@@ -16,7 +16,7 @@ const DottedMapInner = dynamic(
 );
 
 export default function LazyDottedMap({ markers }: { markers?: MapMarker[] }) {
-	const { ref, isInView } = useOnceInView<HTMLDivElement>("220px 0px");
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("460px 0px");
 
 	return (
 		<div ref={ref} className="min-h-[320px]">
@@ -24,7 +24,7 @@ export default function LazyDottedMap({ markers }: { markers?: MapMarker[] }) {
 				<DottedMapInner markers={markers} />
 			) : (
 				<div
-					className="h-[320px] w-full animate-pulse bg-muted/10"
+					className="h-[320px] w-full animate-pulse bg-linear-to-br from-muted/5 via-muted/10 to-muted/5"
 					aria-hidden
 				/>
 			)}

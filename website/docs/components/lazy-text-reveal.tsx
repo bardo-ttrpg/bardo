@@ -18,7 +18,7 @@ export default function LazyTextReveal({
 	text: string;
 	className?: string;
 }) {
-	const { ref, isInView } = useOnceInView<HTMLDivElement>("220px 0px");
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("520px 0px");
 
 	return (
 		<div ref={ref}>

@@ -3,7 +3,7 @@ import { SECURITY_POLICY } from "../domain/config/security";
 import { SessionStore } from "../session/session-store";
 import { authenticateRequest } from "./middleware/auth";
 import { corsHeaders, jsonRpcError, withCors } from "./middleware/cors";
-import { RateLimiter } from "./middleware/rate-limiter";
+import { createRateLimiter } from "./middleware/rate-limiter";
 import {
 	getRateLimitKey,
 	isRequestPayloadTooLarge,
@@ -26,9 +26,10 @@ export function createHttpServer({
 		},
 	}),
 }: ServerOptions = {}) {
-	const rateLimiter = new RateLimiter({
+	const rateLimiter = createRateLimiter({
 		windowMs: SECURITY_POLICY.rateLimitWindowMs,
 		maxRequests: SECURITY_POLICY.rateLimitMaxRequests,
+		failClosed: SECURITY_POLICY.rateLimitFailClosed,
 	});
 
 	return Bun.serve({
@@ -69,7 +70,7 @@ export function createHttpServer({
 				}
 
 				const limitKey = getRateLimitKey(request, auth.apiKey);
-				const limitResult = rateLimiter.consume(limitKey);
+				const limitResult = await rateLimiter.limiter.consume(limitKey);
 				if (!limitResult.allowed) {
 					return withCors(
 						new Response(
@@ -83,6 +84,11 @@ export function createHttpServer({
 									"content-type": "application/json",
 									"retry-after": String(
 										Math.ceil(limitResult.retryAfterMs / 1000),
+									),
+									"x-ratelimit-limit": String(limitResult.limit),
+									"x-ratelimit-remaining": String(limitResult.remaining),
+									"x-ratelimit-reset": String(
+										Math.ceil(limitResult.reset / 1000),
 									),
 								},
 							},

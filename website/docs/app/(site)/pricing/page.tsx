@@ -1,35 +1,25 @@
 import type { Metadata } from "next";
+import CrosshairMarker from "@/components/crosshair-marker";
 import PricingToggle, { type BillingPeriod } from "./pricing-toggle";
 
 export const metadata: Metadata = {
 	title: "Pricing",
-	description: "Simple, transparent pricing for every campaign scale.",
+	description:
+		"Stripe subscriptions for Free, Solo, Solo Plus, and Party plans.",
 };
-
-/* ── Crosshair marker ── */
-function X({ className = "" }: { className?: string }) {
-	return (
-		<span
-			aria-hidden="true"
-			className={`pointer-events-none absolute select-none font-mono text-base leading-none text-foreground/20 ${className}`}
-		>
-			+
-		</span>
-	);
-}
 
 const faqs = [
 	{
 		q: "What counts as a credit?",
-		a: "One MCP tool call — state-get, player-action, world-sync, etc. — consumes one credit. Reads are cheap; writes cost the same. Credits reset on your monthly billing date.",
+		a: "One MCP tool call consumes one credit. Credits reset each billing cycle based on your Stripe subscription interval.",
 	},
 	{
 		q: "Can I change plans anytime?",
-		a: "Yes. Upgrade or downgrade at any time. Unused credits don't carry over between periods.",
+		a: "Yes. Upgrade or downgrade anytime in the billing portal. Cancellations remain active until the current period ends.",
 	},
 	{
 		q: "Is there a self-hosted option?",
-		a: "The Bardo MCP server is open source. You can self-host it without any account. The hosted plans add persistence, analytics, and multi-device sync.",
+		a: "The Bardo MCP server is open source, so you can self-host it. Hosted plans add managed persistence, billing, and team workflow support.",
 	},
 ] as const;
 
@@ -50,11 +40,11 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 					/ Pricing
 				</p>
 				<h1 className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-					Simple, transparent pricing.
+					Simple pricing with Stripe subscriptions.
 				</h1>
 				<p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
-					Start free. Scale as your campaign does. No hidden fees, no feature
-					gates on core tools.
+					Start free, then scale with Solo, Solo Plus, or Party. Yearly plans
+					offer up to 27% savings versus monthly billing.
 				</p>
 			</section>
 
@@ -65,10 +55,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
 			{/* ── FAQ ── */}
 			<section className="relative border border-border [contain-intrinsic-size:600px] [content-visibility:auto]">
-				<X className="-left-[5px] -top-[8px]" />
-				<X className="-right-[5px] -top-[8px]" />
-				<X className="-bottom-[8px] -left-[5px]" />
-				<X className="-right-[5px] -bottom-[8px]" />
+				<CrosshairMarker className="-left-[5px] -top-[8px]" />
+				<CrosshairMarker className="-right-[5px] -top-[8px]" />
+				<CrosshairMarker className="-bottom-[8px] -left-[5px]" />
+				<CrosshairMarker className="-right-[5px] -bottom-[8px]" />
 
 				<div className="border-b border-border px-8 py-4">
 					<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

@@ -1,69 +1,15 @@
 import Link from "next/link";
-
-function X({ className = "" }: { className?: string }) {
-	return (
-		<span
-			aria-hidden="true"
-			className={`pointer-events-none absolute select-none font-mono text-base leading-none text-foreground/20 ${className}`}
-		>
-			+
-		</span>
-	);
-}
+import CrosshairMarker from "@/components/crosshair-marker";
+import {
+	displayPriceCents,
+	formatUsdCents,
+	YEARLY_SAVINGS_UP_TO_PERCENT,
+} from "@/lib/billing-catalog";
+import CheckoutButton from "./checkout-button";
+import PartyPricingControls from "./party-pricing-controls";
+import { pricingTiers } from "./pricing-data";
 
 export type BillingPeriod = "monthly" | "yearly";
-
-const tiers = [
-	{
-		name: "Free",
-		monthly: 0,
-		yearly: 0,
-		credits: 100,
-		highlighted: false,
-		cta: "Get started",
-		ctaHref: "/sign-up",
-		features: [
-			"1 active campaign",
-			"100 MCP calls / month",
-			"Core MCP tools",
-			"Markdown-first storage",
-			"Community support",
-		],
-	},
-	{
-		name: "Pro",
-		monthly: 12,
-		yearly: 99,
-		credits: 1000,
-		highlighted: true,
-		cta: "Start Pro",
-		ctaHref: "/sign-up",
-		features: [
-			"Unlimited campaigns",
-			"1,000 MCP calls / month",
-			"Core MCP tools",
-			"Priority support",
-			"Early tool access",
-		],
-	},
-	{
-		name: "Ultra",
-		monthly: 39,
-		yearly: 349,
-		credits: 10000,
-		highlighted: false,
-		cta: "Go Ultra",
-		ctaHref: "/sign-up",
-		features: [
-			"Unlimited campaigns",
-			"10,000 MCP calls / month",
-			"Core MCP tools",
-			"Team access",
-			"SLA support",
-			"API access",
-		],
-	},
-] as const;
 
 export default function PricingToggle({
 	billingPeriod,
@@ -71,16 +17,18 @@ export default function PricingToggle({
 	billingPeriod: BillingPeriod;
 }) {
 	const yearly = billingPeriod === "yearly";
+	const interval = yearly ? "year" : "month";
+	const yearlySavingsLabel = `Save up to ${YEARLY_SAVINGS_UP_TO_PERCENT}%`;
 
 	return (
 		<>
 			<div className="mb-12 flex items-center justify-center">
-				<div className="inline-flex items-center border border-border p-1">
+				<div className="inline-flex items-center gap-1 border border-border bg-card/40 p-1">
 					<Link
 						href="/pricing?billing=monthly"
 						aria-current={!yearly ? "page" : undefined}
 						className={[
-							"px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
+							"min-w-24 px-4 py-2 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
 							!yearly
 								? "bg-foreground text-background"
 								: "text-muted-foreground hover:text-foreground",
@@ -92,7 +40,7 @@ export default function PricingToggle({
 						href="/pricing?billing=yearly"
 						aria-current={yearly ? "page" : undefined}
 						className={[
-							"ml-1 px-4 py-1.5 font-mono text-[11px] uppercase tracking-widest transition-colors",
+							"min-w-24 px-4 py-2 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
 							yearly
 								? "bg-foreground text-background"
 								: "text-muted-foreground hover:text-foreground",
@@ -100,32 +48,45 @@ export default function PricingToggle({
 					>
 						Yearly
 					</Link>
-					<span className="ml-2 border border-green-400/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-green-400/80">
-						Save up to 31%
+					<span className="ml-2 border border-green-400/35 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-green-400/80">
+						{yearlySavingsLabel}
 					</span>
 				</div>
 			</div>
 
-			<div className="relative grid grid-cols-1 sm:grid-cols-3">
-				{tiers.map((tier, i) => {
-					const price = yearly ? tier.yearly : tier.monthly;
+			<div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+				{pricingTiers.map((tier, i) => {
+					const priceCents = tier.checkoutPlan
+						? displayPriceCents(tier.checkoutPlan, interval)
+						: 0;
 					const perLabel = yearly ? "/ yr" : "/ mo";
+					const isParty = tier.key === "party";
+					const ctaClassName = [
+						"block w-full border px-5 py-2.5 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
+						tier.highlighted
+							? "border-foreground text-foreground hover:bg-foreground hover:text-background"
+							: "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+					].join(" ");
 
 					return (
 						<div
-							key={tier.name}
+							key={tier.key}
 							className={[
 								"relative border border-border p-8",
-								i < tiers.length - 1 ? "sm:border-r-0" : "",
+								i < pricingTiers.length - 1
+									? "sm:border-r-0 lg:border-r-0"
+									: "",
+								i > 1 ? "sm:border-t-0 lg:border-t-0" : "",
+								i % 2 === 1 ? "sm:border-l-0 lg:border-l-0" : "",
 								tier.highlighted ? "bg-foreground/[0.03]" : "",
 							]
 								.filter(Boolean)
 								.join(" ")}
 						>
-							<X className="-left-[5px] -top-[8px]" />
-							<X className="-right-[5px] -top-[8px]" />
-							<X className="-bottom-[8px] -left-[5px]" />
-							<X className="-right-[5px] -bottom-[8px]" />
+							<CrosshairMarker className="-left-[5px] -top-[8px]" />
+							<CrosshairMarker className="-right-[5px] -top-[8px]" />
+							<CrosshairMarker className="-bottom-[8px] -left-[5px]" />
+							<CrosshairMarker className="-right-[5px] -bottom-[8px]" />
 
 							{tier.highlighted && (
 								<div className="mb-4 inline-block border border-foreground/30 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-foreground">
@@ -139,23 +100,33 @@ export default function PricingToggle({
 
 							<div className="mb-2">
 								<span className="font-mono text-3xl font-bold text-foreground">
-									${price}
+									{formatUsdCents(priceCents)}
 								</span>
-								{price > 0 && (
+								{priceCents > 0 && (
 									<span className="ml-1 font-mono text-[11px] text-muted-foreground">
 										{perLabel}
+										{isParty ? " / seat" : ""}
 									</span>
 								)}
 							</div>
 
-							<p className="mb-6 font-mono text-[10px] text-muted-foreground">
-								{tier.credits.toLocaleString()} credits / month
-							</p>
+							{isParty ? (
+								<PartyPricingControls
+									yearly={yearly}
+									interval={interval}
+									label={tier.cta}
+									buttonClassName={ctaClassName}
+								/>
+							) : (
+								<p className="mb-6 font-mono text-[10px] text-muted-foreground">
+									{tier.credits.toLocaleString()} credits / month
+								</p>
+							)}
 
 							<ul className="mb-8 space-y-2.5">
 								{tier.features.map((feature) => (
 									<li key={feature} className="flex items-start gap-2.5">
-										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-green-400/70">
+										<span className="mt-0.5 shrink-0 font-mono text-[11px] text-green-700 dark:text-green-400/70">
 											✓
 										</span>
 										<span className="text-sm text-muted-foreground">
@@ -165,17 +136,19 @@ export default function PricingToggle({
 								))}
 							</ul>
 
-							<Link
-								href={tier.ctaHref}
-								className={[
-									"block border px-5 py-2.5 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
-									tier.highlighted
-										? "border-foreground text-foreground hover:bg-foreground hover:text-background"
-										: "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
-								].join(" ")}
-							>
-								{tier.cta} ↗
-							</Link>
+							{tier.key === "free" ? (
+								<Link href={tier.ctaHref} className={ctaClassName}>
+									{tier.cta} ↗
+								</Link>
+							) : tier.checkoutPlan ? (
+								<CheckoutButton
+									plan={tier.checkoutPlan}
+									interval={interval}
+									quantity={1}
+									label={tier.cta}
+									className={ctaClassName}
+								/>
+							) : null}
 						</div>
 					);
 				})}

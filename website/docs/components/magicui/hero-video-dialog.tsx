@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ interface HeroVideoDialogProps {
 	animationStyle?: "from-bottom" | "from-center" | "from-top" | "fade";
 	videoSrc: string;
 	thumbnailSrc: string;
+	darkThumbnailSrc?: string;
 	thumbnailAlt?: string;
 	className?: string;
 }
@@ -41,11 +43,16 @@ export default function HeroVideoDialog({
 	animationStyle = "from-center",
 	videoSrc,
 	thumbnailSrc,
+	darkThumbnailSrc,
 	thumbnailAlt = "Video thumbnail",
 	className,
 }: HeroVideoDialogProps) {
 	const [open, setOpen] = useState(false);
+	const { resolvedTheme } = useTheme();
 	const anim = variants[animationStyle];
+	const isDark = resolvedTheme !== "light";
+	const activeThumbnailSrc =
+		isDark && darkThumbnailSrc ? darkThumbnailSrc : thumbnailSrc;
 
 	return (
 		<div className={cn("relative", className)}>
@@ -56,7 +63,7 @@ export default function HeroVideoDialog({
 				onClick={() => setOpen(true)}
 			>
 				<Image
-					src={thumbnailSrc}
+					src={activeThumbnailSrc}
 					alt={thumbnailAlt}
 					width={1600}
 					height={900}

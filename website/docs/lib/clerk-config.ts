@@ -22,6 +22,29 @@ export function isClerkSecretKeyConfigured(
 	);
 }
 
+function clerkKeyMode(
+	key: string | null | undefined,
+	prefix: "pk" | "sk",
+): "test" | "live" | null {
+	const normalized = key?.trim() ?? "";
+	const match = normalized.match(new RegExp(`^${prefix}_(test|live)_`));
+	if (!match) return null;
+	return match[1] === "test" ? "test" : "live";
+}
+
+export function doClerkKeysShareEnvironment({
+	publishableKey,
+	secretKey,
+}: {
+	publishableKey: string | null | undefined;
+	secretKey: string | null | undefined;
+}): boolean {
+	const publishableMode = clerkKeyMode(publishableKey, "pk");
+	const secretMode = clerkKeyMode(secretKey, "sk");
+	if (!publishableMode || !secretMode) return false;
+	return publishableMode === secretMode;
+}
+
 export function isClerkIssuerDomainConfigured(
 	issuerDomain: string | null | undefined,
 ): boolean {
@@ -48,6 +71,48 @@ function base64UrlToText(value: string): string | null {
 	} catch {
 		return null;
 	}
+}
+
+function issuerHostname(value: string): string | null {
+	const normalized = value.trim();
+	if (!normalized) return null;
+	try {
+		return new URL(normalized).hostname;
+	} catch {
+		return null;
+	}
+}
+
+function decodeSessionTokenPayload(
+	sessionToken: string | null | undefined,
+): Record<string, unknown> | null {
+	const normalized = sessionToken?.trim();
+	if (!normalized) return null;
+
+	const parts = normalized.split(".");
+	if (parts.length < 2) return null;
+
+	const payloadRaw = base64UrlToText(parts[1] ?? "");
+	if (!payloadRaw) return null;
+
+	try {
+		const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
+		return payload;
+	} catch {
+		return null;
+	}
+}
+
+function normalizeHostname(hostname: string): string {
+	return hostname
+		.trim()
+		.toLowerCase()
+		.replace(/^\[|\]$/g, "");
+}
+
+function areEquivalentLocalHosts(a: string, b: string): boolean {
+	const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+	return localHosts.has(a) && localHosts.has(b);
 }
 
 export function clerkDomainFromPublishableKey(
@@ -96,6 +161,81 @@ export function doesClerkDomainMatchIssuer({
 	}
 }
 
+export function issuerHostFromSessionToken(
+	sessionToken: string | null | undefined,
+): string | null {
+	const payload = decodeSessionTokenPayload(sessionToken);
+	if (!payload) return null;
+	if (typeof payload.iss !== "string") return null;
+	return issuerHostname(payload.iss);
+}
+
+export function authorizedPartyHostFromSessionToken(
+	sessionToken: string | null | undefined,
+): string | null {
+	const payload = decodeSessionTokenPayload(sessionToken);
+	if (!payload) return null;
+	if (typeof payload.azp !== "string") return null;
+
+	const directHostname = issuerHostname(payload.azp);
+	if (directHostname) {
+		return normalizeHostname(directHostname);
+	}
+
+	// Fallback for non-URL host claims.
+	return normalizeHostname(payload.azp);
+}
+
+export function shouldResetClerkSessionForIssuer({
+	sessionToken,
+	issuerDomain,
+}: {
+	sessionToken: string | null | undefined;
+	issuerDomain: string | null | undefined;
+}): boolean {
+	const tokenIssuerHost = issuerHostFromSessionToken(sessionToken);
+	if (!tokenIssuerHost) return false;
+
+	const configuredIssuerHost = issuerHostname(issuerDomain ?? "");
+	if (!configuredIssuerHost) return false;
+
+	return tokenIssuerHost !== configuredIssuerHost;
+}
+
+export function shouldResetClerkSessionForRequest({
+	sessionToken,
+	issuerDomain,
+	requestHostname,
+}: {
+	sessionToken: string | null | undefined;
+	issuerDomain: string | null | undefined;
+	requestHostname: string;
+}): boolean {
+	if (
+		shouldResetClerkSessionForIssuer({
+			sessionToken,
+			issuerDomain,
+		})
+	) {
+		return true;
+	}
+
+	const azpHost = authorizedPartyHostFromSessionToken(sessionToken);
+	if (!azpHost) return false;
+
+	const normalizedRequestHost = normalizeHostname(requestHostname);
+	if (!normalizedRequestHost) return false;
+
+	if (
+		normalizedRequestHost === azpHost ||
+		areEquivalentLocalHosts(normalizedRequestHost, azpHost)
+	) {
+		return false;
+	}
+
+	return true;
+}
+
 export function isClerkAuthConfigured({
 	publishableKey,
 	secretKey,
@@ -108,6 +248,10 @@ export function isClerkAuthConfigured({
 	return (
 		isClerkPublishableKeyConfigured(publishableKey) &&
 		isClerkSecretKeyConfigured(secretKey) &&
+		doClerkKeysShareEnvironment({
+			publishableKey,
+			secretKey,
+		}) &&
 		doesClerkDomainMatchIssuer({
 			publishableKey,
 			issuerDomain,

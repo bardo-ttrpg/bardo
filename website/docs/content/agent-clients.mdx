@@ -1,20 +1,207 @@
 ---
-title: Supported Agent Clients
-description: Bardo works with any MCP-capable AI coding agent.
+title: Agent Clients
+description: Configuration examples for every MCP-capable AI client that works with Bardo.
 ---
 
-# Supported Agent Clients
+import { Callout, Tabs } from 'nextra/components'
 
-Bardo is designed for **any MCP-capable client**.
+# Agent Clients
 
-## Known compatible examples
+Bardo works with **any MCP-capable AI client**. If your agent supports MCP transport and tool-calling, it can run Bardo campaigns. Below are configuration snippets for the most common clients.
 
-- VS Code + GitHub Copilot
-- Claude Code
-- Cursor
-- Cline
-- OpenCode
-- Codex CLI
-- Gemini CLI
+<Callout type="info">
+  All clients connect to the same Bardo MCP server. Only the config file format differs between clients.
+</Callout>
 
-If your agent supports MCP transport and tool-calling, Bardo can be integrated.
+## Supported clients
+
+<Tabs items={['Claude Code', 'Cursor', 'Cline', 'VS Code Copilot', 'Codex CLI', 'Gemini CLI']}>
+
+<Tabs.Tab>
+
+### Claude Code
+
+Add Bardo to your Claude Code MCP configuration:
+
+```json filename="~/.claude/mcp.json"
+{
+  "mcpServers": {
+    "bardo": {
+      "command": "bunx",
+      "args": ["@bardohq/bardo"],
+      "env": {
+        "BARDO_WORKSPACE": "/path/to/your/campaigns"
+      }
+    }
+  }
+}
+```
+
+Or add it per-project in `.claude/mcp.json` at the root of your campaign directory:
+
+```json filename=".claude/mcp.json"
+{
+  "mcpServers": {
+    "bardo": {
+      "command": "bunx",
+      "args": ["@bardohq/bardo"],
+      "env": {
+        "BARDO_WORKSPACE": "."
+      }
+    }
+  }
+}
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+### Cursor
+
+Add Bardo to Cursor's MCP server list in settings:
+
+```json filename=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "bardo": {
+      "command": "bunx",
+      "args": ["@bardohq/bardo"],
+      "env": {
+        "BARDO_WORKSPACE": "/path/to/your/campaigns"
+      }
+    }
+  }
+}
+```
+
+Then open **Cursor Settings → MCP** and verify the server appears as connected.
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+### Cline
+
+In VS Code with the Cline extension, open the MCP Servers panel and add a new entry:
+
+```json
+{
+  "name": "bardo",
+  "command": "bunx",
+  "args": ["@bardohq/bardo"],
+  "env": {
+    "BARDO_WORKSPACE": "/path/to/your/campaigns"
+  }
+}
+```
+
+Cline will display Bardo's available tools in the tool approval panel on first use.
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+### VS Code + GitHub Copilot
+
+Add Bardo to your VS Code workspace settings:
+
+```json filename=".vscode/settings.json"
+{
+  "github.copilot.chat.mcp.servers": {
+    "bardo": {
+      "command": "bunx",
+      "args": ["@bardohq/bardo"],
+      "env": {
+        "BARDO_WORKSPACE": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+<Callout type="warning">
+  GitHub Copilot's MCP support is available in VS Code Insiders and requires the latest Copilot Chat extension.
+</Callout>
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+### Codex CLI
+
+Pass the MCP server config via the `--mcp` flag or add it to your `~/.codex/config.json`:
+
+```json filename="~/.codex/config.json"
+{
+  "mcp": {
+    "servers": {
+      "bardo": {
+        "command": "bunx",
+        "args": ["@bardohq/bardo"],
+        "env": {
+          "BARDO_WORKSPACE": "/path/to/your/campaigns"
+        }
+      }
+    }
+  }
+}
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+### Gemini CLI
+
+Add Bardo to your Gemini CLI tools configuration:
+
+```json filename="~/.gemini/config.json"
+{
+  "tools": {
+    "mcp": {
+      "servers": {
+        "bardo": {
+          "command": "bunx",
+          "args": ["@bardohq/bardo"],
+          "env": {
+            "BARDO_WORKSPACE": "/path/to/your/campaigns"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## HTTP transport
+
+If you prefer to run Bardo as a persistent HTTP server rather than a stdio process, start it with:
+
+```bash
+bunx @bardohq/bardo --transport http --port 3001
+```
+
+Then point your client at the SSE endpoint:
+
+```
+http://localhost:3001/sse
+```
+
+<Callout>
+  HTTP transport is useful when multiple clients need to share the same running Bardo instance, or when running Bardo on a remote machine.
+</Callout>
+
+## Verifying the connection
+
+Once configured, ask your agent:
+
+```
+List the available Bardo MCP tools.
+```
+
+You should see the full tool list including `init`, `player_action`, `world_sync`, `state_get`, `state_set`, `markdown_read`, and `markdown_upsert`.

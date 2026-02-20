@@ -20,7 +20,7 @@ export default function LazyFileTree({
 	defaultSelectedId?: string;
 	className?: string;
 }) {
-	const { ref, isInView } = useOnceInView<HTMLDivElement>("220px 0px");
+	const { ref, isInView } = useOnceInView<HTMLDivElement>("420px 0px");
 
 	return (
 		<div ref={ref}>
@@ -32,7 +32,7 @@ export default function LazyFileTree({
 				/>
 			) : (
 				<div
-					className="h-[420px] w-full animate-pulse border border-border bg-muted/10"
+					className="h-[420px] w-full animate-pulse border border-border bg-linear-to-br from-muted/5 via-muted/10 to-muted/5"
 					aria-hidden
 				/>
 			)}

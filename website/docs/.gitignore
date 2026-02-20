@@ -1,5 +1,8 @@
 
 # clerk configuration (can include secrets)
 /.clerk/
+.playwright/
+playwright-report/
+test-results/
 
 .env.local

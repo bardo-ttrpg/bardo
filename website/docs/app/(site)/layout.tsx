@@ -12,11 +12,84 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
+const PRIMARY_NAV_LINKS = [
+	{ href: "/mpc-docs", label: "Docs" },
+	{ href: "/pricing", label: "Pricing" },
+	{ href: "/dashboard", label: "Dashboard" },
+	{ href: "/legal", label: "Legal" },
+] as const;
+
+const FOOTER_PRODUCT_LINKS = [
+	{ label: "Docs", href: "/mpc-docs" },
+	{ label: "Dashboard", href: "/dashboard" },
+	{ label: "Pricing", href: "/pricing" },
+	{ label: "Legal", href: "/legal" },
+	{ label: "Sign up", href: "/sign-up" },
+] as const;
+
+const FOOTER_AGENTS = ["Claude Code", "Cursor", "Cline", "OpenCode"] as const;
+
+const FOOTER_STACK = [
+	"Any TTRPG system",
+	"Markdown-first",
+	"System-agnostic",
+	"MCP protocol",
+] as const;
+
+const navLinkClass =
+	"font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground";
+
+function NavLink({ href, label }: { href: string; label: string }) {
+	return (
+		<Link href={href} prefetch={false} className={navLinkClass}>
+			{label}
+		</Link>
+	);
+}
+
+function AuthControls() {
+	if (!IS_CLERK_CONFIGURED) {
+		return (
+			<>
+				<Link href="/sign-in" prefetch={false} className={navLinkClass}>
+					Log in
+				</Link>
+				<Link
+					href="/sign-up"
+					prefetch={false}
+					className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+				>
+					Sign up ↗
+				</Link>
+			</>
+		);
+	}
+
+	return (
+		<>
+			<SignedOut>
+				<Link href="/sign-in" prefetch={false} className={navLinkClass}>
+					Log in
+				</Link>
+				<Link
+					href="/sign-up"
+					prefetch={false}
+					className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+				>
+					Sign up ↗
+				</Link>
+			</SignedOut>
+			<SignedIn>
+				<UserButton afterSignOutUrl="/" />
+			</SignedIn>
+		</>
+	);
+}
+
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const body = (
 		<div className="min-h-screen text-foreground">
-			{/* ── Header ── */}
-			<header className="sticky top-0 z-50 border-b border-border bg-background">
+			<header className="sticky top-0 z-50 border-b border-border bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82">
 				<div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6">
 					<Link
 						href="/"
@@ -25,103 +98,48 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						Bardo
 					</Link>
 
-					<nav className="hidden items-center gap-7 sm:flex">
-						<Link
-							href="/mpc-docs"
-							prefetch={false}
-							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-						>
-							Docs
-						</Link>
-						<Link
-							href="/dashboard"
-							prefetch={false}
-							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-						>
-							Dashboard
-						</Link>
-						<Link
-							href="/pricing"
-							prefetch={false}
-							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-						>
-							Pricing
-						</Link>
-						<Link
-							href="/legal"
-							prefetch={false}
-							className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-						>
-							Legal
-						</Link>
+					<nav
+						aria-label="Primary"
+						className="hidden items-center gap-7 sm:flex"
+					>
+						{PRIMARY_NAV_LINKS.map((link) => (
+							<NavLink key={link.href} href={link.href} label={link.label} />
+						))}
 					</nav>
 
 					<div className="flex items-center gap-3">
-						{IS_CLERK_CONFIGURED ? (
-							<>
-								<SignedOut>
-									<Link
-										href="/sign-in"
-										prefetch={false}
-										className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-									>
-										Log in
-									</Link>
-									<Link
-										href="/sign-up"
-										prefetch={false}
-										className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-									>
-										Sign up ↗
-									</Link>
-								</SignedOut>
-								<SignedIn>
-									<UserButton afterSignOutUrl="/" />
-								</SignedIn>
-							</>
-						) : (
-							<>
-								<Link
-									href="/sign-in"
-									prefetch={false}
-									className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-								>
-									Log in
-								</Link>
-								<Link
-									href="/sign-up"
-									prefetch={false}
-									className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-								>
-									Sign up ↗
-								</Link>
-							</>
-						)}
+						<AuthControls />
 						<ThemeToggle />
 					</div>
 				</div>
+
+				<div className="sm:hidden">
+					<nav
+						aria-label="Mobile"
+						className="mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-4 py-2.5"
+					>
+						{PRIMARY_NAV_LINKS.map((link) => (
+							<NavLink
+								key={`mobile-${link.href}`}
+								href={link.href}
+								label={link.label}
+							/>
+						))}
+					</nav>
+				</div>
 			</header>
 
-			{/* ── Content ── */}
-			<main>{children}</main>
+			<main id="main-content">{children}</main>
 
-			{/* ── Footer ── */}
-			<footer className="mt-24 border-t border-border bg-background">
+			<footer className="mt-24 border-t border-border bg-background/98">
 				<div className="mx-auto max-w-7xl">
 					<div className="grid grid-cols-2 border-b border-border sm:grid-cols-4">
-						{/* Product */}
 						<div className="border-r border-border px-6 py-10 sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								Product
 							</p>
 							<ul className="space-y-3">
-								{[
-									{ label: "Docs", href: "/mpc-docs" },
-									{ label: "Dashboard", href: "/dashboard" },
-									{ label: "Pricing", href: "/pricing" },
-									{ label: "Legal", href: "/legal" },
-									{ label: "Sign up", href: "/sign-up" },
-								].map(({ label, href }) => (
+								{FOOTER_PRODUCT_LINKS.map(({ label, href }) => (
 									<li key={label}>
 										<Link
 											href={href}
@@ -134,46 +152,38 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 							</ul>
 						</div>
 
-						{/* Agents */}
 						<div className="px-6 py-10 sm:border-r sm:border-border sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								Agents
 							</p>
 							<ul className="space-y-3">
-								{["Claude Code", "Cursor", "Cline", "OpenCode"].map((a) => (
+								{FOOTER_AGENTS.map((agent) => (
 									<li
-										key={a}
+										key={agent}
 										className="font-mono text-xs text-muted-foreground"
 									>
-										{a}
+										{agent}
 									</li>
 								))}
 							</ul>
 						</div>
 
-						{/* Stack */}
 						<div className="border-r border-t border-border px-6 py-10 sm:border-t-0 sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								Stack
 							</p>
 							<ul className="space-y-3">
-								{[
-									"Any TTRPG system",
-									"Markdown-first",
-									"System-agnostic",
-									"MCP protocol",
-								].map((a) => (
+								{FOOTER_STACK.map((item) => (
 									<li
-										key={a}
+										key={item}
 										className="font-mono text-xs text-muted-foreground"
 									>
-										{a}
+										{item}
 									</li>
 								))}
 							</ul>
 						</div>
 
-						{/* CTA */}
 						<div className="border-t border-border px-6 py-10 sm:border-t-0 sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 								Get started
@@ -187,8 +197,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						</div>
 					</div>
 
-					{/* Bottom bar */}
-					<div className="flex items-center justify-between px-6 py-5 sm:px-8">
+					<div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-8">
 						<span className="font-mono text-[11px] text-muted-foreground">
 							© {new Date().getFullYear()} Bardo — MCP-driven TTRPG operations
 						</span>
@@ -215,6 +224,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 	if (!IS_CLERK_CONFIGURED) {
 		return themedBody;
 	}
+
 	return (
 		<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
 			{themedBody}

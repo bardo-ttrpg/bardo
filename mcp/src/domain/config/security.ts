@@ -7,6 +7,7 @@ export type SecurityPolicy = {
 	sessionTtlMs: number;
 	rateLimitWindowMs: number;
 	rateLimitMaxRequests: number;
+	rateLimitFailClosed: boolean;
 };
 
 const DEFAULTS = {
@@ -47,6 +48,15 @@ function resolveQueryApiKeyPolicy(
 	return !isProduction;
 }
 
+function resolveFailClosedRateLimit(
+	env: Record<string, string | undefined>,
+): boolean {
+	const value = env.BARDO_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
+	if (value === "true") return true;
+	if (value === "false") return false;
+	return false;
+}
+
 export function resolveSecurityPolicy(
 	env: Record<string, string | undefined>,
 ): SecurityPolicy {
@@ -70,6 +80,7 @@ export function resolveSecurityPolicy(
 			env.BARDO_RATE_LIMIT_MAX_REQUESTS,
 			DEFAULTS.rateLimitMaxRequests,
 		),
+		rateLimitFailClosed: resolveFailClosedRateLimit(env),
 	};
 }
 

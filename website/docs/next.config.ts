@@ -4,14 +4,15 @@ import nextra from "nextra";
 const withNextra = nextra({
 	contentDirBasePath: "/mpc-docs",
 	search: false,
-	codeHighlight: false,
+	codeHighlight: true,
 	latex: false,
 	readingTime: false,
-	defaultShowCopyCode: false,
+	defaultShowCopyCode: true,
 });
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
+	allowedDevOrigins: ["127.0.0.1", "localhost"],
 	images: {
 		formats: ["image/avif", "image/webp"],
 		remotePatterns: [

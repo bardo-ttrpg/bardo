@@ -1,12 +1,23 @@
 import { v } from "convex/values";
-import {
-	buildBillingBackfillPatch,
-	planCreditsFor,
-	resolveBillingState,
-} from "../lib/user-billing";
 import { mutation, query } from "./_generated/server";
-
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+import {
+	applyStripeSubscriptionHandler,
+	completeBillingEventHandler,
+	downgradeToFreeHandler,
+	getUserByClerkIdHandler,
+	getUserByStripeCustomerIdHandler,
+	migrateLegacyPlanCatalogHandler,
+	recordInvoicePaymentHandler,
+	reserveBillingEventHandler,
+	setStripeCustomerIdHandler,
+	trackMcpCallHandler,
+	upsertUserHandler,
+} from "./users/handlers";
+import {
+	BILLING_INTERVAL_VALIDATOR,
+	PLAN_TIER_VALIDATOR,
+	SUBSCRIPTION_STATUS_VALIDATOR,
+} from "./users/shared";
 
 export const upsertUser = mutation({
 	args: {
@@ -15,145 +26,105 @@ export const upsertUser = mutation({
 		imageUrl: v.union(v.string(), v.null()),
 		name: v.union(v.string(), v.null()),
 	},
-	handler: async (ctx, args) => {
-		const existing = await ctx.db
-			.query("users")
-			.withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-			.unique();
-
-		const now = Date.now();
-
-		if (existing) {
-			const backfillPatch = buildBillingBackfillPatch(
-				{
-					plan: existing.plan,
-					creditsTotal: existing.creditsTotal,
-					creditsUsed: existing.creditsUsed,
-					periodStart: existing.periodStart,
-					mcpCallsTotal: existing.mcpCallsTotal,
-					mcpCallsThisPeriod: existing.mcpCallsThisPeriod,
-				},
-				now,
-			);
-
-			await ctx.db.patch(existing._id, {
-				email: args.email,
-				imageUrl: args.imageUrl,
-				name: args.name,
-				updatedAt: now,
-				...backfillPatch,
-			});
-			return existing._id;
-		}
-
-		const initialBilling = resolveBillingState(
-			{
-				plan: "free",
-				creditsTotal: undefined,
-				creditsUsed: undefined,
-				periodStart: undefined,
-				mcpCallsTotal: undefined,
-				mcpCallsThisPeriod: undefined,
-			},
-			now,
-		);
-
-		return await ctx.db.insert("users", {
-			clerkId: args.clerkId,
-			email: args.email,
-			imageUrl: args.imageUrl,
-			name: args.name,
-			createdAt: now,
-			updatedAt: now,
-			plan: initialBilling.plan,
-			creditsTotal: initialBilling.creditsTotal,
-			creditsUsed: initialBilling.creditsUsed,
-			periodStart: initialBilling.periodStart,
-			mcpCallsTotal: initialBilling.mcpCallsTotal,
-			mcpCallsThisPeriod: initialBilling.mcpCallsThisPeriod,
-		});
-	},
+	handler: upsertUserHandler,
 });
 
 export const trackMcpCall = mutation({
 	args: {
 		clerkId: v.string(),
 	},
-	handler: async (ctx, args) => {
-		const user = await ctx.db
-			.query("users")
-			.withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-			.unique();
-
-		if (!user) return null;
-
-		const now = Date.now();
-		const billing = resolveBillingState(
-			{
-				plan: user.plan,
-				creditsTotal: user.creditsTotal,
-				creditsUsed: user.creditsUsed,
-				periodStart: user.periodStart,
-				mcpCallsTotal: user.mcpCallsTotal,
-				mcpCallsThisPeriod: user.mcpCallsThisPeriod,
-			},
-			now,
-		);
-		const backfillPatch = buildBillingBackfillPatch(
-			{
-				plan: user.plan,
-				creditsTotal: user.creditsTotal,
-				creditsUsed: user.creditsUsed,
-				periodStart: user.periodStart,
-				mcpCallsTotal: user.mcpCallsTotal,
-				mcpCallsThisPeriod: user.mcpCallsThisPeriod,
-			},
-			now,
-		);
-		const periodExpired = now > billing.periodStart + THIRTY_DAYS_MS;
-
-		if (periodExpired) {
-			await ctx.db.patch(user._id, {
-				...backfillPatch,
-				creditsUsed: 1,
-				mcpCallsThisPeriod: 1,
-				mcpCallsTotal: billing.mcpCallsTotal + 1,
-				periodStart: now,
-				creditsTotal: planCreditsFor(billing.plan),
-			});
-		} else {
-			await ctx.db.patch(user._id, {
-				...backfillPatch,
-				creditsUsed: billing.creditsUsed + 1,
-				mcpCallsThisPeriod: billing.mcpCallsThisPeriod + 1,
-				mcpCallsTotal: billing.mcpCallsTotal + 1,
-			});
-		}
-
-		return user._id;
-	},
+	handler: trackMcpCallHandler,
 });
 
 export const getUserByClerkId = query({
 	args: { clerkId: v.string() },
-	handler: async (ctx, args) => {
-		const user = await ctx.db
-			.query("users")
-			.withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-			.unique();
+	handler: (ctx, args) => getUserByClerkIdHandler(ctx, args.clerkId),
+});
 
-		if (!user) return null;
+export const getUserByStripeCustomerId = query({
+	args: { stripeCustomerId: v.string() },
+	handler: (ctx, args) =>
+		getUserByStripeCustomerIdHandler(ctx, args.stripeCustomerId),
+});
 
-		return {
-			...user,
-			...resolveBillingState({
-				plan: user.plan,
-				creditsTotal: user.creditsTotal,
-				creditsUsed: user.creditsUsed,
-				periodStart: user.periodStart,
-				mcpCallsTotal: user.mcpCallsTotal,
-				mcpCallsThisPeriod: user.mcpCallsThisPeriod,
-			}),
-		};
+export const setStripeCustomerId = mutation({
+	args: {
+		clerkId: v.string(),
+		stripeCustomerId: v.string(),
 	},
+	handler: setStripeCustomerIdHandler,
+});
+
+export const applyStripeSubscription = mutation({
+	args: {
+		clerkId: v.optional(v.string()),
+		stripeCustomerId: v.string(),
+		stripeSubscriptionId: v.union(v.string(), v.null()),
+		stripePriceId: v.union(v.string(), v.null()),
+		subscriptionStatus: SUBSCRIPTION_STATUS_VALIDATOR,
+		billingInterval: v.union(BILLING_INTERVAL_VALIDATOR, v.null()),
+		plan: v.optional(PLAN_TIER_VALIDATOR),
+		partySeats: v.optional(v.float64()),
+		currentPeriodEnd: v.union(v.float64(), v.null()),
+		cancelAtPeriodEnd: v.boolean(),
+		periodStart: v.union(v.float64(), v.null()),
+		now: v.float64(),
+	},
+	handler: applyStripeSubscriptionHandler,
+});
+
+export const downgradeToFree = mutation({
+	args: {
+		stripeCustomerId: v.string(),
+		now: v.float64(),
+	},
+	handler: downgradeToFreeHandler,
+});
+
+export const migrateLegacyPlanCatalog = mutation({
+	args: {},
+	handler: migrateLegacyPlanCatalogHandler,
+});
+
+export const recordInvoicePayment = mutation({
+	args: {
+		clerkId: v.string(),
+		stripeCustomerId: v.string(),
+		stripeSubscriptionId: v.union(v.string(), v.null()),
+		stripeInvoiceId: v.string(),
+		amountPaidCents: v.float64(),
+		currency: v.string(),
+		paidAt: v.float64(),
+		status: v.string(),
+		billingReason: v.union(v.string(), v.null()),
+		priceId: v.union(v.string(), v.null()),
+		billingInterval: v.union(BILLING_INTERVAL_VALIDATOR, v.null()),
+		partySeats: v.float64(),
+		now: v.float64(),
+	},
+	handler: recordInvoicePaymentHandler,
+});
+
+export const reserveBillingEvent = mutation({
+	args: {
+		stripeEventId: v.string(),
+		type: v.string(),
+		createdAt: v.float64(),
+		receivedAt: v.float64(),
+	},
+	handler: reserveBillingEventHandler,
+});
+
+export const completeBillingEvent = mutation({
+	args: {
+		stripeEventId: v.string(),
+		status: v.union(
+			v.literal("processed"),
+			v.literal("failed"),
+			v.literal("ignored"),
+		),
+		error: v.optional(v.string()),
+		processedAt: v.float64(),
+	},
+	handler: completeBillingEventHandler,
 });

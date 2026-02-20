@@ -1,28 +1,138 @@
 ---
 title: Workspace Model
-description: Understand the markdown-first source-of-truth model behind Bardo.
+description: How Bardo uses a local markdown-first filesystem as the persistent source of truth for every campaign.
 ---
+
+import { Callout, FileTree } from 'nextra/components'
 
 # Workspace Model
 
-Bardo treats your local filesystem as campaign truth.
+Bardo treats your local filesystem as **campaign truth**. Every durable fact about a campaign — world lore, entity state, quest progress, session history — lives in a plain markdown file under a controlled directory structure.
 
-## Core idea
+<Callout type="info">
+  Because the workspace is plain files, it's fully version-controllable with git. You can branch timelines, roll back mistakes, diff narration changes, and collaborate with other GMs.
+</Callout>
 
-Every durable campaign artifact is represented in markdown files under a controlled directory structure.
+## Directory structure
 
-## Typical domains
+A typical Bardo workspace looks like this:
 
-- `_settings`: preferences and setup metadata
-- `world`: locations, scenes, maps, and lore
-- `party`: player party state
-- `entities`: NPCs and notable actors
-- `quests`: objective and progress records
-- `state`: current world state + history timeline
+<FileTree>
+  <FileTree.Folder name="my-campaign" defaultOpen>
+    <FileTree.Folder name="_settings" defaultOpen>
+      <FileTree.File name="config.md" />
+      <FileTree.File name="rules.md" />
+    </FileTree.Folder>
+    <FileTree.Folder name="world">
+      <FileTree.File name="overview.md" />
+      <FileTree.Folder name="locations">
+        <FileTree.File name="the-ruined-tower.md" />
+        <FileTree.File name="port-calderon.md" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="party">
+      <FileTree.File name="roster.md" />
+      <FileTree.File name="inventory.md" />
+    </FileTree.Folder>
+    <FileTree.Folder name="entities">
+      <FileTree.File name="elder-mira.md" />
+      <FileTree.File name="guard-captain.md" />
+    </FileTree.Folder>
+    <FileTree.Folder name="quests">
+      <FileTree.File name="the-missing-relic.md" />
+    </FileTree.Folder>
+    <FileTree.Folder name="state">
+      <FileTree.File name="current.md" />
+      <FileTree.File name="history.md" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
 
-## Benefits
+## Domain reference
 
-- Human-readable data
-- Git-friendly versioning
-- Portable between tools and agents
-- System-agnostic gameplay orchestration
+### `_settings/`
+
+Global campaign configuration. The agent reads this at session start.
+
+```md filename="_settings/config.md"
+# Campaign Config
+
+system: Blades in the Dark
+tone: gritty, low-fantasy
+safety: lines=[graphic violence], veils=[torture]
+gm_style: improv-first, rulings over rules
+```
+
+### `world/`
+
+Lore, geography, factions, and scenes. Anything that exists in the fiction independent of the player party belongs here.
+
+```md filename="world/locations/port-calderon.md"
+# Port Calderon
+
+A fog-choked harbor city ruled by three rival merchant guilds.
+
+## Districts
+- The Docks: controlled by the Salthand Consortium
+- Thornwall: residential, mostly neutral
+- The Warrens: underworld territory, lawless
+
+## Notable NPCs
+- Harbormaster Voss (Salthand, corrupt)
+- Sister Aela (Forgotten Gods shrine, neutral)
+```
+
+### `party/`
+
+The player party's shared state: character roster, inventory, debts, and resources.
+
+### `entities/`
+
+Individual named entities — NPCs, creatures, factions, and objects significant enough to track. One file per entity.
+
+```md filename="entities/elder-mira.md"
+# Elder Mira
+
+Disposition: cautious but not hostile
+Location: Port Calderon, Thornwall district
+Knows: location of the relic vault, distrusts the guilds
+Last seen: session 3, gave the party the iron key
+```
+
+### `quests/`
+
+Active and completed quest threads. Each file tracks objective, current status, and key facts.
+
+### `state/`
+
+- `current.md` — snapshot of the world right now (weather, open threads, party position)
+- `history.md` — append-only log of every major session event
+
+## How the agent uses the workspace
+
+The agent never holds campaign state in its context window. Instead:
+
+1. `init` reads `_settings/` and `state/current.md` to restore context
+2. `player_action` loads only the files relevant to the current scene
+3. `world_sync` writes new entity or location files when proper names appear
+4. `state_set` updates `state/current.md` at the end of every turn
+
+<Callout type="warning">
+  Never edit `state/history.md` manually. The agent appends to it in a structured format. Editing it by hand can cause desync between narration and tracked state.
+</Callout>
+
+## File format conventions
+
+All workspace files are plain Markdown. Bardo doesn't enforce a schema — it uses heading structure and frontmatter as loose conventions that the agent learns from `_settings/rules.md`.
+
+You can add frontmatter for structured metadata:
+
+```md
+---
+entity: npc
+status: active
+last_updated: "2025-06-01"
+---
+```
+
+But it's optional. The agent is instructed to treat H1 as the entity name and everything else as free-form lore.

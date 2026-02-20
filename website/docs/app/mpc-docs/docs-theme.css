@@ -1,0 +1,601 @@
+/*
+ * Bardo docs theme — full design system override for nextra-theme-docs.
+ * Loaded AFTER nextra-theme-docs/style.css so cascade order wins.
+ * Matches the dark, monospace, brutalist aesthetic of the main site.
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   1. NEXTRA COLOR TOKENS
+   --nextra-bg      : comma-separated R,G,B used as rgb(var(--nextra-bg))
+   --nextra-primary : HSL-based accent colour (hue / saturation / lightness)
+   Zero saturation = pure greyscale = white/grey accent everywhere.
+───────────────────────────────────────────────────────────── */
+:root {
+	/* Page background: match Bardo near-black */
+	--nextra-bg: 10, 10, 10;
+
+	/* Monochrome accent — white-ish in dark mode */
+	--nextra-primary-hue: 0;
+	--nextra-primary-saturation: 0%;
+	--nextra-primary-lightness: 62%;
+
+	/* Navbar height matches site header h-11 = 44px */
+	--nextra-navbar-height: 44px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   2. FONT INHERITANCE
+   Pass Geist fonts through Nextra's own font variables so all
+   text inherits the same typeface as the rest of the site.
+───────────────────────────────────────────────────────────── */
+:root {
+	--x-font-sans: var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif);
+	--x-font-mono: var(
+		--font-geist-mono,
+		ui-monospace,
+		SFMono-Regular,
+		monospace
+	);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3. GLOBAL RESET — no rounded corners anywhere in docs
+───────────────────────────────────────────────────────────── */
+.nextra-nav-container *,
+aside *,
+article *,
+footer * {
+	border-radius: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4. FIX globals.css CONFLICT
+   app/globals.css sets `a { color: inherit; text-decoration: none; }`
+   which makes sidebar links invisible. Re-assert Nextra link colours.
+───────────────────────────────────────────────────────────── */
+
+/* Sidebar links */
+aside a {
+	color: oklch(0.45 0 0);
+	text-decoration: none;
+}
+aside a:hover,
+aside button:hover {
+	color: oklch(0.97 0 0);
+}
+
+/* Article prose links */
+article a {
+	color: oklch(0.8 0 0);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-color: oklch(1 0 0 / 30%);
+}
+article a:hover {
+	color: oklch(0.97 0 0);
+	text-decoration-color: oklch(1 0 0 / 70%);
+}
+
+/* Light mode overrides for links */
+.light aside a {
+	color: oklch(0.45 0 0);
+}
+.light aside a:hover,
+.light aside button:hover {
+	color: oklch(0.1 0 0);
+}
+.light article a {
+	color: oklch(0.25 0 0);
+	text-decoration-color: oklch(0 0 0 / 30%);
+}
+.light article a:hover {
+	text-decoration-color: oklch(0 0 0 / 70%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   5. NAVBAR
+   Nextra renders the navbar prop inside a sticky <header>.
+   Override it to match the Bardo site header exactly.
+───────────────────────────────────────────────────────────── */
+
+/* Nextra's sticky nav wrapper */
+header[class*="nextra"] {
+	background-color: oklch(0.04 0 0 / 92%);
+	backdrop-filter: blur(12px);
+	border-bottom: 1px solid oklch(1 0 0 / 10%);
+}
+.light header[class*="nextra"] {
+	background-color: oklch(0.99 0 0 / 92%);
+	border-bottom: 1px solid oklch(0 0 0 / 12%);
+}
+
+/* Nav links styled like the site */
+.bardo-nav-link {
+	color: oklch(0.44 0 0);
+}
+.bardo-nav-link:hover {
+	color: oklch(0.97 0 0);
+}
+.light .bardo-nav-link {
+	color: oklch(0.5 0 0);
+}
+.light .bardo-nav-link:hover {
+	color: oklch(0.1 0 0);
+}
+
+/* Sign-up button */
+.bardo-signup-btn {
+	border: 1px solid oklch(1 0 0 / 30%);
+	padding: 0.375rem 0.875rem;
+	color: oklch(0.97 0 0);
+}
+.bardo-signup-btn:hover {
+	background-color: oklch(0.97 0 0);
+	color: oklch(0.04 0 0);
+}
+.light .bardo-signup-btn {
+	border-color: oklch(0 0 0 / 30%);
+	color: oklch(0.1 0 0);
+}
+.light .bardo-signup-btn:hover {
+	background-color: oklch(0.1 0 0);
+	color: oklch(0.99 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   6. SIDEBAR (left navigation)
+───────────────────────────────────────────────────────────── */
+
+/* Container */
+aside,
+.nextra-sidebar-container {
+	background-color: oklch(0.04 0 0);
+	border-right: 1px solid oklch(1 0 0 / 8%);
+}
+.light aside,
+.light .nextra-sidebar-container {
+	background-color: oklch(0.97 0 0);
+	border-right: 1px solid oklch(0 0 0 / 8%);
+}
+
+/* All sidebar links and buttons */
+aside a,
+aside button,
+aside [role="button"] {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	padding-top: 0.35rem;
+	padding-bottom: 0.35rem;
+	border-radius: 0;
+}
+
+/* Active / current page */
+aside a[aria-current="page"],
+aside a[class*="active"] {
+	color: oklch(0.97 0 0);
+	background-color: oklch(1 0 0 / 7%);
+	border-left: 2px solid oklch(0.97 0 0);
+	font-weight: 600;
+}
+.light aside a[aria-current="page"],
+.light aside a[class*="active"] {
+	color: oklch(0.1 0 0);
+	background-color: oklch(0 0 0 / 6%);
+	border-left: 2px solid oklch(0.1 0 0);
+}
+
+/* Section / folder headings in sidebar */
+aside li > p,
+aside [class*="separator"],
+aside [class*="folder"] > div > button {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 9px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: oklch(0.35 0 0);
+	font-weight: 700;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   7. ARTICLE CONTENT TYPOGRAPHY
+───────────────────────────────────────────────────────────── */
+article {
+	color: oklch(0.82 0 0);
+}
+.light article {
+	color: oklch(0.25 0 0);
+}
+
+/* Headings */
+article h1,
+article h2,
+article h3,
+article h4 {
+	font-family: var(--font-geist-sans, ui-sans-serif, sans-serif);
+	color: oklch(0.97 0 0);
+	font-weight: 600;
+	letter-spacing: -0.02em;
+}
+.light article h1,
+.light article h2,
+.light article h3,
+.light article h4 {
+	color: oklch(0.08 0 0);
+}
+
+article h1 {
+	font-size: clamp(1.6rem, 4vw, 2.25rem);
+	line-height: 1.15;
+	margin-bottom: 0.5rem;
+}
+article h2 {
+	font-size: 1.25rem;
+	margin-top: 2.5rem;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid oklch(1 0 0 / 10%);
+}
+.light article h2 {
+	border-bottom-color: oklch(0 0 0 / 10%);
+}
+article h3 {
+	font-size: 1rem;
+}
+
+/* Body text */
+article p,
+article li {
+	line-height: 1.75;
+	font-size: 0.9rem;
+}
+
+/* Inline code */
+article code:not(pre code) {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 0.78rem;
+	background-color: oklch(1 0 0 / 7%);
+	border: 1px solid oklch(1 0 0 / 12%);
+	color: oklch(0.9 0 0);
+	padding: 0.15em 0.4em;
+	border-radius: 0;
+}
+.light article code:not(pre code) {
+	background-color: oklch(0 0 0 / 6%);
+	border-color: oklch(0 0 0 / 12%);
+	color: oklch(0.15 0 0);
+}
+
+/* Blockquotes */
+article blockquote {
+	border-left: 2px solid oklch(1 0 0 / 20%);
+	color: oklch(0.55 0 0);
+	font-style: italic;
+	background: none;
+	margin-left: 0;
+}
+.light article blockquote {
+	border-left-color: oklch(0 0 0 / 20%);
+}
+
+/* Tables */
+article table {
+	font-size: 0.875rem;
+}
+article th {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 10px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	border-bottom: 1px solid oklch(1 0 0 / 15%);
+}
+.light article th {
+	border-bottom-color: oklch(0 0 0 / 15%);
+}
+article td {
+	border-bottom: 1px solid oklch(1 0 0 / 7%);
+}
+.light article td {
+	border-bottom-color: oklch(0 0 0 / 7%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   8. CODE BLOCKS
+───────────────────────────────────────────────────────────── */
+pre,
+[class*="nextra-code"] {
+	background-color: oklch(0.07 0 0);
+	border: 1px solid oklch(1 0 0 / 10%);
+	border-radius: 0;
+}
+.light pre,
+.light [class*="nextra-code"] {
+	background-color: oklch(0.95 0 0);
+	border-color: oklch(0 0 0 / 10%);
+}
+
+pre code {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 0.8rem;
+	background: none;
+	border: none;
+}
+
+/* Filename label above code block */
+[class*="nextra-code"] [class*="filename"],
+[data-filename] {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	background-color: oklch(0.09 0 0);
+	border-bottom: 1px solid oklch(1 0 0 / 8%);
+	color: oklch(0.55 0 0);
+}
+.light [class*="nextra-code"] [class*="filename"],
+.light [data-filename] {
+	background-color: oklch(0.9 0 0);
+	border-bottom-color: oklch(0 0 0 / 8%);
+	color: oklch(0.42 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   9. CALLOUTS / ADMONITIONS
+───────────────────────────────────────────────────────────── */
+[class*="callout"],
+.nextra-callout {
+	border-radius: 0;
+	border-left-width: 2px;
+	background-color: oklch(1 0 0 / 3%);
+	border-top: none;
+	border-right: none;
+	border-bottom: none;
+}
+.light [class*="callout"],
+.light .nextra-callout {
+	background-color: oklch(0 0 0 / 3%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   10. TOC (right sidebar — "On this page")
+───────────────────────────────────────────────────────────── */
+nav[aria-label="On this page"] a,
+[class*="nextra-toc"] a {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 10px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: oklch(0.42 0 0);
+	text-decoration: none;
+}
+nav[aria-label="On this page"] a:hover,
+[class*="nextra-toc"] a:hover {
+	color: oklch(0.97 0 0);
+}
+nav[aria-label="On this page"] a[class*="active"],
+[class*="nextra-toc"] a[class*="active"] {
+	color: oklch(0.97 0 0);
+}
+.light nav[aria-label="On this page"] a,
+.light [class*="nextra-toc"] a {
+	color: oklch(0.5 0 0);
+}
+.light nav[aria-label="On this page"] a:hover,
+.light [class*="nextra-toc"] a:hover {
+	color: oklch(0.1 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   11. BREADCRUMBS
+───────────────────────────────────────────────────────────── */
+nav[aria-label="Breadcrumb"] {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 10px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: oklch(0.42 0 0);
+}
+nav[aria-label="Breadcrumb"] a {
+	color: oklch(0.42 0 0);
+	text-decoration: none;
+}
+nav[aria-label="Breadcrumb"] a:hover {
+	color: oklch(0.97 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   12. FOOTER
+───────────────────────────────────────────────────────────── */
+footer {
+	background-color: oklch(0.04 0 0);
+	border-top: 1px solid oklch(1 0 0 / 10%);
+}
+.light footer {
+	background-color: oklch(0.97 0 0);
+	border-top-color: oklch(0 0 0 / 10%);
+}
+
+.bardo-footer-copy {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+	color: oklch(0.42 0 0);
+}
+.light .bardo-footer-copy {
+	color: oklch(0.5 0 0);
+}
+
+.bardo-footer-link {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: oklch(0.42 0 0);
+	text-decoration: none;
+	transition: color 0.15s;
+}
+.bardo-footer-link:hover {
+	color: oklch(0.97 0 0);
+}
+.light .bardo-footer-link {
+	color: oklch(0.5 0 0);
+}
+.light .bardo-footer-link:hover {
+	color: oklch(0.1 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   13. PAGE / MAIN BACKGROUND
+───────────────────────────────────────────────────────────── */
+html,
+body {
+	background-color: oklch(0.04 0 0);
+}
+.light html,
+.light body,
+html.light,
+body.light {
+	background-color: oklch(0.99 0 0);
+}
+
+/* Nextra's main content area */
+main,
+.nextra-content {
+	background-color: oklch(0.04 0 0);
+}
+.light main,
+.light .nextra-content {
+	background-color: oklch(0.99 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   14. SCROLLBAR (webkit) — subtle dark style
+───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+	width: 5px;
+	height: 5px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background-color: oklch(1 0 0 / 14%);
+}
+::-webkit-scrollbar-thumb:hover {
+	background-color: oklch(1 0 0 / 24%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   15. NEXTRA STEPS COMPONENT
+───────────────────────────────────────────────────────────── */
+[class*="steps"] h3::before,
+[class*="steps"] li::before {
+	background-color: oklch(0.15 0 0);
+	border: 1px solid oklch(1 0 0 / 15%);
+	color: oklch(0.65 0 0);
+	border-radius: 0;
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+}
+.light [class*="steps"] h3::before,
+.light [class*="steps"] li::before {
+	background-color: oklch(0.93 0 0);
+	border-color: oklch(0 0 0 / 12%);
+	color: oklch(0.42 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   16. NEXTRA CARDS COMPONENT
+───────────────────────────────────────────────────────────── */
+[class*="nextra-card"],
+.nextra-cards a {
+	border: 1px solid oklch(1 0 0 / 10%);
+	background-color: oklch(0.07 0 0);
+	border-radius: 0;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+}
+[class*="nextra-card"]:hover,
+.nextra-cards a:hover {
+	background-color: oklch(0.1 0 0);
+	border-color: oklch(1 0 0 / 20%);
+}
+.light [class*="nextra-card"],
+.light .nextra-cards a {
+	border-color: oklch(0 0 0 / 10%);
+	background-color: oklch(0.97 0 0);
+}
+.light [class*="nextra-card"]:hover,
+.light .nextra-cards a:hover {
+	background-color: oklch(0.93 0 0);
+	border-color: oklch(0 0 0 / 20%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   17. NEXTRA TABS COMPONENT
+───────────────────────────────────────────────────────────── */
+[role="tablist"] {
+	border-bottom: 1px solid oklch(1 0 0 / 10%);
+}
+.light [role="tablist"] {
+	border-bottom-color: oklch(0 0 0 / 10%);
+}
+[role="tab"] {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	border-radius: 0;
+}
+[role="tab"][aria-selected="true"] {
+	color: oklch(0.97 0 0);
+	border-bottom: 2px solid oklch(0.97 0 0);
+}
+.light [role="tab"][aria-selected="true"] {
+	color: oklch(0.1 0 0);
+	border-bottom-color: oklch(0.1 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   18. NEXTRA FILETREE COMPONENT
+───────────────────────────────────────────────────────────── */
+[class*="nextra-filetree"] {
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 0.8rem;
+	border: 1px solid oklch(1 0 0 / 10%);
+	background-color: oklch(0.07 0 0);
+	border-radius: 0;
+}
+.light [class*="nextra-filetree"] {
+	border-color: oklch(0 0 0 / 10%);
+	background-color: oklch(0.96 0 0);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   19. NAVIGATION ARROWS (prev/next page)
+───────────────────────────────────────────────────────────── */
+[class*="nextra-navigation"] a,
+nav[aria-label="Previous and next"] a {
+	border: 1px solid oklch(1 0 0 / 10%);
+	border-radius: 0;
+	font-family: var(--font-geist-mono, ui-monospace, monospace);
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: oklch(0.55 0 0);
+	text-decoration: none;
+}
+[class*="nextra-navigation"] a:hover,
+nav[aria-label="Previous and next"] a:hover {
+	border-color: oklch(1 0 0 / 25%);
+	color: oklch(0.97 0 0);
+}
+.light [class*="nextra-navigation"] a,
+.light nav[aria-label="Previous and next"] a {
+	border-color: oklch(0 0 0 / 10%);
+	color: oklch(0.5 0 0);
+}
+.light [class*="nextra-navigation"] a:hover,
+.light nav[aria-label="Previous and next"] a:hover {
+	border-color: oklch(0 0 0 / 25%);
+	color: oklch(0.1 0 0);
+}

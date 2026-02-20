@@ -1,7 +1,7 @@
 export default {
-	index: "What is Bardo?",
+	index: "Introduction",
 	"getting-started": "Getting Started",
 	"workspace-model": "Workspace Model",
-	"agent-clients": "Supported Agent Clients",
-	"auth-and-dashboard": "Auth and Dashboard",
+	"agent-clients": "Agent Clients",
+	"auth-and-dashboard": "Auth & Dashboard",
 };
