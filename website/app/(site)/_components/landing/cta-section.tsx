@@ -23,10 +23,10 @@ export default function CtaSection() {
 					</div>
 					<div className="flex items-center gap-4 p-8">
 						<Link
-							href="/mpc-docs"
+							href="/pricing"
 							className="border border-foreground px-5 py-2.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 						>
-							Read the docs ↗
+							View pricing ↗
 						</Link>
 						<Link
 							href="/sign-up"

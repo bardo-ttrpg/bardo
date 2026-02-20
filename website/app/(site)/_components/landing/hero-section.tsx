@@ -39,10 +39,10 @@ export default function HeroSection({
 						</p>
 						<div className="flex flex-wrap gap-3">
 							<Link
-								href="/mpc-docs"
+								href="/pricing"
 								className="border border-foreground px-5 py-2.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 							>
-								Read the docs ↗
+								View pricing ↗
 							</Link>
 							<Link
 								href="/dashboard"

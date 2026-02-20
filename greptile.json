@@ -11,7 +11,7 @@
 		"**/node_modules/**",
 		"**/.next/**",
 		"**/.turbo/**",
-		"website/docs/convex/_generated/**"
+		"website/convex/_generated/**"
 	],
 	"customRules": {
 		"tagline": "Bardo repository safety and quality rules",

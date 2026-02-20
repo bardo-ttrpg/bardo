@@ -33,7 +33,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["website/docs/convex/_generated/**"],
+			"includes": ["website/convex/_generated/**"],
 			"formatter": {
 				"enabled": false
 			},
@@ -45,7 +45,7 @@
 			}
 		},
 		{
-			"includes": ["website/docs/app/globals.css"],
+			"includes": ["website/app/globals.css"],
 			"formatter": {
 				"enabled": false
 			},

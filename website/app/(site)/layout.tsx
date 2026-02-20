@@ -13,14 +13,12 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 });
 
 const PRIMARY_NAV_LINKS = [
-	{ href: "/mpc-docs", label: "Docs" },
 	{ href: "/pricing", label: "Pricing" },
 	{ href: "/dashboard", label: "Dashboard" },
 	{ href: "/legal", label: "Legal" },
 ] as const;
 
 const FOOTER_PRODUCT_LINKS = [
-	{ label: "Docs", href: "/mpc-docs" },
 	{ label: "Dashboard", href: "/dashboard" },
 	{ label: "Pricing", href: "/pricing" },
 	{ label: "Legal", href: "/legal" },
@@ -189,10 +187,10 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 								Get started
 							</p>
 							<Link
-								href="/mpc-docs"
+								href="/pricing"
 								className="inline-block border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 							>
-								Read the docs ↗
+								View pricing ↗
 							</Link>
 						</div>
 					</div>

@@ -2,7 +2,7 @@
 
 This repository is organized as a Turborepo workspace with two packages:
 
-- `website/docs`: Next.js website package (Turbopack dev server on port `3001`)
+- `website`: Next.js website package (Turbopack dev server on port `3001`)
 - `mcp`: Bun-based Bardo MCP server (port `3000`)
 
 ## Install
@@ -25,10 +25,10 @@ Run MCP only:
 bun run dev:mcp
 ```
 
-Run Convex dev worker (from `website/docs`):
+Run Convex dev worker (from `website`):
 
 ```bash
-cd website/docs
+cd website
 bunx convex dev
 ```
 
@@ -46,7 +46,7 @@ bun run dev:website
 
 ## Website auth setup (Clerk)
 
-Copy `website/docs/.env.example` values into your local env and set real Clerk keys:
+Copy `website/.env.example` values into your local env and set real Clerk keys:
 
 ```bash
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
@@ -56,7 +56,7 @@ CLERK_JWT_ISSUER_DOMAIN=...
 
 ## Website billing setup (Stripe + Convex)
 
-Set these in `website/docs/.env.local`:
+Set these in `website/.env.local`:
 
 ```bash
 STRIPE_SECRET_KEY=...
