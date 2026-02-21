@@ -1,208 +1,23 @@
-import * as z from "zod/v4";
+import { recordOrchestratorWorkflowMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
-import { withCors } from "../middleware/cors";
+import {
+	buildJsonResponse,
+	callMcpJsonRpc,
+	closeSession,
+	isRecord,
+	parseResolveTurnPayload,
+	parseSseJsonEvents,
+	type ResolveTurnPayload,
+	readToolPayload,
+	runOrchestratorStep,
+} from "./turns-orchestrator-internal";
 
-const resolveTurnPayloadSchema = z.object({
-	action: z.string().min(1).max(1000),
-	transcript: z.string().min(1).max(40_000).optional(),
-	syncWorld: z.boolean().optional(),
-	includeState: z.boolean().optional(),
-});
-
-type ResolveTurnPayload = {
-	action: string;
-	transcript: string | null;
-	syncWorld: boolean;
-	includeState: boolean;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readToolPayload(result: Record<string, unknown>): unknown {
-	if (isRecord(result.structuredContent)) {
-		return result.structuredContent;
-	}
-
-	const content = result.content;
-	if (!Array.isArray(content)) {
-		return result;
-	}
-
-	for (const item of content) {
-		if (!isRecord(item) || typeof item.text !== "string") {
-			continue;
-		}
-		try {
-			return JSON.parse(item.text);
-		} catch {
-			return item.text;
-		}
-	}
-
-	return result;
-}
-
-function buildJsonResponse(
-	status: number,
-	payload: Record<string, unknown>,
-	extraHeaders?: Record<string, string>,
-): Response {
-	return withCors(
-		new Response(JSON.stringify(payload), {
-			status,
-			headers: {
-				"content-type": "application/json",
-				...extraHeaders,
-			},
-		}),
-	);
-}
-
-function extractJsonRpcError(
-	responseStatus: number,
-	events: unknown[],
-	rawBody: string,
-): string {
-	for (const event of events) {
-		if (!isRecord(event) || !isRecord(event.error)) {
-			continue;
-		}
-		const message = event.error.message;
-		if (typeof message === "string" && message.trim().length > 0) {
-			return message;
-		}
-	}
-
-	try {
-		const parsed = JSON.parse(rawBody);
-		if (isRecord(parsed) && typeof parsed.error === "string") {
-			return parsed.error;
-		}
-	} catch {
-		// no-op: fallback below
-	}
-
-	return `MCP request failed with status ${responseStatus}.`;
-}
-
-async function callMcpJsonRpc({
-	request,
-	auth,
-	sessionId,
-	body,
-}: {
-	request: Request;
-	auth: AuthContext;
-	sessionId?: string;
-	body: Record<string, unknown>;
-}): Promise<{
-	sessionId: string | null;
-	lastEvent: Record<string, unknown> | null;
-}> {
-	const headers = new Headers({
-		accept: "application/json, text/event-stream",
-		"content-type": "application/json",
-	});
-
-	if (auth.apiKey) {
-		headers.set("x-api-key", auth.apiKey);
-	}
-
-	if (sessionId) {
-		headers.set("mcp-session-id", sessionId);
-	}
-
-	const response = await fetch(new URL("/mcp", request.url), {
-		method: "POST",
-		headers,
-		body: JSON.stringify(body),
-	});
-	const rawBody = await response.text();
-	const events = parseSseJsonEvents(rawBody);
-	const lastEvent = events.findLast(isRecord) ?? null;
-
-	if (!response.ok) {
-		throw new Error(extractJsonRpcError(response.status, events, rawBody));
-	}
-
-	const nextSessionId =
-		response.headers.get("mcp-session-id") ?? sessionId ?? null;
-	return { sessionId: nextSessionId, lastEvent };
-}
-
-async function closeSession(
-	request: Request,
-	auth: AuthContext,
-	sessionId: string,
-): Promise<void> {
-	const headers = new Headers({
-		accept: "application/json, text/event-stream",
-		"mcp-session-id": sessionId,
-	});
-	if (auth.apiKey) {
-		headers.set("x-api-key", auth.apiKey);
-	}
-
-	await fetch(new URL("/mcp", request.url), {
-		method: "DELETE",
-		headers,
-	});
-}
-
-export function parseSseJsonEvents(rawBody: string): unknown[] {
-	const events: unknown[] = [];
-	for (const line of rawBody.split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed.startsWith("data:")) {
-			continue;
-		}
-		const jsonChunk = trimmed.slice("data:".length).trim();
-		if (!jsonChunk) {
-			continue;
-		}
-		try {
-			events.push(JSON.parse(jsonChunk));
-		} catch {
-			// Ignore malformed chunks and continue to next event.
-		}
-	}
-
-	if (events.length > 0) {
-		return events;
-	}
-
-	try {
-		return [JSON.parse(rawBody)];
-	} catch {
-		return [];
-	}
-}
-
-export function parseResolveTurnPayload(input: unknown): ResolveTurnPayload {
-	const parsed = resolveTurnPayloadSchema.safeParse(input);
-	if (!parsed.success) {
-		const firstIssue = parsed.error.issues[0];
-		const issueText =
-			firstIssue?.message ?? "Payload must include a valid action.";
-		throw new Error(`Invalid turn payload: ${issueText}`);
-	}
-
-	const transcript = parsed.data.transcript?.trim() || null;
-	const syncWorld = parsed.data.syncWorld ?? Boolean(transcript);
-
-	return {
-		action: parsed.data.action.trim(),
-		transcript,
-		syncWorld: syncWorld && Boolean(transcript),
-		includeState: parsed.data.includeState ?? true,
-	};
-}
+export { parseResolveTurnPayload, parseSseJsonEvents };
 
 export async function handleResolveTurnRequest(
 	request: Request,
 	auth: AuthContext,
+	telemetryEnabled = true,
 ): Promise<Response> {
 	let payload: ResolveTurnPayload;
 	try {
@@ -220,25 +35,32 @@ export async function handleResolveTurnRequest(
 	}
 
 	const workflowId = crypto.randomUUID();
+	const workflow = "turns_resolve";
 	let sessionId: string | null = null;
 
 	try {
-		const initialize = await callMcpJsonRpc({
-			request,
-			auth,
-			body: {
-				jsonrpc: "2.0",
-				id: 1,
-				method: "initialize",
-				params: {
-					protocolVersion: "2025-03-26",
-					capabilities: {},
-					clientInfo: {
-						name: "bardo-turns-orchestrator",
-						version: "1.0.0",
+		const initialize = await runOrchestratorStep({
+			workflow,
+			step: "initialize",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					body: {
+						jsonrpc: "2.0",
+						id: 1,
+						method: "initialize",
+						params: {
+							protocolVersion: "2025-03-26",
+							capabilities: {},
+							clientInfo: {
+								name: "bardo-turns-orchestrator",
+								version: "1.0.0",
+							},
+						},
 					},
-				},
-			},
+				}),
 		});
 
 		sessionId = initialize.sessionId;
@@ -247,32 +69,76 @@ export async function handleResolveTurnRequest(
 				"MCP session initialization failed (missing session id).",
 			);
 		}
+		const activeSessionId = sessionId;
 
-		await callMcpJsonRpc({
-			request,
-			auth,
-			sessionId,
-			body: {
-				jsonrpc: "2.0",
-				method: "notifications/initialized",
-			},
+		await runOrchestratorStep({
+			workflow,
+			step: "initialized_notification",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						method: "notifications/initialized",
+					},
+				}),
 		});
 
-		const actionCall = await callMcpJsonRpc({
-			request,
-			auth,
-			sessionId,
-			body: {
-				jsonrpc: "2.0",
-				id: 2,
-				method: "tools/call",
-				params: {
-					name: "player_action",
-					arguments: {
-						action: payload.action,
+		const contextCall = await runOrchestratorStep({
+			workflow,
+			step: "context_query",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 2,
+						method: "tools/call",
+						params: {
+							name: "context_query",
+							arguments: {
+								query: payload.transcript
+									? `${payload.action}\n${payload.transcript}`
+									: payload.action,
+								mode: payload.memoryProfile,
+							},
+						},
 					},
-				},
-			},
+				}),
+		});
+
+		const contextResult =
+			isRecord(contextCall.lastEvent) && isRecord(contextCall.lastEvent.result)
+				? readToolPayload(contextCall.lastEvent.result)
+				: null;
+
+		const actionCall = await runOrchestratorStep({
+			workflow,
+			step: "player_action",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 3,
+						method: "tools/call",
+						params: {
+							name: "player_action",
+							arguments: {
+								action: payload.action,
+							},
+						},
+					},
+				}),
 		});
 
 		const actionResult =
@@ -282,21 +148,27 @@ export async function handleResolveTurnRequest(
 
 		let worldSyncResult: unknown = null;
 		if (payload.syncWorld && payload.transcript) {
-			const syncCall = await callMcpJsonRpc({
-				request,
-				auth,
-				sessionId,
-				body: {
-					jsonrpc: "2.0",
-					id: 3,
-					method: "tools/call",
-					params: {
-						name: "world_sync",
-						arguments: {
-							transcript: payload.transcript,
+			const syncCall = await runOrchestratorStep({
+				workflow,
+				step: "world_sync",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 4,
+							method: "tools/call",
+							params: {
+								name: "world_sync",
+								arguments: {
+									transcript: payload.transcript,
+								},
+							},
 						},
-					},
-				},
+					}),
 			});
 
 			worldSyncResult =
@@ -305,21 +177,89 @@ export async function handleResolveTurnRequest(
 					: null;
 		}
 
+		let tickResult: unknown = null;
+		if (payload.autoTick) {
+			const tickCall = await runOrchestratorStep({
+				workflow,
+				step: "simulation_tick",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 5,
+							method: "tools/call",
+							params: {
+								name: "simulation_tick",
+								arguments: {
+									mode: "turn",
+									tickCount: 1,
+									idempotencyKey: workflowId,
+								},
+							},
+						},
+					}),
+			});
+
+			tickResult =
+				isRecord(tickCall.lastEvent) && isRecord(tickCall.lastEvent.result)
+					? readToolPayload(tickCall.lastEvent.result)
+					: null;
+		}
+
+		const consistencyCall = await runOrchestratorStep({
+			workflow,
+			step: "consistency_check",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 7,
+						method: "tools/call",
+						params: {
+							name: "consistency_check",
+							arguments: {
+								includeWarnings: false,
+							},
+						},
+					},
+				}),
+		});
+
+		const consistencyResult =
+			isRecord(consistencyCall.lastEvent) &&
+			isRecord(consistencyCall.lastEvent.result)
+				? readToolPayload(consistencyCall.lastEvent.result)
+				: null;
+
 		let stateResult: unknown = null;
 		if (payload.includeState) {
-			const stateCall = await callMcpJsonRpc({
-				request,
-				auth,
-				sessionId,
-				body: {
-					jsonrpc: "2.0",
-					id: 4,
-					method: "tools/call",
-					params: {
-						name: "state_get",
-						arguments: {},
-					},
-				},
+			const stateCall = await runOrchestratorStep({
+				workflow,
+				step: "state_get",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 8,
+							method: "tools/call",
+							params: {
+								name: "state_get",
+								arguments: {},
+							},
+						},
+					}),
 			});
 
 			stateResult =
@@ -328,6 +268,9 @@ export async function handleResolveTurnRequest(
 					: null;
 		}
 
+		if (telemetryEnabled) {
+			recordOrchestratorWorkflowMetric({ workflow, status: "success" });
+		}
 		return buildJsonResponse(
 			200,
 			{
@@ -338,7 +281,10 @@ export async function handleResolveTurnRequest(
 					input: payload.action,
 					result: actionResult,
 				},
+				context: contextResult,
 				worldSync: worldSyncResult,
+				tick: tickResult,
+				consistency: consistencyResult,
 				state: stateResult,
 			},
 			{
@@ -346,6 +292,9 @@ export async function handleResolveTurnRequest(
 			},
 		);
 	} catch (error) {
+		if (telemetryEnabled) {
+			recordOrchestratorWorkflowMetric({ workflow, status: "error" });
+		}
 		const message =
 			error instanceof Error
 				? error.message

@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcpServer } from "../mcp/create-mcp-server";
 import type { AuthContext } from "../types/contracts";
+import type { SessionRegistry } from "./session-registry";
 import type { SessionStore } from "./session-store";
 
 export function createSessionFinalizer(
@@ -26,8 +27,13 @@ export async function createAndHandleSessionRequest(
 	request: Request,
 	auth: AuthContext,
 	sessionStore: SessionStore,
+	sessionRegistry: SessionRegistry,
 ): Promise<Response> {
-	const server = createMcpServer(auth);
+	let transport: WebStandardStreamableHTTPServerTransport;
+	const server = createMcpServer(auth, {
+		sessionRegistry,
+		getCurrentSessionId: () => transport?.sessionId ?? null,
+	});
 	const closeServer = async () => {
 		try {
 			await server.close();
@@ -37,7 +43,7 @@ export async function createAndHandleSessionRequest(
 	};
 	const finalizeSession = createSessionFinalizer(sessionStore, closeServer);
 
-	const transport = new WebStandardStreamableHTTPServerTransport({
+	transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => crypto.randomUUID(),
 		onsessioninitialized: (sessionId) => {
 			sessionStore.set(sessionId, {
@@ -46,18 +52,27 @@ export async function createAndHandleSessionRequest(
 				server,
 				transport,
 			});
+			sessionRegistry.registerSession({
+				sessionId,
+				apiKey: auth.apiKey,
+				campaignBasePath: auth.campaignBasePath,
+			});
 			console.log(
 				`Session initialized: ${sessionId} auth=${auth.apiKey ? "api-key" : "anonymous"}`,
 			);
 		},
 		onsessionclosed: (sessionId) => {
 			finalizeSession(sessionId);
+			sessionRegistry.closeSession(sessionId);
 			console.log(`Session closed: ${sessionId}`);
 		},
 	});
 
 	transport.onclose = () => {
 		finalizeSession(transport.sessionId);
+		if (transport.sessionId) {
+			sessionRegistry.closeSession(transport.sessionId);
+		}
 	};
 
 	await server.connect(transport);

@@ -5,9 +5,7 @@
 			"**",
 			"!**/node_modules",
 			"!**/.next",
-			"!**/.turbo",
-			"!mcp/testsprite_tests/tmp",
-			"!mcp/testsprite_tests/testsprite-mcp-test-report.html"
+			"!**/.turbo"
 		]
 	},
 	"formatter": {
@@ -35,7 +33,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["mcp/testsprite_tests/**/*.py"],
+			"includes": ["website/convex/_generated/**"],
 			"formatter": {
 				"enabled": false
 			},
@@ -47,19 +45,7 @@
 			}
 		},
 		{
-			"includes": ["website/docs/convex/_generated/**"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
-			}
-		},
-		{
-			"includes": ["website/docs/app/globals.css"],
+			"includes": ["website/app/globals.css"],
 			"formatter": {
 				"enabled": false
 			},

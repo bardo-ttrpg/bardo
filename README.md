@@ -2,7 +2,7 @@
 
 This repository is organized as a Turborepo workspace with two packages:
 
-- `website/docs`: Next.js website package (Turbopack dev server on port `3001`)
+- `website`: Next.js website package (Turbopack dev server on port `3001`)
 - `mcp`: Bun-based Bardo MCP server (port `3000`)
 
 ## Install
@@ -25,11 +25,17 @@ Run MCP only:
 bun run dev:mcp
 ```
 
-Run Convex dev worker (from `website/docs`):
+Run Convex dev worker (from `website`):
 
 ```bash
-cd website/docs
+cd website
 bunx convex dev
+```
+
+If Convex warns about `/tmp` being on a different filesystem, set:
+
+```bash
+CONVEX_TMPDIR=./convex/.tmp
 ```
 
 Run website only:
@@ -40,13 +46,34 @@ bun run dev:website
 
 ## Website auth setup (Clerk)
 
-Copy `website/docs/.env.example` values into your local env and set real Clerk keys:
+Copy `website/.env.example` values into your local env and set real Clerk keys:
 
 ```bash
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 CLERK_SECRET_KEY=...
 CLERK_JWT_ISSUER_DOMAIN=...
 ```
+
+## Website billing setup (Stripe + Convex)
+
+Set these in `website/.env.local`:
+
+```bash
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+NEXT_PUBLIC_APP_URL=http://127.0.0.1:3001
+
+STRIPE_PRICE_SOLO_MONTHLY=price_...
+STRIPE_PRICE_SOLO_YEARLY=price_...
+STRIPE_PRICE_SOLO_PLUS_MONTHLY=price_...
+STRIPE_PRICE_SOLO_PLUS_YEARLY=price_...
+STRIPE_PRICE_PARTY_MONTHLY=price_...
+STRIPE_PRICE_PARTY_YEARLY=price_...
+```
+
+Webhook endpoint:
+
+- `POST /api/webhooks/stripe`
 
 ## MCP security policy
 
@@ -59,6 +86,19 @@ BARDO_MAX_REQUEST_BYTES=1048576
 BARDO_SESSION_TTL_MS=3600000
 BARDO_RATE_LIMIT_WINDOW_MS=60000
 BARDO_RATE_LIMIT_MAX_REQUESTS=120
+BARDO_RATE_LIMIT_FAIL_CLOSED=false
+BARDO_TELEMETRY_ENABLED=true
+BARDO_METRICS_ROUTE_ENABLED=true
+BARDO_METRICS_REQUIRE_AUTH=false
+BARDO_TOOLS_PROFILE=full
+BARDO_TOOLS_ALLOW=
+BARDO_TOOLS_DENY=
+BARDO_TOOLS_BY_PROVIDER_JSON=
+BARDO_LOOP_DETECTION_ENABLED=true
+BARDO_LOOP_HISTORY_SIZE=30
+BARDO_LOOP_WARNING_THRESHOLD=10
+BARDO_LOOP_CRITICAL_THRESHOLD=20
+BARDO_LOOP_GLOBAL_CIRCUIT_BREAKER_THRESHOLD=30
 ```
 
 Recommended production defaults:
@@ -66,7 +106,23 @@ Recommended production defaults:
 ```bash
 BARDO_AUTH_MODE=required
 BARDO_ALLOW_QUERY_API_KEY=false
+BARDO_RATE_LIMIT_FAIL_CLOSED=true
+BARDO_METRICS_REQUIRE_AUTH=true
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
 ```
+
+## Metrics endpoint (Prometheus)
+
+- `GET /metrics` exposes Prometheus text metrics when telemetry is enabled.
+- The endpoint can be protected with `BARDO_METRICS_REQUIRE_AUTH=true`.
+- Metrics include HTTP request totals/latency, orchestrator workflow and step latency, MCP JSON-RPC calls, tool call latency, and rate-limit outcomes.
+
+## Tool control and loop protection
+
+- Tool access can be constrained with `BARDO_TOOLS_PROFILE` (`minimal|standard|full`) plus optional `BARDO_TOOLS_ALLOW`/`BARDO_TOOLS_DENY`.
+- Per-provider and per-model overrides are supported via `BARDO_TOOLS_BY_PROVIDER_JSON`.
+- Repeating no-progress tool calls are protected by loop detection thresholds (`BARDO_LOOP_*`).
 
 ## Orchestrated Turn API (Custom)
 
@@ -100,22 +156,6 @@ bun run check
 bun run biome:check
 ```
 
-## Route profiling (agent-browser)
-
-Run the Bun/Bunx route profiler (requires local dev server on `:3001`):
-
-```bash
-bun run profile:routes -- / /pricing /mpc-docs
-```
-
-Optional env overrides:
-
-```bash
-BASE_URL=http://127.0.0.1:3001 \
-CHROMIUM_EXECUTABLE_PATH=~/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome \
-bun run profile:routes
-```
-
 ## Greptile integration
 
 - Repository-level Greptile policy is defined in `greptile.json`.
@@ -126,20 +166,3 @@ bun run profile:routes
 ## Codex PR review trigger
 
 - Trigger Codex review by commenting `@codex` on the PR.
-
-## Codex CLI Playwright MCP
-
-This repository includes project-local Codex MCP config at `.codex/config.toml`:
-
-```toml
-[mcp_servers.playwright]
-command = "bunx"
-args = ["@playwright/mcp@latest"]
-```
-
-Validate from repo root:
-
-```bash
-codex mcp list
-codex mcp get playwright
-```

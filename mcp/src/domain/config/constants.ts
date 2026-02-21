@@ -10,11 +10,13 @@ export const PROJECT_ROOT =
 
 export const BARDO_SUBDIRECTORIES = [
 	"_settings",
+	"context",
 	"rules",
 	"party",
 	"entities",
 	"items",
 	"world",
 	"quests",
+	"simulation",
 	"state",
 ] as const;

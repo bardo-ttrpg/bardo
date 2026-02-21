@@ -7,6 +7,10 @@ export type SecurityPolicy = {
 	sessionTtlMs: number;
 	rateLimitWindowMs: number;
 	rateLimitMaxRequests: number;
+	rateLimitFailClosed: boolean;
+	telemetryEnabled: boolean;
+	metricsRouteEnabled: boolean;
+	metricsRequireAuth: boolean;
 };
 
 const DEFAULTS = {
@@ -47,6 +51,23 @@ function resolveQueryApiKeyPolicy(
 	return !isProduction;
 }
 
+function resolveFailClosedRateLimit(
+	env: Record<string, string | undefined>,
+): boolean {
+	const value = env.BARDO_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
+	if (value === "true") return true;
+	if (value === "false") return false;
+	return false;
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+	if (!value) return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return fallback;
+}
+
 export function resolveSecurityPolicy(
 	env: Record<string, string | undefined>,
 ): SecurityPolicy {
@@ -69,6 +90,13 @@ export function resolveSecurityPolicy(
 		rateLimitMaxRequests: parsePositiveInteger(
 			env.BARDO_RATE_LIMIT_MAX_REQUESTS,
 			DEFAULTS.rateLimitMaxRequests,
+		),
+		rateLimitFailClosed: resolveFailClosedRateLimit(env),
+		telemetryEnabled: parseBoolean(env.BARDO_TELEMETRY_ENABLED, true),
+		metricsRouteEnabled: parseBoolean(env.BARDO_METRICS_ROUTE_ENABLED, true),
+		metricsRequireAuth: parseBoolean(
+			env.BARDO_METRICS_REQUIRE_AUTH,
+			isProduction,
 		),
 	};
 }
