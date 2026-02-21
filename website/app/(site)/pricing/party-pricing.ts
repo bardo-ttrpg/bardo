@@ -4,4 +4,4 @@ export {
 	partySeatPriceCents,
 	partyTotalCentsForSeats,
 	sanitizePartySeatsInput,
-} from "@/lib/billing-catalog";
+} from "../../../lib/billing-catalog";

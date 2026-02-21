@@ -15,6 +15,8 @@ describe("parseResolveTurnPayload", () => {
 			transcript: null,
 			syncWorld: false,
 			includeState: true,
+			autoTick: true,
+			memoryProfile: "fast",
 		});
 	});
 

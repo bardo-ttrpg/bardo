@@ -14,12 +14,10 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 
 const PRIMARY_NAV_LINKS = [
 	{ href: "/pricing", label: "Pricing" },
-	{ href: "/dashboard", label: "Dashboard" },
 	{ href: "/legal", label: "Legal" },
 ] as const;
 
 const FOOTER_PRODUCT_LINKS = [
-	{ label: "Dashboard", href: "/dashboard" },
 	{ label: "Pricing", href: "/pricing" },
 	{ label: "Legal", href: "/legal" },
 	{ label: "Sign up", href: "/sign-up" },
@@ -84,6 +82,18 @@ function AuthControls() {
 	);
 }
 
+function DashboardHeaderLink() {
+	if (!IS_CLERK_CONFIGURED) {
+		return null;
+	}
+
+	return (
+		<SignedIn>
+			<NavLink href="/dashboard" label="DASHBOARD" />
+		</SignedIn>
+	);
+}
+
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const body = (
 		<div className="min-h-screen text-foreground">
@@ -103,6 +113,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						{PRIMARY_NAV_LINKS.map((link) => (
 							<NavLink key={link.href} href={link.href} label={link.label} />
 						))}
+						<DashboardHeaderLink />
 					</nav>
 
 					<div className="flex items-center gap-3">
@@ -123,6 +134,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 								label={link.label}
 							/>
 						))}
+						<DashboardHeaderLink />
 					</nav>
 				</div>
 			</header>

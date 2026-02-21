@@ -12,6 +12,9 @@ function createPolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 		rateLimitMaxRequests: 120,
 		rateLimitWindowMs: 60_000,
 		rateLimitFailClosed: false,
+		telemetryEnabled: true,
+		metricsRouteEnabled: true,
+		metricsRequireAuth: false,
 		...overrides,
 	};
 }

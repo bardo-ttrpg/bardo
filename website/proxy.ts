@@ -10,7 +10,10 @@ import {
 } from "./lib/clerk-config";
 import { shouldRedirectToCanonicalLocalhost } from "./lib/local-domain";
 
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
+const isProtectedRoute = createRouteMatcher([
+	"/dashboard(.*)",
+	"/onboarding(.*)",
+]);
 const IS_CLERK_AUTH_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
@@ -148,6 +151,13 @@ export default async function proxy(
 	}
 
 	if (!IS_CLERK_AUTH_CONFIGURED) {
+		if (isProtectedRoute(request)) {
+			const redirectUrl = new URL("/", request.url);
+			return appendExpiredCookies(
+				NextResponse.redirect(redirectUrl, 307),
+				staleCookies,
+			);
+		}
 		return appendExpiredCookies(passThroughMiddleware(request), staleCookies);
 	}
 

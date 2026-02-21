@@ -4,6 +4,75 @@ export const diceRollerSchema = z
 	.enum(["player", "bardo"])
 	.describe("Who rolls party character dice: `player` or `bardo`.");
 
+export const bootstrapAnswerKeySchema = z.enum([
+	"purpose",
+	"userProfile",
+	"agentProfile",
+	"workingPreferences",
+	"boundaries",
+	"successCriteria",
+	"values",
+]);
+
+export const bootstrapAnswersInputSchema = z
+	.object({
+		purpose: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("Answer for: What are we building together?"),
+		userProfile: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("User profile, constraints, and context."),
+		agentProfile: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("How the agent should behave and collaborate."),
+		workingPreferences: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("Communication style, verbosity, and cadence."),
+		boundaries: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("Boundaries or red flags to avoid."),
+		successCriteria: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe("Success definition and checkpoint expectations."),
+		values: z
+			.string()
+			.trim()
+			.min(3)
+			.max(3_000)
+			.optional()
+			.describe(
+				"Optional values answer used when `SOUL.md` exists in workspace.",
+			),
+	})
+	.partial()
+	.describe(
+		"One-time bootstrap answers for /init. Provide only the answer requested in `nextPrompts` to keep one-question-at-a-time flow.",
+	);
+
 export const optionalSystemsInputSchema = z
 	.object({
 		npcs: z
@@ -37,6 +106,13 @@ export const optionalSystemsOutputSchema = z.object({
 
 export const initInputSchema = z
 	.object({
+		bootstrapOnly: z
+			.boolean()
+			.optional()
+			.describe(
+				"When true, run only bootstrap orchestration and skip campaign scene/state setup.",
+			),
+		bootstrapAnswers: bootstrapAnswersInputSchema.optional(),
 		diceRoller: diceRollerSchema
 			.optional()
 			.describe(
@@ -85,6 +161,38 @@ export const workspaceSummarySchema = z.object({
 	worldLocationFiles: z.number().int().nonnegative(),
 	worldInformativeFiles: z.number().int().nonnegative(),
 	workspaceEmpty: z.boolean(),
+});
+
+export const bootstrapOutputSchema = z.object({
+	complete: z
+		.boolean()
+		.describe("True when OpenClaw-style bootstrap ritual is completed."),
+	alreadyInitialized: z
+		.boolean()
+		.describe("True when /init detected a previously completed bootstrap."),
+	pendingQuestionKey: z
+		.union([bootstrapAnswerKeySchema, z.null()])
+		.describe("Current missing bootstrap answer key, or null when complete."),
+	nextPrompt: z
+		.union([z.string(), z.null()])
+		.describe("Single next bootstrap prompt, or null when complete."),
+	bootstrapPath: z.string().describe("Absolute path to BOOTSTRAP.md"),
+	identityPath: z.string().describe("Absolute path to IDENTITY.md"),
+	userPath: z.string().describe("Absolute path to USER.md"),
+	soulPath: z.string().describe("Absolute path to SOUL.md"),
+	includeValues: z
+		.boolean()
+		.describe("True when SOUL values are required in bootstrap workflow."),
+	answeredCount: z
+		.number()
+		.int()
+		.nonnegative()
+		.describe("Number of bootstrap questions answered so far."),
+	totalQuestions: z
+		.number()
+		.int()
+		.nonnegative()
+		.describe("Total required bootstrap questions in this workspace."),
 });
 
 export const initOutputSchema = z.object({
@@ -176,6 +284,9 @@ export const initOutputSchema = z.object({
 	historyPath: z
 		.string()
 		.describe("Absolute path to campaign history markdown"),
+	bootstrap: bootstrapOutputSchema.describe(
+		"OpenClaw-style /init bootstrap status and artifact paths",
+	),
 });
 
 export type DirectoryReport = z.infer<typeof directoryReportSchema>;

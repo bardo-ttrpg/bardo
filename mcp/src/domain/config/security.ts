@@ -8,6 +8,9 @@ export type SecurityPolicy = {
 	rateLimitWindowMs: number;
 	rateLimitMaxRequests: number;
 	rateLimitFailClosed: boolean;
+	telemetryEnabled: boolean;
+	metricsRouteEnabled: boolean;
+	metricsRequireAuth: boolean;
 };
 
 const DEFAULTS = {
@@ -57,6 +60,14 @@ function resolveFailClosedRateLimit(
 	return false;
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+	if (!value) return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return fallback;
+}
+
 export function resolveSecurityPolicy(
 	env: Record<string, string | undefined>,
 ): SecurityPolicy {
@@ -81,6 +92,12 @@ export function resolveSecurityPolicy(
 			DEFAULTS.rateLimitMaxRequests,
 		),
 		rateLimitFailClosed: resolveFailClosedRateLimit(env),
+		telemetryEnabled: parseBoolean(env.BARDO_TELEMETRY_ENABLED, true),
+		metricsRouteEnabled: parseBoolean(env.BARDO_METRICS_ROUTE_ENABLED, true),
+		metricsRequireAuth: parseBoolean(
+			env.BARDO_METRICS_REQUIRE_AUTH,
+			isProduction,
+		),
 	};
 }
 

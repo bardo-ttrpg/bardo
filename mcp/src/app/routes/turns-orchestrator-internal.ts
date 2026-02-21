@@ -1,4 +1,5 @@
 import * as z from "zod/v4";
+import { recordOrchestratorStepMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import { withCors } from "../middleware/cors";
 
@@ -7,6 +8,8 @@ const resolveTurnPayloadSchema = z.object({
 	transcript: z.string().min(1).max(40_000).optional(),
 	syncWorld: z.boolean().optional(),
 	includeState: z.boolean().optional(),
+	autoTick: z.boolean().optional(),
+	memoryProfile: z.enum(["fast", "deep"]).optional(),
 });
 
 export type ResolveTurnPayload = {
@@ -14,6 +17,8 @@ export type ResolveTurnPayload = {
 	transcript: string | null;
 	syncWorld: boolean;
 	includeState: boolean;
+	autoTick: boolean;
+	memoryProfile: "fast" | "deep";
 };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -151,6 +156,42 @@ export async function closeSession(
 	});
 }
 
+export async function runOrchestratorStep<T>({
+	workflow,
+	step,
+	telemetryEnabled = true,
+	fn,
+}: {
+	workflow: string;
+	step: string;
+	telemetryEnabled?: boolean;
+	fn: () => Promise<T>;
+}): Promise<T> {
+	const startedAt = performance.now();
+	try {
+		const result = await fn();
+		if (telemetryEnabled) {
+			recordOrchestratorStepMetric({
+				workflow,
+				step,
+				status: "success",
+				durationMs: performance.now() - startedAt,
+			});
+		}
+		return result;
+	} catch (error) {
+		if (telemetryEnabled) {
+			recordOrchestratorStepMetric({
+				workflow,
+				step,
+				status: "error",
+				durationMs: performance.now() - startedAt,
+			});
+		}
+		throw error;
+	}
+}
+
 export function parseSseJsonEvents(rawBody: string): unknown[] {
 	const events: unknown[] = [];
 	for (const line of rawBody.split("\n")) {
@@ -197,5 +238,7 @@ export function parseResolveTurnPayload(input: unknown): ResolveTurnPayload {
 		transcript,
 		syncWorld: syncWorld && Boolean(transcript),
 		includeState: parsed.data.includeState ?? true,
+		autoTick: parsed.data.autoTick ?? true,
+		memoryProfile: parsed.data.memoryProfile ?? "fast",
 	};
 }

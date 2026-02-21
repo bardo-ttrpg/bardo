@@ -5,6 +5,7 @@ import { makeToolResult } from "../../tool-result";
 import {
 	analyzeWorkspace,
 	buildInitFailureOutput,
+	ensureContextRepositoryScaffold,
 	ensureInitDirectories,
 	ensureLocationMarkdownFile,
 	type InitOutput,
@@ -19,6 +20,7 @@ import {
 	readJsonMarkdown,
 	resolveInitPaths,
 	resolveStartingScene,
+	runBootstrapStep,
 } from "./shared";
 
 export function registerInitTool(server: McpServer, auth: AuthContext): void {
@@ -27,7 +29,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 		{
 			title: "Initialize Campaign Setup",
 			description:
-				"Initialize workspace, save player preferences (dice roller, theme, optional non-core systems), and set a starting scene. Scene strategy: use user-provided scene first; otherwise use existing world content; otherwise generate a theme-aware map and opening scene. For every new setup scene, pick a random spawn point (map/location or wilderness) and persist it to campaign state. If required context is missing, returns `requiresUserInput=true` with exact prompts.",
+				"OpenClaw-style one-time bootstrap plus campaign setup. Bootstrap creates/maintains AGENTS.md, BOOTSTRAP.md, IDENTITY.md, USER.md (and SOUL.md when present), asks one question at a time, and removes BOOTSTRAP.md once complete. After bootstrap, init saves gameplay preferences (dice roller, theme, optional non-core systems), resolves starting scene, and persists campaign state/history.",
 			inputSchema: initInputSchema,
 			outputSchema: initOutputSchema,
 			annotations: {
@@ -38,7 +40,14 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				openWorldHint: false,
 			},
 		},
-		async ({ diceRoller, theme, optionalSystems, startingScene }) => {
+		async ({
+			bootstrapOnly,
+			bootstrapAnswers,
+			diceRoller,
+			theme,
+			optionalSystems,
+			startingScene,
+		}) => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
 			const paths = resolveInitPaths(bardoRoot);
 			const nextPrompts: string[] = [];
@@ -58,6 +67,9 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				return makeToolResult(output, true);
 			}
 
+			await ensureContextRepositoryScaffold(bardoRoot);
+
+			const nowIso = new Date().toISOString();
 			const { summary, hint } = await analyzeWorkspace(bardoRoot);
 			const settings = await readJsonMarkdown(paths.settingsPath);
 			const legacySettings = await readJsonMarkdown(paths.legacySettingsPath);
@@ -86,6 +98,103 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				optionalSystems,
 			);
 
+			const bootstrap = await runBootstrapStep({
+				paths,
+				nowIso,
+				bootstrapAnswers,
+			});
+
+			if (!bootstrap.complete) {
+				const output: InitOutput = {
+					success: true,
+					setupComplete: false,
+					requiresUserInput: true,
+					message:
+						"Initialization paused for bootstrap. Continue answering one prompt at a time.",
+					nextPrompts: bootstrap.nextPrompt ? [bootstrap.nextPrompt] : [],
+					rootPath: bardoRoot,
+					rootExistedBefore: directorySetup.rootExistedBefore,
+					createdDirectories: directorySetup.createdDirectories,
+					existingDirectories: directorySetup.existingDirectories,
+					directories: directorySetup.directories,
+					diceRoller: resolvedDiceRoller,
+					theme: resolvedTheme,
+					optionalSystems: resolvedOptionalSystems,
+					settingsPath: paths.settingsPath,
+					legacySettingsPath: paths.legacySettingsPath,
+					legacySettingsDetected,
+					startingScenePath: paths.scenePath,
+					mapPath: paths.mapPath,
+					mapGenerated: false,
+					startingSceneSource: "not_available",
+					startingScenePreview: "",
+					workspaceSummary: summary,
+					statePath: paths.statePath,
+					historyPath: paths.historyPath,
+					bootstrap: {
+						complete: false,
+						alreadyInitialized: bootstrap.alreadyInitialized,
+						pendingQuestionKey: bootstrap.pendingQuestionKey,
+						nextPrompt: bootstrap.nextPrompt,
+						bootstrapPath: bootstrap.bootstrapPath,
+						identityPath: bootstrap.identityPath,
+						userPath: bootstrap.userPath,
+						soulPath: bootstrap.soulPath,
+						includeValues: bootstrap.includeValues,
+						answeredCount: bootstrap.answeredCount,
+						totalQuestions: bootstrap.totalQuestions,
+					},
+				};
+
+				return makeToolResult(output);
+			}
+
+			if (bootstrapOnly) {
+				const output: InitOutput = {
+					success: true,
+					setupComplete: true,
+					requiresUserInput: false,
+					message: bootstrap.alreadyInitialized
+						? "Bootstrap already complete."
+						: "Bootstrap complete.",
+					nextPrompts: [],
+					rootPath: bardoRoot,
+					rootExistedBefore: directorySetup.rootExistedBefore,
+					createdDirectories: directorySetup.createdDirectories,
+					existingDirectories: directorySetup.existingDirectories,
+					directories: directorySetup.directories,
+					diceRoller: resolvedDiceRoller,
+					theme: resolvedTheme,
+					optionalSystems: resolvedOptionalSystems,
+					settingsPath: paths.settingsPath,
+					legacySettingsPath: paths.legacySettingsPath,
+					legacySettingsDetected,
+					startingScenePath: paths.scenePath,
+					mapPath: paths.mapPath,
+					mapGenerated: false,
+					startingSceneSource: "not_available",
+					startingScenePreview: "",
+					workspaceSummary: summary,
+					statePath: paths.statePath,
+					historyPath: paths.historyPath,
+					bootstrap: {
+						complete: true,
+						alreadyInitialized: bootstrap.alreadyInitialized,
+						pendingQuestionKey: null,
+						nextPrompt: null,
+						bootstrapPath: bootstrap.bootstrapPath,
+						identityPath: bootstrap.identityPath,
+						userPath: bootstrap.userPath,
+						soulPath: bootstrap.soulPath,
+						includeValues: bootstrap.includeValues,
+						answeredCount: bootstrap.totalQuestions,
+						totalQuestions: bootstrap.totalQuestions,
+					},
+				};
+
+				return makeToolResult(output);
+			}
+
 			if (!resolvedDiceRoller) {
 				nextPrompts.push(
 					"Who should roll party character dice for this campaign: `player` or `bardo`?",
@@ -102,7 +211,6 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				nextPrompts,
 			});
 
-			const nowIso = new Date().toISOString();
 			await persistInitSettings({
 				settingsPath: paths.settingsPath,
 				nowIso,
@@ -110,6 +218,10 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				resolvedTheme,
 				resolvedOptionalSystems,
 				spawnSelection: scene.spawnSelection,
+				bootstrap: {
+					complete: true,
+					alreadyInitialized: bootstrap.alreadyInitialized,
+				},
 			});
 
 			if (scene.startingSceneContent) {
@@ -132,11 +244,16 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			}
 
 			const setupComplete =
+				bootstrap.complete &&
 				Boolean(resolvedDiceRoller) &&
 				Boolean(scene.startingSceneContent.trim());
-			const requiresUserInput = nextPrompts.length > 0;
+			const nextPrompt = nextPrompts[0] ?? null;
+			const normalizedNextPrompts = nextPrompt ? [nextPrompt] : [];
+			const requiresUserInput = normalizedNextPrompts.length > 0;
 			const message = setupComplete
-				? "Initialization complete. Workspace, preferences, theme, and starting scene are ready."
+				? bootstrap.alreadyInitialized
+					? "Initialization complete. Bootstrap was already initialized and campaign setup is ready."
+					: "Initialization complete. Bootstrap, workspace, preferences, and starting scene are ready."
 				: "Initialization partially complete. Additional user input is required before campaign start.";
 
 			const output: InitOutput = {
@@ -144,7 +261,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				setupComplete,
 				requiresUserInput,
 				message,
-				nextPrompts,
+				nextPrompts: normalizedNextPrompts,
 				rootPath: bardoRoot,
 				rootExistedBefore: directorySetup.rootExistedBefore,
 				createdDirectories: directorySetup.createdDirectories,
@@ -167,6 +284,19 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				workspaceSummary: summary,
 				statePath: paths.statePath,
 				historyPath: paths.historyPath,
+				bootstrap: {
+					complete: true,
+					alreadyInitialized: bootstrap.alreadyInitialized,
+					pendingQuestionKey: null,
+					nextPrompt: null,
+					bootstrapPath: bootstrap.bootstrapPath,
+					identityPath: bootstrap.identityPath,
+					userPath: bootstrap.userPath,
+					soulPath: bootstrap.soulPath,
+					includeValues: bootstrap.includeValues,
+					answeredCount: bootstrap.totalQuestions,
+					totalQuestions: bootstrap.totalQuestions,
+				},
 			};
 
 			return makeToolResult(output);

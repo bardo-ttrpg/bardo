@@ -153,5 +153,18 @@ export function buildInitFailureOutput(args: {
 		workspaceSummary: emptyWorkspaceSummary(),
 		statePath: args.paths.statePath,
 		historyPath: args.paths.historyPath,
+		bootstrap: {
+			complete: false,
+			alreadyInitialized: false,
+			pendingQuestionKey: null,
+			nextPrompt: null,
+			bootstrapPath: args.paths.bootstrapPath,
+			identityPath: args.paths.identityPath,
+			userPath: args.paths.userPath,
+			soulPath: args.paths.soulPath,
+			includeValues: false,
+			answeredCount: 0,
+			totalQuestions: 0,
+		},
 	};
 }

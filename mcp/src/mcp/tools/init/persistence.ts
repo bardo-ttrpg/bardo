@@ -67,6 +67,10 @@ export async function persistInitSettings(args: {
 		worldGeneration: boolean;
 	};
 	spawnSelection: SpawnSelection | null;
+	bootstrap: {
+		complete: boolean;
+		alreadyInitialized: boolean;
+	};
 }): Promise<void> {
 	const nextSettings = {
 		diceRoller: args.resolvedDiceRoller,
@@ -81,6 +85,11 @@ export async function persistInitSettings(args: {
 					origin: args.spawnSelection.origin,
 				}
 			: null,
+		bootstrap: {
+			complete: args.bootstrap.complete,
+			alreadyInitialized: args.bootstrap.alreadyInitialized,
+			updatedAtISO: args.nowIso,
+		},
 		updatedAtISO: args.nowIso,
 	};
 

@@ -7,6 +7,11 @@ export type InitPaths = {
 	mapPath: string;
 	statePath: string;
 	historyPath: string;
+	agentsPath: string;
+	bootstrapPath: string;
+	identityPath: string;
+	userPath: string;
+	soulPath: string;
 };
 
 export function resolveInitPaths(bardoRoot: string): InitPaths {
@@ -20,5 +25,10 @@ export function resolveInitPaths(bardoRoot: string): InitPaths {
 		mapPath: resolvePathInsideRoot(bardoRoot, "world/maps/primary-map.md"),
 		statePath: resolvePathInsideRoot(bardoRoot, "state/current.md"),
 		historyPath: resolvePathInsideRoot(bardoRoot, "state/history.md"),
+		agentsPath: resolvePathInsideRoot(bardoRoot, "AGENTS.md"),
+		bootstrapPath: resolvePathInsideRoot(bardoRoot, "BOOTSTRAP.md"),
+		identityPath: resolvePathInsideRoot(bardoRoot, "IDENTITY.md"),
+		userPath: resolvePathInsideRoot(bardoRoot, "USER.md"),
+		soulPath: resolvePathInsideRoot(bardoRoot, "SOUL.md"),
 	};
 }

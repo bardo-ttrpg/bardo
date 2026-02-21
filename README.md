@@ -87,6 +87,18 @@ BARDO_SESSION_TTL_MS=3600000
 BARDO_RATE_LIMIT_WINDOW_MS=60000
 BARDO_RATE_LIMIT_MAX_REQUESTS=120
 BARDO_RATE_LIMIT_FAIL_CLOSED=false
+BARDO_TELEMETRY_ENABLED=true
+BARDO_METRICS_ROUTE_ENABLED=true
+BARDO_METRICS_REQUIRE_AUTH=false
+BARDO_TOOLS_PROFILE=full
+BARDO_TOOLS_ALLOW=
+BARDO_TOOLS_DENY=
+BARDO_TOOLS_BY_PROVIDER_JSON=
+BARDO_LOOP_DETECTION_ENABLED=true
+BARDO_LOOP_HISTORY_SIZE=30
+BARDO_LOOP_WARNING_THRESHOLD=10
+BARDO_LOOP_CRITICAL_THRESHOLD=20
+BARDO_LOOP_GLOBAL_CIRCUIT_BREAKER_THRESHOLD=30
 ```
 
 Recommended production defaults:
@@ -95,9 +107,22 @@ Recommended production defaults:
 BARDO_AUTH_MODE=required
 BARDO_ALLOW_QUERY_API_KEY=false
 BARDO_RATE_LIMIT_FAIL_CLOSED=true
+BARDO_METRICS_REQUIRE_AUTH=true
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
+
+## Metrics endpoint (Prometheus)
+
+- `GET /metrics` exposes Prometheus text metrics when telemetry is enabled.
+- The endpoint can be protected with `BARDO_METRICS_REQUIRE_AUTH=true`.
+- Metrics include HTTP request totals/latency, orchestrator workflow and step latency, MCP JSON-RPC calls, tool call latency, and rate-limit outcomes.
+
+## Tool control and loop protection
+
+- Tool access can be constrained with `BARDO_TOOLS_PROFILE` (`minimal|standard|full`) plus optional `BARDO_TOOLS_ALLOW`/`BARDO_TOOLS_DENY`.
+- Per-provider and per-model overrides are supported via `BARDO_TOOLS_BY_PROVIDER_JSON`.
+- Repeating no-progress tool calls are protected by loop detection thresholds (`BARDO_LOOP_*`).
 
 ## Orchestrated Turn API (Custom)
 

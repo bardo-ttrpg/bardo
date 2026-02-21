@@ -1,3 +1,5 @@
+export * from "./bootstrap";
+export * from "./context-repo";
 export * from "./directories";
 export * from "./map";
 export * from "./paths";

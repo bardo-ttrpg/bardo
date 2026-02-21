@@ -1,5 +1,5 @@
 {
-	"$schema": "https://turbo.build/schema.json",
+	"$schema": "https://turborepo.dev/schema.v2.json",
 	"ui": "tui",
 	"tasks": {
 		"dev": {
@@ -11,7 +11,7 @@
 			"outputs": []
 		},
 		"website#build": {
-			"outputs": [".next/**"]
+			"outputs": [".next/**", "!.next/cache/**"]
 		},
 		"mcp#build": {
 			"outputs": []

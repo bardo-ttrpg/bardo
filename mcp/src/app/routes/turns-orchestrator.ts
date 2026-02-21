@@ -1,3 +1,4 @@
+import { recordOrchestratorWorkflowMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import {
 	buildJsonResponse,
@@ -8,6 +9,7 @@ import {
 	parseSseJsonEvents,
 	type ResolveTurnPayload,
 	readToolPayload,
+	runOrchestratorStep,
 } from "./turns-orchestrator-internal";
 
 export { parseResolveTurnPayload, parseSseJsonEvents };
@@ -15,6 +17,7 @@ export { parseResolveTurnPayload, parseSseJsonEvents };
 export async function handleResolveTurnRequest(
 	request: Request,
 	auth: AuthContext,
+	telemetryEnabled = true,
 ): Promise<Response> {
 	let payload: ResolveTurnPayload;
 	try {
@@ -32,25 +35,32 @@ export async function handleResolveTurnRequest(
 	}
 
 	const workflowId = crypto.randomUUID();
+	const workflow = "turns_resolve";
 	let sessionId: string | null = null;
 
 	try {
-		const initialize = await callMcpJsonRpc({
-			request,
-			auth,
-			body: {
-				jsonrpc: "2.0",
-				id: 1,
-				method: "initialize",
-				params: {
-					protocolVersion: "2025-03-26",
-					capabilities: {},
-					clientInfo: {
-						name: "bardo-turns-orchestrator",
-						version: "1.0.0",
+		const initialize = await runOrchestratorStep({
+			workflow,
+			step: "initialize",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					body: {
+						jsonrpc: "2.0",
+						id: 1,
+						method: "initialize",
+						params: {
+							protocolVersion: "2025-03-26",
+							capabilities: {},
+							clientInfo: {
+								name: "bardo-turns-orchestrator",
+								version: "1.0.0",
+							},
+						},
 					},
-				},
-			},
+				}),
 		});
 
 		sessionId = initialize.sessionId;
@@ -59,32 +69,76 @@ export async function handleResolveTurnRequest(
 				"MCP session initialization failed (missing session id).",
 			);
 		}
+		const activeSessionId = sessionId;
 
-		await callMcpJsonRpc({
-			request,
-			auth,
-			sessionId,
-			body: {
-				jsonrpc: "2.0",
-				method: "notifications/initialized",
-			},
+		await runOrchestratorStep({
+			workflow,
+			step: "initialized_notification",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						method: "notifications/initialized",
+					},
+				}),
 		});
 
-		const actionCall = await callMcpJsonRpc({
-			request,
-			auth,
-			sessionId,
-			body: {
-				jsonrpc: "2.0",
-				id: 2,
-				method: "tools/call",
-				params: {
-					name: "player_action",
-					arguments: {
-						action: payload.action,
+		const contextCall = await runOrchestratorStep({
+			workflow,
+			step: "context_query",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 2,
+						method: "tools/call",
+						params: {
+							name: "context_query",
+							arguments: {
+								query: payload.transcript
+									? `${payload.action}\n${payload.transcript}`
+									: payload.action,
+								mode: payload.memoryProfile,
+							},
+						},
 					},
-				},
-			},
+				}),
+		});
+
+		const contextResult =
+			isRecord(contextCall.lastEvent) && isRecord(contextCall.lastEvent.result)
+				? readToolPayload(contextCall.lastEvent.result)
+				: null;
+
+		const actionCall = await runOrchestratorStep({
+			workflow,
+			step: "player_action",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 3,
+						method: "tools/call",
+						params: {
+							name: "player_action",
+							arguments: {
+								action: payload.action,
+							},
+						},
+					},
+				}),
 		});
 
 		const actionResult =
@@ -94,21 +148,27 @@ export async function handleResolveTurnRequest(
 
 		let worldSyncResult: unknown = null;
 		if (payload.syncWorld && payload.transcript) {
-			const syncCall = await callMcpJsonRpc({
-				request,
-				auth,
-				sessionId,
-				body: {
-					jsonrpc: "2.0",
-					id: 3,
-					method: "tools/call",
-					params: {
-						name: "world_sync",
-						arguments: {
-							transcript: payload.transcript,
+			const syncCall = await runOrchestratorStep({
+				workflow,
+				step: "world_sync",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 4,
+							method: "tools/call",
+							params: {
+								name: "world_sync",
+								arguments: {
+									transcript: payload.transcript,
+								},
+							},
 						},
-					},
-				},
+					}),
 			});
 
 			worldSyncResult =
@@ -117,21 +177,89 @@ export async function handleResolveTurnRequest(
 					: null;
 		}
 
+		let tickResult: unknown = null;
+		if (payload.autoTick) {
+			const tickCall = await runOrchestratorStep({
+				workflow,
+				step: "simulation_tick",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 5,
+							method: "tools/call",
+							params: {
+								name: "simulation_tick",
+								arguments: {
+									mode: "turn",
+									tickCount: 1,
+									idempotencyKey: workflowId,
+								},
+							},
+						},
+					}),
+			});
+
+			tickResult =
+				isRecord(tickCall.lastEvent) && isRecord(tickCall.lastEvent.result)
+					? readToolPayload(tickCall.lastEvent.result)
+					: null;
+		}
+
+		const consistencyCall = await runOrchestratorStep({
+			workflow,
+			step: "consistency_check",
+			telemetryEnabled,
+			fn: () =>
+				callMcpJsonRpc({
+					request,
+					auth,
+					sessionId: activeSessionId,
+					body: {
+						jsonrpc: "2.0",
+						id: 7,
+						method: "tools/call",
+						params: {
+							name: "consistency_check",
+							arguments: {
+								includeWarnings: false,
+							},
+						},
+					},
+				}),
+		});
+
+		const consistencyResult =
+			isRecord(consistencyCall.lastEvent) &&
+			isRecord(consistencyCall.lastEvent.result)
+				? readToolPayload(consistencyCall.lastEvent.result)
+				: null;
+
 		let stateResult: unknown = null;
 		if (payload.includeState) {
-			const stateCall = await callMcpJsonRpc({
-				request,
-				auth,
-				sessionId,
-				body: {
-					jsonrpc: "2.0",
-					id: 4,
-					method: "tools/call",
-					params: {
-						name: "state_get",
-						arguments: {},
-					},
-				},
+			const stateCall = await runOrchestratorStep({
+				workflow,
+				step: "state_get",
+				telemetryEnabled,
+				fn: () =>
+					callMcpJsonRpc({
+						request,
+						auth,
+						sessionId: activeSessionId,
+						body: {
+							jsonrpc: "2.0",
+							id: 8,
+							method: "tools/call",
+							params: {
+								name: "state_get",
+								arguments: {},
+							},
+						},
+					}),
 			});
 
 			stateResult =
@@ -140,6 +268,9 @@ export async function handleResolveTurnRequest(
 					: null;
 		}
 
+		if (telemetryEnabled) {
+			recordOrchestratorWorkflowMetric({ workflow, status: "success" });
+		}
 		return buildJsonResponse(
 			200,
 			{
@@ -150,7 +281,10 @@ export async function handleResolveTurnRequest(
 					input: payload.action,
 					result: actionResult,
 				},
+				context: contextResult,
 				worldSync: worldSyncResult,
+				tick: tickResult,
+				consistency: consistencyResult,
 				state: stateResult,
 			},
 			{
@@ -158,6 +292,9 @@ export async function handleResolveTurnRequest(
 			},
 		);
 	} catch (error) {
+		if (telemetryEnabled) {
+			recordOrchestratorWorkflowMetric({ workflow, status: "error" });
+		}
 		const message =
 			error instanceof Error
 				? error.message
