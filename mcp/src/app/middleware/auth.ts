@@ -27,7 +27,7 @@ function tryParseObject(raw: string): Record<string, unknown> | null {
 	}
 }
 
-export function parseApiKeyMapFromEnv(
+function parseApiKeyMapFromEnv(
 	env: Record<string, string | undefined> = Bun.env,
 	projectRoot = PROJECT_ROOT,
 ): Map<string, string> {

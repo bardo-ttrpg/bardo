@@ -1,4 +1,4 @@
-export type ParsedMarkdown = {
+type ParsedMarkdown = {
 	frontmatter: Record<string, string>;
 	content: string;
 };

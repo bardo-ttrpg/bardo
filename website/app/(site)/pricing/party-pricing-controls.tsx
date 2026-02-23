@@ -2,35 +2,45 @@
 
 import { useId, useMemo, useState } from "react";
 import {
-	formatUsdCents,
+	formatUsdCents as formatBillingUsdCents,
 	normalizePartySeats,
 	partyCreditsForSeats,
 	partySeatPriceCents,
 	partyTotalCentsForSeats,
 	sanitizePartySeatsInput,
 } from "@/lib/billing-catalog";
+import {
+	type ClerkPlanPeriod,
+	clerkPlanPeriodFromBillingInterval,
+} from "@/lib/clerk-billing";
 import type { BillingInterval } from "@/lib/user-billing";
 import CheckoutButton from "./checkout-button";
 
 export default function PartyPricingControls({
 	yearly,
 	interval,
+	clerkEnabled,
+	clerkPlanId,
 	label,
 	buttonClassName,
 }: {
 	yearly: boolean;
 	interval: BillingInterval;
+	clerkEnabled: boolean;
+	clerkPlanId: string | null;
 	label: string;
 	buttonClassName: string;
 }) {
 	const seatInputId = useId();
 	const [seatInput, setSeatInput] = useState("2");
+	const planPeriod: ClerkPlanPeriod =
+		clerkPlanPeriodFromBillingInterval(interval);
 	const seatCount = normalizePartySeats(seatInput);
 	const monthlyCredits = partyCreditsForSeats(seatCount);
 	const totalCents = partyTotalCentsForSeats(seatCount, yearly);
 	const perLabel = yearly ? "/ yr" : "/ mo";
 	const seatPriceLabel = useMemo(
-		() => formatUsdCents(partySeatPriceCents(yearly)),
+		() => formatBillingUsdCents(partySeatPriceCents(yearly)),
 		[yearly],
 	);
 
@@ -61,7 +71,7 @@ export default function PartyPricingControls({
 					className="w-full border border-border bg-transparent px-2 py-1.5 font-mono text-sm text-foreground outline-none ring-0"
 				/>
 				<p className="mt-2 font-mono text-[10px] text-muted-foreground">
-					{formatUsdCents(totalCents)} total {perLabel}
+					{formatBillingUsdCents(totalCents)} total {perLabel}
 				</p>
 				<p className="mt-1 font-mono text-[10px] text-muted-foreground">
 					{seatPriceLabel}
@@ -70,12 +80,15 @@ export default function PartyPricingControls({
 			</div>
 
 			<CheckoutButton
-				plan="party"
-				interval={interval}
-				quantity={seatCount}
+				clerkEnabled={clerkEnabled}
+				clerkPlanId={clerkPlanId}
+				planPeriod={planPeriod}
 				label={label}
 				className={buttonClassName}
 			/>
+			<p className="mt-2 font-mono text-[10px] text-muted-foreground">
+				Seat adjustments are managed from Clerk Billing after checkout.
+			</p>
 		</>
 	);
 }

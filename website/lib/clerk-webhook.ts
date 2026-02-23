@@ -3,7 +3,7 @@ type ClerkEmailAddress = {
 	email_address: string;
 };
 
-export type ClerkUserUpsertPayload = {
+type ClerkUserUpsertPayload = {
 	clerkId: string;
 	email: string | null;
 	imageUrl: string | null;

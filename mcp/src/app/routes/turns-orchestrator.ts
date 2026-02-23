@@ -146,6 +146,37 @@ export async function handleResolveTurnRequest(
 				? readToolPayload(actionCall.lastEvent.result)
 				: null;
 
+		if (
+			isRecord(actionResult) &&
+			actionResult.requiresSetup === true &&
+			typeof actionResult.setupStatus === "string"
+		) {
+			if (telemetryEnabled) {
+				recordOrchestratorWorkflowMetric({ workflow, status: "success" });
+			}
+			return buildJsonResponse(
+				200,
+				{
+					success: true,
+					workflowId,
+					mode: "orchestrated-turn",
+					status: "needs_input",
+					action: {
+						input: payload.action,
+						result: actionResult,
+					},
+					context: contextResult,
+					worldSync: null,
+					tick: null,
+					consistency: null,
+					state: null,
+				},
+				{
+					"x-workflow-id": workflowId,
+				},
+			);
+		}
+
 		let worldSyncResult: unknown = null;
 		if (payload.syncWorld && payload.transcript) {
 			const syncCall = await runOrchestratorStep({

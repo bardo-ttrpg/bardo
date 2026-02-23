@@ -11,7 +11,7 @@ import {
 	resolvePathInsideRoot,
 } from "../../../infra/filesystem/filesystem";
 
-export type WorldSyncPaths = {
+type WorldSyncPaths = {
 	statePath: string;
 	historyPath: string;
 	entitiesDir: string;

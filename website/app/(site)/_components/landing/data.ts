@@ -10,7 +10,7 @@ import {
 import type { MapMarker } from "@/components/magicui/dotted-map";
 import type { FileTreeRoot } from "@/components/magicui/file-tree";
 
-export type LandingFeature = {
+type LandingFeature = {
 	icon: LucideIcon;
 	label: string;
 	desc: string;

@@ -8,8 +8,8 @@ export default defineSchema({
 		email: v.union(v.string(), v.null()),
 		imageUrl: v.union(v.string(), v.null()),
 		name: v.union(v.string(), v.null()),
-		createdAt: v.float64(),
-		updatedAt: v.float64(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
 		// Billing fields are optional for legacy rows and are backfilled on write/read.
 		plan: v.optional(
 			v.union(
@@ -22,12 +22,12 @@ export default defineSchema({
 				v.literal("ultra"),
 			),
 		),
-		creditsTotal: v.optional(v.float64()), // quota for current period
-		creditsUsed: v.optional(v.float64()), // used so far this period
-		periodStart: v.optional(v.float64()), // Unix ms when period began
-		mcpCallsTotal: v.optional(v.float64()), // lifetime total
-		mcpCallsThisPeriod: v.optional(v.float64()), // resets with period
-		partySeats: v.optional(v.float64()),
+		creditsTotal: v.optional(v.number()), // quota for current period
+		creditsUsed: v.optional(v.number()), // used so far this period
+		periodStart: v.optional(v.number()), // Unix ms when period began
+		mcpCallsTotal: v.optional(v.number()), // lifetime total
+		mcpCallsThisPeriod: v.optional(v.number()), // resets with period
+		partySeats: v.optional(v.number()),
 		stripeCustomerId: v.optional(v.string()),
 		stripeSubscriptionId: v.optional(v.string()),
 		stripePriceId: v.optional(v.string()),
@@ -44,10 +44,10 @@ export default defineSchema({
 				v.literal("paused"),
 			),
 		),
-		currentPeriodEnd: v.optional(v.float64()),
+		currentPeriodEnd: v.optional(v.number()),
 		cancelAtPeriodEnd: v.optional(v.boolean()),
 		lastInvoiceId: v.optional(v.string()),
-		lastPaymentAt: v.optional(v.float64()),
+		lastPaymentAt: v.optional(v.number()),
 	})
 		.index("by_clerk_id", ["clerkId"])
 		.index("by_email", ["email"])
@@ -58,15 +58,15 @@ export default defineSchema({
 		stripeCustomerId: v.string(),
 		stripeSubscriptionId: v.union(v.string(), v.null()),
 		stripeInvoiceId: v.string(),
-		amountPaidCents: v.float64(),
+		amountPaidCents: v.number(),
 		currency: v.string(),
-		paidAt: v.float64(),
+		paidAt: v.number(),
 		status: v.string(),
 		billingReason: v.union(v.string(), v.null()),
 		priceId: v.union(v.string(), v.null()),
 		billingInterval: v.union(v.literal("month"), v.literal("year"), v.null()),
-		partySeats: v.float64(),
-		createdAt: v.float64(),
+		partySeats: v.number(),
+		createdAt: v.number(),
 	})
 		.index("by_stripe_invoice_id", ["stripeInvoiceId"])
 		.index("by_clerk_id", ["clerkId"])
@@ -80,9 +80,9 @@ export default defineSchema({
 			v.literal("failed"),
 			v.literal("ignored"),
 		),
-		createdAt: v.float64(),
-		receivedAt: v.float64(),
-		processedAt: v.optional(v.float64()),
+		createdAt: v.number(),
+		receivedAt: v.number(),
+		processedAt: v.optional(v.number()),
 		error: v.optional(v.string()),
 	})
 		.index("by_stripe_event_id", ["stripeEventId"])

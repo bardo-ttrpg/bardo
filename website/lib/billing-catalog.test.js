@@ -1,9 +1,7 @@
 import { expect, test } from "bun:test";
 import {
 	displayPriceCents,
-	getStripePriceId,
 	normalizePartyCheckoutSeats,
-	resolvePlanFromStripePriceId,
 	yearlyPriceCents,
 } from "./billing-catalog";
 
@@ -23,22 +21,4 @@ test("normalizePartyCheckoutSeats clamps seat quantities", () => {
 	expect(normalizePartyCheckoutSeats(1)).toBe(2);
 	expect(normalizePartyCheckoutSeats(2.9)).toBe(2);
 	expect(normalizePartyCheckoutSeats(1000)).toBe(100);
-});
-
-test("price-id helpers map plans and intervals", () => {
-	const env = {
-		STRIPE_PRICE_SOLO_MONTHLY: "price_solo_month",
-		STRIPE_PRICE_SOLO_YEARLY: "price_solo_year",
-		STRIPE_PRICE_SOLO_PLUS_MONTHLY: "price_solo_plus_month",
-		STRIPE_PRICE_SOLO_PLUS_YEARLY: "price_solo_plus_year",
-		STRIPE_PRICE_PARTY_MONTHLY: "price_party_month",
-		STRIPE_PRICE_PARTY_YEARLY: "price_party_year",
-	};
-
-	expect(getStripePriceId("solo", "month", env)).toBe("price_solo_month");
-	expect(resolvePlanFromStripePriceId("price_party_year", env)).toEqual({
-		plan: "party",
-		interval: "year",
-	});
-	expect(resolvePlanFromStripePriceId("price_unknown", env)).toBeNull();
 });

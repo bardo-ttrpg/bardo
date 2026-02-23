@@ -5,6 +5,7 @@ import {
 	planCreditsFor,
 	resolveBillingState,
 } from "../../lib/user-billing";
+import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import {
 	type ApplyStripeSubscriptionArgs,
@@ -25,7 +26,7 @@ import {
 export async function upsertUserHandler(
 	ctx: MutationCtx,
 	args: UpsertUserArgs,
-): Promise<string> {
+): Promise<Id<"users">> {
 	const existing = await findUserByClerkId(ctx, args.clerkId);
 	const now = Date.now();
 
@@ -77,7 +78,7 @@ export async function upsertUserHandler(
 export async function trackMcpCallHandler(
 	ctx: MutationCtx,
 	args: TrackMcpCallArgs,
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
 	const user = await findUserByClerkId(ctx, args.clerkId);
 	if (!user) return null;
 
@@ -131,7 +132,7 @@ export async function getUserByStripeCustomerIdHandler(
 export async function setStripeCustomerIdHandler(
 	ctx: MutationCtx,
 	args: SetStripeCustomerIdArgs,
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
 	const user = await findUserByClerkId(ctx, args.clerkId);
 	if (!user) return null;
 
@@ -145,7 +146,7 @@ export async function setStripeCustomerIdHandler(
 export async function applyStripeSubscriptionHandler(
 	ctx: MutationCtx,
 	args: ApplyStripeSubscriptionArgs,
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
 	let user = await findUserByStripeCustomerId(ctx, args.stripeCustomerId);
 
 	if (!user && args.clerkId) {
@@ -197,7 +198,7 @@ export async function applyStripeSubscriptionHandler(
 export async function downgradeToFreeHandler(
 	ctx: MutationCtx,
 	args: DowngradeToFreeArgs,
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
 	const user = await findUserByStripeCustomerId(ctx, args.stripeCustomerId);
 	if (!user) return null;
 
@@ -297,7 +298,10 @@ export async function recordInvoicePaymentHandler(
 export async function reserveBillingEventHandler(
 	ctx: MutationCtx,
 	args: ReserveBillingEventArgs,
-): Promise<{ accepted: boolean; status: string }> {
+): Promise<{
+	accepted: boolean;
+	status: "processing" | "processed" | "failed" | "ignored";
+}> {
 	const existing = await ctx.db
 		.query("billing_events")
 		.withIndex("by_stripe_event_id", (q) =>
@@ -326,7 +330,7 @@ export async function reserveBillingEventHandler(
 export async function completeBillingEventHandler(
 	ctx: MutationCtx,
 	args: CompleteBillingEventArgs,
-): Promise<string | null> {
+): Promise<Id<"billing_events"> | null> {
 	const row = await ctx.db
 		.query("billing_events")
 		.withIndex("by_stripe_event_id", (q) =>

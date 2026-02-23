@@ -1,10 +1,15 @@
 import * as z from "zod/v4";
+import {
+	setupAnswersSchema,
+	setupConflictSchema,
+	setupIntegritySchema,
+} from "./setup-schemas";
 
-export const diceRollerSchema = z
+const diceRollerSchema = z
 	.enum(["player", "bardo"])
 	.describe("Who rolls party character dice: `player` or `bardo`.");
 
-export const bootstrapAnswerKeySchema = z.enum([
+const bootstrapAnswerKeySchema = z.enum([
 	"purpose",
 	"userProfile",
 	"agentProfile",
@@ -14,7 +19,7 @@ export const bootstrapAnswerKeySchema = z.enum([
 	"values",
 ]);
 
-export const bootstrapAnswersInputSchema = z
+const bootstrapAnswersInputSchema = z
 	.object({
 		purpose: z
 			.string()
@@ -73,7 +78,7 @@ export const bootstrapAnswersInputSchema = z
 		"One-time bootstrap answers for /init. Provide only the answer requested in `nextPrompts` to keep one-question-at-a-time flow.",
 	);
 
-export const optionalSystemsInputSchema = z
+const optionalSystemsInputSchema = z
 	.object({
 		npcs: z
 			.boolean()
@@ -97,7 +102,7 @@ export const optionalSystemsInputSchema = z
 		"Optional non-core gameplay systems. Core setup and state tools are always active and cannot be disabled.",
 	);
 
-export const optionalSystemsOutputSchema = z.object({
+const optionalSystemsOutputSchema = z.object({
 	npcs: z.boolean(),
 	quests: z.boolean(),
 	items: z.boolean(),
@@ -113,6 +118,8 @@ export const initInputSchema = z
 				"When true, run only bootstrap orchestration and skip campaign scene/state setup.",
 			),
 		bootstrapAnswers: bootstrapAnswersInputSchema.optional(),
+		setupAnswers: setupAnswersSchema.optional(),
+		setupRevision: z.number().int().nonnegative().optional(),
 		diceRoller: diceRollerSchema
 			.optional()
 			.describe(
@@ -152,7 +159,7 @@ export const directoryReportSchema = z.object({
 		.describe("Whether the path is currently a directory"),
 });
 
-export const workspaceSummarySchema = z.object({
+const workspaceSummarySchema = z.object({
 	markdownFiles: z.number().int().nonnegative(),
 	informativeFiles: z.number().int().nonnegative(),
 	totalContentChars: z.number().int().nonnegative(),
@@ -163,7 +170,7 @@ export const workspaceSummarySchema = z.object({
 	workspaceEmpty: z.boolean(),
 });
 
-export const bootstrapOutputSchema = z.object({
+const bootstrapOutputSchema = z.object({
 	complete: z
 		.boolean()
 		.describe("True when OpenClaw-style bootstrap ritual is completed."),
@@ -287,6 +294,15 @@ export const initOutputSchema = z.object({
 	bootstrap: bootstrapOutputSchema.describe(
 		"OpenClaw-style /init bootstrap status and artifact paths",
 	),
+	setupStatus: z
+		.enum(["needs_input", "complete", "error", "locked"])
+		.optional(),
+	setupQuestionKey: z.union([z.string(), z.null()]).optional(),
+	setupQuestion: z.union([z.string(), z.null()]).optional(),
+	setupRevision: z.number().int().nonnegative().optional(),
+	setupConflict: setupConflictSchema.optional(),
+	setupIntegrity: setupIntegritySchema.optional(),
+	deprecationNotice: z.string().optional(),
 });
 
 export type DirectoryReport = z.infer<typeof directoryReportSchema>;

@@ -5,6 +5,10 @@ import {
 	formatUsdCents,
 	YEARLY_SAVINGS_UP_TO_PERCENT,
 } from "@/lib/billing-catalog";
+import {
+	clerkPlanPeriodFromBillingInterval,
+	getClerkPlanId,
+} from "@/lib/clerk-billing";
 import CheckoutButton from "./checkout-button";
 import PartyPricingControls from "./party-pricing-controls";
 import { pricingTiers } from "./pricing-data";
@@ -13,11 +17,14 @@ export type BillingPeriod = "monthly" | "yearly";
 
 export default function PricingToggle({
 	billingPeriod,
+	clerkEnabled,
 }: {
 	billingPeriod: BillingPeriod;
+	clerkEnabled: boolean;
 }) {
 	const yearly = billingPeriod === "yearly";
 	const interval = yearly ? "year" : "month";
+	const clerkPlanPeriod = clerkPlanPeriodFromBillingInterval(interval);
 	const yearlySavingsLabel = `Save up to ${YEARLY_SAVINGS_UP_TO_PERCENT}%`;
 
 	return (
@@ -59,6 +66,9 @@ export default function PricingToggle({
 					const priceCents = tier.checkoutPlan
 						? displayPriceCents(tier.checkoutPlan, interval)
 						: 0;
+					const clerkPlanId = tier.checkoutPlan
+						? getClerkPlanId(tier.checkoutPlan)
+						: null;
 					const perLabel = yearly ? "/ yr" : "/ mo";
 					const isParty = tier.key === "party";
 					const ctaClassName = [
@@ -114,6 +124,8 @@ export default function PricingToggle({
 								<PartyPricingControls
 									yearly={yearly}
 									interval={interval}
+									clerkEnabled={clerkEnabled}
+									clerkPlanId={clerkPlanId}
 									label={tier.cta}
 									buttonClassName={ctaClassName}
 								/>
@@ -142,9 +154,9 @@ export default function PricingToggle({
 								</Link>
 							) : tier.checkoutPlan ? (
 								<CheckoutButton
-									plan={tier.checkoutPlan}
-									interval={interval}
-									quantity={1}
+									clerkEnabled={clerkEnabled}
+									clerkPlanId={clerkPlanId}
+									planPeriod={clerkPlanPeriod}
 									label={tier.cta}
 									className={ctaClassName}
 								/>

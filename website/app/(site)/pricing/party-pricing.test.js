@@ -4,7 +4,7 @@ import {
 	partyCreditsForSeats,
 	partyTotalCentsForSeats,
 	sanitizePartySeatsInput,
-} from "./party-pricing";
+} from "../../../lib/billing-catalog";
 
 test("sanitizePartySeatsInput strips non-digit characters", () => {
 	expect(sanitizePartySeatsInput("12abc 3")).toBe("123");

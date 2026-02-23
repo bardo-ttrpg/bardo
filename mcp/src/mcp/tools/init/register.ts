@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { resolveFeatureFlags } from "../../../domain/config/features";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
@@ -21,7 +22,11 @@ import {
 	resolveInitPaths,
 	resolveStartingScene,
 	runBootstrapStep,
+	runGuidedSetupFlow,
 } from "./shared";
+
+const INIT_DEPRECATION_NOTICE =
+	"`init` remains available but the recommended primary entrypoint is `player_action`, which now auto-guides setup.";
 
 export function registerInitTool(server: McpServer, auth: AuthContext): void {
 	server.registerTool(
@@ -43,6 +48,8 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 		async ({
 			bootstrapOnly,
 			bootstrapAnswers,
+			setupAnswers,
+			setupRevision,
 			diceRoller,
 			theme,
 			optionalSystems,
@@ -91,12 +98,94 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				sourceSettingsData.optionalSystems,
 			);
 
-			const resolvedDiceRoller = diceRoller ?? savedDiceRoller;
+			let resolvedDiceRoller = diceRoller ?? savedDiceRoller;
 			const resolvedTheme = normalizeTheme(theme) ?? savedTheme;
 			const resolvedOptionalSystems = mergeOptionalSystems(
 				savedOptionalSystems,
 				optionalSystems,
 			);
+
+			let setupStatus:
+				| "needs_input"
+				| "complete"
+				| "error"
+				| "locked"
+				| undefined;
+			let setupQuestionKey: string | null | undefined;
+			let setupQuestion: string | null | undefined;
+			let setupRevisionOutput: number | undefined;
+			let setupConflict:
+				| {
+						detected: boolean;
+						reason: string | null;
+				  }
+				| undefined;
+			let setupIntegrity:
+				| {
+						ok: boolean;
+						missingPaths: string[];
+						invalidPaths: string[];
+				  }
+				| undefined;
+			const guidedSetupEnabled = resolveFeatureFlags(
+				Bun.env,
+			).guidedSetupEnabled;
+
+			if (!bootstrapOnly && guidedSetupEnabled) {
+				const setup = await runGuidedSetupFlow({
+					campaignBasePath: auth.campaignBasePath,
+					nowIso,
+					bootstrapAnswers,
+					setupAnswers,
+					expectedRevision: setupRevision,
+				});
+
+				setupStatus = setup.status;
+				setupQuestionKey = setup.questionKey;
+				setupQuestion = setup.question;
+				setupRevisionOutput = setup.revision;
+				setupConflict = setup.conflict;
+				setupIntegrity = setup.integrity;
+				resolvedDiceRoller = resolvedDiceRoller ?? setup.answers.diceRoller;
+
+				if (setup.status !== "complete") {
+					const output: InitOutput = {
+						success: true,
+						setupComplete: false,
+						requiresUserInput: true,
+						message: setup.message,
+						nextPrompts: setup.question ? [setup.question] : [],
+						rootPath: bardoRoot,
+						rootExistedBefore: directorySetup.rootExistedBefore,
+						createdDirectories: directorySetup.createdDirectories,
+						existingDirectories: directorySetup.existingDirectories,
+						directories: directorySetup.directories,
+						diceRoller: resolvedDiceRoller,
+						theme: resolvedTheme,
+						optionalSystems: resolvedOptionalSystems,
+						settingsPath: paths.settingsPath,
+						legacySettingsPath: paths.legacySettingsPath,
+						legacySettingsDetected,
+						startingScenePath: paths.scenePath,
+						mapPath: paths.mapPath,
+						mapGenerated: false,
+						startingSceneSource: "not_available",
+						startingScenePreview: "",
+						workspaceSummary: summary,
+						statePath: paths.statePath,
+						historyPath: paths.historyPath,
+						bootstrap: setup.bootstrap,
+						setupStatus,
+						setupQuestionKey,
+						setupQuestion,
+						setupRevision: setupRevisionOutput,
+						setupConflict,
+						setupIntegrity,
+						deprecationNotice: INIT_DEPRECATION_NOTICE,
+					};
+					return makeToolResult(output);
+				}
+			}
 
 			const bootstrap = await runBootstrapStep({
 				paths,
@@ -144,6 +233,13 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 						answeredCount: bootstrap.answeredCount,
 						totalQuestions: bootstrap.totalQuestions,
 					},
+					setupStatus,
+					setupQuestionKey,
+					setupQuestion,
+					setupRevision: setupRevisionOutput,
+					setupConflict,
+					setupIntegrity,
+					deprecationNotice: INIT_DEPRECATION_NOTICE,
 				};
 
 				return makeToolResult(output);
@@ -190,6 +286,13 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 						answeredCount: bootstrap.totalQuestions,
 						totalQuestions: bootstrap.totalQuestions,
 					},
+					setupStatus,
+					setupQuestionKey,
+					setupQuestion,
+					setupRevision: setupRevisionOutput,
+					setupConflict,
+					setupIntegrity,
+					deprecationNotice: INIT_DEPRECATION_NOTICE,
 				};
 
 				return makeToolResult(output);
@@ -297,6 +400,13 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					answeredCount: bootstrap.totalQuestions,
 					totalQuestions: bootstrap.totalQuestions,
 				},
+				setupStatus,
+				setupQuestionKey,
+				setupQuestion,
+				setupRevision: setupRevisionOutput,
+				setupConflict,
+				setupIntegrity,
+				deprecationNotice: INIT_DEPRECATION_NOTICE,
 			};
 
 			return makeToolResult(output);

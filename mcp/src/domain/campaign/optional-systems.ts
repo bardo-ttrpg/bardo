@@ -13,7 +13,7 @@ export const defaultOptionalSystems: OptionalSystems = {
 	worldGeneration: true,
 };
 
-export function normalizeOptionalSystems(value: unknown): OptionalSystems {
+function normalizeOptionalSystems(value: unknown): OptionalSystems {
 	if (typeof value !== "object" || value === null) {
 		return { ...defaultOptionalSystems };
 	}

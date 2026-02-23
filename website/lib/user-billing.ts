@@ -1,6 +1,6 @@
 export type PlanTier = "free" | "solo" | "solo_plus" | "party";
-export type LegacyPlanTier = "free" | "pro" | "ultra";
-export type PlanTierInput = PlanTier | LegacyPlanTier | undefined;
+type LegacyPlanTier = "free" | "pro" | "ultra";
+type PlanTierInput = PlanTier | LegacyPlanTier | undefined;
 export type BillingInterval = "month" | "year";
 export type SubscriptionStatus =
 	| "incomplete"
@@ -18,7 +18,7 @@ const PLAN_CREDITS: Record<Exclude<PlanTier, "party">, number> = {
 	solo_plus: 50_000,
 };
 
-export const PARTY_CREDITS_PER_SEAT = 20_000;
+const PARTY_CREDITS_PER_SEAT = 20_000;
 export const PARTY_MIN_SEATS = 2;
 export const PARTY_MAX_SEATS = 100;
 

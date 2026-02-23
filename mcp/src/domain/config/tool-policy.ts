@@ -1,4 +1,4 @@
-export const KNOWN_TOOL_NAMES = [
+const KNOWN_TOOL_NAMES = [
 	"init",
 	"context_query",
 	"player_action",
@@ -37,7 +37,7 @@ export type ToolPolicyConfig = {
 	byProvider: Record<string, ToolPolicyRule>;
 };
 
-export type ResolvedToolPolicy = {
+type ResolvedToolPolicy = {
 	profile: ToolProfile;
 	providerRuleKey: string | null;
 	allowedTools: Set<string>;

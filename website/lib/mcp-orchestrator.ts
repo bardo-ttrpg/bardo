@@ -11,6 +11,20 @@ type BootstrapAnswers = Partial<
 	>
 >;
 
+type SetupAnswers = Partial<
+	Record<
+		| "ttrpgSystem"
+		| "systemUrl"
+		| "sourceMaterialsStatus"
+		| "diceRoller"
+		| "playerCount"
+		| "sourcePolicy"
+		| "additionalContext"
+		| "materialsConfirmation",
+		string | number
+	>
+>;
+
 export type InitBootstrapResponse = {
 	success: boolean;
 	status: "needs_input" | "complete" | "error";
@@ -33,6 +47,12 @@ export type InitBootstrapResponse = {
 		setupComplete: boolean;
 		requiresUserInput: boolean;
 		nextPrompt: string | null;
+	};
+	setup?: {
+		status: string | null;
+		questionKey: string | null;
+		question: string | null;
+		revision: number | null;
 	};
 	error?: string;
 };
@@ -58,6 +78,8 @@ function mcpHeaders(): HeadersInit {
 
 export async function requestInitBootstrap(args?: {
 	answers?: BootstrapAnswers;
+	setupAnswers?: SetupAnswers;
+	setupRevision?: number;
 	workspaceId?: string;
 }): Promise<InitBootstrapResponse> {
 	const url = new URL("/api/v1/init/bootstrap", resolveMcpBaseUrl());
@@ -66,6 +88,8 @@ export async function requestInitBootstrap(args?: {
 		headers: mcpHeaders(),
 		body: JSON.stringify({
 			answers: args?.answers,
+			setupAnswers: args?.setupAnswers,
+			setupRevision: args?.setupRevision,
 			workspaceId: args?.workspaceId,
 		}),
 		cache: "no-store",
@@ -122,6 +146,10 @@ export async function requestInitBootstrap(args?: {
 		typeof payload.campaignSetup === "object" && payload.campaignSetup !== null
 			? (payload.campaignSetup as Record<string, unknown>)
 			: {};
+	const setupRecord =
+		typeof payload.setup === "object" && payload.setup !== null
+			? (payload.setup as Record<string, unknown>)
+			: {};
 
 	return {
 		success: payload.success === true,
@@ -165,6 +193,18 @@ export async function requestInitBootstrap(args?: {
 				typeof campaignSetupRecord.nextPrompt === "string"
 					? campaignSetupRecord.nextPrompt
 					: null,
+		},
+		setup: {
+			status:
+				typeof setupRecord.status === "string" ? setupRecord.status : null,
+			questionKey:
+				typeof setupRecord.questionKey === "string"
+					? setupRecord.questionKey
+					: null,
+			question:
+				typeof setupRecord.question === "string" ? setupRecord.question : null,
+			revision:
+				typeof setupRecord.revision === "number" ? setupRecord.revision : null,
 		},
 		error: typeof payload.error === "string" ? payload.error : undefined,
 	};

@@ -55,7 +55,7 @@ export function toDisplayName(slugOrText: string): string {
 		.trim();
 }
 
-export function randomChoice<T>(values: T[]): T | null {
+function randomChoice<T>(values: T[]): T | null {
 	if (values.length === 0) return null;
 	const index = Math.floor(Math.random() * values.length);
 	return values[index] ?? null;
@@ -74,7 +74,7 @@ export function dedupeLocationCandidates(
 	return [...bySlug.values()];
 }
 
-export function wildernessLocationName(theme: string | null): string {
+function wildernessLocationName(theme: string | null): string {
 	if (!theme) return "Middle of Nowhere";
 	const category = inferThemeCategory(theme);
 	switch (category) {

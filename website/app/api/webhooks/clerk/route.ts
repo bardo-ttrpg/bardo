@@ -16,7 +16,6 @@ export async function POST(req: NextRequest) {
 	if (!convexUrl) {
 		return new Response("Convex URL not configured", { status: 500 });
 	}
-
 	let event: Awaited<ReturnType<typeof verifyWebhook>>;
 	try {
 		event = await verifyWebhook(req);

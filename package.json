@@ -19,8 +19,8 @@
 		"dev:mcp": "turbo run dev --filter=mcp"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.1",
+		"@biomejs/biome": "2.4.4",
 		"turbo": "^2.8.10",
-		"typescript": "6.0.0-beta"
+		"typescript": "5.9.3"
 	}
 }

@@ -17,7 +17,7 @@ const worldTickPayloadSchema = z.object({
 	dryRun: z.boolean().optional(),
 });
 
-export type WorldTickPayload = z.infer<typeof worldTickPayloadSchema>;
+type WorldTickPayload = z.infer<typeof worldTickPayloadSchema>;
 
 export function parseWorldTickPayload(input: unknown): WorldTickPayload {
 	const parsed = worldTickPayloadSchema.safeParse(input);

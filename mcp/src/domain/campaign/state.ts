@@ -1,6 +1,6 @@
 import type { CampaignState } from "./types";
 
-export function newStateTemplate(): CampaignState {
+function newStateTemplate(): CampaignState {
 	return {
 		worldTimeISO: new Date().toISOString(),
 		currentLocation: "starting-area",

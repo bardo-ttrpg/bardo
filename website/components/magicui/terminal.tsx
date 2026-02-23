@@ -2,7 +2,6 @@
 
 import { type MotionProps, motion } from "framer-motion";
 import type React from "react";
-import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface AnimatedSpanProps extends MotionProps {
@@ -27,56 +26,6 @@ export const AnimatedSpan = ({
 		{children}
 	</motion.div>
 );
-
-interface TypingAnimationProps extends MotionProps {
-	children: string;
-	className?: string;
-	duration?: number;
-	delay?: number;
-}
-
-export const TypingAnimation = ({
-	children,
-	className,
-	duration = 40,
-	delay = 0,
-	...props
-}: TypingAnimationProps) => {
-	if (typeof children !== "string") {
-		throw new Error("TypingAnimation children must be a string");
-	}
-
-	const [displayedText, setDisplayedText] = useState("");
-	const [started, setStarted] = useState(false);
-
-	useEffect(() => {
-		const t = setTimeout(() => setStarted(true), delay);
-		return () => clearTimeout(t);
-	}, [delay]);
-
-	useEffect(() => {
-		if (!started) return;
-		let i = 0;
-		const id = setInterval(() => {
-			if (i < children.length) {
-				setDisplayedText(children.substring(0, i + 1));
-				i++;
-			} else {
-				clearInterval(id);
-			}
-		}, duration);
-		return () => clearInterval(id);
-	}, [children, duration, started]);
-
-	return (
-		<motion.span
-			className={cn("text-sm font-normal tracking-tight", className)}
-			{...props}
-		>
-			{displayedText}
-		</motion.span>
-	);
-};
 
 interface TerminalProps {
 	children: React.ReactNode;

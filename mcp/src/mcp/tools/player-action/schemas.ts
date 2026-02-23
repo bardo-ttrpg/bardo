@@ -1,4 +1,9 @@
 import * as z from "zod/v4";
+import {
+	setupAnswersSchema,
+	setupConflictSchema,
+	setupIntegritySchema,
+} from "../init/setup-schemas";
 
 export const playerActionInputSchema = z.object({
 	action: z
@@ -8,11 +13,29 @@ export const playerActionInputSchema = z.object({
 			"Natural player action message from the user (use this as the default gameplay entrypoint), e.g. `I travel to the village tavern`",
 		)
 		.max(1000),
+	bootstrapAnswers: z
+		.object({
+			purpose: z.string().trim().min(3).max(3_000).optional(),
+			userProfile: z.string().trim().min(3).max(3_000).optional(),
+			agentProfile: z.string().trim().min(3).max(3_000).optional(),
+			workingPreferences: z.string().trim().min(3).max(3_000).optional(),
+			boundaries: z.string().trim().min(3).max(3_000).optional(),
+			successCriteria: z.string().trim().min(3).max(3_000).optional(),
+			values: z.string().trim().min(3).max(3_000).optional(),
+		})
+		.partial()
+		.optional(),
+	setupAnswers: setupAnswersSchema.optional(),
+	setupRevision: z.number().int().nonnegative().optional(),
+	idempotencyKey: z.string().trim().min(8).max(200).optional(),
 });
 
 export const playerActionOutputSchema = z.object({
 	success: z.boolean().describe("True when the action was processed"),
 	message: z.string().describe("Human-readable action summary"),
+	idempotentReplay: z
+		.boolean()
+		.describe("True when the response was replayed via idempotency key"),
 	rootPath: z.string().describe("Absolute bardo root path"),
 	intent: z
 		.enum(["travel", "explore", "social", "rest", "combat", "general"])
@@ -34,6 +57,18 @@ export const playerActionOutputSchema = z.object({
 		items: z.boolean(),
 		worldGeneration: z.boolean(),
 	}),
+	requiresSetup: z.boolean(),
+	setupStatus: z.enum(["needs_input", "complete", "error", "locked"]),
+	setupQuestionKey: z.union([z.string(), z.null()]),
+	setupQuestion: z.union([z.string(), z.null()]),
+	setupProgressAnswered: z.number().int().nonnegative(),
+	setupProgressTotal: z.number().int().nonnegative(),
+	setupWarnings: z.array(z.string()),
+	setupEvidenceSummary: z.array(z.string()),
+	setupRevision: z.number().int().nonnegative(),
+	setupConflict: setupConflictSchema,
+	setupIntegrity: setupIntegritySchema,
+	pendingAction: z.union([z.string(), z.null()]),
 });
 
 export type PlayerActionOutput = z.infer<typeof playerActionOutputSchema>;

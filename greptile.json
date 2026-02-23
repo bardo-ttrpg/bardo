@@ -1,18 +1,12 @@
 {
 	"strictness": 3,
 	"instructions": "Prioritize auth correctness, request-bounds safety, race conditions, and backwards-compatible MCP behavior. Favor composable React APIs and Next.js 16 app-router best practices.",
-	"commentTypes": [
-		{ "type": "logic", "enabled": true },
-		{ "type": "security", "enabled": true },
-		{ "type": "performance", "enabled": true },
-		{ "type": "maintainability", "enabled": true }
-	],
-	"ignorePatterns": [
-		"**/node_modules/**",
-		"**/.next/**",
-		"**/.turbo/**",
-		"website/convex/_generated/**"
-	],
+	"commentTypes": ["logic", "syntax", "style", "info"],
+	"triggerOnUpdates": true,
+	"fileChangeLimit": 400,
+	"statusCheck": true,
+	"statusCommentsEnabled": true,
+	"ignorePatterns": "**/node_modules/**\n**/.next/**\n**/.turbo/**\n**/dist/**\nwebsite/convex/_generated/**\n**/*.generated.*\n**/coverage/**",
 	"customRules": {
 		"tagline": "Bardo repository safety and quality rules",
 		"rules": [

@@ -1,6 +1,6 @@
 import type { CheckoutPlanTier } from "@/lib/billing-catalog";
 
-export type PricingTier = {
+type PricingTier = {
 	key: "free" | CheckoutPlanTier;
 	name: string;
 	credits: number;
@@ -41,7 +41,7 @@ export const pricingTiers: readonly PricingTier[] = [
 			"Core MCP tools",
 			"Hosted persistence",
 			"Faster sync",
-			"Billing portal access",
+			"Clerk billing management",
 		],
 	},
 	{

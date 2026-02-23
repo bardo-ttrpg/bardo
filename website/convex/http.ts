@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { clerkIdFromIdentity } from "../lib/convex-auth";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
@@ -19,7 +19,9 @@ http.route({
 			});
 		}
 
-		const result = await ctx.runMutation(api.users.trackMcpCall, { clerkId });
+		const result = await ctx.runMutation(internal.users.trackMcpCall, {
+			clerkId,
+		});
 
 		return new Response(JSON.stringify({ ok: true, userId: result }), {
 			status: 200,
