@@ -1,6 +1,6 @@
 "use client";
 
-import { type MotionProps, motion } from "framer-motion";
+import { domAnimation, LazyMotion, type MotionProps, m } from "framer-motion";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +16,17 @@ export const AnimatedSpan = ({
 	className,
 	...props
 }: AnimatedSpanProps) => (
-	<motion.div
-		initial={{ opacity: 0, y: -4 }}
-		animate={{ opacity: 1, y: 0 }}
-		transition={{ duration: 0.25, delay }}
-		className={cn("grid text-sm font-normal tracking-tight", className)}
-		{...props}
-	>
-		{children}
-	</motion.div>
+	<LazyMotion features={domAnimation}>
+		<m.div
+			initial={{ opacity: 0, y: -4 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ duration: 0.25, delay }}
+			className={cn("grid text-sm font-normal tracking-tight", className)}
+			{...props}
+		>
+			{children}
+		</m.div>
+	</LazyMotion>
 );
 
 interface TerminalProps {

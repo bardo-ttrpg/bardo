@@ -1,11 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SessionRegistry } from "../session/session-registry";
 import type { AuthContext } from "../types/contracts";
+import { registerCoreResourcesAndPrompts } from "./core-capabilities";
+import { registerAppendEventTool } from "./tools/append-event";
+import { registerApplyDomainTransitionTool } from "./tools/apply-domain-transition";
 import { registerConsistencyCheckTool } from "./tools/consistency-check";
 import { registerContextQueryTool } from "./tools/context-query";
+import { registerEvalRunGoldenScenariosTool } from "./tools/eval-run-golden-scenarios";
+import { registerEvalRunLongCampaignStabilityTool } from "./tools/eval-run-long-campaign-stability";
 import { registerInitTool } from "./tools/init";
 import { registerMarkdownReadTool } from "./tools/markdown-read";
 import { registerMarkdownUpsertTool } from "./tools/markdown-upsert";
+import { registerMigrateLegacyStateTool } from "./tools/migrate-legacy-state";
 import { registerPlayerActionTool } from "./tools/player-action";
 import {
 	registerEntityCrudTool,
@@ -13,10 +19,15 @@ import {
 	registerFactionCrudTool,
 	registerLocationCrudTool,
 } from "./tools/record-crud";
+import { registerRegenerateProjectionTool } from "./tools/regenerate-projection";
+import { registerReplayEventsTool } from "./tools/replay-events";
+import { registerResolveMechanicsTool } from "./tools/resolve-mechanics";
+import { registerRollDiceTool } from "./tools/roll-dice";
 import { registerSessionManagementTools } from "./tools/sessions";
 import { registerSimulationTickTool } from "./tools/simulation-tick";
 import { registerStateGetTool } from "./tools/state-get";
 import { registerStateSetTool } from "./tools/state-set";
+import { registerValidateActionAgainstRulesetTool } from "./tools/validate-action-against-ruleset";
 import { registerWorldSyncTool } from "./tools/world-sync";
 
 export function createMcpServer(
@@ -34,13 +45,24 @@ export function createMcpServer(
 		},
 		{
 			instructions:
-				"Setup workflow: call player_action directly as the primary entrypoint. If setup is incomplete, the server will auto-guide one question at a time (OpenClaw bootstrap + campaign setup) and resume pending action after completion. Query memory with context_query before major narrative decisions. For autonomous progression, use simulation_tick with idempotency keys and dryRun when evaluating outcomes. Gameplay workflow: call player_action with narrative action text; it updates state/history and respects setup preferences (for example NPC/world-generation toggles). Canon rule: do not invent persistent location/NPC names unless they are already in workspace or synchronized via tools. When narration introduces new proper names, call world_sync to persist them before reusing them. Use entity_crud/location_crud/faction_crud/event_crud for typed canonical writes and consistency_check to validate causality and references. Use sessions_list/sessions_history/sessions_send/sessions_spawn/session_status to coordinate multi-session and sub-agent workflows. markdown_read/markdown_upsert/state_get/state_set remain advanced direct controls. All paths are relative to the authorized bardo root.",
+				"Setup workflow: call player_action directly as the primary entrypoint. If setup is incomplete, the server will auto-guide one question at a time (OpenClaw bootstrap + campaign setup) and resume pending action after completion. Query memory with context_query before major narrative decisions. For autonomous progression, use simulation_tick with idempotency keys and dryRun when evaluating outcomes. Gameplay workflow: call player_action with narrative action text; it appends canonical events and refreshes derived projections while respecting setup preferences (for example NPC/world-generation toggles). Canon rule: do not invent persistent location/NPC names unless they are already in workspace or synchronized via tools. When narration introduces new proper names, call world_sync to persist them before reusing them. Use MCP resources resource://campaign/current-summary, resource://scene/current, and resource://events/recent-digest for compact state context. Use prompts resolve_player_action and generate_session_recap as workflow templates. Use validate_action_against_ruleset before resolve_mechanics for rules-safe action resolution. Use roll_dice and resolve_mechanics for authoritative mechanics resolution; both emit canonical events. Use append_event for canonical append-only events and replay_events to read event history. Use apply_domain_transition for append-only entity/location/faction transitions. Use migrate_legacy_state when converting old state/current.md campaigns into canonical events. Use eval_run_golden_scenarios for deterministic scenario regression and eval_run_long_campaign_stability for 10-25 turn campaign hardening checks. Use regenerate_projection to refresh derived projection files from canonical events. entity_crud/location_crud/faction_crud/event_crud are read/list helpers only. Use consistency_check to validate causality and references. Use sessions_list/sessions_history/sessions_send/sessions_spawn/session_status to coordinate multi-session and sub-agent workflows. markdown_upsert/state_set are restricted to non-canonical paths; use canonical tools for world state. markdown_read and state_get remain advanced read controls. All paths are relative to the authorized bardo root.",
 		},
 	);
 
+	registerCoreResourcesAndPrompts(server, auth);
 	registerInitTool(server, auth);
 	registerContextQueryTool(server, auth);
+	registerEvalRunGoldenScenariosTool(server, auth);
+	registerEvalRunLongCampaignStabilityTool(server, auth);
 	registerPlayerActionTool(server, auth);
+	registerAppendEventTool(server, auth);
+	registerApplyDomainTransitionTool(server, auth);
+	registerReplayEventsTool(server, auth);
+	registerRollDiceTool(server, auth);
+	registerValidateActionAgainstRulesetTool(server, auth);
+	registerResolveMechanicsTool(server, auth);
+	registerRegenerateProjectionTool(server, auth);
+	registerMigrateLegacyStateTool(server, auth);
 	registerSimulationTickTool(server, auth);
 	registerEntityCrudTool(server, auth);
 	registerLocationCrudTool(server, auth);

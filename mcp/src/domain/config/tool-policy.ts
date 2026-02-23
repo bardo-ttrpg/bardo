@@ -1,7 +1,17 @@
 const KNOWN_TOOL_NAMES = [
 	"init",
 	"context_query",
+	"eval_run_golden_scenarios",
+	"eval_run_long_campaign_stability",
 	"player_action",
+	"append_event",
+	"apply_domain_transition",
+	"replay_events",
+	"roll_dice",
+	"validate_action_against_ruleset",
+	"resolve_mechanics",
+	"regenerate_projection",
+	"migrate_legacy_state",
 	"simulation_tick",
 	"entity_crud",
 	"location_crud",
@@ -22,7 +32,7 @@ const KNOWN_TOOL_NAMES = [
 
 type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
-export type ToolProfile = "minimal" | "standard" | "full";
+export type ToolProfile = "minimal" | "gameplay" | "standard" | "full";
 
 export type ToolPolicyRule = {
 	profile?: ToolProfile;
@@ -49,7 +59,17 @@ const TOOL_GROUPS: Record<string, readonly ToolName[]> = {
 	"group:core": [
 		"init",
 		"context_query",
+		"eval_run_golden_scenarios",
+		"eval_run_long_campaign_stability",
 		"player_action",
+		"append_event",
+		"apply_domain_transition",
+		"replay_events",
+		"roll_dice",
+		"validate_action_against_ruleset",
+		"resolve_mechanics",
+		"regenerate_projection",
+		"migrate_legacy_state",
 		"simulation_tick",
 		"consistency_check",
 		"state_get",
@@ -77,15 +97,48 @@ const PROFILE_TOOLS: Record<ToolProfile, readonly ToolName[]> = {
 	minimal: [
 		"init",
 		"context_query",
+		"eval_run_golden_scenarios",
+		"eval_run_long_campaign_stability",
 		"state_get",
 		"sessions_list",
 		"sessions_history",
 		"session_status",
 	],
+	gameplay: [
+		"init",
+		"context_query",
+		"eval_run_golden_scenarios",
+		"eval_run_long_campaign_stability",
+		"player_action",
+		"replay_events",
+		"roll_dice",
+		"validate_action_against_ruleset",
+		"resolve_mechanics",
+		"regenerate_projection",
+		"simulation_tick",
+		"consistency_check",
+		"state_get",
+		"world_sync",
+		"sessions_list",
+		"sessions_history",
+		"sessions_send",
+		"sessions_spawn",
+		"session_status",
+	],
 	standard: [
 		"init",
 		"context_query",
+		"eval_run_golden_scenarios",
+		"eval_run_long_campaign_stability",
 		"player_action",
+		"append_event",
+		"apply_domain_transition",
+		"replay_events",
+		"roll_dice",
+		"validate_action_against_ruleset",
+		"resolve_mechanics",
+		"regenerate_projection",
+		"migrate_legacy_state",
 		"simulation_tick",
 		"consistency_check",
 		"entity_crud",
@@ -93,7 +146,6 @@ const PROFILE_TOOLS: Record<ToolProfile, readonly ToolName[]> = {
 		"faction_crud",
 		"event_crud",
 		"state_get",
-		"state_set",
 		"world_sync",
 		"sessions_list",
 		"sessions_history",
@@ -111,6 +163,7 @@ function parseProfile(
 	const normalized = value?.trim().toLowerCase();
 	if (
 		normalized === "minimal" ||
+		normalized === "gameplay" ||
 		normalized === "standard" ||
 		normalized === "full"
 	) {
@@ -215,13 +268,14 @@ function parseProviderRules(
 		let profile: ToolProfile | undefined;
 		if (
 			rawProfile === "minimal" ||
+			rawProfile === "gameplay" ||
 			rawProfile === "standard" ||
 			rawProfile === "full"
 		) {
 			profile = rawProfile;
 		} else if (rawProfile !== undefined) {
 			throw new Error(
-				`Invalid BARDO_TOOLS_BY_PROVIDER_JSON: profile for ${key} must be minimal, standard, or full.`,
+				`Invalid BARDO_TOOLS_BY_PROVIDER_JSON: profile for ${key} must be minimal, gameplay, standard, or full.`,
 			);
 		}
 		const allowTokens = parseRuleTokens(ruleRecord.allow, `allow (${key})`);
@@ -248,7 +302,10 @@ function resolveProfileTools(profile: ToolProfile): Set<string> {
 export function resolveToolPolicyConfig(
 	env: Record<string, string | undefined>,
 ): ToolPolicyConfig {
-	const defaultProfile = parseProfile(env.BARDO_TOOLS_PROFILE, "full");
+	const defaultProfile = parseProfile(
+		env.BARDO_TOOLS_PROFILE,
+		env.NODE_ENV === "production" ? "gameplay" : "standard",
+	);
 	const baseAllowTokens = parseTokenList(env.BARDO_TOOLS_ALLOW);
 	const baseDenyTokens = parseTokenList(env.BARDO_TOOLS_DENY);
 

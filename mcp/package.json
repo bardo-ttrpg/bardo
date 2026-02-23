@@ -9,6 +9,12 @@
 		"build": "tsc --noEmit",
 		"lint": "biome check .",
 		"format": "biome check --write .",
+		"test": "bun test",
+		"test:ga-gates": "BARDO_STRICT_CANONICAL_MODE=true bun test src/app/routes/turns-orchestrator.handler.test.ts src/mcp/tools/player-action/register.test.ts src/mcp/tools/world-sync/register.test.ts src/mcp/tools/simulation-tick.test.ts src/mcp/tools/consistency-check.test.ts src/mcp/evals/golden-scenarios.test.ts src/mcp/evals/long-run-campaign-stability.test.ts",
+		"test:soak-gates": "BARDO_STRICT_CANONICAL_MODE=true bun test src/mcp/evals/long-run-campaign-stability.test.ts",
+		"test:mechanics-edge-gates": "BARDO_STRICT_CANONICAL_MODE=true bun test src/mcp/evals/golden-scenarios.test.ts src/mcp/tools/mechanics-tools.test.ts src/mcp/tools/validate-action-against-ruleset.test.ts",
+		"test:perf-gates": "BARDO_STRICT_CANONICAL_MODE=true bun test src/mcp/evals/performance-benchmark.test.ts",
+		"ga:readiness": "bun run check && bun test && bun run test:ga-gates && bun run test:soak-gates && bun run test:mechanics-edge-gates && bun run test:perf-gates",
 		"typecheck": "tsc --noEmit",
 		"check": "bun run lint && bun run typecheck"
 	},

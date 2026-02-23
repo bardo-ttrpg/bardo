@@ -5,10 +5,22 @@ import {
 	loadOptionalSystems,
 } from "../../../domain/campaign/optional-systems";
 import { resolveFeatureFlags } from "../../../domain/config/features";
+import { appendCanonicalEvent } from "../../../domain/events/store";
 import {
 	getIdempotentResult,
 	setIdempotentResult,
 } from "../../../domain/idempotency/store";
+import type { AdvantageMode } from "../../../domain/mechanics/dice";
+import { resolveRulesetAdapter } from "../../../domain/mechanics/rulesets/registry";
+import type { MechanicsActionType } from "../../../domain/mechanics/rulesets/types";
+import {
+	evaluateRuntimePolicy,
+	loadAuthorityPolicy,
+	loadTableContract,
+	summarizeRuntimePolicyViolations,
+} from "../../../domain/policy/runtime-guards";
+import { loadPreferredCurrentState } from "../../../domain/projections/preferred-state";
+import { regenerateProjectionsForEventTypes } from "../../../domain/projections/refresh";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
@@ -25,14 +37,11 @@ import {
 	resolveTravelTarget,
 } from "./parsing";
 import {
-	appendHistoryEntry,
 	buildHistoryEntry,
 	createUnknownNpc,
 	ensureLocationFile,
 	ensurePlayerActionDirectories,
-	loadCampaignState,
 	loadKnownLocations,
-	persistCampaignState,
 	resolvePlayerActionPaths,
 } from "./persistence";
 import {
@@ -43,6 +52,24 @@ import {
 } from "./schemas";
 
 const PLAYER_ACTION_SCOPE = "player_action";
+
+type PlayerActionMechanics = {
+	ruleset: string;
+	required: boolean;
+	resolved: boolean;
+	actionType: MechanicsActionType | null;
+	targetDifficulty: number | null;
+	modifier: number;
+	advantage: AdvantageMode | null;
+	rawRoll: number | null;
+	total: number | null;
+	outcome: "success" | "failure" | null;
+	margin: number | null;
+	resolutionMode: "dice" | "deterministic" | "unsupported" | null;
+	unsupportedReason: string | null;
+	trace: Record<string, unknown> | null;
+	validationErrors: string[];
+};
 
 type SetupRuntimeState = {
 	status: GuidedSetupFlowResult["status"];
@@ -90,6 +117,110 @@ function defaultSetupBypassState(): SetupRuntimeState {
 	};
 }
 
+function canonicalPlayerActionEventBase(
+	idempotencyKey: string | undefined,
+): string {
+	if (!idempotencyKey) {
+		return crypto.randomUUID();
+	}
+	return idempotencyKey
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9_-]/g, "-")
+		.slice(0, 80);
+}
+
+function defaultMechanicsSummary(required: boolean): PlayerActionMechanics {
+	return {
+		ruleset: defaultMechanicsRulesetId(),
+		required,
+		resolved: false,
+		actionType: null,
+		targetDifficulty: null,
+		modifier: 0,
+		advantage: null,
+		rawRoll: null,
+		total: null,
+		outcome: null,
+		margin: null,
+		resolutionMode: null,
+		unsupportedReason: null,
+		trace: null,
+		validationErrors: [],
+	};
+}
+
+function resolveMechanicsActionType(
+	intent: PlayerActionOutput["intent"],
+	rulesetId: string,
+): MechanicsActionType | null {
+	if (rulesetId === "narrative_v1") {
+		if (intent === "combat") {
+			return "narrative_check";
+		}
+		if (intent === "social") {
+			return "social_check";
+		}
+		return null;
+	}
+	if (intent === "combat") {
+		return "attack_roll";
+	}
+	if (intent === "social") {
+		return "skill_check";
+	}
+	return null;
+}
+
+function resolveAdvantageFromAction(action: string): AdvantageMode {
+	const normalized = action.toLowerCase();
+	if (
+		/\b(disadvantage|hindered|blinded|distracted|rushed)\b/.test(normalized)
+	) {
+		return "disadvantage";
+	}
+	if (/\b(advantage|carefully|flank|ambush|aim)\b/.test(normalized)) {
+		return "advantage";
+	}
+	return "none";
+}
+
+function resolveTargetDifficulty(args: {
+	intent: PlayerActionOutput["intent"];
+	action: string;
+}): number {
+	const normalized = args.action.toLowerCase();
+	if (/\b(very hard|extreme|legendary)\b/.test(normalized)) {
+		return 18;
+	}
+	if (/\b(hard|difficult)\b/.test(normalized)) {
+		return 15;
+	}
+	if (/\b(easy|simple)\b/.test(normalized)) {
+		return 10;
+	}
+	return args.intent === "combat" ? 12 : 13;
+}
+
+function resolveModifier(args: {
+	intent: PlayerActionOutput["intent"];
+	action: string;
+}): number {
+	const normalized = args.action.toLowerCase();
+	const base = args.intent === "combat" ? 2 : 1;
+	if (/\b(power attack|reckless|all-out)\b/.test(normalized)) {
+		return base + 2;
+	}
+	if (/\b(careful|defensive|hesitant)\b/.test(normalized)) {
+		return base - 1;
+	}
+	return base;
+}
+
+function defaultMechanicsRulesetId(): string {
+	const configured = Bun.env.BARDO_DEFAULT_RULESET?.trim();
+	return configured && configured.length > 0 ? configured : "d20_v1";
+}
+
 export async function runPlayerAction(args: {
 	auth: AuthContext;
 	action: string;
@@ -107,6 +238,7 @@ export async function runPlayerAction(args: {
 		args.guidedSetupEnabled ?? resolveFeatureFlags(Bun.env).guidedSetupEnabled;
 	const createdNpcIds: string[] = [];
 	const createdLocationIds: string[] = [];
+	const actionEventBase = canonicalPlayerActionEventBase(args.idempotencyKey);
 
 	try {
 		if (args.idempotencyKey) {
@@ -167,6 +299,7 @@ export async function runPlayerAction(args: {
 					locationAfter: "",
 					createdNpcIds: [],
 					createdLocationIds: [],
+					mechanics: defaultMechanicsSummary(false),
 					historyEntry: "",
 					statePath: paths.statePath,
 					historyPath: paths.historyPath,
@@ -191,11 +324,135 @@ export async function runPlayerAction(args: {
 		}
 
 		const optionalSystems = await loadOptionalSystems(bardoRoot);
+		const tableContract = await loadTableContract({ bardoRoot });
+		const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
+		const runtimeViolations = evaluateRuntimePolicy({
+			action: actionToRun,
+			tableContract,
+			authorityPolicy,
+		});
+		if (runtimeViolations.length > 0) {
+			const blockedMessage =
+				summarizeRuntimePolicyViolations(runtimeViolations);
+			await appendCanonicalEvent({
+				bardoRoot,
+				event: {
+					id: `evt-player-action-policy-${actionEventBase}`,
+					type: "runtime_policy_blocked",
+					atISO: nowIso,
+					source: "player_action",
+					data: {
+						action: actionToRun,
+						runtimeViolations,
+						tableContract: {
+							tone: tableContract.tone,
+							boundaries: tableContract.boundaries,
+							pvp: tableContract.pvp,
+							retconPolicy: tableContract.retconPolicy,
+						},
+						authorityPolicy: {
+							mode: authorityPolicy.mode,
+							factIntroduction: authorityPolicy.factIntroduction,
+							ruleAdjudication: authorityPolicy.ruleAdjudication,
+							safetyVeto: authorityPolicy.safetyVeto,
+							allowRuleBypass: authorityPolicy.allowRuleBypass,
+							allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+							allowPlayerCanonDeclarations:
+								authorityPolicy.allowPlayerCanonDeclarations,
+						},
+					},
+				},
+			});
+			const output: PlayerActionOutput = {
+				success: false,
+				message: `Action blocked by runtime policy: ${blockedMessage}`,
+				idempotentReplay: false,
+				rootPath: bardoRoot,
+				intent: parseIntent(actionToRun),
+				timeAdvancedMinutes: 0,
+				worldTimeBeforeISO: "",
+				worldTimeAfterISO: "",
+				locationBefore: "",
+				locationAfter: "",
+				createdNpcIds: [],
+				createdLocationIds: [],
+				mechanics: defaultMechanicsSummary(false),
+				historyEntry: "",
+				statePath: paths.statePath,
+				historyPath: paths.historyPath,
+				narrationGuardrails: [...narrationGuardrails],
+				optionalSystems,
+				requiresSetup: false,
+				setupStatus: setup.status,
+				setupQuestionKey: null,
+				setupQuestion: null,
+				setupProgressAnswered: setup.progressAnswered,
+				setupProgressTotal: setup.progressTotal,
+				setupWarnings: setup.warnings,
+				setupEvidenceSummary: setup.evidenceSummary,
+				setupRevision: setup.revision,
+				setupConflict: setup.conflict,
+				setupIntegrity: setup.integrity,
+				pendingAction: null,
+			};
+			if (args.idempotencyKey) {
+				await setIdempotentResult({
+					bardoRoot,
+					key: args.idempotencyKey,
+					scope: PLAYER_ACTION_SCOPE,
+					result: output,
+					nowIso,
+				});
+			}
+			return output;
+		}
+
 		const knownLocations = await loadKnownLocations(bardoRoot);
 		await ensurePlayerActionDirectories(bardoRoot, paths);
 
-		const state = await loadCampaignState(paths.statePath);
+		const preferredState = await loadPreferredCurrentState({
+			bardoRoot,
+			consumer: "player_action",
+		});
+		const state = JSON.parse(
+			JSON.stringify(preferredState.chosen.state),
+		) as Awaited<
+			ReturnType<typeof loadPreferredCurrentState>
+		>["chosen"]["state"];
 		const intent = parseIntent(actionToRun);
+		const mechanicsRuleset = defaultMechanicsRulesetId();
+		const mechanicsActionType = resolveMechanicsActionType(
+			intent,
+			mechanicsRuleset,
+		);
+		const mechanicsAdapter = mechanicsActionType
+			? resolveRulesetAdapter(mechanicsRuleset)
+			: null;
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: `evt-player-action-declared-${actionEventBase}`,
+				type: "player_action_declared",
+				atISO: nowIso,
+				source: "player_action",
+				data: {
+					action: actionToRun,
+				},
+			},
+		});
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: `evt-player-action-intent-${actionEventBase}`,
+				type: "action_intent_validated",
+				atISO: nowIso,
+				source: "player_action",
+				data: {
+					action: actionToRun,
+					intent,
+				},
+			},
+		});
 		const locationBefore = state.currentLocation;
 		const targetLocationText = extractTargetLocation(actionToRun);
 		let locationAfter = state.currentLocation;
@@ -278,7 +535,114 @@ export async function runPlayerAction(args: {
 		state.worldTimeISO = worldTimeAfterISO;
 		state.lastAction = actionToRun;
 
-		await persistCampaignState(paths.statePath, state);
+		let mechanics = {
+			...defaultMechanicsSummary(mechanicsActionType !== null),
+			ruleset: mechanicsRuleset,
+		};
+		if (mechanicsActionType && mechanicsAdapter) {
+			const targetDifficulty = resolveTargetDifficulty({
+				intent,
+				action: actionToRun,
+			});
+			const modifier = resolveModifier({ intent, action: actionToRun });
+			const advantage = resolveAdvantageFromAction(actionToRun);
+			const validation = mechanicsAdapter.validate({
+				actionType: mechanicsActionType,
+				targetDifficulty,
+				modifier,
+				actorId: "pc_party",
+				declaredIntent: actionToRun,
+				advantage,
+			});
+			if (!validation.valid) {
+				throw new Error(
+					`${mechanicsAdapter.id} mechanics validation failed: ${validation.errors.join("; ")}`,
+				);
+			}
+
+			const resolution = mechanicsAdapter.resolve({
+				actionType: mechanicsActionType,
+				targetDifficulty,
+				modifier,
+				actorId: "pc_party",
+				declaredIntent: actionToRun,
+				advantage,
+			});
+			if (resolution.resolutionMode === "unsupported") {
+				throw new Error(
+					resolution.unsupportedReason ??
+						`${mechanicsAdapter.id} does not support this mechanics request.`,
+				);
+			}
+
+			mechanics = {
+				ruleset: mechanicsAdapter.id,
+				required: true,
+				resolved: true,
+				actionType: resolution.actionType,
+				targetDifficulty: resolution.targetDifficulty,
+				modifier: resolution.modifier,
+				advantage: resolution.advantage,
+				rawRoll: resolution.rawRoll,
+				total: resolution.total,
+				outcome: resolution.outcome,
+				margin: resolution.margin,
+				resolutionMode: resolution.resolutionMode,
+				unsupportedReason: resolution.unsupportedReason,
+				trace: resolution.trace,
+				validationErrors: [],
+			};
+
+			if (resolution.rolls.length > 0) {
+				await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-dice-${actionEventBase}`,
+						type: "dice_rolled",
+						atISO: worldTimeAfterISO,
+						source: "player_action",
+						data: {
+							ruleset: mechanicsAdapter.id,
+							action: actionToRun,
+							intent,
+							actionType: resolution.actionType,
+							targetDifficulty: resolution.targetDifficulty,
+							modifier: resolution.modifier,
+							advantage: resolution.advantage,
+							rolls: resolution.rolls,
+							selectedRoll: resolution.rawRoll,
+							total: resolution.total,
+							resolutionMode: resolution.resolutionMode,
+						},
+					},
+				});
+			}
+			await appendCanonicalEvent({
+				bardoRoot,
+				event: {
+					id: `evt-player-action-mechanics-${actionEventBase}`,
+					type: "mechanics_resolved",
+					atISO: worldTimeAfterISO,
+					source: "player_action",
+					data: {
+						ruleset: mechanicsAdapter.id,
+						action: actionToRun,
+						intent,
+						actionType: resolution.actionType,
+						targetDifficulty: resolution.targetDifficulty,
+						modifier: resolution.modifier,
+						advantage: resolution.advantage,
+						rawRoll: resolution.rawRoll,
+						total: resolution.total,
+						outcome: resolution.outcome,
+						margin: resolution.margin,
+						resolutionMode: resolution.resolutionMode,
+						trace: resolution.trace,
+					},
+				},
+			});
+		}
+
 		const historyEntry = buildHistoryEntry({
 			worldTimeAfterISO,
 			intent,
@@ -288,7 +652,30 @@ export async function runPlayerAction(args: {
 			newNpcCount: createdNpcIds.length,
 			newLocationCount: createdLocationIds.length,
 		});
-		await appendHistoryEntry(paths.historyPath, historyEntry);
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: `evt-player-action-${actionEventBase}`,
+				type: "player_action_resolved",
+				atISO: worldTimeAfterISO,
+				source: "player_action",
+				data: {
+					action: actionToRun,
+					intent,
+					worldTimeBeforeISO,
+					worldTimeAfterISO,
+					locationBefore,
+					locationAfter,
+					createdNpcIds,
+					createdLocationIds,
+					mechanics,
+				},
+			},
+		});
+		await regenerateProjectionsForEventTypes({
+			bardoRoot,
+			eventTypes: ["player_action_resolved"],
+		});
 
 		const output: PlayerActionOutput = {
 			success: true,
@@ -306,6 +693,7 @@ export async function runPlayerAction(args: {
 			locationAfter,
 			createdNpcIds,
 			createdLocationIds,
+			mechanics,
 			historyEntry,
 			statePath: paths.statePath,
 			historyPath: paths.historyPath,
@@ -353,6 +741,7 @@ export async function runPlayerAction(args: {
 			locationAfter: "",
 			createdNpcIds: [],
 			createdLocationIds: [],
+			mechanics: defaultMechanicsSummary(false),
 			historyEntry: "",
 			statePath: paths.statePath,
 			historyPath: paths.historyPath,

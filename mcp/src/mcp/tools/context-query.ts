@@ -43,6 +43,7 @@ const contextQueryOutputSchema = z.object({
 	focus: z.enum(["all", "world", "entities", "quests", "state"]),
 	query: z.string(),
 	docsIndexed: z.number().int().nonnegative(),
+	indexRebuilt: z.boolean(),
 	results: z.array(
 		z.object({
 			relativePath: z.string(),
@@ -104,6 +105,7 @@ export function registerContextQueryTool(
 					focus: resolvedFocus,
 					query,
 					docsIndexed: context.docsIndexed,
+					indexRebuilt: context.indexRebuilt,
 					results: context.results,
 				};
 				return makeToolResult(output);
@@ -120,6 +122,7 @@ export function registerContextQueryTool(
 					focus: resolvedFocus,
 					query,
 					docsIndexed: 0,
+					indexRebuilt: false,
 					results: [],
 				};
 				return makeToolResult(output, true);

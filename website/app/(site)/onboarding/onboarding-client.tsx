@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { InitBootstrapResponse } from "@/lib/mcp-orchestrator";
 
 type Props = {
@@ -75,7 +75,10 @@ async function callBootstrapApi(payload: {
 
 export function OnboardingClient({ initial }: Props) {
 	const router = useRouter();
-	const [result, setResult] = useState<InitBootstrapResponse>(initial);
+	const initialResultRef = useRef(initial);
+	const [result, setResult] = useState<InitBootstrapResponse>(
+		initialResultRef.current,
+	);
 	const [value, setValue] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);

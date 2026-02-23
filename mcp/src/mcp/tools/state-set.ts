@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
+import { getCanonicalProtectionReason } from "../../domain/canon/path-policy";
 import { parseMarkdown, renderMarkdown } from "../../domain/markdown/markdown";
 import {
 	ensureMarkdownPath,
@@ -23,8 +24,10 @@ const markdownFrontmatterSchema = z.object({
 const stateSetInputSchema = z.object({
 	path: z
 		.string()
-		.default("state/current.md")
-		.describe("Relative state markdown file path under bardo root"),
+		.default("scratch/state-note.md")
+		.describe(
+			"Relative markdown file path for non-canonical state notes under bardo root",
+		),
 	state: z
 		.record(z.string(), z.unknown())
 		.describe("State object to write to markdown body as pretty JSON"),
@@ -61,7 +64,7 @@ export function registerStateSetTool(
 		{
 			title: "Set Campaign State",
 			description:
-				"Write campaign state as JSON in markdown body (default `state/current.md`) with frontmatter metadata for persistent memory.",
+				"Write JSON state notes to non-canonical markdown paths. Protected canonical paths (state/current, projections, events, _settings) are blocked.",
 			inputSchema: stateSetInputSchema,
 			outputSchema: stateSetOutputSchema,
 			annotations: {
@@ -75,6 +78,26 @@ export function registerStateSetTool(
 		async ({ path: relativePath, state, title, description }) => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
 			try {
+				const protectionReason = getCanonicalProtectionReason(relativePath);
+				if (protectionReason) {
+					const output: StateSetOutput = {
+						success: false,
+						message:
+							`${protectionReason} Use append_event + regenerate_projection ` +
+							"or domain-specific tools (player_action/world_sync/simulation_tick) for canonical updates.",
+						rootPath: bardoRoot,
+						filePath: "",
+						fileExistedBefore: false,
+						frontmatter: {
+							description: description ?? "Scratch state notes (non-canonical)",
+							title: title ?? "State Note",
+						},
+						state: {},
+						rawContent: "",
+					};
+					return makeToolResult(output, true);
+				}
+
 				const filePath = resolvePathInsideRoot(bardoRoot, relativePath);
 				ensureMarkdownPath(filePath);
 				const raw = await readTextIfExists(filePath);

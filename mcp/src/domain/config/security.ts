@@ -53,11 +53,12 @@ function resolveQueryApiKeyPolicy(
 
 function resolveFailClosedRateLimit(
 	env: Record<string, string | undefined>,
+	isProduction: boolean,
 ): boolean {
 	const value = env.BARDO_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
 	if (value === "true") return true;
 	if (value === "false") return false;
-	return false;
+	return isProduction;
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -91,7 +92,7 @@ export function resolveSecurityPolicy(
 			env.BARDO_RATE_LIMIT_MAX_REQUESTS,
 			DEFAULTS.rateLimitMaxRequests,
 		),
-		rateLimitFailClosed: resolveFailClosedRateLimit(env),
+		rateLimitFailClosed: resolveFailClosedRateLimit(env, isProduction),
 		telemetryEnabled: parseBoolean(env.BARDO_TELEMETRY_ENABLED, true),
 		metricsRouteEnabled: parseBoolean(env.BARDO_METRICS_ROUTE_ENABLED, true),
 		metricsRequireAuth: parseBoolean(

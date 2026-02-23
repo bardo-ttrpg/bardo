@@ -24,6 +24,14 @@
 			"dependsOn": ["^typecheck"],
 			"outputs": []
 		},
+		"test:ga-gates": {
+			"dependsOn": ["^test:ga-gates"],
+			"outputs": []
+		},
+		"test:perf-gates": {
+			"dependsOn": ["^test:perf-gates"],
+			"outputs": []
+		},
 		"check": {
 			"dependsOn": ["lint", "typecheck"],
 			"outputs": []

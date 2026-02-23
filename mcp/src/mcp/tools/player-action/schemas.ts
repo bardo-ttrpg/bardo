@@ -47,6 +47,51 @@ export const playerActionOutputSchema = z.object({
 	locationAfter: z.string(),
 	createdNpcIds: z.array(z.string()),
 	createdLocationIds: z.array(z.string()),
+	mechanics: z.object({
+		ruleset: z
+			.string()
+			.describe("Ruleset adapter id used for mechanics resolution."),
+		required: z
+			.boolean()
+			.describe("True when mechanics resolution was required"),
+		resolved: z
+			.boolean()
+			.describe("True when mechanics were validated and resolved"),
+		actionType: z
+			.union([z.string(), z.null()])
+			.describe("Resolved mechanics action type when applicable"),
+		targetDifficulty: z
+			.union([z.number().int(), z.null()])
+			.describe("Target difficulty used for mechanics resolution"),
+		modifier: z.number().int().describe("Applied mechanics modifier"),
+		advantage: z
+			.union([z.enum(["none", "advantage", "disadvantage"]), z.null()])
+			.describe("Applied advantage mode when supported by ruleset"),
+		rawRoll: z
+			.union([z.number().int().min(1).max(20), z.null()])
+			.describe("Selected raw die roll when resolved with dice"),
+		total: z
+			.union([z.number().int(), z.null()])
+			.describe("Total resolved value when mechanics were applied"),
+		outcome: z
+			.union([z.enum(["success", "failure"]), z.null()])
+			.describe("Resolved success/failure outcome"),
+		margin: z
+			.union([z.number().int(), z.null()])
+			.describe("Outcome margin (total - targetDifficulty)"),
+		resolutionMode: z
+			.union([z.enum(["dice", "deterministic", "unsupported"]), z.null()])
+			.describe("Resolution strategy used by the ruleset adapter."),
+		unsupportedReason: z
+			.union([z.string(), z.null()])
+			.describe("Reason when mechanics request is unsupported by ruleset."),
+		trace: z
+			.union([z.record(z.string(), z.unknown()), z.null()])
+			.describe("Ruleset-specific trace metadata for auditability."),
+		validationErrors: z
+			.array(z.string())
+			.describe("Validation errors when mechanics payload is invalid"),
+	}),
 	historyEntry: z.string(),
 	statePath: z.string(),
 	historyPath: z.string(),

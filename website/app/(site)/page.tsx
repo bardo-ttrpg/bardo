@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import AmbientParticles from "@/components/ambient-particles";
 import ComparisonSection from "./_components/landing/comparison-section";
 import CompatibilitySection from "./_components/landing/compatibility-section";
@@ -8,6 +9,12 @@ import TerminalDemoSection from "./_components/landing/terminal-demo-section";
 import VideoSection from "./_components/landing/video-section";
 import WorkspaceSection from "./_components/landing/workspace-section";
 import WorldMapSection from "./_components/landing/world-map-section";
+
+export const metadata: Metadata = {
+	title: "Bardo",
+	description:
+		"Bardo converts AI agents into system-agnostic TTRPG game masters with deterministic runtime controls.",
+};
 
 export default function LandingPage() {
 	return (

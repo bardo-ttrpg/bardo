@@ -1,6 +1,7 @@
 "use client";
 
 import DottedMapLib from "dotted-map";
+import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,8 @@ export interface MapMarker {
 interface DottedMapProps {
 	markers?: MapMarker[];
 }
+
+const EMPTY_MARKERS: MapMarker[] = [];
 
 /**
  * Module-level SVG cache. The DottedMapLib computation is expensive (~200–500 ms
@@ -60,7 +63,7 @@ function getMapSvg(dark: boolean): string {
 	return _svgLight;
 }
 
-export default function DottedMap({ markers = [] }: DottedMapProps) {
+export default function DottedMap({ markers = EMPTY_MARKERS }: DottedMapProps) {
 	const [activeIndex, setActiveIndex] = useState<number | null>(null);
 	const { resolvedTheme } = useTheme();
 
@@ -89,11 +92,13 @@ export default function DottedMap({ markers = [] }: DottedMapProps) {
 		<div className="overflow-x-auto">
 			<div className="relative" style={{ minWidth: 600 }}>
 				{/* Dotted background map */}
-				{/* biome-ignore lint/performance/noImgElement: data URI rendering for generated map SVG */}
-				<img
+				<Image
 					src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMap)}`}
 					className="h-full w-full select-none pointer-events-none [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)]"
 					alt="world map"
+					width={800}
+					height={400}
+					unoptimized
 					draggable={false}
 				/>
 

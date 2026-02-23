@@ -1,8 +1,9 @@
 import { readdir } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
-import { safeParseState } from "../../domain/campaign/state";
-import { parseMarkdown } from "../../domain/markdown/markdown";
+import { readCanonicalEvents } from "../../domain/events/store";
+import { deriveCurrentStateFromEvents } from "../../domain/projections/current-state";
+import { loadPreferredCurrentState } from "../../domain/projections/preferred-state";
 import {
 	readTextIfExists,
 	resolveBardoRoot,
@@ -43,6 +44,18 @@ type ConsistencyIssue = {
 
 type ConsistencyCheckOutput = z.infer<typeof consistencyCheckOutputSchema>;
 
+function stableStringify(value: unknown): string {
+	if (Array.isArray(value)) {
+		return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
+	}
+	if (value && typeof value === "object") {
+		const record = value as Record<string, unknown>;
+		const keys = Object.keys(record).sort();
+		return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
+	}
+	return JSON.stringify(value);
+}
+
 export function registerConsistencyCheckTool(
 	server: McpServer,
 	auth: AuthContext,
@@ -65,14 +78,25 @@ export function registerConsistencyCheckTool(
 		},
 		async ({ includeWarnings }) => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
-			const statePath = resolvePathInsideRoot(bardoRoot, "state/current.md");
 			const issues: ConsistencyIssue[] = [];
 
 			try {
-				const stateRaw = await readTextIfExists(statePath);
-				const state = safeParseState(
-					stateRaw ? parseMarkdown(stateRaw).content : "",
-				);
+				const preferredState = await loadPreferredCurrentState({
+					bardoRoot,
+					consumer: "consistency_check",
+				});
+				const state = preferredState.chosen.state;
+				const stateReadPath = preferredState.chosen.path;
+
+				if (preferredState.source === "legacy_state") {
+					issues.push({
+						severity: "warning",
+						code: "STATE_READ_FROM_LEGACY_FALLBACK",
+						message:
+							"Projection state is missing. Consistency check fell back to legacy state/current.md.",
+						path: preferredState.legacyState.path,
+					});
+				}
 
 				if (!state.locations[state.currentLocation]) {
 					issues.push({
@@ -80,7 +104,7 @@ export function registerConsistencyCheckTool(
 						code: "STATE_CURRENT_LOCATION_MISSING",
 						message:
 							"`currentLocation` points to a location missing from `state.locations`.",
-						path: statePath,
+						path: stateReadPath,
 					});
 				}
 
@@ -92,7 +116,7 @@ export function registerConsistencyCheckTool(
 							severity: "warning",
 							code: "LOCATION_NAME_EMPTY",
 							message: `Location '${locationSlug}' has an empty name.`,
-							path: statePath,
+							path: stateReadPath,
 						});
 					}
 
@@ -139,6 +163,52 @@ export function registerConsistencyCheckTool(
 					// events directory may not exist yet
 				}
 
+				const canonicalEvents = await readCanonicalEvents({ bardoRoot });
+				if (canonicalEvents.length > 0) {
+					const derivedState = deriveCurrentStateFromEvents(canonicalEvents);
+					const derivedSignature = stableStringify(derivedState);
+
+					if (!preferredState.projection.exists) {
+						issues.push({
+							severity: "warning",
+							code: "PROJECTION_MISSING_FOR_EVENTS",
+							message:
+								"Canonical events exist but projections/current-state.md is missing.",
+							path: preferredState.projection.path,
+						});
+					}
+
+					if (preferredState.projection.exists) {
+						const projectionSignature = stableStringify(
+							preferredState.projection.state,
+						);
+						if (projectionSignature !== derivedSignature) {
+							issues.push({
+								severity: "warning",
+								code: "PROJECTION_EVENT_DRIFT",
+								message:
+									"Projection state diverges from canonical event-derived state. Regenerate projections.",
+								path: preferredState.projection.path,
+							});
+						}
+					}
+
+					if (preferredState.legacyState.exists) {
+						const legacySignature = stableStringify(
+							preferredState.legacyState.state,
+						);
+						if (legacySignature !== derivedSignature) {
+							issues.push({
+								severity: "warning",
+								code: "LEGACY_STATE_EVENT_DRIFT",
+								message:
+									"Legacy state/current.md diverges from canonical event-derived state.",
+								path: preferredState.legacyState.path,
+							});
+						}
+					}
+				}
+
 				const filtered = includeWarnings
 					? issues
 					: issues.filter((issue) => issue.severity === "error");
@@ -162,6 +232,55 @@ export function registerConsistencyCheckTool(
 				};
 				return makeToolResult(output, errorCount > 0);
 			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
+				) {
+					const output: ConsistencyCheckOutput = {
+						success: false,
+						message:
+							"Strict canonical mode blocked consistency check because projection fallback would use legacy state/current.md.",
+						rootPath: bardoRoot,
+						issues: [
+							{
+								severity: "error",
+								code: "STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED",
+								message:
+									"Projection is missing and strict canonical mode disallows legacy fallback.",
+								path: resolvePathInsideRoot(bardoRoot, "state/current.md"),
+							},
+						],
+						errorCount: 1,
+						warningCount: 0,
+					};
+					return makeToolResult(output, true);
+				}
+				if (
+					error instanceof Error &&
+					error.message.startsWith("STRICT_CANONICAL_STALE_PROJECTION")
+				) {
+					const output: ConsistencyCheckOutput = {
+						success: false,
+						message:
+							"Strict canonical mode blocked consistency check because projection is stale relative to canonical events.",
+						rootPath: bardoRoot,
+						issues: [
+							{
+								severity: "error",
+								code: "STRICT_CANONICAL_STALE_PROJECTION",
+								message:
+									"Projection metadata indicates stale event sequence. Regenerate projections/current-state.md.",
+								path: resolvePathInsideRoot(
+									bardoRoot,
+									"projections/current-state.md",
+								),
+							},
+						],
+						errorCount: 1,
+						warningCount: 0,
+					};
+					return makeToolResult(output, true);
+				}
 				const output: ConsistencyCheckOutput = {
 					success: false,
 					message:

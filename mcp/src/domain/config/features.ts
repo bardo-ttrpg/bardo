@@ -1,5 +1,6 @@
 export type FeatureFlags = {
 	guidedSetupEnabled: boolean;
+	strictCanonicalMode: boolean;
 };
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -13,8 +14,13 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 export function resolveFeatureFlags(
 	env: Record<string, string | undefined>,
 ): FeatureFlags {
+	const isProduction = env.NODE_ENV === "production";
 	return {
 		guidedSetupEnabled: parseBoolean(env.BARDO_GUIDED_SETUP_ENABLED, true),
+		strictCanonicalMode: parseBoolean(
+			env.BARDO_STRICT_CANONICAL_MODE,
+			isProduction,
+		),
 	};
 }
 

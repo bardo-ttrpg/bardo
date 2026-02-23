@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#@$%";
 const FRAME_MS = 45;
@@ -12,6 +12,22 @@ function randomChar() {
 }
 
 type StaggerFrom = "left" | "right" | "center";
+
+type DisplayAction =
+	| { type: "reset"; chars: string[] }
+	| { type: "set_char"; index: number; value: string };
+
+function displayReducer(state: string[], action: DisplayAction): string[] {
+	if (action.type === "reset") {
+		return [...action.chars];
+	}
+	if (state[action.index] === action.value) {
+		return state;
+	}
+	const next = [...state];
+	next[action.index] = action.value;
+	return next;
+}
 
 interface ScrambleTextProps {
 	/** The final text to reveal */
@@ -32,7 +48,19 @@ export default function ScrambleText({
 	active,
 }: ScrambleTextProps) {
 	const chars = useMemo(() => text.split(""), [text]);
-	const [display, setDisplay] = useState<string[]>(chars.slice());
+	const [display, dispatchDisplay] = useReducer(
+		displayReducer,
+		chars,
+		(initialChars) => [...initialChars],
+	);
+	const displayGlyphs = useMemo(
+		() =>
+			chars.map((char, index) => ({
+				id: `${text}-${char}-${String(index)}`,
+				index,
+			})),
+		[chars, text],
+	);
 	// Internal trigger — fires once on mount if no external `active` prop
 	const [triggered, setTriggered] = useState(false);
 	const hasRunOnMount = useRef(false);
@@ -51,9 +79,10 @@ export default function ScrambleText({
 
 	useEffect(() => {
 		if (!currentActive) {
-			setDisplay(chars.slice());
+			dispatchDisplay({ type: "reset", chars });
 			return;
 		}
+		dispatchDisplay({ type: "reset", chars });
 
 		// Build stagger order
 		const indices = chars.map((_, i) => i);
@@ -76,17 +105,17 @@ export default function ScrambleText({
 					frame++;
 					if (frame >= SCRAMBLE_FRAMES) {
 						clearInterval(intervalId);
-						setDisplay((prev) => {
-							const next = [...prev];
-							next[charIdx] = chars[charIdx] ?? "";
-							return next;
+						dispatchDisplay({
+							type: "set_char",
+							index: charIdx,
+							value: chars[charIdx] ?? "",
 						});
 						return;
 					}
-					setDisplay((prev) => {
-						const next = [...prev];
-						next[charIdx] = randomChar() ?? "";
-						return next;
+					dispatchDisplay({
+						type: "set_char",
+						index: charIdx,
+						value: randomChar() ?? "",
 					});
 				}, FRAME_MS);
 				cleanups.push(() => clearInterval(intervalId));
@@ -105,14 +134,13 @@ export default function ScrambleText({
 	return (
 		<span className={className}>
 			<span className="sr-only">{text}</span>
-			{display.map((ch, i) => (
+			{displayGlyphs.map((glyph) => (
 				<span
-					// biome-ignore lint/suspicious/noArrayIndexKey: char index is stable for a fixed string
-					key={i}
+					key={glyph.id}
 					aria-hidden="true"
 					className={`inline-block ${charClassName ?? ""}`}
 				>
-					{ch === " " ? "\u00a0" : ch}
+					{display[glyph.index] === " " ? "\u00a0" : display[glyph.index]}
 				</span>
 			))}
 		</span>
