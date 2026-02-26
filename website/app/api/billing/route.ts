@@ -17,6 +17,12 @@ export async function GET() {
 
 	const clerk = await clerkClient();
 	const live = await fetchLiveBillingSnapshotFromClerk(clerk, userId);
+	if (live.billingUnavailable) {
+		return NextResponse.json(
+			{ error: "Billing service unavailable, please try again" },
+			{ status: 503 },
+		);
+	}
 	const creditsTotal = planCreditsFor(live.plan, live.partySeats);
 
 	const billing = {

@@ -114,10 +114,17 @@ export async function fetchLiveBillingSnapshotFromClerk(
 	now = Date.now(),
 ) {
 	let subscription: BillingSubscriptionLike | null = null;
+	let billingUnavailable = false;
 	try {
 		subscription = await clerk.billing.getUserBillingSubscription(userId);
 	} catch {
+		// Treat a Clerk billing failure as an unknown state rather than free tier
+		// so callers can return 503 instead of silently downgrading paid users.
+		billingUnavailable = true;
 		subscription = null;
 	}
-	return resolveLiveBillingSnapshotFromSubscription(subscription, env, now);
+	return {
+		...resolveLiveBillingSnapshotFromSubscription(subscription, env, now),
+		billingUnavailable,
+	};
 }

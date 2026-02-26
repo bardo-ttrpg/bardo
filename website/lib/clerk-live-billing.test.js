@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { resolveLiveBillingSnapshotFromSubscription } from "./clerk-live-billing";
+import {
+	fetchLiveBillingSnapshotFromClerk,
+	resolveLiveBillingSnapshotFromSubscription,
+} from "./clerk-live-billing";
 
 describe("clerk-live-billing", () => {
 	test("falls back to free plan when user has no subscription", () => {
@@ -45,6 +48,33 @@ describe("clerk-live-billing", () => {
 		expect(snapshot.periodStart).toBe(100);
 		expect(snapshot.currentPeriodEnd).toBe(200);
 		expect(snapshot.cancelAtPeriodEnd).toBe(false);
+	});
+
+	test("fetchLiveBillingSnapshotFromClerk sets billingUnavailable on clerk error", async () => {
+		const fakeClerk = {
+			billing: {
+				getUserBillingSubscription: async () => {
+					throw new Error("network failure");
+				},
+			},
+		};
+		const snapshot = await fetchLiveBillingSnapshotFromClerk(fakeClerk, "user_123", {});
+		expect(snapshot.billingUnavailable).toBe(true);
+		expect(snapshot.plan).toBe("free");
+	});
+
+	test("fetchLiveBillingSnapshotFromClerk sets billingUnavailable false on success", async () => {
+		const fakeClerk = {
+			billing: {
+				getUserBillingSubscription: async () => ({
+					id: "sub_ok",
+					status: "active",
+					subscriptionItems: [],
+				}),
+			},
+		};
+		const snapshot = await fetchLiveBillingSnapshotFromClerk(fakeClerk, "user_123", {});
+		expect(snapshot.billingUnavailable).toBe(false);
 	});
 
 	test("marks cancel_at_period_end when canceled_at exists before period end", () => {

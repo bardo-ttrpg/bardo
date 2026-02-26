@@ -40,6 +40,26 @@ function clerkErrorStatus(err: unknown): number {
 	return 500;
 }
 
+// Rejects absolute paths and path-traversal segments so user-supplied
+// workspacePath cannot escape the intended tenant directory on the MCP host.
+function sanitizeWorkspacePath(raw: string | undefined, fallback: string): string {
+	const trimmed = raw?.trim();
+	if (!trimmed) return fallback;
+	// Reject absolute paths (Unix and Windows) and null bytes.
+	if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.includes("\0")) {
+		return fallback;
+	}
+	// Walk each path segment; reject if any is "..".
+	const segments = trimmed.replace(/\\/g, "/").split("/");
+	const clean: string[] = [];
+	for (const seg of segments) {
+		if (seg === "..") return fallback;
+		if (seg === "." || seg === "") continue;
+		clean.push(seg);
+	}
+	return clean.length > 0 ? `./${clean.join("/")}` : fallback;
+}
+
 // ─── GET /api/keys ────────────────────────────────────────────────────────────
 // Lists all Clerk API keys for the authenticated user.
 
@@ -109,22 +129,29 @@ export async function POST(request: Request) {
 
 	// Read plan from live Clerk billing state for key-limit enforcement.
 	const liveBilling = await fetchLiveBillingSnapshotFromClerk(clerk, userId);
+	if (liveBilling.billingUnavailable) {
+		return NextResponse.json(
+			{ error: "Billing service unavailable, please try again" },
+			{ status: 503 },
+		);
+	}
 	const maxAllowed = maxApiKeysForPlan(liveBilling.plan);
 
-	let existingKeys: Awaited<ReturnType<(typeof clerk)["apiKeys"]["list"]>>;
+	// Use totalCount from a minimal query — avoids undercounting when a user
+	// has more active keys than a single page can return (plans allow up to 250).
+	// includeInvalid defaults to false so totalCount reflects active keys only.
+	let activeCount: number;
 	try {
-		existingKeys = await clerk.apiKeys.list({ subject: userId, limit: 100 });
+		const probe = await clerk.apiKeys.list({ subject: userId, limit: 1 });
+		activeCount = probe.totalCount;
 	} catch (err) {
-		console.error("[api/keys] clerk.apiKeys.list failed:", err);
+		console.error("[api/keys] clerk.apiKeys.list failed:", clerkErrorMessage(err));
 		return NextResponse.json(
 			{ error: clerkErrorMessage(err) },
 			{ status: 500 },
 		);
 	}
 
-	const activeCount = existingKeys.data.filter(
-		(k) => !k.revoked && !k.expired,
-	).length;
 	if (activeCount >= maxAllowed) {
 		return NextResponse.json(
 			{ error: "API key limit reached for your plan" },
@@ -133,7 +160,10 @@ export async function POST(request: Request) {
 	}
 
 	const name = body.name?.trim() || "Default key";
-	const workspacePath = body.workspacePath?.trim() || `./customers/${userId}`;
+	const workspacePath = sanitizeWorkspacePath(
+		body.workspacePath,
+		`./customers/${userId}`,
+	);
 	const scopes =
 		Array.isArray(body.scopes) && body.scopes.length > 0
 			? body.scopes
