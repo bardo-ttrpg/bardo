@@ -1,12 +1,17 @@
 {
 	"strictness": 3,
 	"instructions": "Prioritize auth correctness, request-bounds safety, race conditions, and backwards-compatible MCP behavior. Favor composable React APIs and Next.js 16 app-router best practices.",
-	"commentTypes": ["logic", "syntax", "style", "info"],
+	"commentTypes": [
+		"logic",
+		"syntax",
+		"style",
+		"info"
+	],
 	"triggerOnUpdates": true,
-	"fileChangeLimit": 400,
+	"fileChangeLimit": 100,
 	"statusCheck": true,
 	"statusCommentsEnabled": true,
-	"ignorePatterns": "**/node_modules/**\n**/.next/**\n**/.turbo/**\n**/dist/**\n**/*.generated.*\n**/coverage/**",
+	"ignorePatterns": "**/node_modules/**\n**/.next/**\n**/.turbo/**\n**/dist/**\n**/*.generated.*\n**/coverage/**\nbun.lock\n**/*.lock\n**/*.png\n**/*.jpg\n**/*.gif\n**/*.svg\n**/*.html\ndesign/**\npublic/**\n.agents/**\n.claude/**\n.github/**\nmcp/testsprite_tests/**\n**/legacy-content/**\n**/tmp/**\ndeep-research-report.md\nwebsite/docs/**\nmcp/src/mcp/tools/**\nmcp/src/domain/**\nmcp/src/session/**\nmcp/src/telemetry/**\nmcp/src/infra/**\nmcp/src/mcp/evals/**\nmcp/src/mcp/core-capabilities*\nmcp/src/mcp/create-mcp-server*\nmcp/src/app/routes/**\nmcp/docs/**\nwebsite/app/(site)/_components/**\nwebsite/app/(site)/legal/**\nwebsite/components/magicui/**\nwebsite/components/lazy-*\nwebsite/e2e/**",
 	"customRules": {
 		"tagline": "Bardo repository safety and quality rules",
 		"rules": [
