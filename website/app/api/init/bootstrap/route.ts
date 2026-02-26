@@ -15,7 +15,6 @@ function json(status: number, payload: Record<string, unknown>): Response {
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 export async function POST(req: NextRequest) {

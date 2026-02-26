@@ -61,22 +61,4 @@ export const pricingTiers: readonly PricingTier[] = [
 			"Early tool access",
 		],
 	},
-	{
-		key: "party",
-		checkoutPlan: "party",
-		name: "Party",
-		credits: 40_000,
-		highlighted: false,
-		cta: "Start Party",
-		ctaHref: "/sign-up",
-		features: [
-			"Per-seat billing",
-			"20,000 MCP calls / seat / month",
-			"Core MCP tools",
-			"Team access",
-			"Priority support",
-			"SLA support",
-			"Shared workspace tooling",
-		],
-	},
 ] as const;

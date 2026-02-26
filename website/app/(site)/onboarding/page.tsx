@@ -11,7 +11,6 @@ export const metadata = {
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 export default async function OnboardingPage() {

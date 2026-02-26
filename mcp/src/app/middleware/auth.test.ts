@@ -36,14 +36,14 @@ async function responseBody(response: Response) {
 }
 
 describe("createAuthenticator", () => {
-	test("returns optional unauthenticated context when auth is optional and no keys configured", () => {
+	test("returns optional unauthenticated context when auth is optional and no keys configured", async () => {
 		const authenticate = createAuthenticator({
 			apiKeyMap: new Map(),
 			policy: createPolicy({ authMode: "optional" }),
 			projectRoot: "/repo",
 		});
 
-		const result = authenticate(
+		const result = await authenticate(
 			new Request("http://localhost:3000/mcp"),
 			new Map(),
 		);
@@ -58,7 +58,7 @@ describe("createAuthenticator", () => {
 			projectRoot: "/repo",
 		});
 
-		const result = authenticate(
+		const result = await authenticate(
 			new Request("http://localhost:3000/mcp"),
 			new Map(),
 		);
@@ -80,7 +80,7 @@ describe("createAuthenticator", () => {
 		});
 
 		const request = new Request("http://localhost:3000/mcp?apiKey=key-1");
-		const result = authenticate(request, new Map());
+		const result = await authenticate(request, new Map());
 
 		expect(result instanceof Response).toBe(true);
 		if (!(result instanceof Response)) return;
@@ -88,7 +88,7 @@ describe("createAuthenticator", () => {
 		expect((await responseBody(result)).error).toContain("Missing API key");
 	});
 
-	test("accepts valid header API key", () => {
+	test("accepts valid header API key", async () => {
 		const authenticate = createAuthenticator({
 			apiKeyMap: new Map([["key-1", "/repo/customers/a"]]),
 			policy: createPolicy(),
@@ -98,12 +98,54 @@ describe("createAuthenticator", () => {
 		const request = new Request("http://localhost:3000/mcp", {
 			headers: { "x-api-key": "key-1" },
 		});
-		const result = authenticate(request, new Map());
+		const result = await authenticate(request, new Map());
 
 		expect(result instanceof Response).toBe(false);
 		expect(result).toEqual({
 			apiKey: "key-1",
 			campaignBasePath: "/repo/customers/a",
+		});
+	});
+
+	test("accepts BARDO_API_KEY header as primary auth header", async () => {
+		const authenticate = createAuthenticator({
+			apiKeyMap: new Map([["key-1", "/repo/customers/a"]]),
+			policy: createPolicy(),
+			projectRoot: "/repo",
+		});
+
+		const request = new Request("http://localhost:3000/mcp", {
+			headers: { BARDO_API_KEY: "key-1" },
+		});
+		const result = await authenticate(request, new Map());
+
+		expect(result instanceof Response).toBe(false);
+		expect(result).toEqual({
+			apiKey: "key-1",
+			campaignBasePath: "/repo/customers/a",
+		});
+	});
+
+	test("accepts API key from hosted validator", async () => {
+		const authenticate = createAuthenticator({
+			apiKeyMap: new Map(),
+			policy: createPolicy({ authMode: "required" }),
+			projectRoot: "/repo",
+			validateApiKey: async (apiKey) => {
+				if (apiKey !== "hosted-key") return null;
+				return { apiKey, campaignBasePath: "/repo/customers/hosted" };
+			},
+		});
+
+		const request = new Request("http://localhost:3000/mcp", {
+			headers: { BARDO_API_KEY: "hosted-key" },
+		});
+		const result = await authenticate(request, new Map());
+
+		expect(result instanceof Response).toBe(false);
+		expect(result).toEqual({
+			apiKey: "hosted-key",
+			campaignBasePath: "/repo/customers/hosted",
 		});
 	});
 
@@ -127,7 +169,7 @@ describe("createAuthenticator", () => {
 			},
 		});
 
-		const result = authenticate(request, sessions);
+		const result = await authenticate(request, sessions);
 		expect(result instanceof Response).toBe(true);
 		if (!(result instanceof Response)) return;
 		expect(result.status).toBe(403);

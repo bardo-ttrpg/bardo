@@ -6,8 +6,7 @@ import SubscriptionDetailsCta from "./subscription-details-button";
 
 export const metadata: Metadata = {
 	title: "Pricing",
-	description:
-		"Clerk Billing plans for Free, Solo, Solo Plus, and Party tiers.",
+	description: "Clerk Billing plans for Free, Solo, and Solo Plus.",
 };
 
 const faqs = [
@@ -36,7 +35,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 	const clerkEnabled = isClerkAuthConfigured({
 		publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 		secretKey: process.env.CLERK_SECRET_KEY,
-		issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 	});
 
 	return (

@@ -9,6 +9,10 @@ import {
 	type SecurityPolicy,
 } from "../../domain/config/security";
 import type { AuthContext, Session } from "../../types/contracts";
+import {
+	type ApiKeyValidator,
+	resolveRuntimeApiKeyValidator,
+} from "./api-key-validator";
 import { corsHeaders } from "./cors";
 
 function tryParseObject(raw: string): Record<string, unknown> | null {
@@ -110,6 +114,11 @@ function readApiKey(
 	request: Request,
 	allowQueryApiKey: boolean,
 ): string | null {
+	const bardoApiKeyHeader = request.headers.get("BARDO_API_KEY")?.trim();
+	if (bardoApiKeyHeader) {
+		return bardoApiKeyHeader;
+	}
+
 	const keyFromHeader = request.headers.get(AUTH_HEADER)?.trim();
 	if (keyFromHeader) {
 		return keyFromHeader;
@@ -144,33 +153,56 @@ function authError(status: number, message: string): Response {
 
 function missingApiKeyMessage(allowQueryApiKey: boolean): string {
 	return allowQueryApiKey
-		? "Missing API key for new session. Send x-api-key, Authorization: Bearer <key>, or use /mcp?apiKey=<key>."
-		: "Missing API key for new session. Send x-api-key or Authorization: Bearer <key>.";
+		? "Missing API key for new session. Send BARDO_API_KEY, x-api-key, Authorization: Bearer <key>, or use /mcp?apiKey=<key>."
+		: "Missing API key for new session. Send BARDO_API_KEY, x-api-key, or Authorization: Bearer <key>.";
 }
 
 type AuthenticatorDeps = {
 	apiKeyMap: Map<string, string>;
 	policy: SecurityPolicy;
 	projectRoot: string;
+	validateApiKey?: ApiKeyValidator | null;
 };
 
 export function createAuthenticator({
 	apiKeyMap,
 	policy,
 	projectRoot,
+	validateApiKey = null,
 }: AuthenticatorDeps) {
-	return function authenticateRequest(
+	async function resolveKeyContext(
+		apiKey: string,
+		metadata?: {
+			requiredScope?: "mcp" | "api";
+			providerId?: string | null;
+			modelId?: string | null;
+		},
+	): Promise<AuthContext | null> {
+		if (validateApiKey) {
+			const validated = await validateApiKey(apiKey, metadata);
+			if (validated) {
+				return { apiKey, campaignBasePath: validated.campaignBasePath };
+			}
+		}
+
+		const mapped = apiKeyMap.get(apiKey);
+		if (!mapped) return null;
+		return { apiKey, campaignBasePath: mapped };
+	}
+
+	return async function authenticateRequest(
 		request: Request,
 		sessions: Map<string, Session>,
-	): AuthContext | Response {
-		if (policy.authMode === "required" && apiKeyMap.size === 0) {
+	): Promise<AuthContext | Response> {
+		const hasApiKeyBackend = apiKeyMap.size > 0 || Boolean(validateApiKey);
+		if (policy.authMode === "required" && !hasApiKeyBackend) {
 			return authError(
 				503,
 				"Authentication is required but BARDO_API_KEYS_JSON is not configured.",
 			);
 		}
 
-		if (apiKeyMap.size === 0) {
+		if (!hasApiKeyBackend) {
 			return { apiKey: null, campaignBasePath: projectRoot };
 		}
 
@@ -197,19 +229,23 @@ export function createAuthenticator({
 				};
 			}
 
-			const mappedPath = apiKeyMap.get(apiKey);
-			if (!mappedPath) {
+			const context = await resolveKeyContext(apiKey, {
+				requiredScope: "mcp",
+				providerId: request.headers.get("x-provider-id"),
+				modelId: request.headers.get("x-model-id"),
+			});
+			if (!context) {
 				return authError(403, "Invalid API key.");
 			}
 
 			if (
 				existingSession.apiKey !== apiKey ||
-				existingSession.campaignBasePath !== mappedPath
+				existingSession.campaignBasePath !== context.campaignBasePath
 			) {
 				return authError(403, "Session does not belong to this API key.");
 			}
 
-			return { apiKey, campaignBasePath: mappedPath };
+			return context;
 		}
 
 		if (!apiKey) {
@@ -221,24 +257,34 @@ export function createAuthenticator({
 			return authError(401, missingApiKeyMessage(policy.allowQueryApiKey));
 		}
 
-		const campaignBasePath = apiKeyMap.get(apiKey);
-		if (!campaignBasePath) {
+		const context = await resolveKeyContext(apiKey, {
+			requiredScope: "mcp",
+			providerId: request.headers.get("x-provider-id"),
+			modelId: request.headers.get("x-model-id"),
+		});
+		if (!context) {
 			return authError(403, "Invalid API key.");
 		}
 
-		return { apiKey, campaignBasePath };
+		return context;
 	};
 }
 
-const runtimeAuthenticator = createAuthenticator({
+const runtimeApiKeyValidator = resolveRuntimeApiKeyValidator({
 	apiKeyMap,
-	policy: SECURITY_POLICY,
 	projectRoot: PROJECT_ROOT,
 });
 
-export function authenticateRequest(
+const runtimeAuthenticator = createAuthenticator({
+	apiKeyMap: runtimeApiKeyValidator.mode === "hosted" ? new Map() : apiKeyMap,
+	policy: SECURITY_POLICY,
+	projectRoot: PROJECT_ROOT,
+	validateApiKey: runtimeApiKeyValidator.validateApiKey,
+});
+
+export async function authenticateRequest(
 	request: Request,
 	sessions: Map<string, Session>,
-): AuthContext | Response {
-	return runtimeAuthenticator(request, sessions);
+): Promise<AuthContext | Response> {
+	return await runtimeAuthenticator(request, sessions);
 }

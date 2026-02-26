@@ -6,7 +6,7 @@
 	"fileChangeLimit": 400,
 	"statusCheck": true,
 	"statusCommentsEnabled": true,
-	"ignorePatterns": "**/node_modules/**\n**/.next/**\n**/.turbo/**\n**/dist/**\nwebsite/convex/_generated/**\n**/*.generated.*\n**/coverage/**",
+	"ignorePatterns": "**/node_modules/**\n**/.next/**\n**/.turbo/**\n**/dist/**\n**/*.generated.*\n**/coverage/**",
 	"customRules": {
 		"tagline": "Bardo repository safety and quality rules",
 		"rules": [

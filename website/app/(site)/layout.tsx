@@ -9,7 +9,6 @@ import { isClerkAuthConfigured } from "@/lib/clerk-config";
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 const PRIMARY_NAV_LINKS = [
@@ -97,7 +96,7 @@ function DashboardHeaderLink() {
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const body = (
 		<div className="min-h-screen text-foreground">
-			<header className="sticky top-0 z-50 border-b border-border bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/82">
+			<header className="sticky top-0 z-50 border-b border-border bg-background">
 				<div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6">
 					<Link
 						href="/"

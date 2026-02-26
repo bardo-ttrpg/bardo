@@ -181,7 +181,7 @@ export function createHttpRequestHandler({
 			}
 
 			if (securityPolicy.metricsRequireAuth) {
-				const auth = authenticateRequest(request, store.asMap());
+				const auth = await authenticateRequest(request, store.asMap());
 				if (auth instanceof Response) {
 					return finalize(auth);
 				}
@@ -201,7 +201,7 @@ export function createHttpRequestHandler({
 		}
 
 		try {
-			const auth = authenticateRequest(request, store.asMap());
+			const auth = await authenticateRequest(request, store.asMap());
 			if (auth instanceof Response) {
 				return finalize(auth);
 			}

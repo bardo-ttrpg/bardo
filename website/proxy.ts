@@ -4,10 +4,7 @@ import {
 	type NextRequest,
 	NextResponse,
 } from "next/server";
-import {
-	isClerkAuthConfigured,
-	shouldResetClerkSessionForRequest,
-} from "./lib/clerk-config";
+import { isClerkAuthConfigured } from "./lib/clerk-config";
 import { shouldRedirectToCanonicalLocalhost } from "./lib/local-domain";
 
 const isProtectedRoute = createRouteMatcher([
@@ -17,7 +14,6 @@ const isProtectedRoute = createRouteMatcher([
 const IS_CLERK_AUTH_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 const clerkHandler = clerkMiddleware(async (auth, req) => {
@@ -32,75 +28,6 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
 
 function passThroughMiddleware(_request: NextRequest) {
 	return NextResponse.next();
-}
-
-function requestHostnameFromRequest(request: NextRequest): string {
-	const forwardedHostHeader = request.headers.get("x-forwarded-host");
-	const hostHeader = request.headers.get("host");
-	const requestUrl = new URL(request.url);
-	const requestHostCandidates = [
-		forwardedHostHeader?.split(",")[0]?.trim() || null,
-		hostHeader?.split(",")[0]?.trim() || null,
-		requestUrl.host || null,
-		request.nextUrl.host || null,
-	];
-	const requestHost =
-		requestHostCandidates.find(
-			(value): value is string => typeof value === "string" && value.length > 0,
-		) ?? "";
-
-	return requestHost.split(":")[0]?.trim() || request.nextUrl.hostname;
-}
-
-const KNOWN_CLERK_COOKIES = new Set(["__session", "__client_uat"]);
-
-function isClerkCookieName(name: string): boolean {
-	return KNOWN_CLERK_COOKIES.has(name) || name.startsWith("__clerk");
-}
-
-function staleClerkCookieNames(request: NextRequest): string[] {
-	const clerkCookieNames = request.cookies
-		.getAll()
-		.map((cookie) => cookie.name)
-		.filter(isClerkCookieName);
-	if (clerkCookieNames.length === 0) {
-		return [];
-	}
-
-	const sessionToken = request.cookies.get("__session")?.value ?? null;
-	if (!sessionToken) {
-		return [];
-	}
-
-	const shouldReset = shouldResetClerkSessionForRequest({
-		sessionToken,
-		issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
-		requestHostname: requestHostnameFromRequest(request),
-	});
-	if (!shouldReset) {
-		return [];
-	}
-
-	return clerkCookieNames;
-}
-
-function appendExpiredCookies(
-	response: Response,
-	cookieNames: string[],
-): Response {
-	if (cookieNames.length === 0) {
-		return response;
-	}
-
-	const nextResponse = new Response(response.body, response);
-	for (const cookieName of cookieNames) {
-		nextResponse.headers.append(
-			"Set-Cookie",
-			`${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0`,
-		);
-	}
-
-	return nextResponse;
 }
 
 function maybeRedirectToCanonicalLocalhost(
@@ -143,28 +70,21 @@ export default async function proxy(
 	request: NextRequest,
 	event: NextFetchEvent,
 ) {
-	const staleCookies = staleClerkCookieNames(request);
-
 	const localDomainRedirect = maybeRedirectToCanonicalLocalhost(request);
 	if (localDomainRedirect) {
-		return appendExpiredCookies(localDomainRedirect, staleCookies);
+		return localDomainRedirect;
 	}
 
 	if (!IS_CLERK_AUTH_CONFIGURED) {
 		if (isProtectedRoute(request)) {
 			const redirectUrl = new URL("/", request.url);
-			return appendExpiredCookies(
-				NextResponse.redirect(redirectUrl, 307),
-				staleCookies,
-			);
+			return NextResponse.redirect(redirectUrl, 307);
 		}
-		return appendExpiredCookies(passThroughMiddleware(request), staleCookies);
+		return passThroughMiddleware(request);
 	}
 
 	const clerkResult = await clerkHandler(request, event);
-	const response =
-		clerkResult instanceof Response ? clerkResult : NextResponse.next();
-	return appendExpiredCookies(response, staleCookies);
+	return clerkResult instanceof Response ? clerkResult : NextResponse.next();
 }
 
 export const config = {

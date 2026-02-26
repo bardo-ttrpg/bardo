@@ -9,7 +9,6 @@ export const metadata = {
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 export default function SignUpPage() {
@@ -24,10 +23,9 @@ export default function SignUpPage() {
 						Clerk publishable key is missing
 					</h1>
 					<p className="text-sm text-muted-foreground">
-						Set matching <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code>,{" "}
-						<code>CLERK_SECRET_KEY</code>, and{" "}
-						<code>CLERK_JWT_ISSUER_DOMAIN</code> values in{" "}
-						<code>.env.local</code>, then restart the dev server.
+						Set <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> and{" "}
+						<code>CLERK_SECRET_KEY</code> in <code>.env.local</code>, then
+						restart the dev server.
 					</p>
 				</div>
 			</div>

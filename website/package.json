@@ -9,7 +9,6 @@
 		"lint": "biome check .",
 		"typecheck": "tsc --noEmit",
 		"check": "bun run lint && bun run typecheck",
-		"convex": "convex",
 		"test:e2e": "playwright test",
 		"test:e2e:headed": "playwright test --headed"
 	},
@@ -17,7 +16,6 @@
 		"@clerk/nextjs": "6.38.1",
 		"@tailwindcss/postcss": "^4.2.0",
 		"clsx": "^2.1.1",
-		"convex": "^1.32.0",
 		"dotted-map": "^2.2.3",
 		"framer-motion": "^12.34.3",
 		"geist": "^1.7.0",

@@ -3,7 +3,7 @@ export function corsHeaders(): Record<string, string> {
 		"access-control-allow-origin": "*",
 		"access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
 		"access-control-allow-headers":
-			"content-type, authorization, x-api-key, mcp-session-id, mcp-protocol-version, last-event-id",
+			"content-type, authorization, x-api-key, bardo_api_key, mcp-session-id, mcp-protocol-version, last-event-id",
 		"access-control-expose-headers": "mcp-session-id, mcp-protocol-version",
 	};
 }

@@ -71,6 +71,7 @@ function mcpHeaders(): HeadersInit {
 	};
 	const apiKey = process.env.BARDO_MCP_API_KEY?.trim();
 	if (apiKey) {
+		headers.BARDO_API_KEY = apiKey;
 		headers["x-api-key"] = apiKey;
 	}
 	return headers;

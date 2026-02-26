@@ -1,0 +1,15 @@
+{
+	"name": "@bardo/mcp",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"bardo-mcp": "./src/cli.ts"
+	},
+	"scripts": {
+		"start": "bun run src/cli.ts"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.26.0"
+	}
+}

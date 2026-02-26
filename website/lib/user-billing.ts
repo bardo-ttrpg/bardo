@@ -66,6 +66,8 @@ type BillingFields = {
 	periodStart: number | undefined;
 	mcpCallsTotal: number | undefined;
 	mcpCallsThisPeriod: number | undefined;
+	apiKeyCallsTotal: number | undefined;
+	apiKeyCallsThisPeriod: number | undefined;
 	partySeats: number | undefined;
 };
 
@@ -76,6 +78,8 @@ type ResolvedBillingFields = {
 	periodStart: number;
 	mcpCallsTotal: number;
 	mcpCallsThisPeriod: number;
+	apiKeyCallsTotal: number;
+	apiKeyCallsThisPeriod: number;
 	partySeats: number;
 };
 
@@ -93,31 +97,8 @@ export function resolveBillingState(
 		periodStart: fields.periodStart ?? now,
 		mcpCallsTotal: fields.mcpCallsTotal ?? 0,
 		mcpCallsThisPeriod: fields.mcpCallsThisPeriod ?? 0,
+		apiKeyCallsTotal: fields.apiKeyCallsTotal ?? 0,
+		apiKeyCallsThisPeriod: fields.apiKeyCallsThisPeriod ?? 0,
 		partySeats,
 	};
-}
-
-export function buildBillingBackfillPatch(
-	fields: BillingFields,
-	now = Date.now(),
-): Partial<ResolvedBillingFields> {
-	const resolved = resolveBillingState(fields, now);
-	const patch: Partial<ResolvedBillingFields> = {};
-
-	if (fields.plan !== resolved.plan) {
-		patch.plan = resolved.plan;
-	}
-	if (fields.creditsTotal === undefined)
-		patch.creditsTotal = resolved.creditsTotal;
-	if (fields.creditsUsed === undefined)
-		patch.creditsUsed = resolved.creditsUsed;
-	if (fields.periodStart === undefined)
-		patch.periodStart = resolved.periodStart;
-	if (fields.mcpCallsTotal === undefined)
-		patch.mcpCallsTotal = resolved.mcpCallsTotal;
-	if (fields.mcpCallsThisPeriod === undefined)
-		patch.mcpCallsThisPeriod = resolved.mcpCallsThisPeriod;
-	if (fields.partySeats === undefined) patch.partySeats = resolved.partySeats;
-
-	return patch;
 }
