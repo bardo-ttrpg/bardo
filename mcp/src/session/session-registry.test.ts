@@ -74,6 +74,36 @@ describe("SessionRegistry", () => {
 		expect(send.delivered).toBe(true);
 	});
 
+	test("rejects messages addressed to closed sessions", () => {
+		const registry = new SessionRegistry({ loopPolicy: createLoopPolicy() });
+		registry.registerSession({
+			sessionId: "s1",
+			apiKey: "k1",
+			campaignBasePath: "/repo",
+		});
+		registry.registerSession({
+			sessionId: "s2",
+			apiKey: "k2",
+			campaignBasePath: "/repo",
+		});
+		registry.closeSession("s2");
+
+		const send = registry.sendMessage({
+			fromSessionId: "s1",
+			targetSessionKeyOrId: "s2",
+			message: "hello after close",
+		});
+
+		expect(send.accepted).toBe(false);
+		expect(send.delivered).toBe(false);
+		expect(send.messageId).toBeNull();
+		expect(send.targetSessionId).toBe("s2");
+
+		const list = registry.listSessions({ limit: 10 });
+		const closed = list.find((row) => row.sessionId === "s2");
+		expect(closed?.pendingMessages ?? 0).toBe(0);
+	});
+
 	test("creates spawned agent sessions", () => {
 		const registry = new SessionRegistry({ loopPolicy: createLoopPolicy() });
 		registry.registerSession({

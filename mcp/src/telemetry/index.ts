@@ -4,7 +4,7 @@ const LATENCY_BUCKETS = [
 	5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000,
 ] as const;
 
-export const METRIC_NAMES = {
+const METRIC_NAMES = {
 	httpRequestsTotal: "bardo_http_requests_total",
 	httpRequestDurationMs: "bardo_http_request_duration_ms",
 	orchestratorWorkflowsTotal: "bardo_orchestrator_workflows_total",
@@ -14,9 +14,19 @@ export const METRIC_NAMES = {
 	toolCallsTotal: "bardo_tool_calls_total",
 	toolDurationMs: "bardo_tool_duration_ms",
 	rateLimitEventsTotal: "bardo_rate_limit_events_total",
+	setupRunsTotal: "bardo_setup_runs_total",
+	setupDurationMs: "bardo_setup_duration_ms",
+	setupScanCacheEventsTotal: "bardo_setup_scan_cache_events_total",
+	legacyFallbackReadsTotal: "bardo_legacy_fallback_reads_total",
+	legacyCompatWritesTotal: "bardo_legacy_compat_writes_total",
+	evalLongRunRunsTotal: "bardo_eval_long_run_runs_total",
+	evalLongRunDurationMs: "bardo_eval_long_run_duration_ms",
+	evalLongRunInvariantFailuresTotal:
+		"bardo_eval_long_run_invariant_failures_total",
+	evalLongRunReplayDriftTotal: "bardo_eval_long_run_replay_drift_total",
 } as const;
 
-export const telemetryRegistry = new MetricsRegistry();
+const telemetryRegistry = new MetricsRegistry();
 
 function registerDefaultMetrics(): void {
 	telemetryRegistry.registerCounter(METRIC_NAMES.httpRequestsTotal, {
@@ -49,6 +59,38 @@ function registerDefaultMetrics(): void {
 	});
 	telemetryRegistry.registerCounter(METRIC_NAMES.rateLimitEventsTotal, {
 		help: "Rate limit outcomes.",
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.setupRunsTotal, {
+		help: "Total guided setup flow runs by status.",
+	});
+	telemetryRegistry.registerHistogram(METRIC_NAMES.setupDurationMs, {
+		help: "Guided setup flow latency in milliseconds.",
+		buckets: LATENCY_BUCKETS,
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.setupScanCacheEventsTotal, {
+		help: "Setup scan-cache file classification outcomes.",
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.legacyFallbackReadsTotal, {
+		help: "Legacy projection fallback read outcomes by consumer and strict mode.",
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.legacyCompatWritesTotal, {
+		help: "Legacy compatibility state/history write operations by consumer and strict mode.",
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.evalLongRunRunsTotal, {
+		help: "Total long-run campaign stability eval executions by outcome.",
+	});
+	telemetryRegistry.registerHistogram(METRIC_NAMES.evalLongRunDurationMs, {
+		help: "Long-run campaign stability eval duration in milliseconds.",
+		buckets: LATENCY_BUCKETS,
+	});
+	telemetryRegistry.registerCounter(
+		METRIC_NAMES.evalLongRunInvariantFailuresTotal,
+		{
+			help: "Long-run campaign eval invariant failure counts by invariant type.",
+		},
+	);
+	telemetryRegistry.registerCounter(METRIC_NAMES.evalLongRunReplayDriftTotal, {
+		help: "Replay drift outcomes for long-run campaign evals.",
 	});
 }
 
@@ -178,4 +220,132 @@ export function recordRateLimitEventMetric(
 	outcome: "allowed" | "blocked" | "error",
 ): void {
 	telemetryRegistry.inc(METRIC_NAMES.rateLimitEventsTotal, { outcome });
+}
+
+export function recordSetupFlowMetric({
+	status,
+	durationMs,
+}: {
+	status: "needs_input" | "complete" | "error" | "locked";
+	durationMs: number;
+}): void {
+	const labels = { status };
+	telemetryRegistry.inc(METRIC_NAMES.setupRunsTotal, labels);
+	telemetryRegistry.observe(METRIC_NAMES.setupDurationMs, durationMs, labels);
+}
+
+export function recordSetupScanCacheMetric({
+	outcome,
+	count,
+}: {
+	outcome: "hit" | "miss";
+	count: number;
+}): void {
+	if (!Number.isFinite(count) || count <= 0) {
+		return;
+	}
+	telemetryRegistry.inc(
+		METRIC_NAMES.setupScanCacheEventsTotal,
+		{ outcome },
+		count,
+	);
+}
+
+export function recordLegacyFallbackReadMetric(args: {
+	consumer: string;
+	strictMode: boolean;
+	outcome: "used" | "blocked";
+}): void {
+	telemetryRegistry.inc(METRIC_NAMES.legacyFallbackReadsTotal, {
+		consumer: args.consumer,
+		strictMode: args.strictMode,
+		outcome: args.outcome,
+	});
+}
+
+export function recordLegacyCompatibilityWriteMetric(args: {
+	consumer: string;
+	artifact: "state_current" | "state_history";
+	strictMode: boolean;
+}): void {
+	telemetryRegistry.inc(METRIC_NAMES.legacyCompatWritesTotal, {
+		consumer: args.consumer,
+		artifact: args.artifact,
+		strictMode: args.strictMode,
+	});
+}
+
+export function recordLongRunCampaignEvalMetric(args: {
+	outcome: "success" | "error";
+	durationMs: number;
+	turnCount: number;
+	failedTurns: number;
+	invariantFailures: {
+		actionFailed: number;
+		eventGrowthViolation: number;
+		projectionDrift: number;
+		replayEventDrift: number;
+		replayProjectionDrift: number;
+	};
+	replayConsistency: {
+		stable: boolean;
+		eventCountBeforeReplay: number;
+		eventCountAfterReplay: number;
+		projectionStable: boolean;
+	};
+}): void {
+	const baseLabels = {
+		outcome: args.outcome,
+		turnCount: args.turnCount,
+	};
+	telemetryRegistry.inc(METRIC_NAMES.evalLongRunRunsTotal, baseLabels);
+	telemetryRegistry.observe(
+		METRIC_NAMES.evalLongRunDurationMs,
+		args.durationMs,
+		baseLabels,
+	);
+
+	const invariantEntries: Array<[string, number]> = [
+		["action_failed", args.invariantFailures.actionFailed],
+		["event_growth_violation", args.invariantFailures.eventGrowthViolation],
+		["projection_drift", args.invariantFailures.projectionDrift],
+		["replay_event_drift", args.invariantFailures.replayEventDrift],
+		["replay_projection_drift", args.invariantFailures.replayProjectionDrift],
+	];
+	for (const [invariant, count] of invariantEntries) {
+		if (!Number.isFinite(count) || count <= 0) {
+			continue;
+		}
+		telemetryRegistry.inc(
+			METRIC_NAMES.evalLongRunInvariantFailuresTotal,
+			{
+				outcome: args.outcome,
+				invariant,
+			},
+			count,
+		);
+	}
+
+	const replayEventDriftDetected =
+		args.replayConsistency.eventCountBeforeReplay !==
+		args.replayConsistency.eventCountAfterReplay;
+	if (replayEventDriftDetected) {
+		telemetryRegistry.inc(METRIC_NAMES.evalLongRunReplayDriftTotal, {
+			dimension: "events",
+		});
+	}
+	if (!args.replayConsistency.projectionStable) {
+		telemetryRegistry.inc(METRIC_NAMES.evalLongRunReplayDriftTotal, {
+			dimension: "projection",
+		});
+	}
+	if (
+		!replayEventDriftDetected &&
+		args.replayConsistency.projectionStable &&
+		args.replayConsistency.stable
+	) {
+		telemetryRegistry.inc(METRIC_NAMES.evalLongRunReplayDriftTotal, {
+			dimension: "none",
+		});
+	}
 }

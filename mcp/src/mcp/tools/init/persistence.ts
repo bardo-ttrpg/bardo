@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { resolveFeatureFlags } from "../../../domain/config/features";
 import {
 	parseMarkdown,
 	renderMarkdown,
@@ -7,6 +8,7 @@ import {
 	ensureParentDirectoryExists,
 	readTextIfExists,
 } from "../../../infra/filesystem/filesystem";
+import { recordLegacyCompatibilityWriteMetric } from "../../../telemetry";
 import type { InitOutput } from "./schemas";
 import { readJsonMarkdown } from "./settings";
 import { inferLocationSlug, toDisplayName } from "./spawn";
@@ -118,6 +120,7 @@ export async function persistStateAndHistory(args: {
 	resolvedTheme: string | null;
 	startingSceneSource: InitOutput["startingSceneSource"];
 }): Promise<void> {
+	const strictCanonicalMode = resolveFeatureFlags(Bun.env).strictCanonicalMode;
 	const currentState = await readJsonMarkdown(args.statePath);
 	const stateData = currentState.data;
 
@@ -171,6 +174,11 @@ export async function persistStateAndHistory(args: {
 		),
 		"utf8",
 	);
+	recordLegacyCompatibilityWriteMetric({
+		consumer: "init",
+		artifact: "state_current",
+		strictMode: strictCanonicalMode,
+	});
 
 	const history = await readJsonMarkdown(args.historyPath);
 	const existingHistoryRaw = await readTextIfExists(args.historyPath);
@@ -200,4 +208,9 @@ export async function persistStateAndHistory(args: {
 		),
 		"utf8",
 	);
+	recordLegacyCompatibilityWriteMetric({
+		consumer: "init",
+		artifact: "state_history",
+		strictMode: strictCanonicalMode,
+	});
 }

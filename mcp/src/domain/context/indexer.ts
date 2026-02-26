@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
-import { readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	ensureParentDirectoryExists,
@@ -35,6 +36,20 @@ function contextIndexPath(bardoRoot: string): string {
 	return resolvePathInsideRoot(bardoRoot, "context/index.sqlite");
 }
 
+function contextIndexManifestPath(bardoRoot: string): string {
+	return resolvePathInsideRoot(
+		bardoRoot,
+		"_settings/context-index-manifest.json",
+	);
+}
+
+type ContextIndexManifest = {
+	version: 1;
+	corpusFingerprint: string;
+	docsIndexed: number;
+	updatedAtISO: string;
+};
+
 function topLevelDir(relativePath: string): string {
 	const normalized = relativePath.replaceAll("\\", "/");
 	const top = normalized.split("/")[0];
@@ -62,6 +77,15 @@ async function listMarkdownFilesRecursive(root: string): Promise<string[]> {
 	}
 
 	return files;
+}
+
+function isIndexableRelativePath(relativePath: string): boolean {
+	return !(
+		relativePath.startsWith("context/") ||
+		relativePath.startsWith(".git/") ||
+		relativePath === "AGENTS.md" ||
+		relativePath === "BOOTSTRAP.md"
+	);
 }
 
 function normalizeDoc({
@@ -122,12 +146,7 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 			const relativePath = path
 				.relative(bardoRoot, filePath)
 				.replaceAll("\\", "/");
-			if (
-				relativePath.startsWith("context/") ||
-				relativePath.startsWith(".git/") ||
-				relativePath === "AGENTS.md" ||
-				relativePath === "BOOTSTRAP.md"
-			) {
+			if (!isIndexableRelativePath(relativePath)) {
 				continue;
 			}
 
@@ -152,6 +171,101 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 	} finally {
 		db.close();
 	}
+}
+
+function parseManifest(
+	raw: string | null,
+): { corpusFingerprint: string; docsIndexed: number } | null {
+	if (!raw || raw.trim().length === 0) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(raw) as Partial<ContextIndexManifest>;
+		if (
+			typeof parsed.corpusFingerprint !== "string" ||
+			typeof parsed.docsIndexed !== "number"
+		) {
+			return null;
+		}
+		return {
+			corpusFingerprint: parsed.corpusFingerprint,
+			docsIndexed: parsed.docsIndexed,
+		};
+	} catch {
+		return null;
+	}
+}
+
+async function hasIndexFile(indexPath: string): Promise<boolean> {
+	try {
+		const file = await stat(indexPath);
+		return file.isFile();
+	} catch {
+		return false;
+	}
+}
+
+async function computeCorpusFingerprint(bardoRoot: string): Promise<string> {
+	const markdownPaths = await listMarkdownFilesRecursive(bardoRoot);
+	const rows: string[] = [];
+	for (const filePath of markdownPaths) {
+		const relativePath = path
+			.relative(bardoRoot, filePath)
+			.replaceAll("\\", "/");
+		if (!isIndexableRelativePath(relativePath)) {
+			continue;
+		}
+		const details = await stat(filePath);
+		rows.push(`${relativePath}|${details.size}|${details.mtimeMs}`);
+	}
+	rows.sort((left, right) => left.localeCompare(right));
+	const hasher = createHash("sha256");
+	for (const row of rows) {
+		hasher.update(row);
+		hasher.update("\n");
+	}
+	return hasher.digest("hex");
+}
+
+export async function refreshContextIndex(bardoRoot: string): Promise<{
+	indexPath: string;
+	docsIndexed: number;
+	indexRebuilt: boolean;
+}> {
+	const indexPath = contextIndexPath(bardoRoot);
+	const manifestPath = contextIndexManifestPath(bardoRoot);
+	const corpusFingerprint = await computeCorpusFingerprint(bardoRoot);
+	const [manifestRaw, indexExists] = await Promise.all([
+		readTextIfExists(manifestPath),
+		hasIndexFile(indexPath),
+	]);
+	const manifest = parseManifest(manifestRaw);
+	if (
+		indexExists &&
+		manifest &&
+		manifest.corpusFingerprint === corpusFingerprint
+	) {
+		return {
+			indexPath,
+			docsIndexed: manifest.docsIndexed,
+			indexRebuilt: false,
+		};
+	}
+
+	const rebuilt = await rebuildContextIndex(bardoRoot);
+	const nextManifest: ContextIndexManifest = {
+		version: 1,
+		corpusFingerprint,
+		docsIndexed: rebuilt.docsIndexed,
+		updatedAtISO: new Date().toISOString(),
+	};
+	await ensureParentDirectoryExists(manifestPath);
+	await writeFile(manifestPath, JSON.stringify(nextManifest, null, 2), "utf8");
+	return {
+		indexPath: rebuilt.indexPath,
+		docsIndexed: rebuilt.docsIndexed,
+		indexRebuilt: true,
+	};
 }
 
 export function queryContextDocs(args: {

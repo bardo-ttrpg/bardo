@@ -202,3 +202,21 @@
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* Keep Clerk billing/modal overlays above sticky headers and floating UI. */
+:where(
+	[data-clerk-portal-root],
+	[data-clerk-modal-root],
+	[data-clerk-drawer-root],
+	.cl-modalRoot,
+	.cl-drawerRoot,
+	.cl-modalContent,
+	.cl-cardBox,
+	.cl-checkoutRoot
+) {
+	z-index: 2147483000 !important;
+}
+
+:where(.cl-modalBackdrop, .cl-drawerBackdrop, .cl-checkoutBackdrop) {
+	z-index: 2147482999 !important;
+}

@@ -161,4 +161,79 @@ describe("handleMcpRequest policy and loop protection", () => {
 		);
 		expect(second.status).toBe(429);
 	});
+
+	test("blocks disallowed tools inside JSON-RPC batch payloads", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry({
+			loopPolicy: resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+		});
+		let forwardedRequests = 0;
+
+		sessionStore.set(
+			"s1",
+			createSession({
+				handleRequest: async () => {
+					forwardedRequests += 1;
+					return new Response(
+						JSON.stringify({
+							ok: true,
+						}),
+						{
+							status: 200,
+							headers: {
+								"content-type": "application/json",
+							},
+						},
+					);
+				},
+			}),
+		);
+		sessionRegistry.registerSession({
+			sessionId: "s1",
+			apiKey: "k1",
+			campaignBasePath: "/repo/customer-a",
+		});
+
+		const request = new Request("http://localhost:3000/mcp", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"mcp-session-id": "s1",
+			},
+			body: JSON.stringify([
+				{
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: {
+						name: "player_action",
+						arguments: {
+							action: "hello",
+						},
+					},
+				},
+			]),
+		});
+
+		const response = await handleMcpRequest(
+			request,
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			resolveToolPolicyConfig({
+				BARDO_TOOLS_PROFILE: "minimal",
+			}),
+			resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+			true,
+		);
+
+		expect(response.status).toBe(403);
+		expect(forwardedRequests).toBe(0);
+		const payload = (await response.json()) as { error?: { message?: string } };
+		expect(payload.error?.message).toContain("not allowed");
+	});
 });

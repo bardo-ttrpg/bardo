@@ -1,15 +1,19 @@
-import { writeFile } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
-import { safeParseState } from "../../domain/campaign/state";
+import { appendCanonicalEvent } from "../../domain/events/store";
 import {
 	getIdempotentResult,
 	setIdempotentResult,
 } from "../../domain/idempotency/store";
-import { parseMarkdown, renderMarkdown } from "../../domain/markdown/markdown";
 import {
-	ensureParentDirectoryExists,
-	readTextIfExists,
+	evaluateRuntimePolicy,
+	loadAuthorityPolicy,
+	loadTableContract,
+	summarizeRuntimePolicyViolations,
+} from "../../domain/policy/runtime-guards";
+import { loadPreferredCurrentState } from "../../domain/projections/preferred-state";
+import { regenerateProjectionsForEventTypes } from "../../domain/projections/refresh";
+import {
 	resolveBardoRoot,
 	resolvePathInsideRoot,
 } from "../../infra/filesystem/filesystem";
@@ -64,14 +68,6 @@ const simulationTickOutputSchema = z.object({
 
 type SimulationTickOutput = z.infer<typeof simulationTickOutputSchema>;
 
-type TickEvent = {
-	id: string;
-	summary: string;
-	mode: "turn" | "scheduled";
-	tickIndex: number;
-	atISO: string;
-};
-
 function createDeterministicRng(seed: number): () => number {
 	let value = seed >>> 0;
 	return () => {
@@ -89,71 +85,17 @@ function parseSeed(input: string): number {
 	return hash >>> 0;
 }
 
-async function appendHistoryLine(
-	historyPath: string,
-	line: string,
-): Promise<void> {
-	const existing = await readTextIfExists(historyPath);
-	const parsed = existing
-		? parseMarkdown(existing)
-		: { frontmatter: {}, content: "" };
-	const nextContent = parsed.content.trim()
-		? `${parsed.content.trimEnd()}\n${line}`
-		: line;
-
-	await ensureParentDirectoryExists(historyPath);
-	await writeFile(
-		historyPath,
-		renderMarkdown(
-			{
-				description:
-					parsed.frontmatter.description ??
-					"Chronological campaign action history log",
-				title: parsed.frontmatter.title ?? "Campaign History",
-			},
-			nextContent,
-		),
-		"utf8",
-	);
-}
-
-async function writeEventFile(
-	bardoRoot: string,
-	event: TickEvent,
-): Promise<string> {
-	const eventPath = resolvePathInsideRoot(
-		bardoRoot,
-		`world/events/${event.id}.md`,
-	);
-	const existing = await readTextIfExists(eventPath);
-	if (existing !== null) {
-		return eventPath;
+function canonicalSimulationTickEventId(
+	idempotencyKey: string | undefined,
+): string {
+	if (!idempotencyKey) {
+		return `evt-simulation-tick-${crypto.randomUUID()}`;
 	}
-
-	await ensureParentDirectoryExists(eventPath);
-	await writeFile(
-		eventPath,
-		renderMarkdown(
-			{
-				description: "Autonomous simulation event",
-				title: `Simulation Event ${event.id}`,
-			},
-			JSON.stringify(
-				{
-					id: event.id,
-					type: "simulation_tick",
-					mode: event.mode,
-					tickIndex: event.tickIndex,
-					atISO: event.atISO,
-					summary: event.summary,
-				},
-				null,
-				2,
-			),
-		),
-		"utf8",
-	);
-	return eventPath;
+	const normalized = idempotencyKey
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9_-]/g, "-")
+		.slice(0, 80);
+	return `evt-simulation-tick-${normalized}`;
 }
 
 export function registerSimulationTickTool(
@@ -165,7 +107,7 @@ export function registerSimulationTickTool(
 		{
 			title: "Simulation Tick",
 			description:
-				"Advance world simulation deterministically for one or more bounded ticks and persist resulting state/history/events.",
+				"Advance world simulation deterministically for one or more bounded ticks and persist canonical events/projections.",
 			inputSchema: simulationTickInputSchema,
 			outputSchema: simulationTickOutputSchema,
 			annotations: {
@@ -180,6 +122,10 @@ export function registerSimulationTickTool(
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
 			const statePath = resolvePathInsideRoot(bardoRoot, "state/current.md");
 			const historyPath = resolvePathInsideRoot(bardoRoot, "state/history.md");
+			const canonicalLogPath = resolvePathInsideRoot(
+				bardoRoot,
+				"events/canonical.ndjson",
+			);
 
 			try {
 				if (!dryRun && !idempotencyKey) {
@@ -200,15 +146,92 @@ export function registerSimulationTickTool(
 					}
 				}
 
-				const rawState = await readTextIfExists(statePath);
-				const parsedState = rawState
-					? parseMarkdown(rawState)
-					: { frontmatter: {}, content: "" };
-				const state = safeParseState(parsedState.content);
+				const tableContract = await loadTableContract({ bardoRoot });
+				const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
+				const policyAction = `simulation_tick mode=${mode} tickCount=${String(tickCount)}`;
+				const runtimeViolations = evaluateRuntimePolicy({
+					action: policyAction,
+					tableContract,
+					authorityPolicy,
+				});
+				if (runtimeViolations.length > 0) {
+					const blockedMessage =
+						summarizeRuntimePolicyViolations(runtimeViolations);
+					const nowIso = new Date().toISOString();
+					await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: `evt-simulation-tick-policy-${crypto.randomUUID()}`,
+							type: "runtime_policy_blocked",
+							atISO: nowIso,
+							source: "simulation_tick",
+							data: {
+								action: policyAction,
+								mode,
+								tickCount,
+								runtimeViolations,
+								tableContract: {
+									tone: tableContract.tone,
+									boundaries: tableContract.boundaries,
+									pvp: tableContract.pvp,
+									retconPolicy: tableContract.retconPolicy,
+								},
+								authorityPolicy: {
+									mode: authorityPolicy.mode,
+									factIntroduction: authorityPolicy.factIntroduction,
+									ruleAdjudication: authorityPolicy.ruleAdjudication,
+									safetyVeto: authorityPolicy.safetyVeto,
+									allowRuleBypass: authorityPolicy.allowRuleBypass,
+									allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+									allowPlayerCanonDeclarations:
+										authorityPolicy.allowPlayerCanonDeclarations,
+								},
+							},
+						},
+					});
+					const output: SimulationTickOutput = {
+						success: false,
+						message: `Simulation tick blocked by runtime policy: ${blockedMessage}`,
+						rootPath: bardoRoot,
+						mode,
+						tickCount,
+						dryRun,
+						idempotentReplay: false,
+						statePath,
+						historyPath,
+						filesTouched: [],
+						entitiesUpdated: 0,
+						factionsUpdated: 0,
+						eventsCreated: 0,
+						stateVersion: "",
+						worldTimeBeforeISO: "",
+						worldTimeAfterISO: "",
+					};
+
+					if (!dryRun && idempotencyKey) {
+						await setIdempotentResult({
+							bardoRoot,
+							key: idempotencyKey,
+							scope: "simulation_tick",
+							result: output,
+							nowIso,
+						});
+					}
+
+					return makeToolResult(output, true);
+				}
+
+				const preferredState = await loadPreferredCurrentState({
+					bardoRoot,
+					consumer: "simulation_tick",
+				});
+				const state = JSON.parse(
+					JSON.stringify(preferredState.chosen.state),
+				) as typeof preferredState.chosen.state;
 				const worldTimeBeforeISO = state.worldTimeISO;
 				const now = new Date(worldTimeBeforeISO);
 				const filesTouched = new Set<string>();
-				let eventsCreated = 0;
+				const sampledLocations: string[] = [];
 				const entitiesUpdated = 0;
 				const factionsUpdated = 0;
 
@@ -221,51 +244,48 @@ export function registerSimulationTickTool(
 				for (let i = 0; i < tickCount; i += 1) {
 					const minutes = mode === "turn" ? 15 : 60;
 					now.setMinutes(now.getMinutes() + minutes);
-					const atISO = now.toISOString();
 					const locationKeys = Object.keys(state.locations);
 					const selectedLocation =
 						locationKeys.length > 0
 							? locationKeys[Math.floor(rng() * locationKeys.length)] ||
 								"unknown"
 							: "starting-area";
-					const event: TickEvent = {
-						id: `sim-${atISO.replaceAll(/[:.]/g, "-")}-${i + 1}`,
-						summary: `Autonomous world evolution progressed near ${selectedLocation}.`,
-						mode,
-						tickIndex: i + 1,
-						atISO,
-					};
-
-					if (!dryRun) {
-						const eventPath = await writeEventFile(bardoRoot, event);
-						filesTouched.add(eventPath);
-					}
-					eventsCreated += 1;
+					sampledLocations.push(selectedLocation);
 				}
 
 				state.worldTimeISO = now.toISOString();
 				state.lastAction = `simulation_tick:${mode}`;
 
 				if (!dryRun) {
-					await ensureParentDirectoryExists(statePath);
-					await writeFile(
-						statePath,
-						renderMarkdown(
-							{
-								description: "Current campaign state and memory snapshot",
-								title: "Campaign State",
+					const canonicalAtISO = new Date().toISOString();
+					await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: canonicalSimulationTickEventId(idempotencyKey),
+							type: "simulation_tick_applied",
+							atISO: canonicalAtISO,
+							source: "simulation_tick",
+							data: {
+								mode,
+								tickCount,
+								eventsCreated: tickCount,
+								sampledLocations,
+								worldTimeBeforeISO,
+								worldTimeAfterISO: state.worldTimeISO,
+								stateAfter: state,
 							},
-							JSON.stringify(state, null, 2),
-						),
-						"utf8",
+						},
+					});
+					filesTouched.add(canonicalLogPath);
+					const refreshedProjections = await regenerateProjectionsForEventTypes(
+						{
+							bardoRoot,
+							eventTypes: ["simulation_tick_applied"],
+						},
 					);
-					filesTouched.add(statePath);
-
-					const historyLine =
-						`${new Date().toISOString()} | intent=simulate | action="simulation_tick" | ` +
-						`mode=${mode} | ticks=${tickCount} | events=${eventsCreated}`;
-					await appendHistoryLine(historyPath, historyLine);
-					filesTouched.add(historyPath);
+					for (const projection of refreshedProjections) {
+						filesTouched.add(projection.projectionPath);
+					}
 				}
 
 				const output: SimulationTickOutput = {
@@ -283,7 +303,7 @@ export function registerSimulationTickTool(
 					filesTouched: [...filesTouched],
 					entitiesUpdated,
 					factionsUpdated,
-					eventsCreated,
+					eventsCreated: tickCount,
 					stateVersion: `${state.worldTimeISO}:${mode}:${tickCount}`,
 					worldTimeBeforeISO,
 					worldTimeAfterISO: state.worldTimeISO,

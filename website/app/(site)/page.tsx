@@ -1,4 +1,4 @@
-import { Space_Grotesk } from "next/font/google";
+import type { Metadata } from "next";
 import AmbientParticles from "@/components/ambient-particles";
 import ComparisonSection from "./_components/landing/comparison-section";
 import CompatibilitySection from "./_components/landing/compatibility-section";
@@ -10,17 +10,17 @@ import VideoSection from "./_components/landing/video-section";
 import WorkspaceSection from "./_components/landing/workspace-section";
 import WorldMapSection from "./_components/landing/world-map-section";
 
-const spaceGrotesk = Space_Grotesk({
-	subsets: ["latin"],
-	weight: "700",
-	display: "swap",
-});
+export const metadata: Metadata = {
+	title: "Bardo",
+	description:
+		"Bardo converts AI agents into system-agnostic TTRPG game masters with deterministic runtime controls.",
+};
 
 export default function LandingPage() {
 	return (
 		<div>
 			<AmbientParticles />
-			<HeroSection wordmarkClassName={spaceGrotesk.className} />
+			<HeroSection wordmarkClassName="font-sans" />
 			<div className="mx-auto max-w-7xl px-4 sm:px-6">
 				<ComparisonSection />
 				<WorkspaceSection />

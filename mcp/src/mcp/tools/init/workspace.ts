@@ -24,9 +24,7 @@ import type {
 	WorkspaceSummary,
 } from "./types";
 
-export async function listMarkdownFilesRecursive(
-	root: string,
-): Promise<string[]> {
+async function listMarkdownFilesRecursive(root: string): Promise<string[]> {
 	const entries = await readdir(root, { withFileTypes: true });
 	const files: string[] = [];
 
@@ -82,7 +80,7 @@ export async function readMapLocationCandidates(
 	return locationCandidatesFromMapData(mapData);
 }
 
-export function getTopLevelDir(relativePath: string): string {
+function getTopLevelDir(relativePath: string): string {
 	const normalized = relativePath.replaceAll("\\", "/");
 	const first = normalized.split("/")[0];
 	return first || "unknown";

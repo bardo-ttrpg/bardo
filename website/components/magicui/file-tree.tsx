@@ -77,7 +77,7 @@ function FolderNode({
 	depth: number;
 	defaultOpen?: boolean;
 }) {
-	const [open, setOpen] = useState(defaultOpen);
+	const [open, setOpen] = useState(() => defaultOpen);
 
 	return (
 		<div>

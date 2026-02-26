@@ -7,6 +7,8 @@ export * from "./persistence";
 export * from "./scene-resolution";
 export * from "./schemas";
 export * from "./settings";
+export * from "./setup-flow";
+export * from "./setup-schemas";
 export * from "./spawn";
 export * from "./types";
 export * from "./workspace";

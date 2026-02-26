@@ -29,7 +29,7 @@ import {
 	readMapLocationCandidates,
 } from "./workspace";
 
-export type SceneResolution = {
+type SceneResolution = {
 	startingSceneContent: string;
 	startingSceneSource: InitOutput["startingSceneSource"];
 	mapGenerated: boolean;

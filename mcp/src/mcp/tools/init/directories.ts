@@ -6,7 +6,7 @@ import type { InitPaths } from "./paths";
 import type { DirectoryReport, InitOutput } from "./schemas";
 import { defaultOptionalSystems, type WorkspaceSummary } from "./types";
 
-export type DirectorySetupResult = {
+type DirectorySetupResult = {
 	rootExistedBefore: boolean;
 	createdDirectories: string[];
 	existingDirectories: string[];
@@ -14,7 +14,7 @@ export type DirectorySetupResult = {
 	failureMessage: string | null;
 };
 
-export function emptyWorkspaceSummary(): WorkspaceSummary {
+function emptyWorkspaceSummary(): WorkspaceSummary {
 	return {
 		markdownFiles: 0,
 		informativeFiles: 0,

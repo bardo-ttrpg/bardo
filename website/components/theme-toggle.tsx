@@ -8,17 +8,11 @@ export default function ThemeToggle() {
 	const { resolvedTheme, setTheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 
-	useEffect(() => {
-		setMounted(true);
-	}, []);
+	useEffect(() => setMounted(true), []);
 
-	// Prevent hydration mismatch — render a fixed-size placeholder until mounted
-	if (!mounted) {
-		return <span className="inline-block h-4 w-4" aria-hidden />;
-	}
+	if (!mounted) return <span className="h-4 w-4" />;
 
 	const isDark = resolvedTheme === "dark";
-
 	return (
 		<button
 			type="button"

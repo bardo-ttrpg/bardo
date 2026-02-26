@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export async function inspectPath(targetPath: string): Promise<{
@@ -82,6 +82,22 @@ export async function readTextIfExists(
 		) {
 			return null;
 		}
+		throw error;
+	}
+}
+
+export async function writeTextAtomic(
+	filePath: string,
+	content: string,
+): Promise<void> {
+	const nonce = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	const tempPath = `${filePath}.${nonce}.tmp`;
+	await ensureParentDirectoryExists(filePath);
+	await writeFile(tempPath, content, "utf8");
+	try {
+		await rename(tempPath, filePath);
+	} catch (error) {
+		await rm(tempPath, { force: true });
 		throw error;
 	}
 }

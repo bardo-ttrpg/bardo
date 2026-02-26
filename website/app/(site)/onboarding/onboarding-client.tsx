@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { InitBootstrapResponse } from "@/lib/mcp-orchestrator";
 
 type Props = {
@@ -17,6 +17,18 @@ type BootstrapAnswerKey =
 	| "successCriteria"
 	| "values";
 
+type SetupAnswerKey =
+	| "ttrpgSystem"
+	| "systemUrl"
+	| "sourceMaterialsStatus"
+	| "diceRoller"
+	| "playerCount"
+	| "sourcePolicy"
+	| "additionalContext"
+	| "materialsConfirmation";
+
+type QuestionKey = BootstrapAnswerKey | SetupAnswerKey | "campaign_setup";
+
 function isBootstrapAnswerKey(
 	value: string | null,
 ): value is BootstrapAnswerKey {
@@ -31,8 +43,23 @@ function isBootstrapAnswerKey(
 	);
 }
 
+function isSetupAnswerKey(value: string | null): value is SetupAnswerKey {
+	return (
+		value === "ttrpgSystem" ||
+		value === "systemUrl" ||
+		value === "sourceMaterialsStatus" ||
+		value === "diceRoller" ||
+		value === "playerCount" ||
+		value === "sourcePolicy" ||
+		value === "additionalContext" ||
+		value === "materialsConfirmation"
+	);
+}
+
 async function callBootstrapApi(payload: {
 	answers?: Partial<Record<BootstrapAnswerKey, string>>;
+	setupAnswers?: Record<string, string | number>;
+	setupRevision?: number;
 }): Promise<InitBootstrapResponse> {
 	const response = await fetch("/api/init/bootstrap", {
 		method: "POST",
@@ -48,7 +75,10 @@ async function callBootstrapApi(payload: {
 
 export function OnboardingClient({ initial }: Props) {
 	const router = useRouter();
-	const [result, setResult] = useState<InitBootstrapResponse>(initial);
+	const initialResultRef = useRef(initial);
+	const [result, setResult] = useState<InitBootstrapResponse>(
+		initialResultRef.current,
+	);
 	const [value, setValue] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -61,7 +91,8 @@ export function OnboardingClient({ initial }: Props) {
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		if (!isBootstrapAnswerKey(result.questionKey)) {
+		const questionKey = result.questionKey as QuestionKey | null;
+		if (!questionKey) {
 			setError("No bootstrap question is active.");
 			return;
 		}
@@ -73,11 +104,41 @@ export function OnboardingClient({ initial }: Props) {
 		setSubmitting(true);
 		setError(null);
 		try {
-			const next = await callBootstrapApi({
-				answers: {
-					[result.questionKey]: value.trim(),
-				},
-			});
+			const trimmedValue = value.trim();
+			let payload: {
+				answers?: Partial<Record<BootstrapAnswerKey, string>>;
+				setupAnswers?: Record<string, string | number>;
+				setupRevision?: number;
+			} = {};
+
+			if (isBootstrapAnswerKey(questionKey)) {
+				payload = {
+					answers: {
+						[questionKey]: trimmedValue,
+					},
+				};
+			} else if (isSetupAnswerKey(questionKey)) {
+				let setupValue: string | number = trimmedValue;
+				if (questionKey === "playerCount") {
+					const parsed = Number(trimmedValue);
+					setupValue = Number.isFinite(parsed) ? parsed : trimmedValue;
+				}
+				payload = {
+					setupAnswers: {
+						[questionKey]: setupValue,
+					},
+					setupRevision: result.setup?.revision ?? undefined,
+				};
+			} else {
+				payload = {
+					setupAnswers: {
+						additionalContext: trimmedValue,
+					},
+					setupRevision: result.setup?.revision ?? undefined,
+				};
+			}
+
+			const next = await callBootstrapApi(payload);
 			setResult(next);
 			setValue("");
 			if (next.status === "complete") {

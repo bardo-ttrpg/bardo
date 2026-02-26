@@ -6,12 +6,12 @@ type Bucket = {
 	requestCount: number;
 };
 
-export type RateLimiterOptions = {
+type RateLimiterOptions = {
 	windowMs: number;
 	maxRequests: number;
 };
 
-export type RateLimitResult = {
+type RateLimitResult = {
 	allowed: boolean;
 	retryAfterMs: number;
 	limit: number;
@@ -30,7 +30,7 @@ type UpstashLimiterClient = {
 	limit: (key: string) => Promise<UpstashLimitResult>;
 };
 
-export type RateLimiterProvider = {
+type RateLimiterProvider = {
 	consume: (
 		key: string,
 		now?: number,

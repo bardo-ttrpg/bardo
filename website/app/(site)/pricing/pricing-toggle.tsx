@@ -5,19 +5,25 @@ import {
 	formatUsdCents,
 	YEARLY_SAVINGS_UP_TO_PERCENT,
 } from "@/lib/billing-catalog";
+import {
+	clerkPlanPeriodFromBillingInterval,
+	getClerkPlanId,
+} from "@/lib/clerk-billing";
 import CheckoutButton from "./checkout-button";
-import PartyPricingControls from "./party-pricing-controls";
 import { pricingTiers } from "./pricing-data";
 
 export type BillingPeriod = "monthly" | "yearly";
 
 export default function PricingToggle({
 	billingPeriod,
+	clerkEnabled,
 }: {
 	billingPeriod: BillingPeriod;
+	clerkEnabled: boolean;
 }) {
 	const yearly = billingPeriod === "yearly";
 	const interval = yearly ? "year" : "month";
+	const clerkPlanPeriod = clerkPlanPeriodFromBillingInterval(interval);
 	const yearlySavingsLabel = `Save up to ${YEARLY_SAVINGS_UP_TO_PERCENT}%`;
 
 	return (
@@ -59,8 +65,10 @@ export default function PricingToggle({
 					const priceCents = tier.checkoutPlan
 						? displayPriceCents(tier.checkoutPlan, interval)
 						: 0;
+					const clerkPlanId = tier.checkoutPlan
+						? getClerkPlanId(tier.checkoutPlan)
+						: null;
 					const perLabel = yearly ? "/ yr" : "/ mo";
-					const isParty = tier.key === "party";
 					const ctaClassName = [
 						"block w-full border px-5 py-2.5 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
 						tier.highlighted
@@ -105,23 +113,13 @@ export default function PricingToggle({
 								{priceCents > 0 && (
 									<span className="ml-1 font-mono text-[11px] text-muted-foreground">
 										{perLabel}
-										{isParty ? " / seat" : ""}
 									</span>
 								)}
 							</div>
 
-							{isParty ? (
-								<PartyPricingControls
-									yearly={yearly}
-									interval={interval}
-									label={tier.cta}
-									buttonClassName={ctaClassName}
-								/>
-							) : (
-								<p className="mb-6 font-mono text-[10px] text-muted-foreground">
-									{tier.credits.toLocaleString()} credits / month
-								</p>
-							)}
+							<p className="mb-6 font-mono text-[10px] text-muted-foreground">
+								{tier.credits.toLocaleString()} credits / month
+							</p>
 
 							<ul className="mb-8 space-y-2.5">
 								{tier.features.map((feature) => (
@@ -142,9 +140,9 @@ export default function PricingToggle({
 								</Link>
 							) : tier.checkoutPlan ? (
 								<CheckoutButton
-									plan={tier.checkoutPlan}
-									interval={interval}
-									quantity={1}
+									clerkEnabled={clerkEnabled}
+									clerkPlanId={clerkPlanId}
+									planPeriod={clerkPlanPeriod}
 									label={tier.cta}
 									className={ctaClassName}
 								/>

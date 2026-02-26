@@ -1,6 +1,6 @@
 import type { CheckoutPlanTier } from "@/lib/billing-catalog";
 
-export type PricingTier = {
+type PricingTier = {
 	key: "free" | CheckoutPlanTier;
 	name: string;
 	credits: number;
@@ -41,7 +41,7 @@ export const pricingTiers: readonly PricingTier[] = [
 			"Core MCP tools",
 			"Hosted persistence",
 			"Faster sync",
-			"Billing portal access",
+			"Clerk billing management",
 		],
 	},
 	{
@@ -59,24 +59,6 @@ export const pricingTiers: readonly PricingTier[] = [
 			"Hosted persistence",
 			"Priority support",
 			"Early tool access",
-		],
-	},
-	{
-		key: "party",
-		checkoutPlan: "party",
-		name: "Party",
-		credits: 40_000,
-		highlighted: false,
-		cta: "Start Party",
-		ctaHref: "/sign-up",
-		features: [
-			"Per-seat billing",
-			"20,000 MCP calls / seat / month",
-			"Core MCP tools",
-			"Team access",
-			"Priority support",
-			"SLA support",
-			"Shared workspace tooling",
 		],
 	},
 ] as const;

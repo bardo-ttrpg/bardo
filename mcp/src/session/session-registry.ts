@@ -3,10 +3,10 @@ import {
 	type LoopDetectionPolicy,
 } from "../domain/config/loop-detection";
 
-export type SessionKind = "main" | "agent";
+type SessionKind = "main" | "agent";
 export type SessionStatus = "active" | "idle" | "queued" | "closed";
 
-export type SessionHistoryEntry = {
+type SessionHistoryEntry = {
 	at: number;
 	type:
 		| "jsonrpc"
@@ -20,7 +20,7 @@ export type SessionHistoryEntry = {
 	data?: Record<string, unknown>;
 };
 
-export type SessionListItem = {
+type SessionListItem = {
 	sessionId: string;
 	sessionKey: string;
 	kind: SessionKind;
@@ -413,6 +413,22 @@ export class SessionRegistry {
 				targetSessionId: null,
 			};
 		}
+		if (target.status === "closed") {
+			this.appendHistory(args.fromSessionId, {
+				at: now,
+				type: "message",
+				summary: `Message to ${targetSessionId} rejected: target session is closed.`,
+				data: {
+					toSessionId: targetSessionId,
+				},
+			});
+			return {
+				accepted: false,
+				delivered: false,
+				messageId: null,
+				targetSessionId,
+			};
+		}
 
 		const messageId = crypto.randomUUID();
 		target.messages.push({
@@ -423,9 +439,7 @@ export class SessionRegistry {
 			createdAt: now,
 		});
 		target.updatedAt = now;
-		if (target.status !== "closed") {
-			target.status = "active";
-		}
+		target.status = "active";
 
 		this.appendHistory(targetSessionId, {
 			at: now,

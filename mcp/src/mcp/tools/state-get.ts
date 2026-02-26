@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import { parseMarkdown } from "../../domain/markdown/markdown";
+import { loadPreferredCurrentState } from "../../domain/projections/preferred-state";
 import {
 	ensureMarkdownPath,
 	readTextIfExists,
@@ -13,8 +14,10 @@ import { makeToolResult } from "../tool-result";
 const stateGetInputSchema = z.object({
 	path: z
 		.string()
-		.default("state/current.md")
-		.describe("Relative state markdown file path under bardo root"),
+		.optional()
+		.describe(
+			"Optional relative state markdown path under bardo root. When omitted, reads preferred current state (projection first, then legacy fallback).",
+		),
 });
 
 const stateGetOutputSchema = z.object({
@@ -31,6 +34,16 @@ const stateGetOutputSchema = z.object({
 	frontmatter: z
 		.record(z.string(), z.string())
 		.describe("Parsed frontmatter key/value map"),
+	stateSource: z
+		.enum([
+			"projection",
+			"legacy_state",
+			"explicit_path",
+			"empty_default",
+			"strict_blocked_legacy",
+			"strict_stale_projection",
+		])
+		.describe("Source used to read returned state payload"),
 	state: z.record(z.string(), z.unknown()).describe("Parsed JSON state object"),
 	rawContent: z.string().describe("Raw markdown body content"),
 });
@@ -60,6 +73,31 @@ export function registerStateGetTool(
 		async ({ path: relativePath }) => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
 			try {
+				if (!relativePath) {
+					const preferred = await loadPreferredCurrentState({
+						bardoRoot,
+						consumer: "state_get",
+					});
+					const output: StateGetOutput = {
+						success: true,
+						message:
+							preferred.source === "projection"
+								? "State read successfully from current-state projection."
+								: preferred.source === "legacy_state"
+									? "State read from legacy state file because projection is missing."
+									: "No state files found. Returned default empty state.",
+						rootPath: bardoRoot,
+						filePath: preferred.chosen.path,
+						exists: preferred.chosen.exists,
+						defaulted: preferred.source === "empty_default",
+						frontmatter: preferred.chosen.frontmatter,
+						stateSource: preferred.source,
+						state: preferred.chosen.state,
+						rawContent: preferred.chosen.rawContent,
+					};
+					return makeToolResult(output);
+				}
+
 				const filePath = resolvePathInsideRoot(bardoRoot, relativePath);
 				ensureMarkdownPath(filePath);
 				const raw = await readTextIfExists(filePath);
@@ -72,6 +110,7 @@ export function registerStateGetTool(
 						exists: false,
 						defaulted: true,
 						frontmatter: {},
+						stateSource: "explicit_path",
 						state: {},
 						rawContent: "",
 					};
@@ -97,11 +136,53 @@ export function registerStateGetTool(
 					exists: true,
 					defaulted: false,
 					frontmatter: parsed.frontmatter,
+					stateSource: "explicit_path",
 					state,
 					rawContent: parsed.content,
 				};
 				return makeToolResult(output);
 			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
+				) {
+					const strictOutput: StateGetOutput = {
+						success: false,
+						message:
+							"Strict canonical mode blocked legacy fallback read. Regenerate or restore projections/current-state.md.",
+						rootPath: bardoRoot,
+						filePath: resolvePathInsideRoot(bardoRoot, "state/current.md"),
+						exists: true,
+						defaulted: false,
+						frontmatter: {},
+						stateSource: "strict_blocked_legacy",
+						state: {},
+						rawContent: "",
+					};
+					return makeToolResult(strictOutput, true);
+				}
+				if (
+					error instanceof Error &&
+					error.message.startsWith("STRICT_CANONICAL_STALE_PROJECTION")
+				) {
+					const strictOutput: StateGetOutput = {
+						success: false,
+						message:
+							"Strict canonical mode blocked stale projection read. Regenerate projections/current-state.md from canonical events.",
+						rootPath: bardoRoot,
+						filePath: resolvePathInsideRoot(
+							bardoRoot,
+							"projections/current-state.md",
+						),
+						exists: true,
+						defaulted: false,
+						frontmatter: {},
+						stateSource: "strict_stale_projection",
+						state: {},
+						rawContent: "",
+					};
+					return makeToolResult(strictOutput, true);
+				}
 				const output: StateGetOutput = {
 					success: false,
 					message:
@@ -113,6 +194,7 @@ export function registerStateGetTool(
 					exists: false,
 					defaulted: false,
 					frontmatter: {},
+					stateSource: "explicit_path",
 					state: {},
 					rawContent: "",
 				};

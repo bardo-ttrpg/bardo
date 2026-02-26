@@ -1,13 +1,8 @@
-import { readdir, rm, writeFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
+import { parseMarkdown } from "../../domain/markdown/markdown";
 import {
-	getIdempotentResult,
-	setIdempotentResult,
-} from "../../domain/idempotency/store";
-import { parseMarkdown, renderMarkdown } from "../../domain/markdown/markdown";
-import {
-	ensureParentDirectoryExists,
 	readTextIfExists,
 	resolveBardoRoot,
 	resolvePathInsideRoot,
@@ -45,7 +40,7 @@ const recordCrudInputSchema = z.object({
 		.min(8)
 		.max(256)
 		.optional()
-		.describe("Required for mutating non-dry-run operations"),
+		.describe("Deprecated for this tool; ignored for non-mutating operations."),
 });
 
 const recordCrudOutputSchema = z.object({
@@ -81,16 +76,6 @@ function directoryForKind(kind: RecordKind): string {
 		case "event":
 			return "world/events";
 	}
-}
-
-function titleFor(
-	kind: RecordKind,
-	id: string,
-	name: string | undefined,
-): string {
-	return (
-		name?.trim() || `${kind[0]?.toUpperCase() ?? ""}${kind.slice(1)} ${id}`
-	);
 }
 
 async function listRecords(args: {
@@ -131,39 +116,23 @@ async function listRecords(args: {
 	}
 }
 
-function assertMutationIdempotency(args: {
+function assertAllowedOperation(args: {
+	kind: RecordKind;
 	op: "create" | "update" | "delete" | "get" | "list";
-	dryRun: boolean;
-	idempotencyKey: string | undefined;
 }): void {
-	if (args.dryRun) {
-		return;
-	}
 	if (args.op === "get" || args.op === "list") {
 		return;
 	}
-	if (!args.idempotencyKey) {
+
+	if (args.kind === "event") {
 		throw new Error(
-			"`idempotencyKey` is required for mutating operations when dryRun is false.",
+			"Canonical events are append-only. Use `append_event` for canonical event writes.",
 		);
 	}
-}
 
-function normalizeRecordPayload(args: {
-	id: string;
-	name: string | undefined;
-	data: Record<string, unknown> | undefined;
-}): Record<string, unknown> {
-	const base = args.data ? { ...args.data } : {};
-	return {
-		id: args.id,
-		name: args.name ?? base.name ?? args.id,
-		...base,
-	};
-}
-
-function scopeFor(kind: RecordKind): string {
-	return `${kind}_crud`;
+	throw new Error(
+		"Direct canonical record mutations are disabled. Use `apply_domain_transition` for append-only entity/location/faction transitions.",
+	);
 }
 
 function registerRecordCrudTool(args: {
@@ -189,37 +158,13 @@ function registerRecordCrudTool(args: {
 				openWorldHint: false,
 			},
 		},
-		async ({ op, id, name, data, limit, dryRun, idempotencyKey }) => {
+		async ({ op, id, limit, dryRun }) => {
 			const bardoRoot = resolveBardoRoot(args.auth.campaignBasePath);
 			const directory = directoryForKind(args.kind);
-			const scope = scopeFor(args.kind);
 			const resolvedLimit = limit ?? 25;
 
 			try {
-				assertMutationIdempotency({ op, dryRun, idempotencyKey });
-
-				if (!dryRun && idempotencyKey && op !== "get" && op !== "list") {
-					const replay = await getIdempotentResult({
-						bardoRoot,
-						key: idempotencyKey,
-						scope,
-					});
-					if (replay) {
-						return makeToolResult({
-							...(replay as RecordCrudOutput),
-							idempotentReplay: true,
-						});
-					}
-				}
-
-				const normalizedId = id?.trim() || null;
-				let filePath: string | null = null;
-				if (normalizedId) {
-					filePath = resolvePathInsideRoot(
-						bardoRoot,
-						`${directory}/${normalizedId}.md`,
-					);
-				}
+				assertAllowedOperation({ kind: args.kind, op });
 
 				if (op === "list") {
 					const records = await listRecords({
@@ -244,63 +189,20 @@ function registerRecordCrudTool(args: {
 					return makeToolResult(output);
 				}
 
-				if (!filePath || !normalizedId) {
+				const normalizedId = id?.trim() || null;
+				if (!normalizedId) {
 					throw new Error("`id` is required for this operation.");
 				}
+				const filePath = resolvePathInsideRoot(
+					bardoRoot,
+					`${directory}/${normalizedId}.md`,
+				);
 
-				if (op === "get") {
-					const raw = await readTextIfExists(filePath);
-					if (!raw) {
-						const output: RecordCrudOutput = {
-							success: false,
-							message: `${args.kind} record not found.`,
-							kind: args.kind,
-							op,
-							id: normalizedId,
-							path: filePath,
-							dryRun,
-							idempotentReplay: false,
-							record: null,
-							records: [],
-						};
-						return makeToolResult(output, true);
-					}
-
-					const parsed = parseMarkdown(raw);
-					let record: Record<string, unknown> | null = null;
-					try {
-						record = parsed.content.trim()
-							? (JSON.parse(parsed.content) as Record<string, unknown>)
-							: {};
-					} catch {
-						record = {
-							_body: parsed.content,
-						};
-					}
+				const raw = await readTextIfExists(filePath);
+				if (!raw) {
 					const output: RecordCrudOutput = {
-						success: true,
-						message: `${args.kind} record read successfully.`,
-						kind: args.kind,
-						op,
-						id: normalizedId,
-						path: filePath,
-						dryRun,
-						idempotentReplay: false,
-						record,
-						records: [],
-					};
-					return makeToolResult(output);
-				}
-
-				if (op === "delete") {
-					if (!dryRun) {
-						await rm(filePath, { force: true });
-					}
-					const output: RecordCrudOutput = {
-						success: true,
-						message: dryRun
-							? `${args.kind} delete dry-run completed.`
-							: `${args.kind} deleted successfully.`,
+						success: false,
+						message: `${args.kind} record not found.`,
 						kind: args.kind,
 						op,
 						id: normalizedId,
@@ -310,70 +212,33 @@ function registerRecordCrudTool(args: {
 						record: null,
 						records: [],
 					};
-					if (!dryRun && idempotencyKey) {
-						await setIdempotentResult({
-							bardoRoot,
-							key: idempotencyKey,
-							scope,
-							result: output,
-							nowIso: new Date().toISOString(),
-						});
-					}
-					return makeToolResult(output);
+					return makeToolResult(output, true);
 				}
 
-				const existing = await readTextIfExists(filePath);
-				if (op === "create" && existing !== null) {
-					throw new Error(`${args.kind} record already exists.`);
-				}
-				if (op === "update" && existing === null) {
-					throw new Error(`${args.kind} record does not exist.`);
-				}
-
-				const payload = normalizeRecordPayload({
-					id: normalizedId,
-					name,
-					data,
-				});
-				const frontmatterTitle = titleFor(args.kind, normalizedId, name);
-				if (!dryRun) {
-					await ensureParentDirectoryExists(filePath);
-					await writeFile(
-						filePath,
-						renderMarkdown(
-							{
-								description: `${args.kind} record`,
-								title: frontmatterTitle,
-							},
-							JSON.stringify(payload, null, 2),
-						),
-						"utf8",
-					);
+				const parsed = parseMarkdown(raw);
+				let record: Record<string, unknown> | null = null;
+				try {
+					record = parsed.content.trim()
+						? (JSON.parse(parsed.content) as Record<string, unknown>)
+						: {};
+				} catch {
+					record = {
+						_body: parsed.content,
+					};
 				}
 
 				const output: RecordCrudOutput = {
 					success: true,
-					message: dryRun
-						? `${args.kind} ${op} dry-run completed.`
-						: `${args.kind} ${op} completed successfully.`,
+					message: `${args.kind} record read successfully.`,
 					kind: args.kind,
 					op,
 					id: normalizedId,
 					path: filePath,
 					dryRun,
 					idempotentReplay: false,
-					record: payload,
+					record,
 					records: [],
 				};
-				if (!dryRun && idempotencyKey) {
-					await setIdempotentResult({
-						bardoRoot,
-						key: idempotencyKey,
-						scope,
-						result: output,
-						nowIso: new Date().toISOString(),
-					});
-				}
 				return makeToolResult(output);
 			} catch (error) {
 				const output: RecordCrudOutput = {
@@ -406,9 +271,9 @@ export function registerEntityCrudTool(
 		auth,
 		kind: "entity",
 		toolName: "entity_crud",
-		title: "Entity CRUD",
+		title: "Entity Records",
 		description:
-			"Create, read, update, delete, and list entity records in the canonical workspace.",
+			"Read/list entity records in canonical workspace. Mutations are append-only via apply_domain_transition.",
 	});
 }
 
@@ -421,9 +286,9 @@ export function registerLocationCrudTool(
 		auth,
 		kind: "location",
 		toolName: "location_crud",
-		title: "Location CRUD",
+		title: "Location Records",
 		description:
-			"Create, read, update, delete, and list location records in canonical world storage.",
+			"Read/list location records in canonical workspace. Mutations are append-only via apply_domain_transition.",
 	});
 }
 
@@ -436,9 +301,9 @@ export function registerFactionCrudTool(
 		auth,
 		kind: "faction",
 		toolName: "faction_crud",
-		title: "Faction CRUD",
+		title: "Faction Records",
 		description:
-			"Create, read, update, delete, and list faction records for autonomous world simulation.",
+			"Read/list faction records in canonical workspace. Mutations are append-only via apply_domain_transition.",
 	});
 }
 
@@ -451,8 +316,8 @@ export function registerEventCrudTool(
 		auth,
 		kind: "event",
 		toolName: "event_crud",
-		title: "Event CRUD",
+		title: "Event Records",
 		description:
-			"Create, read, update, delete, and list timeline event records for persistent causality.",
+			"Read/list legacy world event markdown records. Canonical event writes are append-only via append_event.",
 	});
 }

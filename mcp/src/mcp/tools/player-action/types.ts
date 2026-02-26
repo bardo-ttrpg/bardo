@@ -1,5 +1,3 @@
-import type { OptionalSystems } from "../../../domain/campaign/types";
-
 export type Intent =
 	| "travel"
 	| "explore"
@@ -19,16 +17,4 @@ export type PlayerActionPaths = {
 	entitiesDir: string;
 	locationsDir: string;
 	stateDir: string;
-};
-
-export type ActionArtifacts = {
-	createdNpcIds: string[];
-	createdLocationIds: string[];
-};
-
-export type PlayerActionContext = {
-	rootPath: string;
-	statePath: string;
-	historyPath: string;
-	optionalSystems: OptionalSystems;
 };

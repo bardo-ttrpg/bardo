@@ -15,7 +15,6 @@ function json(status: number, payload: Record<string, unknown>): Response {
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
-	issuerDomain: process.env.CLERK_JWT_ISSUER_DOMAIN,
 });
 
 export async function POST(req: NextRequest) {
@@ -28,10 +27,17 @@ export async function POST(req: NextRequest) {
 		return json(401, { error: "Authentication required." });
 	}
 
-	let payload: { answers?: unknown; workspaceId?: unknown } = {};
+	let payload: {
+		answers?: unknown;
+		setupAnswers?: unknown;
+		setupRevision?: unknown;
+		workspaceId?: unknown;
+	} = {};
 	try {
 		payload = (await req.json()) as {
 			answers?: unknown;
+			setupAnswers?: unknown;
+			setupRevision?: unknown;
 			workspaceId?: unknown;
 		};
 	} catch {
@@ -44,9 +50,20 @@ export async function POST(req: NextRequest) {
 		typeof payload.answers === "object" && payload.answers !== null
 			? (payload.answers as Record<string, string>)
 			: undefined;
+	const setupAnswers =
+		typeof payload.setupAnswers === "object" && payload.setupAnswers !== null
+			? (payload.setupAnswers as Record<string, string | number>)
+			: undefined;
+	const setupRevision =
+		typeof payload.setupRevision === "number" &&
+		Number.isFinite(payload.setupRevision)
+			? payload.setupRevision
+			: undefined;
 
 	const result = await requestInitBootstrap({
 		answers,
+		setupAnswers,
+		setupRevision,
 		workspaceId,
 	});
 

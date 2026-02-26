@@ -22,6 +22,7 @@ describe("resolveSecurityPolicy", () => {
 
 		expect(policy.authMode).toBe("required");
 		expect(policy.allowQueryApiKey).toBe(false);
+		expect(policy.rateLimitFailClosed).toBe(true);
 	});
 
 	test("supports explicit environment overrides", () => {

@@ -1,4 +1,9 @@
 import * as z from "zod/v4";
+import {
+	setupAnswersSchema,
+	setupConflictSchema,
+	setupIntegritySchema,
+} from "../init/setup-schemas";
 
 export const playerActionInputSchema = z.object({
 	action: z
@@ -8,11 +13,29 @@ export const playerActionInputSchema = z.object({
 			"Natural player action message from the user (use this as the default gameplay entrypoint), e.g. `I travel to the village tavern`",
 		)
 		.max(1000),
+	bootstrapAnswers: z
+		.object({
+			purpose: z.string().trim().min(3).max(3_000).optional(),
+			userProfile: z.string().trim().min(3).max(3_000).optional(),
+			agentProfile: z.string().trim().min(3).max(3_000).optional(),
+			workingPreferences: z.string().trim().min(3).max(3_000).optional(),
+			boundaries: z.string().trim().min(3).max(3_000).optional(),
+			successCriteria: z.string().trim().min(3).max(3_000).optional(),
+			values: z.string().trim().min(3).max(3_000).optional(),
+		})
+		.partial()
+		.optional(),
+	setupAnswers: setupAnswersSchema.optional(),
+	setupRevision: z.number().int().nonnegative().optional(),
+	idempotencyKey: z.string().trim().min(8).max(200).optional(),
 });
 
 export const playerActionOutputSchema = z.object({
 	success: z.boolean().describe("True when the action was processed"),
 	message: z.string().describe("Human-readable action summary"),
+	idempotentReplay: z
+		.boolean()
+		.describe("True when the response was replayed via idempotency key"),
 	rootPath: z.string().describe("Absolute bardo root path"),
 	intent: z
 		.enum(["travel", "explore", "social", "rest", "combat", "general"])
@@ -24,6 +47,51 @@ export const playerActionOutputSchema = z.object({
 	locationAfter: z.string(),
 	createdNpcIds: z.array(z.string()),
 	createdLocationIds: z.array(z.string()),
+	mechanics: z.object({
+		ruleset: z
+			.string()
+			.describe("Ruleset adapter id used for mechanics resolution."),
+		required: z
+			.boolean()
+			.describe("True when mechanics resolution was required"),
+		resolved: z
+			.boolean()
+			.describe("True when mechanics were validated and resolved"),
+		actionType: z
+			.union([z.string(), z.null()])
+			.describe("Resolved mechanics action type when applicable"),
+		targetDifficulty: z
+			.union([z.number().int(), z.null()])
+			.describe("Target difficulty used for mechanics resolution"),
+		modifier: z.number().int().describe("Applied mechanics modifier"),
+		advantage: z
+			.union([z.enum(["none", "advantage", "disadvantage"]), z.null()])
+			.describe("Applied advantage mode when supported by ruleset"),
+		rawRoll: z
+			.union([z.number().int().min(1).max(20), z.null()])
+			.describe("Selected raw die roll when resolved with dice"),
+		total: z
+			.union([z.number().int(), z.null()])
+			.describe("Total resolved value when mechanics were applied"),
+		outcome: z
+			.union([z.enum(["success", "failure"]), z.null()])
+			.describe("Resolved success/failure outcome"),
+		margin: z
+			.union([z.number().int(), z.null()])
+			.describe("Outcome margin (total - targetDifficulty)"),
+		resolutionMode: z
+			.union([z.enum(["dice", "deterministic", "unsupported"]), z.null()])
+			.describe("Resolution strategy used by the ruleset adapter."),
+		unsupportedReason: z
+			.union([z.string(), z.null()])
+			.describe("Reason when mechanics request is unsupported by ruleset."),
+		trace: z
+			.union([z.record(z.string(), z.unknown()), z.null()])
+			.describe("Ruleset-specific trace metadata for auditability."),
+		validationErrors: z
+			.array(z.string())
+			.describe("Validation errors when mechanics payload is invalid"),
+	}),
 	historyEntry: z.string(),
 	statePath: z.string(),
 	historyPath: z.string(),
@@ -34,6 +102,18 @@ export const playerActionOutputSchema = z.object({
 		items: z.boolean(),
 		worldGeneration: z.boolean(),
 	}),
+	requiresSetup: z.boolean(),
+	setupStatus: z.enum(["needs_input", "complete", "error", "locked"]),
+	setupQuestionKey: z.union([z.string(), z.null()]),
+	setupQuestion: z.union([z.string(), z.null()]),
+	setupProgressAnswered: z.number().int().nonnegative(),
+	setupProgressTotal: z.number().int().nonnegative(),
+	setupWarnings: z.array(z.string()),
+	setupEvidenceSummary: z.array(z.string()),
+	setupRevision: z.number().int().nonnegative(),
+	setupConflict: setupConflictSchema,
+	setupIntegrity: setupIntegritySchema,
+	pendingAction: z.union([z.string(), z.null()]),
 });
 
 export type PlayerActionOutput = z.infer<typeof playerActionOutputSchema>;

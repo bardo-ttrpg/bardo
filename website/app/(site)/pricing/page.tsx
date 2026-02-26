@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
 import CrosshairMarker from "@/components/crosshair-marker";
+import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import PricingToggle, { type BillingPeriod } from "./pricing-toggle";
+import SubscriptionDetailsCta from "./subscription-details-button";
 
 export const metadata: Metadata = {
 	title: "Pricing",
-	description:
-		"Stripe subscriptions for Free, Solo, Solo Plus, and Party plans.",
+	description: "Clerk Billing plans for Free, Solo, and Solo Plus.",
 };
 
 const faqs = [
 	{
 		q: "What counts as a credit?",
-		a: "One MCP tool call consumes one credit. Credits reset each billing cycle based on your Stripe subscription interval.",
+		a: "One MCP tool call consumes one credit. Credits reset each billing cycle based on your active plan interval.",
 	},
 	{
 		q: "Can I change plans anytime?",
-		a: "Yes. Upgrade or downgrade anytime in the billing portal. Cancellations remain active until the current period ends.",
+		a: "Yes. Upgrade, downgrade, or cancel from Clerk Billing. Changes follow your active billing period.",
 	},
 	{
 		q: "Is there a self-hosted option?",
@@ -31,6 +32,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 	const resolvedSearchParams = await searchParams;
 	const billingPeriod: BillingPeriod =
 		resolvedSearchParams.billing === "yearly" ? "yearly" : "monthly";
+	const clerkEnabled = isClerkAuthConfigured({
+		publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+		secretKey: process.env.CLERK_SECRET_KEY,
+	});
 
 	return (
 		<div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -40,17 +45,21 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 					/ Pricing
 				</p>
 				<h1 className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-					Simple pricing with Stripe subscriptions.
+					Simple pricing with Clerk Billing.
 				</h1>
 				<p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
 					Start free, then scale with Solo, Solo Plus, or Party. Yearly plans
 					offer up to 27% savings versus monthly billing.
 				</p>
+				<SubscriptionDetailsCta clerkEnabled={clerkEnabled} />
 			</section>
 
 			{/* ── Tier cards with URL-driven monthly/yearly toggle ── */}
 			<section className="py-16">
-				<PricingToggle billingPeriod={billingPeriod} />
+				<PricingToggle
+					billingPeriod={billingPeriod}
+					clerkEnabled={clerkEnabled}
+				/>
 			</section>
 
 			{/* ── FAQ ── */}

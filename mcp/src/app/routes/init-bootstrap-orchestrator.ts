@@ -22,12 +22,29 @@ const bootstrapAnswersSchema = z
 	})
 	.partial();
 
+const setupAnswersSchema = z
+	.object({
+		ttrpgSystem: z.string().trim().min(2).max(160).optional(),
+		systemUrl: z.string().trim().max(2_000).optional(),
+		sourceMaterialsStatus: z.enum(["complete", "partial", "none"]).optional(),
+		diceRoller: z.enum(["player", "bardo"]).optional(),
+		playerCount: z.number().int().min(1).max(20).optional(),
+		sourcePolicy: z
+			.enum(["use_provided_only", "allow_conservative_skeleton"])
+			.optional(),
+		additionalContext: z.string().trim().max(4_000).optional(),
+		materialsConfirmation: z.string().trim().max(4_000).optional(),
+	})
+	.partial();
+
 const initBootstrapPayloadSchema = z.object({
 	answers: bootstrapAnswersSchema.optional(),
+	setupAnswers: setupAnswersSchema.optional(),
+	setupRevision: z.number().int().nonnegative().optional(),
 	workspaceId: z.string().trim().min(1).max(120).optional(),
 });
 
-export type InitBootstrapPayload = z.infer<typeof initBootstrapPayloadSchema>;
+type InitBootstrapPayload = z.infer<typeof initBootstrapPayloadSchema>;
 
 export function parseInitBootstrapPayload(
 	input: unknown,
@@ -141,11 +158,16 @@ export async function handleInitBootstrapRequest(
 						params: {
 							name: "init",
 							arguments: {
-								bootstrapOnly: true,
 								bootstrapAnswers:
 									payload.answers && Object.keys(payload.answers).length > 0
 										? payload.answers
 										: undefined,
+								setupAnswers:
+									payload.setupAnswers &&
+									Object.keys(payload.setupAnswers).length > 0
+										? payload.setupAnswers
+										: undefined,
+								setupRevision: payload.setupRevision,
 							},
 						},
 					},
@@ -174,12 +196,17 @@ export async function handleInitBootstrapRequest(
 		const campaignNeedsInput = initResult.requiresUserInput === true;
 		const needsInput = !bootstrapComplete || campaignNeedsInput;
 		const status = needsInput ? "needs_input" : "complete";
+		const setupQuestionKey = asOptionalString(initResult.setupQuestionKey);
+		const setupQuestion = asOptionalString(initResult.setupQuestion);
+		const setupRevision = asOptionalNumber(initResult.setupRevision);
 		const questionKey = !bootstrapComplete
 			? pendingQuestionKey
 			: campaignNeedsInput
-				? "campaign_setup"
+				? (setupQuestionKey ?? "campaign_setup")
 				: null;
-		const question = !bootstrapComplete ? bootstrapPrompt : campaignPrompt;
+		const question = !bootstrapComplete
+			? bootstrapPrompt
+			: (setupQuestion ?? campaignPrompt);
 		const answeredCount = asOptionalNumber(bootstrap.answeredCount) ?? 0;
 		const totalQuestions = asOptionalNumber(bootstrap.totalQuestions) ?? 0;
 
@@ -216,6 +243,12 @@ export async function handleInitBootstrapRequest(
 					setupComplete: initResult.setupComplete === true,
 					requiresUserInput: campaignNeedsInput,
 					nextPrompt: campaignPrompt,
+				},
+				setup: {
+					status: asOptionalString(initResult.setupStatus),
+					questionKey: setupQuestionKey,
+					question: setupQuestion,
+					revision: setupRevision,
 				},
 			},
 			{

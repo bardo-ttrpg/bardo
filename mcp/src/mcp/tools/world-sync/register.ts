@@ -4,18 +4,23 @@ import {
 	defaultOptionalSystems,
 	loadOptionalSystems,
 } from "../../../domain/campaign/optional-systems";
+import { appendCanonicalEvent } from "../../../domain/events/store";
+import {
+	evaluateRuntimePolicy,
+	loadAuthorityPolicy,
+	loadTableContract,
+	summarizeRuntimePolicyViolations,
+} from "../../../domain/policy/runtime-guards";
+import { loadPreferredCurrentState } from "../../../domain/projections/preferred-state";
+import { regenerateProjectionsForEventTypes } from "../../../domain/projections/refresh";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
 import { extractLocationNames, extractNpcNames } from "./extract";
 import {
-	appendHistoryEntry,
-	buildWorldSyncHistoryEntry,
 	ensureSyncedLocationFile,
 	ensureSyncedNpcFile,
 	ensureWorldSyncDirectories,
-	loadCampaignState,
-	persistCampaignState,
 	resolveWorldSyncPaths,
 } from "./persistence";
 import {
@@ -33,7 +38,7 @@ export function registerWorldSyncTool(
 		{
 			title: "Sync Narrative Discoveries",
 			description:
-				"Persist discovered proper names from narrative text into workspace files and state. Use this when narration introduces a new location or NPC so canon data stays consistent.",
+				"Persist discovered proper names from narrative text into workspace files and append canonical world-sync events.",
 			inputSchema: worldSyncInputSchema,
 			outputSchema: worldSyncOutputSchema,
 			annotations: {
@@ -50,6 +55,62 @@ export function registerWorldSyncTool(
 
 			try {
 				const optionalSystems = await loadOptionalSystems(bardoRoot);
+				const tableContract = await loadTableContract({ bardoRoot });
+				const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
+				const runtimeViolations = evaluateRuntimePolicy({
+					action: transcript,
+					tableContract,
+					authorityPolicy,
+				});
+				if (runtimeViolations.length > 0) {
+					const blockedMessage =
+						summarizeRuntimePolicyViolations(runtimeViolations);
+					await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: `evt-world-sync-policy-${crypto.randomUUID()}`,
+							type: "runtime_policy_blocked",
+							atISO: new Date().toISOString(),
+							source: "world_sync",
+							data: {
+								transcript,
+								runtimeViolations,
+								tableContract: {
+									tone: tableContract.tone,
+									boundaries: tableContract.boundaries,
+									pvp: tableContract.pvp,
+									retconPolicy: tableContract.retconPolicy,
+								},
+								authorityPolicy: {
+									mode: authorityPolicy.mode,
+									factIntroduction: authorityPolicy.factIntroduction,
+									ruleAdjudication: authorityPolicy.ruleAdjudication,
+									safetyVeto: authorityPolicy.safetyVeto,
+									allowRuleBypass: authorityPolicy.allowRuleBypass,
+									allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+									allowPlayerCanonDeclarations:
+										authorityPolicy.allowPlayerCanonDeclarations,
+								},
+							},
+						},
+					});
+					const output: WorldSyncOutput = {
+						success: false,
+						message: `World sync blocked by runtime policy: ${blockedMessage}`,
+						rootPath: bardoRoot,
+						statePath: paths.statePath,
+						historyPath: paths.historyPath,
+						extractedLocationNames: [],
+						extractedNpcNames: [],
+						createdLocationIds: [],
+						createdNpcIds: [],
+						existingLocationIds: [],
+						existingNpcIds: [],
+						currentLocationAfter: "",
+						optionalSystems,
+					};
+					return makeToolResult(output, true);
+				}
 				await ensureWorldSyncDirectories(paths);
 
 				const extractedLocationNames = extractLocationNames(transcript);
@@ -59,7 +120,13 @@ export function registerWorldSyncTool(
 				const existingLocationIds: string[] = [];
 				const existingNpcIds: string[] = [];
 
-				const state = await loadCampaignState(paths.statePath);
+				const preferredState = await loadPreferredCurrentState({
+					bardoRoot,
+					consumer: "world_sync",
+				});
+				const state = JSON.parse(
+					JSON.stringify(preferredState.chosen.state),
+				) as typeof preferredState.chosen.state;
 				let preferredLocationSlug = state.currentLocation;
 				if (currentLocationHint?.trim()) {
 					preferredLocationSlug = slugify(currentLocationHint);
@@ -126,13 +193,30 @@ export function registerWorldSyncTool(
 				}
 				state.lastAction = "world_sync";
 
-				await persistCampaignState(paths.statePath, state);
-				const historyEntry = buildWorldSyncHistoryEntry({
-					nowIso: new Date().toISOString(),
-					createdLocationCount: createdLocationIds.length,
-					createdNpcCount: createdNpcIds.length,
+				const nowIso = new Date().toISOString();
+				await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-world-sync-${crypto.randomUUID()}`,
+						type: "world_sync_applied",
+						atISO: nowIso,
+						source: "world_sync",
+						data: {
+							extractedLocationNames,
+							extractedNpcNames,
+							createdLocationIds,
+							createdNpcIds,
+							existingLocationIds,
+							existingNpcIds,
+							currentLocationAfter: state.currentLocation,
+							stateAfter: state,
+						},
+					},
 				});
-				await appendHistoryEntry(paths.historyPath, historyEntry);
+				await regenerateProjectionsForEventTypes({
+					bardoRoot,
+					eventTypes: ["world_sync_applied"],
+				});
 
 				const output: WorldSyncOutput = {
 					success: true,

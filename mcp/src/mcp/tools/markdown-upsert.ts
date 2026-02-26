@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
+import { getCanonicalProtectionReason } from "../../domain/canon/path-policy";
 import { parseMarkdown, renderMarkdown } from "../../domain/markdown/markdown";
 import {
 	ensureMarkdownPath,
@@ -70,7 +71,7 @@ export function registerMarkdownUpsertTool(
 		{
 			title: "Create Or Update Markdown",
 			description:
-				"Create or update a markdown file while preserving the frontmatter pattern (`description`, `title`) and safely merging content.",
+				"Create or update non-canonical markdown while preserving frontmatter (`description`, `title`) and safely merging content. Protected canonical paths are blocked.",
 			inputSchema: markdownUpsertInputSchema,
 			outputSchema: markdownUpsertOutputSchema,
 			annotations: {
@@ -90,6 +91,26 @@ export function registerMarkdownUpsertTool(
 		}) => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
 			try {
+				const protectionReason = getCanonicalProtectionReason(relativePath);
+				if (protectionReason) {
+					const output: MarkdownUpsertOutput = {
+						success: false,
+						message:
+							`${protectionReason} Use append_event, regenerate_projection, ` +
+							"or domain-specific canonical tools instead of markdown_upsert.",
+						rootPath: bardoRoot,
+						filePath: "",
+						fileExistedBefore: false,
+						createdNow: false,
+						frontmatter: {
+							description: description ?? "What this file is for",
+							title: title ?? "Untitled",
+						},
+						content: "",
+					};
+					return makeToolResult(output, true);
+				}
+
 				const filePath = resolvePathInsideRoot(bardoRoot, relativePath);
 				ensureMarkdownPath(filePath);
 				const raw = await readTextIfExists(filePath);

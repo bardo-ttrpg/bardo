@@ -17,6 +17,8 @@ export const BARDO_SUBDIRECTORIES = [
 	"items",
 	"world",
 	"quests",
+	"events",
+	"projections",
 	"simulation",
 	"state",
 ] as const;

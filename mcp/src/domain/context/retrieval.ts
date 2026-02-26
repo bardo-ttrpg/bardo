@@ -1,4 +1,4 @@
-import { queryContextDocs, rebuildContextIndex } from "./indexer";
+import { queryContextDocs, refreshContextIndex } from "./indexer";
 
 export type ContextQueryMode = "fast" | "deep";
 export type ContextQueryFocus =
@@ -17,6 +17,7 @@ export async function retrieveContext(args: {
 }): Promise<{
 	indexPath: string;
 	docsIndexed: number;
+	indexRebuilt: boolean;
 	results: Array<{
 		relativePath: string;
 		title: string;
@@ -26,7 +27,7 @@ export async function retrieveContext(args: {
 		matchScore: number;
 	}>;
 }> {
-	const rebuilt = await rebuildContextIndex(args.bardoRoot);
+	const refreshed = await refreshContextIndex(args.bardoRoot);
 	const results = queryContextDocs({
 		bardoRoot: args.bardoRoot,
 		query: args.query.trim(),
@@ -36,8 +37,9 @@ export async function retrieveContext(args: {
 	});
 
 	return {
-		indexPath: rebuilt.indexPath,
-		docsIndexed: rebuilt.docsIndexed,
+		indexPath: refreshed.indexPath,
+		docsIndexed: refreshed.docsIndexed,
+		indexRebuilt: refreshed.indexRebuilt,
 		results,
 	};
 }

@@ -18,6 +18,10 @@ type JsonRpcMetadata = {
 	method: string;
 	toolName: string | null;
 	toolArgsHash: string | null;
+	toolCalls: Array<{
+		toolName: string;
+		toolArgsHash: string;
+	}>;
 };
 
 function stableSerialize(value: unknown): string {
@@ -45,12 +49,53 @@ function hashText(input: string): string {
 	return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function parseToolCallMetadata(payload: unknown): {
+	toolName: string;
+	toolArgsHash: string;
+} | null {
+	if (typeof payload !== "object" || payload === null) {
+		return null;
+	}
+	const methodValue =
+		typeof (payload as { method?: unknown }).method === "string"
+			? (payload as { method: string }).method
+			: "unknown";
+	if (methodValue !== "tools/call") {
+		return null;
+	}
+	const params = (payload as { params?: unknown }).params;
+	if (typeof params !== "object" || params === null) {
+		return null;
+	}
+	const paramsRecord = params as { name?: unknown; arguments?: unknown };
+	if (
+		typeof paramsRecord.name !== "string" ||
+		paramsRecord.name.trim().length < 1
+	) {
+		return null;
+	}
+	return {
+		toolName: paramsRecord.name.trim(),
+		toolArgsHash:
+			paramsRecord.arguments !== undefined
+				? hashText(stableSerialize(paramsRecord.arguments))
+				: hashText("{}"),
+	};
+}
+
 function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
 	if (Array.isArray(payload)) {
+		const toolCalls = payload
+			.map((item) => parseToolCallMetadata(item))
+			.filter(
+				(value): value is { toolName: string; toolArgsHash: string } =>
+					value !== null,
+			);
 		return {
 			method: "batch",
 			toolName: null,
 			toolArgsHash: null,
+			toolCalls,
 		};
 	}
 
@@ -59,6 +104,7 @@ function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
 			method: "unknown",
 			toolName: null,
 			toolArgsHash: null,
+			toolCalls: [],
 		};
 	}
 
@@ -66,31 +112,13 @@ function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
 		typeof (payload as { method?: unknown }).method === "string"
 			? (payload as { method: string }).method
 			: "unknown";
-
-	let toolName: string | null = null;
-	let toolArgsHash: string | null = null;
-	if (methodValue === "tools/call") {
-		const params = (payload as { params?: unknown }).params;
-		if (typeof params === "object" && params !== null) {
-			const paramsRecord = params as { name?: unknown; arguments?: unknown };
-			if (
-				typeof paramsRecord.name === "string" &&
-				paramsRecord.name.trim().length > 0
-			) {
-				toolName = paramsRecord.name.trim();
-			}
-			if (paramsRecord.arguments !== undefined) {
-				toolArgsHash = hashText(stableSerialize(paramsRecord.arguments));
-			} else {
-				toolArgsHash = hashText("{}");
-			}
-		}
-	}
+	const toolCall = parseToolCallMetadata(payload);
 
 	return {
 		method: methodValue,
-		toolName,
-		toolArgsHash,
+		toolName: toolCall?.toolName ?? null,
+		toolArgsHash: toolCall?.toolArgsHash ?? null,
+		toolCalls: toolCall ? [toolCall] : [],
 	};
 }
 
@@ -103,6 +131,7 @@ async function readJsonRpcMetadata(request: Request): Promise<JsonRpcMetadata> {
 			method: "unknown",
 			toolName: null,
 			toolArgsHash: null,
+			toolCalls: [],
 		};
 	}
 }
@@ -133,7 +162,15 @@ async function handleMcpPost(
 			status,
 			durationMs,
 		});
-		if (metadata.toolName) {
+		if (metadata.toolCalls.length > 0) {
+			for (const toolCall of metadata.toolCalls) {
+				recordToolCallMetric({
+					tool: toolCall.toolName,
+					status,
+					durationMs,
+				});
+			}
+		} else if (metadata.toolName) {
 			recordToolCallMetric({
 				tool: metadata.toolName,
 				status,
@@ -158,45 +195,48 @@ async function handleMcpPost(
 				toolName: metadata.toolName,
 			});
 
-			if (metadata.toolName) {
+			if (metadata.toolCalls.length > 0) {
 				const providerId = readHeaderValue(request, "x-provider-id");
 				const modelId = readHeaderValue(request, "x-model-id");
 				const resolvedPolicy = resolveEffectiveToolPolicy(toolPolicy, {
 					providerId,
 					modelId,
 				});
-				if (!isToolAllowed(resolvedPolicy, metadata.toolName)) {
-					recordMetrics("error");
-					sessionRegistry.recordToolOutcome({
-						sessionId: existingSessionId,
-						toolName: metadata.toolName,
-						status: "error",
-					});
-					return jsonRpcError(
-						403,
-						-32020,
-						`Tool '${metadata.toolName}' is not allowed for the active tool policy (profile: ${resolvedPolicy.profile}${resolvedPolicy.providerRuleKey ? `, rule: ${resolvedPolicy.providerRuleKey}` : ""}).`,
-					);
-				}
-
-				if (loopPolicy.enabled) {
-					const loopResult = sessionRegistry.recordToolCallAndCheckLoop({
-						sessionId: existingSessionId,
-						toolName: metadata.toolName,
-						argsHash: metadata.toolArgsHash ?? hashText("{}"),
-					});
-					if (loopResult.blocked) {
+				for (const toolCall of metadata.toolCalls) {
+					if (!isToolAllowed(resolvedPolicy, toolCall.toolName)) {
 						recordMetrics("error");
 						sessionRegistry.recordToolOutcome({
 							sessionId: existingSessionId,
-							toolName: metadata.toolName,
+							toolName: toolCall.toolName,
 							status: "error",
 						});
 						return jsonRpcError(
-							429,
-							-32030,
-							loopResult.reason ?? "Tool loop protection blocked this request.",
+							403,
+							-32020,
+							`Tool '${toolCall.toolName}' is not allowed for the active tool policy (profile: ${resolvedPolicy.profile}${resolvedPolicy.providerRuleKey ? `, rule: ${resolvedPolicy.providerRuleKey}` : ""}).`,
 						);
+					}
+
+					if (loopPolicy.enabled) {
+						const loopResult = sessionRegistry.recordToolCallAndCheckLoop({
+							sessionId: existingSessionId,
+							toolName: toolCall.toolName,
+							argsHash: toolCall.toolArgsHash,
+						});
+						if (loopResult.blocked) {
+							recordMetrics("error");
+							sessionRegistry.recordToolOutcome({
+								sessionId: existingSessionId,
+								toolName: toolCall.toolName,
+								status: "error",
+							});
+							return jsonRpcError(
+								429,
+								-32030,
+								loopResult.reason ??
+									"Tool loop protection blocked this request.",
+							);
+						}
 					}
 				}
 			}
@@ -205,12 +245,14 @@ async function handleMcpPost(
 				await existing.transport.handleRequest(request),
 			);
 			recordMetrics(response.ok ? "success" : "error");
-			if (metadata.toolName) {
-				sessionRegistry.recordToolOutcome({
-					sessionId: existingSessionId,
-					toolName: metadata.toolName,
-					status: response.ok ? "success" : "error",
-				});
+			if (metadata.toolCalls.length > 0) {
+				for (const toolCall of metadata.toolCalls) {
+					sessionRegistry.recordToolOutcome({
+						sessionId: existingSessionId,
+						toolName: toolCall.toolName,
+						status: response.ok ? "success" : "error",
+					});
+				}
 			}
 			return response;
 		}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { SecurityPolicy } from "../domain/config/security";
 import { resetTelemetryForTests } from "../telemetry";
-import { createHttpServer } from "./server";
+import { createHttpRequestHandler } from "./server";
 
 function makePolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 	return {
@@ -19,36 +19,29 @@ function makePolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 	};
 }
 
-const servers: ReturnType<typeof createHttpServer>[] = [];
-
 afterEach(() => {
-	for (const server of servers.splice(0, servers.length)) {
-		server.stop(true);
-	}
 	resetTelemetryForTests();
 });
 
 describe("createHttpServer telemetry route", () => {
 	test("returns 404 when metrics route is disabled", async () => {
-		const server = createHttpServer({
-			port: 0,
+		const handler = createHttpRequestHandler({
 			securityPolicy: makePolicy({ metricsRouteEnabled: false }),
 		});
-		servers.push(server);
 
-		const response = await fetch(new URL("/metrics", server.url));
+		const response = await handler(new Request("http://localhost/metrics"));
 		expect(response.status).toBe(404);
 	});
 
 	test("returns prometheus metrics text when enabled", async () => {
-		const server = createHttpServer({
-			port: 0,
+		const handler = createHttpRequestHandler({
 			securityPolicy: makePolicy(),
 		});
-		servers.push(server);
 
-		await fetch(new URL("/health", server.url));
-		const metricsResponse = await fetch(new URL("/metrics", server.url));
+		await handler(new Request("http://localhost/health"));
+		const metricsResponse = await handler(
+			new Request("http://localhost/metrics"),
+		);
 		const body = await metricsResponse.text();
 
 		expect(metricsResponse.status).toBe(200);
@@ -58,13 +51,11 @@ describe("createHttpServer telemetry route", () => {
 	});
 
 	test("requires auth when metricsRequireAuth is enabled", async () => {
-		const server = createHttpServer({
-			port: 0,
+		const handler = createHttpRequestHandler({
 			securityPolicy: makePolicy({ metricsRequireAuth: true }),
 		});
-		servers.push(server);
 
-		const response = await fetch(new URL("/metrics", server.url));
+		const response = await handler(new Request("http://localhost/metrics"));
 		expect(response.status).toBe(401);
 	});
 });

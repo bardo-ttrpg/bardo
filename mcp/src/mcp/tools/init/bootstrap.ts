@@ -23,7 +23,7 @@ export const bootstrapQuestionOrder = [
 ] as const;
 
 export type BootstrapAnswerKey = (typeof bootstrapQuestionOrder)[number];
-export type BootstrapAnswers = Partial<Record<BootstrapAnswerKey, string>>;
+type BootstrapAnswers = Partial<Record<BootstrapAnswerKey, string>>;
 
 type BootstrapState = {
 	version: number;
@@ -55,13 +55,13 @@ type BootstrapFileWriteInput = {
 	complete: boolean;
 };
 
-export type RunBootstrapStepInput = {
+type RunBootstrapStepInput = {
 	paths: InitPaths;
 	nowIso: string;
 	bootstrapAnswers?: BootstrapAnswers;
 };
 
-export type BootstrapStepResult = {
+type BootstrapStepResult = {
 	complete: boolean;
 	alreadyInitialized: boolean;
 	requiresUserInput: boolean;

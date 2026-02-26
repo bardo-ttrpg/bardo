@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import {
-	buildBillingBackfillPatch,
 	migrateLegacyPlanTier,
 	normalizePartySeats,
 	planCreditsFor,
@@ -42,6 +41,8 @@ test("resolveBillingState falls back to free-tier defaults for legacy users", ()
 			periodStart: undefined,
 			mcpCallsTotal: undefined,
 			mcpCallsThisPeriod: undefined,
+			apiKeyCallsTotal: undefined,
+			apiKeyCallsThisPeriod: undefined,
 			partySeats: undefined,
 		},
 		now,
@@ -54,30 +55,8 @@ test("resolveBillingState falls back to free-tier defaults for legacy users", ()
 		periodStart: now,
 		mcpCallsTotal: 0,
 		mcpCallsThisPeriod: 0,
-		partySeats: 2,
-	});
-});
-
-test("buildBillingBackfillPatch only includes missing fields", () => {
-	const now = 1_700_000_000_000;
-	const patch = buildBillingBackfillPatch(
-		{
-			plan: "pro",
-			creditsTotal: undefined,
-			creditsUsed: 3,
-			periodStart: undefined,
-			mcpCallsTotal: 7,
-			mcpCallsThisPeriod: undefined,
-			partySeats: undefined,
-		},
-		now,
-	);
-
-	expect(patch).toEqual({
-		plan: "solo",
-		creditsTotal: 25_000,
-		periodStart: now,
-		mcpCallsThisPeriod: 0,
+		apiKeyCallsTotal: 0,
+		apiKeyCallsThisPeriod: 0,
 		partySeats: 2,
 	});
 });
@@ -92,6 +71,8 @@ test("resolveBillingState computes party credits using seats", () => {
 			periodStart: undefined,
 			mcpCallsTotal: undefined,
 			mcpCallsThisPeriod: undefined,
+			apiKeyCallsTotal: undefined,
+			apiKeyCallsThisPeriod: undefined,
 			partySeats: 7,
 		},
 		now,
@@ -99,4 +80,5 @@ test("resolveBillingState computes party credits using seats", () => {
 
 	expect(state.creditsTotal).toBe(140_000);
 	expect(state.partySeats).toBe(7);
+	expect(state.apiKeyCallsTotal).toBe(0);
 });

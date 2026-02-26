@@ -1,3 +1,7 @@
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 http_headers = { "CONTEXT7_API_KEY" = "ctx7sk-a7843aa5-84b2-4030-8e51-55a8f7629261" }
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
