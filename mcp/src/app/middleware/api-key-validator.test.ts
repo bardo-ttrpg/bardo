@@ -5,6 +5,47 @@ import {
 } from "./api-key-validator";
 
 describe("createHostedIntrospectionApiKeyValidator", () => {
+	test("sends introspection token in x-bardo-introspection-token header", async () => {
+		const seenHeaders: string[] = [];
+		let seenAuthorization: string | null = null;
+		let seenWorkspaceRoot: string | null = null;
+		const fetchMock = async (_input: unknown, init?: RequestInit) => {
+			const headers = new Headers(init?.headers);
+			const header = headers.get("x-bardo-introspection-token");
+			if (header) {
+				seenHeaders.push(header);
+			}
+			seenAuthorization = headers.get("authorization");
+			if (typeof init?.body === "string") {
+				const parsed = JSON.parse(init.body) as { workspaceRoot?: string };
+				seenWorkspaceRoot = parsed.workspaceRoot ?? null;
+			}
+			return new Response(
+				JSON.stringify({
+					valid: true,
+					campaignBasePath: "./customers/alice",
+				}),
+				{ status: 200 },
+			);
+		};
+		const fetchImpl = fetchMock as unknown as typeof fetch;
+
+		const validator = createHostedIntrospectionApiKeyValidator(
+			{
+				introspectionUrl: "https://example.com/introspect",
+				introspectionToken: "secret",
+				cacheTtlMs: 30_000,
+				fetchImpl,
+			},
+			"/repo",
+		);
+
+		await validator("key", { workspaceRoot: "/tmp/workspace" });
+		expect(seenHeaders).toContain("secret");
+		expect(seenAuthorization).toBeNull();
+		expect(seenWorkspaceRoot === "/tmp/workspace").toBe(true);
+	});
+
 	test("returns campaign path when introspection marks key as valid", async () => {
 		const fetchMock = async () =>
 			new Response(

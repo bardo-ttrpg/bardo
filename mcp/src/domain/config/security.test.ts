@@ -15,6 +15,8 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.telemetryEnabled).toBe(true);
 		expect(policy.metricsRouteEnabled).toBe(true);
 		expect(policy.metricsRequireAuth).toBe(false);
+		expect(policy.transportMode).toBe("stateful");
+		expect(policy.mcpEnableJsonResponse).toBe(false);
 	});
 
 	test("defaults to required auth and disables query API keys in production", () => {
@@ -23,6 +25,7 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.authMode).toBe("required");
 		expect(policy.allowQueryApiKey).toBe(false);
 		expect(policy.rateLimitFailClosed).toBe(true);
+		expect(policy.transportMode).toBe("stateful");
 	});
 
 	test("supports explicit environment overrides", () => {
@@ -38,6 +41,8 @@ describe("resolveSecurityPolicy", () => {
 			BARDO_TELEMETRY_ENABLED: "false",
 			BARDO_METRICS_ROUTE_ENABLED: "false",
 			BARDO_METRICS_REQUIRE_AUTH: "false",
+			BARDO_MCP_TRANSPORT_MODE: "stateless",
+			BARDO_MCP_ENABLE_JSON_RESPONSE: "true",
 		});
 
 		expect(policy.authMode).toBe("optional");
@@ -50,5 +55,16 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.telemetryEnabled).toBe(false);
 		expect(policy.metricsRouteEnabled).toBe(false);
 		expect(policy.metricsRequireAuth).toBe(false);
+		expect(policy.transportMode).toBe("stateless");
+		expect(policy.mcpEnableJsonResponse).toBe(true);
+	});
+
+	test("defaults to stateful transport when mode is not set", () => {
+		const policy = resolveSecurityPolicy({
+			RAILWAY_ENVIRONMENT_NAME: "production",
+		});
+
+		expect(policy.transportMode).toBe("stateful");
+		expect(policy.mcpEnableJsonResponse).toBe(false);
 	});
 });

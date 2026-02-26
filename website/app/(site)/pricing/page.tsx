@@ -48,8 +48,8 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 					Simple pricing with Clerk Billing.
 				</h1>
 				<p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
-					Start free, then scale with Solo, Solo Plus, or Party. Yearly plans
-					offer up to 27% savings versus monthly billing.
+					Start free, then scale with Solo or Solo Plus. Yearly plans offer up
+					to 27% savings versus monthly billing.
 				</p>
 				<SubscriptionDetailsCta clerkEnabled={clerkEnabled} />
 			</section>

@@ -117,7 +117,7 @@ export function createHttpRequestHandler({
 		const method = request.method;
 		const url = new URL(request.url);
 		const route = normalizeRouteLabel(url.pathname);
-		const isMcpRoute = url.pathname === "/mcp";
+		const isMcpRoute = url.pathname === "/mcp" || url.pathname === "/api/mcp";
 		const isTurnsApiRoute = url.pathname === "/api/v1/turns/resolve";
 		const isInitBootstrapApiRoute = url.pathname === "/api/v1/init/bootstrap";
 		const isWorldTickApiRoute = url.pathname === "/api/v1/world/tick";
@@ -152,18 +152,13 @@ export function createHttpRequestHandler({
 		setRequestTimeout(request, 0);
 
 		if (request.method === "OPTIONS") {
-			return finalize(
-				new Response(null, { status: 204, headers: corsHeaders() }),
-			);
+			return finalize(new Response(null, { status: 204, headers: corsHeaders() }));
 		}
 
 		store.sweepExpired();
 
 		if (isMetricsRoute) {
-			if (
-				!securityPolicy.metricsRouteEnabled ||
-				!securityPolicy.telemetryEnabled
-			) {
+			if (!securityPolicy.metricsRouteEnabled || !securityPolicy.telemetryEnabled) {
 				return finalize(withCors(new Response("Not Found", { status: 404 })));
 			}
 
@@ -223,9 +218,7 @@ export function createHttpRequestHandler({
 								status: 429,
 								headers: {
 									"content-type": "application/json",
-									"retry-after": String(
-										Math.ceil(limitResult.retryAfterMs / 1000),
-									),
+									"retry-after": String(Math.ceil(limitResult.retryAfterMs / 1000)),
 									"x-ratelimit-limit": String(limitResult.limit),
 									"x-ratelimit-remaining": String(limitResult.remaining),
 									"x-ratelimit-reset": String(
@@ -252,6 +245,10 @@ export function createHttpRequestHandler({
 						toolPolicy,
 						loopPolicy,
 						securityPolicy.telemetryEnabled,
+						{
+							transportMode: securityPolicy.transportMode,
+							enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
+						},
 					),
 				);
 			}

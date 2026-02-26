@@ -18,6 +18,8 @@ function createSecurityPolicy(
 		telemetryEnabled: true,
 		metricsRouteEnabled: true,
 		metricsRequireAuth: false,
+		transportMode: "stateful",
+		mcpEnableJsonResponse: false,
 		...overrides,
 	};
 }
@@ -66,5 +68,18 @@ describe("validateRuntimeConfiguration", () => {
 				toolPolicy: createToolPolicy(),
 			}),
 		).toThrow("metrics route cannot be enabled");
+	});
+
+	test("fails when stateless transport disables JSON response mode", () => {
+		expect(() =>
+			validateRuntimeConfiguration({
+				securityPolicy: createSecurityPolicy({
+					transportMode: "stateless",
+					mcpEnableJsonResponse: false,
+				}),
+				loopPolicy: createLoopPolicy(),
+				toolPolicy: createToolPolicy(),
+			}),
+		).toThrow("stateless MCP transport requires");
 	});
 });

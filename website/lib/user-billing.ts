@@ -1,4 +1,4 @@
-export type PlanTier = "free" | "solo" | "solo_plus" | "party";
+export type PlanTier = "free" | "solo" | "solo_plus";
 type LegacyPlanTier = "free" | "pro" | "ultra";
 type PlanTierInput = PlanTier | LegacyPlanTier | undefined;
 export type BillingInterval = "month" | "year";
@@ -12,15 +12,11 @@ export type SubscriptionStatus =
 	| "unpaid"
 	| "paused";
 
-const PLAN_CREDITS: Record<Exclude<PlanTier, "party">, number> = {
+const PLAN_CREDITS: Record<PlanTier, number> = {
 	free: 100,
 	solo: 25_000,
 	solo_plus: 50_000,
 };
-
-const PARTY_CREDITS_PER_SEAT = 20_000;
-export const PARTY_MIN_SEATS = 2;
-export const PARTY_MAX_SEATS = 100;
 
 export function migrateLegacyPlanTier(plan: PlanTierInput): PlanTier {
 	switch (plan) {
@@ -31,31 +27,14 @@ export function migrateLegacyPlanTier(plan: PlanTierInput): PlanTier {
 		case "free":
 		case "solo":
 		case "solo_plus":
-		case "party":
 			return plan;
 		default:
 			return "free";
 	}
 }
 
-export function normalizePartySeats(rawSeats: number | undefined): number {
-	if (!Number.isFinite(rawSeats)) {
-		return PARTY_MIN_SEATS;
-	}
-
-	const rounded = Math.floor(rawSeats ?? PARTY_MIN_SEATS);
-	return Math.max(PARTY_MIN_SEATS, Math.min(PARTY_MAX_SEATS, rounded));
-}
-
-export function planCreditsFor(
-	planInput: PlanTierInput,
-	partySeats?: number,
-): number {
+export function planCreditsFor(planInput: PlanTierInput): number {
 	const plan = migrateLegacyPlanTier(planInput);
-	if (plan === "party") {
-		return PARTY_CREDITS_PER_SEAT * normalizePartySeats(partySeats);
-	}
-
 	return PLAN_CREDITS[plan];
 }
 
@@ -68,7 +47,6 @@ type BillingFields = {
 	mcpCallsThisPeriod: number | undefined;
 	apiKeyCallsTotal: number | undefined;
 	apiKeyCallsThisPeriod: number | undefined;
-	partySeats: number | undefined;
 };
 
 type ResolvedBillingFields = {
@@ -80,7 +58,6 @@ type ResolvedBillingFields = {
 	mcpCallsThisPeriod: number;
 	apiKeyCallsTotal: number;
 	apiKeyCallsThisPeriod: number;
-	partySeats: number;
 };
 
 export function resolveBillingState(
@@ -88,17 +65,15 @@ export function resolveBillingState(
 	now = Date.now(),
 ): ResolvedBillingFields {
 	const plan = migrateLegacyPlanTier(fields.plan);
-	const partySeats = normalizePartySeats(fields.partySeats);
 
 	return {
 		plan,
-		creditsTotal: fields.creditsTotal ?? planCreditsFor(plan, partySeats),
+		creditsTotal: fields.creditsTotal ?? planCreditsFor(plan),
 		creditsUsed: fields.creditsUsed ?? 0,
 		periodStart: fields.periodStart ?? now,
 		mcpCallsTotal: fields.mcpCallsTotal ?? 0,
 		mcpCallsThisPeriod: fields.mcpCallsThisPeriod ?? 0,
 		apiKeyCallsTotal: fields.apiKeyCallsTotal ?? 0,
 		apiKeyCallsThisPeriod: fields.apiKeyCallsThisPeriod ?? 0,
-		partySeats,
 	};
 }

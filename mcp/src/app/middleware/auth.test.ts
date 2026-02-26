@@ -15,6 +15,8 @@ function createPolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 		telemetryEnabled: true,
 		metricsRouteEnabled: true,
 		metricsRequireAuth: false,
+		transportMode: "stateful",
+		mcpEnableJsonResponse: false,
 		...overrides,
 	};
 }
@@ -149,6 +151,38 @@ describe("createAuthenticator", () => {
 		});
 	});
 
+	test("reuses existing authenticated session when request API key matches", async () => {
+		let validateCalls = 0;
+		const authenticate = createAuthenticator({
+			apiKeyMap: new Map(),
+			policy: createPolicy({ authMode: "required" }),
+			projectRoot: "/repo",
+			validateApiKey: async (apiKey) => {
+				validateCalls += 1;
+				if (apiKey !== "key-1") return null;
+				return { apiKey, campaignBasePath: "/repo/customers/a" };
+			},
+		});
+
+		const sessions = new Map<string, Session>([
+			["session-1", createSession("key-1", "/repo/customers/a")],
+		]);
+		const request = new Request("http://localhost:3000/mcp", {
+			headers: {
+				"mcp-session-id": "session-1",
+				"x-api-key": "key-1",
+			},
+		});
+
+		const result = await authenticate(request, sessions);
+		expect(result instanceof Response).toBe(false);
+		expect(result).toEqual({
+			apiKey: "key-1",
+			campaignBasePath: "/repo/customers/a",
+		});
+		expect(validateCalls).toBe(0);
+	});
+
 	test("rejects session when API key does not match bound session", async () => {
 		const authenticate = createAuthenticator({
 			apiKeyMap: new Map([
@@ -176,5 +210,35 @@ describe("createAuthenticator", () => {
 		expect(await responseBody(result)).toEqual({
 			error: "Session does not belong to this API key.",
 		});
+	});
+
+	test("enforces workspace root header when BARDO_REQUIRE_WORKSPACE_ROOT is enabled", async () => {
+		const previous = Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT;
+		Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT = "true";
+		try {
+			const authenticate = createAuthenticator({
+				apiKeyMap: new Map([["key-1", "/repo/customers/a"]]),
+				policy: createPolicy(),
+				projectRoot: "/repo",
+			});
+
+			const request = new Request("http://localhost:3000/mcp", {
+				headers: { "x-api-key": "key-1" },
+			});
+			const result = await authenticate(request, new Map());
+
+			expect(result instanceof Response).toBe(true);
+			if (!(result instanceof Response)) return;
+			expect(result.status).toBe(400);
+			expect(await responseBody(result)).toEqual({
+				error: "Missing required x-bardo-workspace-root header.",
+			});
+		} finally {
+			if (previous === undefined) {
+				delete Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT;
+			} else {
+				Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT = previous;
+			}
+		}
 	});
 });

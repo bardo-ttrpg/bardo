@@ -32,15 +32,16 @@ export function buildConnectionSnippet(
 		switch (args.client) {
 			case "claude":
 				return `claude mcp add --scope user --transport http ${serverName} ${baseUrl} \\
---header "BARDO_API_KEY: ${apiKey}"`;
+--header "Authorization: Bearer ${apiKey}"`;
 			case "opencode":
 				return `{
   "mcp": {
     "${serverName}": {
       "type": "remote",
       "url": "${baseUrl}",
+      "oauth": false,
       "headers": {
-        "BARDO_API_KEY": "${apiKey}"
+        "Authorization": "Bearer ${apiKey}"
       },
       "enabled": true
     }
@@ -53,7 +54,7 @@ export function buildConnectionSnippet(
     "${serverName}": {
       "url": "${baseUrl}",
       "headers": {
-        "BARDO_API_KEY": "${apiKey}"
+        "Authorization": "Bearer ${apiKey}"
       }
     }
   }
@@ -61,7 +62,7 @@ export function buildConnectionSnippet(
 			case "codex":
 				return `[mcp_servers.${serverName}]
 url = "${baseUrl}"
-http_headers = { "BARDO_API_KEY" = "${quote(apiKey)}" }`;
+http_headers = { "Authorization" = "Bearer ${quote(apiKey)}" }`;
 			case "vscode":
 				return `{
   "mcp": {
@@ -70,7 +71,7 @@ http_headers = { "BARDO_API_KEY" = "${quote(apiKey)}" }`;
         "type": "http",
         "url": "${baseUrl}",
         "headers": {
-          "BARDO_API_KEY": "${apiKey}"
+          "Authorization": "Bearer ${apiKey}"
         }
       }
     }
@@ -78,7 +79,7 @@ http_headers = { "BARDO_API_KEY" = "${quote(apiKey)}" }`;
 }`;
 			case "generic":
 				return `MCP URL: ${baseUrl}
-Header: BARDO_API_KEY: ${apiKey}`;
+Header: Authorization: Bearer ${apiKey}`;
 		}
 	}
 

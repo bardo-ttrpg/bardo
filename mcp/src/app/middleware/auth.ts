@@ -141,6 +141,16 @@ function readApiKey(
 	return null;
 }
 
+function readHeaderValue(request: Request, name: string): string | null {
+	const value = request.headers.get(name)?.trim();
+	return value && value.length > 0 ? value : null;
+}
+
+function isWorkspaceRootRequired(): boolean {
+	const raw = Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT?.trim().toLowerCase();
+	return raw === "true";
+}
+
 function authError(status: number, message: string): Response {
 	return new Response(JSON.stringify({ error: message }), {
 		status,
@@ -176,6 +186,7 @@ export function createAuthenticator({
 			requiredScope?: "mcp" | "api";
 			providerId?: string | null;
 			modelId?: string | null;
+			workspaceRoot?: string | null;
 		},
 	): Promise<AuthContext | null> {
 		if (validateApiKey) {
@@ -209,6 +220,11 @@ export function createAuthenticator({
 		const sessionId = request.headers.get("mcp-session-id");
 		const existingSession = sessionId ? sessions.get(sessionId) : undefined;
 		const apiKey = readApiKey(request, policy.allowQueryApiKey);
+		const workspaceRoot = readHeaderValue(request, "x-bardo-workspace-root");
+
+		if (isWorkspaceRootRequired() && !workspaceRoot) {
+			return authError(400, "Missing required x-bardo-workspace-root header.");
+		}
 
 		if (sessionId && !existingSession && !apiKey) {
 			return authError(404, "Session not found.");
@@ -229,10 +245,20 @@ export function createAuthenticator({
 				};
 			}
 
+			// Fast-path: if the request key matches the authenticated session key,
+			// reuse the bound session context and avoid repeated revalidation calls.
+			if (existingSession.apiKey === apiKey) {
+				return {
+					apiKey: existingSession.apiKey,
+					campaignBasePath: existingSession.campaignBasePath,
+				};
+			}
+
 			const context = await resolveKeyContext(apiKey, {
 				requiredScope: "mcp",
-				providerId: request.headers.get("x-provider-id"),
-				modelId: request.headers.get("x-model-id"),
+				providerId: readHeaderValue(request, "x-provider-id"),
+				modelId: readHeaderValue(request, "x-model-id"),
+				workspaceRoot,
 			});
 			if (!context) {
 				return authError(403, "Invalid API key.");
@@ -259,8 +285,9 @@ export function createAuthenticator({
 
 		const context = await resolveKeyContext(apiKey, {
 			requiredScope: "mcp",
-			providerId: request.headers.get("x-provider-id"),
-			modelId: request.headers.get("x-model-id"),
+			providerId: readHeaderValue(request, "x-provider-id"),
+			modelId: readHeaderValue(request, "x-model-id"),
+			workspaceRoot,
 		});
 		if (!context) {
 			return authError(403, "Invalid API key.");

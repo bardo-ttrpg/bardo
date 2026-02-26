@@ -5,6 +5,7 @@ export type ApiKeyValidatorMetadata = {
 	requiredScope?: "mcp" | "api";
 	providerId?: string | null;
 	modelId?: string | null;
+	workspaceRoot?: string | null;
 };
 
 export type ApiKeyValidator = (
@@ -103,7 +104,7 @@ export function createHostedIntrospectionApiKeyValidator(
 			"content-type": "application/json",
 		});
 		if (config.introspectionToken) {
-			headers.set("authorization", `Bearer ${config.introspectionToken}`);
+			headers.set("x-bardo-introspection-token", config.introspectionToken);
 		}
 
 		let payload: unknown = null;
@@ -116,6 +117,7 @@ export function createHostedIntrospectionApiKeyValidator(
 					requiredScope: metadata?.requiredScope ?? "mcp",
 					providerId: metadata?.providerId ?? undefined,
 					modelId: metadata?.modelId ?? undefined,
+					workspaceRoot: metadata?.workspaceRoot ?? undefined,
 				}),
 			});
 			if (!response.ok) {
@@ -185,7 +187,7 @@ export function resolveRuntimeApiKeyValidator(args: {
 		{
 			introspectionUrl,
 			introspectionToken: env.BARDO_AUTH_INTROSPECTION_TOKEN?.trim() ?? null,
-			cacheTtlMs: parsePositiveInteger(env.BARDO_AUTH_CACHE_TTL_MS, 30_000),
+			cacheTtlMs: parsePositiveInteger(env.BARDO_AUTH_CACHE_TTL_MS, 120_000),
 		},
 		args.projectRoot,
 	);

@@ -60,7 +60,7 @@ export default function PricingToggle({
 				</div>
 			</div>
 
-			<div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
 				{pricingTiers.map((tier, i) => {
 					const priceCents = tier.checkoutPlan
 						? displayPriceCents(tier.checkoutPlan, interval)

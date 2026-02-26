@@ -46,12 +46,15 @@ type BillingState = {
 	mcpCallsThisPeriod: number;
 	apiKeyCallsTotal: number;
 	apiKeyCallsThisPeriod: number;
-	partySeats: number;
 };
 
 type DashboardData = {
 	billing: BillingState | null;
-	keyPolicy: { maxAllowed: number };
+	keyPolicy: {
+		maxAllowed: number;
+		dailyUserVerificationLimit: number;
+		dailyKeyVerificationLimit: number;
+	};
 };
 
 function formatDate(value: number | null | undefined): string {
@@ -78,13 +81,16 @@ export function DashboardClient() {
 	const [copied, setCopied] = useState(false);
 	const [connectionClient, setConnectionClient] =
 		useState<ConnectionClient>("codex");
-	const [connectionMode, setConnectionMode] =
-		useState<ConnectionMode>("remote");
+	const [connectionMode, setConnectionMode] = useState<ConnectionMode>("local");
 	const [snippet, setSnippet] = useState<string>("");
 	const [snippetLoading, setSnippetLoading] = useState(false);
 
 	const billing = dashboardData?.billing ?? null;
-	const keyPolicy = dashboardData?.keyPolicy ?? { maxAllowed: 0 };
+	const keyPolicy = dashboardData?.keyPolicy ?? {
+		maxAllowed: 0,
+		dailyUserVerificationLimit: 0,
+		dailyKeyVerificationLimit: 0,
+	};
 
 	const activeCount = keys.filter((k) => k.status === "active").length;
 
@@ -313,6 +319,14 @@ export function DashboardClient() {
 					<p className="mt-1 text-xs text-muted-foreground">
 						Active keys: {activeCount} / {keyPolicy.maxAllowed}
 					</p>
+					<p className="mt-1 text-xs text-muted-foreground">
+						Daily verifications (account): up to{" "}
+						{keyPolicy.dailyUserVerificationLimit.toLocaleString()} / day
+					</p>
+					<p className="mt-1 text-xs text-muted-foreground">
+						Daily verifications (per key): up to{" "}
+						{keyPolicy.dailyKeyVerificationLimit.toLocaleString()} / day
+					</p>
 					{mutationError ? (
 						<p className="mt-2 text-xs text-destructive">{mutationError}</p>
 					) : null}
@@ -403,6 +417,10 @@ export function DashboardClient() {
 			<div className="mt-6 border border-border p-6">
 				<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 					Connection Snippet Generator
+				</p>
+				<p className="mb-3 text-xs text-muted-foreground">
+					Recommended: local mode via the @bardo/mcp adapter for maximum
+					compatibility across MCP clients.
 				</p>
 				<div className="flex flex-wrap gap-3">
 					<select

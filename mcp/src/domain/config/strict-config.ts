@@ -24,6 +24,15 @@ export function validateRuntimeConfiguration(args: {
 		);
 	}
 
+	if (
+		args.securityPolicy.transportMode === "stateless" &&
+		!args.securityPolicy.mcpEnableJsonResponse
+	) {
+		issues.push(
+			"Invalid configuration: stateless MCP transport requires BARDO_MCP_ENABLE_JSON_RESPONSE=true.",
+		);
+	}
+
 	try {
 		validateLoopDetectionPolicy(args.loopPolicy);
 	} catch (error) {

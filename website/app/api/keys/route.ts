@@ -19,10 +19,12 @@ function clerkErrorMessage(err: unknown): string {
 		err &&
 		typeof err === "object" &&
 		"errors" in err &&
-		Array.isArray((err as { errors: unknown[] }).errors) &&
-		(err as { errors: { message?: string }[] }).errors[0]?.message
+		Array.isArray((err as { errors: unknown[] }).errors)
 	) {
-		return (err as { errors: { message: string }[] }).errors[0].message;
+		const first = (err as { errors: { message?: string }[] }).errors[0];
+		if (first?.message) {
+			return first.message;
+		}
 	}
 	return String(err);
 }
@@ -42,11 +44,18 @@ function clerkErrorStatus(err: unknown): number {
 
 // Rejects absolute paths and path-traversal segments so user-supplied
 // workspacePath cannot escape the intended tenant directory on the MCP host.
-function sanitizeWorkspacePath(raw: string | undefined, fallback: string): string {
+function sanitizeWorkspacePath(
+	raw: string | undefined,
+	fallback: string,
+): string {
 	const trimmed = raw?.trim();
 	if (!trimmed) return fallback;
 	// Reject absolute paths (Unix and Windows) and null bytes.
-	if (trimmed.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.includes("\0")) {
+	if (
+		trimmed.startsWith("/") ||
+		/^[a-zA-Z]:[\\/]/.test(trimmed) ||
+		trimmed.includes("\0")
+	) {
 		return fallback;
 	}
 	// Walk each path segment; reject if any is "..".
@@ -71,9 +80,7 @@ export async function GET() {
 
 	const clerk = await clerkClient();
 
-	let clerkKeys: Awaited<
-		ReturnType<(typeof clerk)["apiKeys"]["list"]>
-	>;
+	let clerkKeys: Awaited<ReturnType<(typeof clerk)["apiKeys"]["list"]>>;
 	try {
 		clerkKeys = await clerk.apiKeys.list({ subject: userId, limit: 100 });
 	} catch (err) {
@@ -138,14 +145,17 @@ export async function POST(request: Request) {
 	const maxAllowed = maxApiKeysForPlan(liveBilling.plan);
 
 	// Use totalCount from a minimal query — avoids undercounting when a user
-	// has more active keys than a single page can return (plans allow up to 250).
+	// has more active keys than a single page can return.
 	// includeInvalid defaults to false so totalCount reflects active keys only.
 	let activeCount: number;
 	try {
 		const probe = await clerk.apiKeys.list({ subject: userId, limit: 1 });
 		activeCount = probe.totalCount;
 	} catch (err) {
-		console.error("[api/keys] clerk.apiKeys.list failed:", clerkErrorMessage(err));
+		console.error(
+			"[api/keys] clerk.apiKeys.list failed:",
+			clerkErrorMessage(err),
+		);
 		return NextResponse.json(
 			{ error: clerkErrorMessage(err) },
 			{ status: 500 },
@@ -182,10 +192,7 @@ export async function POST(request: Request) {
 	} catch (err) {
 		const msg = clerkErrorMessage(err);
 		console.error("[api/keys] clerk.apiKeys.create failed:", msg);
-		return NextResponse.json(
-			{ error: msg },
-			{ status: clerkErrorStatus(err) },
-		);
+		return NextResponse.json({ error: msg }, { status: clerkErrorStatus(err) });
 	}
 
 	return NextResponse.json({

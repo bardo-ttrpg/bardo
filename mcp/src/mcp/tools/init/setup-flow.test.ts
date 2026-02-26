@@ -85,8 +85,71 @@ describe("runGuidedSetupFlow", () => {
 
 		expect(result.status).toBe("needs_input");
 		expect(result.questionKey).toBe("ttrpgSystem");
-		expect(result.question).toContain("What ttrpg system are we playing?");
+		expect(result.question).toContain("What system are we using?");
+		expect(result.question).toContain("Standard dice rolling");
+		expect(result.question).toContain("Narrative only");
+		expect(result.question).toContain("Custom system");
+		expect(result.question).toContain("Type your own answer");
 		expect(result.pendingAction).toBe("I enter the tavern");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("asks dice roller question with explicit options", async () => {
+		const root = await makeTempRoot("bardo-setup-dice-question-");
+		const campaignRoot = root;
+		const bardoRoot = resolveBardoRoot(campaignRoot);
+		await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
+		await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+		await writeFile(
+			path.join(bardoRoot, "_settings/settings.md"),
+			renderMarkdown(
+				{ title: "Settings", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{ title: "State", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/history.md"),
+			renderMarkdown({ title: "History", description: "test" }, ""),
+			"utf8",
+		);
+		await markBootstrapComplete(bardoRoot);
+
+		const first = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:00.000Z",
+			incomingAction: "I enter the tavern",
+		});
+		expect(first.status).toBe("needs_input");
+		expect(first.questionKey).toBe("ttrpgSystem");
+
+		const second = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:01.000Z",
+			expectedRevision: first.revision,
+			setupAnswers: {
+				ttrpgSystem: "Standard dice rolling",
+				sourceMaterialsStatus: "none",
+			},
+		});
+
+		expect(second.status).toBe("needs_input");
+		expect(second.questionKey).toBe("diceRoller");
+		expect(second.question).toContain("Who rolls the dice?");
+		expect(second.question).toContain(
+			"Every player rolls his own character dice (Recommended)",
+		);
+		expect(second.question).toContain("Bardo rolls all dice");
+		expect(second.question).toContain("Type your own answer");
 
 		await rm(root, { recursive: true, force: true });
 	});

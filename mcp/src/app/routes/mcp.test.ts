@@ -236,4 +236,55 @@ describe("handleMcpRequest policy and loop protection", () => {
 		const payload = (await response.json()) as { error?: { message?: string } };
 		expect(payload.error?.message).toContain("not allowed");
 	});
+
+	test("stateless mode rejects GET and DELETE session transport methods", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry({
+			loopPolicy: resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+		});
+		const toolPolicy = resolveToolPolicyConfig({
+			BARDO_TOOLS_PROFILE: "full",
+		});
+		const loopPolicy = resolveLoopDetectionPolicy({
+			BARDO_LOOP_DETECTION_ENABLED: "false",
+		});
+
+		const getResponse = await handleMcpRequest(
+			new Request("http://localhost:3000/mcp", {
+				method: "GET",
+			}),
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			toolPolicy,
+			loopPolicy,
+			true,
+			{
+				transportMode: "stateless",
+				enableJsonResponse: true,
+			},
+		);
+		expect(getResponse.status).toBe(405);
+		expect(getResponse.headers.get("allow")).toBe("POST, OPTIONS");
+
+		const deleteResponse = await handleMcpRequest(
+			new Request("http://localhost:3000/mcp", {
+				method: "DELETE",
+			}),
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			toolPolicy,
+			loopPolicy,
+			true,
+			{
+				transportMode: "stateless",
+				enableJsonResponse: true,
+			},
+		);
+		expect(deleteResponse.status).toBe(405);
+		expect(deleteResponse.headers.get("allow")).toBe("POST, OPTIONS");
+	});
 });

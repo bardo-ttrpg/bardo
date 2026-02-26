@@ -11,6 +11,7 @@ import { buildWorkspaceBasedScene, generateProceduralMap } from "./map";
 import type { InitPaths } from "./paths";
 import { resolveSceneSpawnFromState } from "./persistence";
 import type { InitOutput } from "./schemas";
+import { THEME_SETUP_QUESTION } from "./setup-prompts";
 import {
 	applySpawnToScene,
 	chooseRandomSpawn,
@@ -97,9 +98,7 @@ export async function resolveStartingScene(args: {
 		startingLocationName = derived.locationName;
 		startingLocationSlug = derived.locationSlug;
 	} else if (!args.resolvedTheme) {
-		args.nextPrompts.push(
-			"What game theme/category are you playing (for example: fantasy, sci-fi, post-apocalyptic, horror)? I need this to generate a coherent world map and starting scene.",
-		);
+		args.nextPrompts.push(THEME_SETUP_QUESTION);
 	} else {
 		const generated = generateProceduralMap(args.resolvedTheme);
 		startingSceneContent = generated.sceneText;

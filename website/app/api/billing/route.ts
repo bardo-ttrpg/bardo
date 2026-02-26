@@ -1,6 +1,10 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { maxApiKeysForPlan } from "@/lib/api-keys";
+import {
+	dailyKeyVerificationLimitForPlan,
+	dailyUserVerificationLimitForPlan,
+	maxApiKeysForPlan,
+} from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
 import { planCreditsFor } from "@/lib/user-billing";
 
@@ -23,7 +27,7 @@ export async function GET() {
 			{ status: 503 },
 		);
 	}
-	const creditsTotal = planCreditsFor(live.plan, live.partySeats);
+	const creditsTotal = planCreditsFor(live.plan);
 
 	const billing = {
 		plan: live.plan,
@@ -34,7 +38,6 @@ export async function GET() {
 		mcpCallsThisPeriod: 0,
 		apiKeyCallsTotal: 0,
 		apiKeyCallsThisPeriod: 0,
-		partySeats: live.partySeats,
 		subscriptionStatus: live.subscriptionStatus,
 		subscriptionId: live.subscriptionId,
 		billingInterval: live.billingInterval,
@@ -43,6 +46,17 @@ export async function GET() {
 	};
 
 	const maxAllowed = maxApiKeysForPlan(live.plan);
+	const dailyUserVerificationLimit = dailyUserVerificationLimitForPlan(
+		live.plan,
+	);
+	const dailyKeyVerificationLimit = dailyKeyVerificationLimitForPlan(live.plan);
 
-	return NextResponse.json({ billing, keyPolicy: { maxAllowed } });
+	return NextResponse.json({
+		billing,
+		keyPolicy: {
+			maxAllowed,
+			dailyUserVerificationLimit,
+			dailyKeyVerificationLimit,
+		},
+	});
 }

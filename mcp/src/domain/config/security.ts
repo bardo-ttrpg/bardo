@@ -1,4 +1,5 @@
 export type AuthMode = "optional" | "required";
+export type McpTransportMode = "stateful" | "stateless";
 
 export type SecurityPolicy = {
 	authMode: AuthMode;
@@ -11,6 +12,8 @@ export type SecurityPolicy = {
 	telemetryEnabled: boolean;
 	metricsRouteEnabled: boolean;
 	metricsRequireAuth: boolean;
+	transportMode: McpTransportMode;
+	mcpEnableJsonResponse: boolean;
 };
 
 const DEFAULTS = {
@@ -69,10 +72,31 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 	return fallback;
 }
 
+function resolveTransportMode(
+	env: Record<string, string | undefined>,
+): McpTransportMode {
+	const raw = env.BARDO_MCP_TRANSPORT_MODE?.trim().toLowerCase();
+	if (raw === "stateful" || raw === "stateless") {
+		return raw;
+	}
+	return "stateful";
+}
+
+function resolveMcpJsonResponse(
+	env: Record<string, string | undefined>,
+	transportMode: McpTransportMode,
+): boolean {
+	return parseBoolean(
+		env.BARDO_MCP_ENABLE_JSON_RESPONSE,
+		transportMode === "stateless",
+	);
+}
+
 export function resolveSecurityPolicy(
 	env: Record<string, string | undefined>,
 ): SecurityPolicy {
 	const isProduction = env.NODE_ENV === "production";
+	const transportMode = resolveTransportMode(env);
 	return {
 		authMode: resolveAuthMode(env, isProduction),
 		allowQueryApiKey: resolveQueryApiKeyPolicy(env, isProduction),
@@ -99,6 +123,8 @@ export function resolveSecurityPolicy(
 			env.BARDO_METRICS_REQUIRE_AUTH,
 			isProduction,
 		),
+		transportMode,
+		mcpEnableJsonResponse: resolveMcpJsonResponse(env, transportMode),
 	};
 }
 

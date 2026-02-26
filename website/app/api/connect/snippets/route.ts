@@ -18,10 +18,21 @@ function isConnectionClient(value: string | null): value is ConnectionClient {
 }
 
 function resolveBaseUrl(request: Request): string {
-	const envBase = process.env.NEXT_PUBLIC_MCP_BASE_URL?.trim();
+	const envBase =
+		process.env.BARDO_MCP_BASE_URL?.trim() ||
+		process.env.NEXT_PUBLIC_MCP_BASE_URL?.trim();
 	if (envBase) return new URL("/mcp", envBase).toString();
 
 	const requestUrl = new URL(request.url);
+	if (
+		requestUrl.protocol === "http:" &&
+		(requestUrl.hostname === "localhost" ||
+			requestUrl.hostname === "127.0.0.1") &&
+		requestUrl.port === "3001"
+	) {
+		return `${requestUrl.protocol}//${requestUrl.hostname}:3000/mcp`;
+	}
+
 	const protocol = requestUrl.protocol === "http:" ? "http:" : "https:";
 	return `${protocol}//${requestUrl.host}/mcp`;
 }

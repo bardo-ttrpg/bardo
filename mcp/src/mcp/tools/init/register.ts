@@ -3,6 +3,7 @@ import { resolveFeatureFlags } from "../../../domain/config/features";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
+import { DICE_ROLLER_SETUP_QUESTION } from "./setup-prompts";
 import {
 	analyzeWorkspace,
 	buildInitFailureOutput,
@@ -299,9 +300,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			}
 
 			if (!resolvedDiceRoller) {
-				nextPrompts.push(
-					"Who should roll party character dice for this campaign: `player` or `bardo`?",
-				);
+				nextPrompts.push(DICE_ROLLER_SETUP_QUESTION);
 			}
 
 			const scene = await resolveStartingScene({

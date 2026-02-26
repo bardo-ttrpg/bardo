@@ -15,11 +15,11 @@ describe("buildConnectionSnippet", () => {
 		});
 	}
 
-	test("renders Claude remote command with BARDO_API_KEY header", () => {
+	test("renders Claude remote command with Authorization Bearer header", () => {
 		const snippet = render("claude", "remote");
 		expect(snippet).toContain("claude mcp add");
 		expect(snippet).toContain(baseUrl);
-		expect(snippet).toContain("BARDO_API_KEY");
+		expect(snippet).toContain("Authorization: Bearer");
 		expect(snippet).toContain(apiKey);
 	});
 
@@ -35,6 +35,14 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('"mcpServers"');
 		expect(snippet).toContain('"url"');
 		expect(snippet).toContain(baseUrl);
+		expect(snippet).toContain('"Authorization": "Bearer');
+	});
+
+	test("renders OpenCode remote JSON with oauth disabled", () => {
+		const snippet = render("opencode", "remote");
+		expect(snippet).toContain('"type": "remote"');
+		expect(snippet).toContain('"oauth": false');
+		expect(snippet).toContain('"Authorization": "Bearer');
 	});
 
 	test("renders Codex local TOML", () => {

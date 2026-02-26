@@ -24,6 +24,10 @@ import {
 import { ensureInitDirectories } from "./directories";
 import { type InitPaths, resolveInitPaths } from "./paths";
 import { readJsonMarkdown } from "./settings";
+import {
+	DICE_ROLLER_SETUP_QUESTION,
+	SYSTEM_SETUP_QUESTION,
+} from "./setup-prompts";
 import type {
 	SetupAnswers,
 	SourceMaterialsStatus,
@@ -1008,8 +1012,7 @@ function setupQuestionForState(
 	if (!state.answers.ttrpgSystem) {
 		return {
 			key: "ttrpgSystem",
-			question:
-				"What ttrpg system are we playing? If possible, share a rulebook URL or file path so I can align mechanics accurately.",
+			question: SYSTEM_SETUP_QUESTION,
 		};
 	}
 
@@ -1027,8 +1030,7 @@ function setupQuestionForState(
 	if (!state.answers.diceRoller) {
 		return {
 			key: "diceRoller",
-			question:
-				"Who should roll party character dice for this campaign: `player` or `bardo`?",
+			question: DICE_ROLLER_SETUP_QUESTION,
 		};
 	}
 
