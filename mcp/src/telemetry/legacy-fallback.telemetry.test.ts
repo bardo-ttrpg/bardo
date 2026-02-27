@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	recordLegacyCompatibilityWriteMetric,
 	recordLegacyFallbackReadMetric,
+	recordSetupLegacyFieldEmitMetric,
 	renderPrometheusMetrics,
 	resetTelemetryForTests,
 } from "./index";
@@ -52,6 +53,28 @@ describe("legacy fallback telemetry", () => {
 		);
 		expect(metrics).toContain(
 			'bardo_legacy_compat_writes_total{artifact="state_history",consumer="init",strictmode="true"} 1',
+		);
+	});
+
+	test("records deprecated setup legacy field emissions", () => {
+		resetTelemetryForTests();
+
+		recordSetupLegacyFieldEmitMetric({
+			source: "init",
+			field: "setupQuestion",
+		});
+		recordSetupLegacyFieldEmitMetric({
+			source: "init_orchestrator",
+			field: "nextPrompts",
+		});
+
+		const metrics = renderPrometheusMetrics();
+		expect(metrics).toContain("bardo_setup_legacy_field_emits_total");
+		expect(metrics).toContain(
+			'bardo_setup_legacy_field_emits_total{field="setupquestion",source="init"} 1',
+		);
+		expect(metrics).toContain(
+			'bardo_setup_legacy_field_emits_total{field="nextprompts",source="init_orchestrator"} 1',
 		);
 	});
 });

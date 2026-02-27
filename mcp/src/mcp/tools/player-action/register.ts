@@ -19,9 +19,11 @@ import {
 	loadTableContract,
 	summarizeRuntimePolicyViolations,
 } from "../../../domain/policy/runtime-guards";
+import { regenerateCurrentStateProjection } from "../../../domain/projections/current-state";
 import { loadPreferredCurrentState } from "../../../domain/projections/preferred-state";
 import { regenerateProjectionsForEventTypes } from "../../../domain/projections/refresh";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
+import { recordSetupLegacyFieldEmitMetric } from "../../../telemetry";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
 import {
@@ -250,6 +252,7 @@ export async function runPlayerAction(args: {
 			if (typeof replay === "object" && replay !== null) {
 				return {
 					...(replay as PlayerActionOutput),
+					setupPrompt: (replay as PlayerActionOutput).setupPrompt ?? null,
 					idempotentReplay: true,
 				};
 			}
@@ -283,6 +286,12 @@ export async function runPlayerAction(args: {
 			};
 
 			if (setupResult.status !== "complete") {
+				if (setupResult.question) {
+					recordSetupLegacyFieldEmitMetric({
+						source: "player_action",
+						field: "setupQuestion",
+					});
+				}
 				return {
 					success: true,
 					message:
@@ -306,6 +315,7 @@ export async function runPlayerAction(args: {
 					narrationGuardrails: [...narrationGuardrails],
 					optionalSystems: { ...defaultOptionalSystems },
 					requiresSetup: true,
+					setupPrompt: setupResult.setupPrompt,
 					setupStatus: setupResult.status,
 					setupQuestionKey: setupResult.questionKey,
 					setupQuestion: setupResult.question,
@@ -383,6 +393,7 @@ export async function runPlayerAction(args: {
 				narrationGuardrails: [...narrationGuardrails],
 				optionalSystems,
 				requiresSetup: false,
+				setupPrompt: null,
 				setupStatus: setup.status,
 				setupQuestionKey: null,
 				setupQuestion: null,
@@ -410,10 +421,26 @@ export async function runPlayerAction(args: {
 		const knownLocations = await loadKnownLocations(bardoRoot);
 		await ensurePlayerActionDirectories(bardoRoot, paths);
 
-		const preferredState = await loadPreferredCurrentState({
-			bardoRoot,
-			consumer: "player_action",
-		});
+		let preferredState: Awaited<ReturnType<typeof loadPreferredCurrentState>>;
+		try {
+			preferredState = await loadPreferredCurrentState({
+				bardoRoot,
+				consumer: "player_action",
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
+			) {
+				await regenerateCurrentStateProjection({ bardoRoot });
+				preferredState = await loadPreferredCurrentState({
+					bardoRoot,
+					consumer: "player_action",
+				});
+			} else {
+				throw error;
+			}
+		}
 		const state = JSON.parse(
 			JSON.stringify(preferredState.chosen.state),
 		) as Awaited<
@@ -700,6 +727,7 @@ export async function runPlayerAction(args: {
 			narrationGuardrails: [...narrationGuardrails],
 			optionalSystems,
 			requiresSetup: false,
+			setupPrompt: null,
 			setupStatus: setup.status,
 			setupQuestionKey: null,
 			setupQuestion: null,
@@ -748,6 +776,7 @@ export async function runPlayerAction(args: {
 			narrationGuardrails: [],
 			optionalSystems: { ...defaultOptionalSystems },
 			requiresSetup: false,
+			setupPrompt: null,
 			setupStatus: "error",
 			setupQuestionKey: null,
 			setupQuestion: null,
@@ -804,6 +833,7 @@ export function registerPlayerActionTool(
 				setupAnswers,
 				setupRevision,
 				idempotencyKey,
+				guidedSetupEnabled: true,
 			});
 			return makeToolResult(output, !output.success);
 		},

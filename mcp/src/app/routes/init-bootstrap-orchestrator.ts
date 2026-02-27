@@ -1,5 +1,8 @@
 import * as z from "zod/v4";
-import { recordOrchestratorWorkflowMetric } from "../../telemetry";
+import {
+	recordOrchestratorWorkflowMetric,
+	recordSetupLegacyFieldEmitMetric,
+} from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import {
 	buildJsonResponse,
@@ -25,6 +28,7 @@ const bootstrapAnswersSchema = z
 const setupAnswersSchema = z
 	.object({
 		ttrpgSystem: z.string().trim().min(2).max(160).optional(),
+		theme: z.string().trim().min(2).max(120).optional(),
 		systemUrl: z.string().trim().max(2_000).optional(),
 		sourceMaterialsStatus: z.enum(["complete", "partial", "none"]).optional(),
 		diceRoller: z.enum(["player", "bardo"]).optional(),
@@ -67,6 +71,14 @@ function asOptionalString(value: unknown): string | null {
 
 function asOptionalNumber(value: unknown): number | null {
 	return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function asSetupPrompt(value: unknown): Record<string, unknown> | null {
+	if (!isRecord(value)) return null;
+	if (value.version !== "2.0") return null;
+	if (typeof value.questionKey !== "string") return null;
+	if (typeof value.prompt !== "string") return null;
+	return value;
 }
 
 export async function handleInitBootstrapRequest(
@@ -198,15 +210,32 @@ export async function handleInitBootstrapRequest(
 		const status = needsInput ? "needs_input" : "complete";
 		const setupQuestionKey = asOptionalString(initResult.setupQuestionKey);
 		const setupQuestion = asOptionalString(initResult.setupQuestion);
+		const setupPrompt = asSetupPrompt(initResult.setupPrompt);
 		const setupRevision = asOptionalNumber(initResult.setupRevision);
 		const questionKey = !bootstrapComplete
 			? pendingQuestionKey
 			: campaignNeedsInput
-				? (setupQuestionKey ?? "campaign_setup")
+				? typeof setupPrompt?.questionKey === "string"
+					? setupPrompt.questionKey
+					: (setupQuestionKey ?? "campaign_setup")
 				: null;
 		const question = !bootstrapComplete
 			? bootstrapPrompt
-			: (setupQuestion ?? campaignPrompt);
+			: typeof setupPrompt?.prompt === "string"
+				? setupPrompt.prompt
+				: (setupQuestion ?? campaignPrompt);
+		if (setupQuestion) {
+			recordSetupLegacyFieldEmitMetric({
+				source: "init_orchestrator",
+				field: "setupQuestion",
+			});
+		}
+		if (campaignPrompt) {
+			recordSetupLegacyFieldEmitMetric({
+				source: "init_orchestrator",
+				field: "nextPrompts",
+			});
+		}
 		const answeredCount = asOptionalNumber(bootstrap.answeredCount) ?? 0;
 		const totalQuestions = asOptionalNumber(bootstrap.totalQuestions) ?? 0;
 
@@ -222,6 +251,7 @@ export async function handleInitBootstrapRequest(
 				status,
 				questionKey,
 				question,
+				setupPrompt,
 				progress: {
 					answered: answeredCount,
 					total: totalQuestions,
@@ -248,6 +278,7 @@ export async function handleInitBootstrapRequest(
 					status: asOptionalString(initResult.setupStatus),
 					questionKey: setupQuestionKey,
 					question: setupQuestion,
+					setupPrompt,
 					revision: setupRevision,
 				},
 			},

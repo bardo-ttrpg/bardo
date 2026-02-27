@@ -167,6 +167,38 @@ function buildPolicyBlockedResponse(
 	);
 }
 
+function parseBooleanFlag(
+	value: string | undefined,
+	fallback: boolean,
+): boolean {
+	if (!value) return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return fallback;
+}
+
+function isStrictSetupContractEnforced(): boolean {
+	return parseBooleanFlag(Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED, false);
+}
+
+function buildSetupContractRequiredResponse(toolName: string): Response {
+	return jsonRpcError(
+		428,
+		-32031,
+		`Tool '${toolName}' requires setup contract v2. Send x-bardo-setup-contract-version: 2.0.`,
+	);
+}
+
+function requiresSetupContractV2(toolName: string): boolean {
+	return toolName === "init" || toolName === "player_action";
+}
+
+function hasSetupContractV2Header(request: Request): boolean {
+	const header = request.headers.get("x-bardo-setup-contract-version")?.trim();
+	return header === "2.0";
+}
+
 async function handleMcpPost(
 	request: Request,
 	auth: AuthContext,
@@ -222,6 +254,17 @@ async function handleMcpPost(
 			});
 
 			if (metadata.toolCalls.length > 0) {
+				if (
+					isStrictSetupContractEnforced() &&
+					!hasSetupContractV2Header(request)
+				) {
+					for (const toolCall of metadata.toolCalls) {
+						if (requiresSetupContractV2(toolCall.toolName)) {
+							recordMetrics("error");
+							return buildSetupContractRequiredResponse(toolCall.toolName);
+						}
+					}
+				}
 				const providerId = readHeaderValue(request, "x-provider-id");
 				const modelId = readHeaderValue(request, "x-model-id");
 				const resolvedPolicy = resolveEffectiveToolPolicy(toolPolicy, {
@@ -267,7 +310,9 @@ async function handleMcpPost(
 				}
 			}
 
-			const response = withCors(await existing.transport.handleRequest(request));
+			const response = withCors(
+				await existing.transport.handleRequest(request),
+			);
 			recordMetrics(response.ok ? "success" : "error");
 			if (metadata.toolCalls.length > 0) {
 				for (const toolCall of metadata.toolCalls) {
@@ -343,6 +388,17 @@ async function handleMcpPostStateless(
 
 	try {
 		if (metadata.toolCalls.length > 0) {
+			if (
+				isStrictSetupContractEnforced() &&
+				!hasSetupContractV2Header(request)
+			) {
+				for (const toolCall of metadata.toolCalls) {
+					if (requiresSetupContractV2(toolCall.toolName)) {
+						recordMetrics("error");
+						return buildSetupContractRequiredResponse(toolCall.toolName);
+					}
+				}
+			}
 			const providerId = readHeaderValue(request, "x-provider-id");
 			const modelId = readHeaderValue(request, "x-model-id");
 			const resolvedPolicy = resolveEffectiveToolPolicy(toolPolicy, {
