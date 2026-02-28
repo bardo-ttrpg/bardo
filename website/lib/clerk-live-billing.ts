@@ -97,7 +97,6 @@ export function resolveLiveBillingSnapshotFromSubscription(
 		subscriptionStatus: asSubscriptionStatus(subscription?.status),
 		subscriptionId: subscription?.id ?? null,
 		cancelAtPeriodEnd,
-		partySeats: 1,
 	};
 }
 

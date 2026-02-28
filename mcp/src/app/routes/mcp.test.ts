@@ -236,4 +236,190 @@ describe("handleMcpRequest policy and loop protection", () => {
 		const payload = (await response.json()) as { error?: { message?: string } };
 		expect(payload.error?.message).toContain("not allowed");
 	});
+
+	test("stateless mode rejects GET and DELETE session transport methods", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry({
+			loopPolicy: resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+		});
+		const toolPolicy = resolveToolPolicyConfig({
+			BARDO_TOOLS_PROFILE: "full",
+		});
+		const loopPolicy = resolveLoopDetectionPolicy({
+			BARDO_LOOP_DETECTION_ENABLED: "false",
+		});
+
+		const getResponse = await handleMcpRequest(
+			new Request("http://localhost:3000/mcp", {
+				method: "GET",
+			}),
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			toolPolicy,
+			loopPolicy,
+			true,
+			{
+				transportMode: "stateless",
+				enableJsonResponse: true,
+			},
+		);
+		expect(getResponse.status).toBe(405);
+		expect(getResponse.headers.get("allow")).toBe("POST, OPTIONS");
+
+		const deleteResponse = await handleMcpRequest(
+			new Request("http://localhost:3000/mcp", {
+				method: "DELETE",
+			}),
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			toolPolicy,
+			loopPolicy,
+			true,
+			{
+				transportMode: "stateless",
+				enableJsonResponse: true,
+			},
+		);
+		expect(deleteResponse.status).toBe(405);
+		expect(deleteResponse.headers.get("allow")).toBe("POST, OPTIONS");
+	});
+
+	test("enforces setup contract v2 header for setup-sensitive tools when enabled", async () => {
+		const previous = Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
+		Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = "true";
+		try {
+			const sessionStore = new SessionStore();
+			const sessionRegistry = new SessionRegistry({
+				loopPolicy: resolveLoopDetectionPolicy({
+					BARDO_LOOP_DETECTION_ENABLED: "false",
+				}),
+			});
+			sessionStore.set("s1", createSession());
+			sessionRegistry.registerSession({
+				sessionId: "s1",
+				apiKey: "k1",
+				campaignBasePath: "/repo/customer-a",
+			});
+
+			const request = new Request("http://localhost:3000/mcp", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"mcp-session-id": "s1",
+				},
+				body: JSON.stringify({
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: {
+						name: "player_action",
+						arguments: { action: "I begin." },
+					},
+				}),
+			});
+
+			const response = await handleMcpRequest(
+				request,
+				createAuth(),
+				sessionStore,
+				sessionRegistry,
+				resolveToolPolicyConfig({
+					BARDO_TOOLS_PROFILE: "full",
+				}),
+				resolveLoopDetectionPolicy({
+					BARDO_LOOP_DETECTION_ENABLED: "false",
+				}),
+				true,
+			);
+
+			expect(response.status).toBe(428);
+			const payload = (await response.json()) as {
+				error?: { message?: string };
+			};
+			expect(payload.error?.message).toContain("setup contract v2");
+		} finally {
+			if (previous === undefined) {
+				delete Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
+			} else {
+				Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = previous;
+			}
+		}
+	});
+
+	test("allows setup-sensitive tools when setup contract v2 header is present", async () => {
+		const previous = Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
+		Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = "true";
+		try {
+			const sessionStore = new SessionStore();
+			const sessionRegistry = new SessionRegistry({
+				loopPolicy: resolveLoopDetectionPolicy({
+					BARDO_LOOP_DETECTION_ENABLED: "false",
+				}),
+			});
+
+			let forwarded = 0;
+			sessionStore.set(
+				"s1",
+				createSession({
+					handleRequest: async () => {
+						forwarded += 1;
+						return new Response(JSON.stringify({ ok: true }), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						});
+					},
+				}),
+			);
+			sessionRegistry.registerSession({
+				sessionId: "s1",
+				apiKey: "k1",
+				campaignBasePath: "/repo/customer-a",
+			});
+
+			const request = new Request("http://localhost:3000/mcp", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"mcp-session-id": "s1",
+					"x-bardo-setup-contract-version": "2.0",
+				},
+				body: JSON.stringify({
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: {
+						name: "init",
+						arguments: {},
+					},
+				}),
+			});
+
+			const response = await handleMcpRequest(
+				request,
+				createAuth(),
+				sessionStore,
+				sessionRegistry,
+				resolveToolPolicyConfig({
+					BARDO_TOOLS_PROFILE: "full",
+				}),
+				resolveLoopDetectionPolicy({
+					BARDO_LOOP_DETECTION_ENABLED: "false",
+				}),
+				true,
+			);
+
+			expect(response.status).toBe(200);
+			expect(forwarded).toBe(1);
+		} finally {
+			if (previous === undefined) {
+				delete Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
+			} else {
+				Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = previous;
+			}
+		}
+	});
 });

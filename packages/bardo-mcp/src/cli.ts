@@ -6,11 +6,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 type CliOptions = {
 	url: string;
 	apiKey: string | null;
+	workspaceRoot: string;
 };
 
 function parseArgs(argv: string[]): CliOptions {
 	let url = Bun.env.BARDO_MCP_URL?.trim() || "http://127.0.0.1:3000/mcp";
 	let apiKey = Bun.env.BARDO_API_KEY?.trim() || null;
+	let workspaceRoot =
+		Bun.env.BARDO_WORKSPACE_ROOT?.trim() || process.cwd();
 
 	for (let i = 0; i < argv.length; i += 1) {
 		const arg = argv[i];
@@ -27,24 +30,35 @@ function parseArgs(argv: string[]): CliOptions {
 			i += 1;
 			continue;
 		}
+		if (
+			(arg === "--workspace-root" || arg === "-w") &&
+			typeof argv[i + 1] === "string"
+		) {
+			workspaceRoot = argv[i + 1]!;
+			i += 1;
+			continue;
+		}
 		if (arg === "--help" || arg === "-h") {
 			printHelp();
 			process.exit(0);
 		}
 	}
 
-	return { url, apiKey };
+	return { url, apiKey, workspaceRoot };
 }
 
 function printHelp(): void {
 	process.stderr.write(`Bardo MCP local adapter
 
 Usage:
-  npx -y @bardo/mcp --api-key <key> [--url <mcp-url>]
+  npx -y @bardo/mcp --api-key <key> [--url <mcp-url>] [--workspace-root <abs-path>]
 
 Options:
-  --api-key, -k   API key used as BARDO_API_KEY header
+  --api-key, -k   API key used as Authorization: Bearer
   --url, -u       Remote MCP endpoint (default: http://127.0.0.1:3000/mcp)
+  --workspace-root, -w
+                  Absolute workspace root to bind writes/reads to.
+                  Defaults to current working directory.
   --help, -h      Show this message
 `);
 }
@@ -62,7 +76,8 @@ async function main(): Promise<void> {
 		{
 			requestInit: {
 				headers: {
-					BARDO_API_KEY: options.apiKey,
+					authorization: `Bearer ${options.apiKey}`,
+					"x-bardo-workspace-root": options.workspaceRoot,
 				},
 			},
 		},

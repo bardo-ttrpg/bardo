@@ -49,6 +49,10 @@ export async function createAndHandleSessionRequest(
 			sessionStore.set(sessionId, {
 				apiKey: auth.apiKey,
 				campaignBasePath: auth.campaignBasePath,
+				subjectId: auth.subjectId ?? null,
+				keyId: auth.keyId ?? null,
+				plan: auth.plan ?? null,
+				mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
 				server,
 				transport,
 			});
@@ -77,4 +81,36 @@ export async function createAndHandleSessionRequest(
 
 	await server.connect(transport);
 	return transport.handleRequest(request);
+}
+
+export async function createAndHandleStatelessRequest(
+	request: Request,
+	auth: AuthContext,
+	options: {
+		enableJsonResponse?: boolean;
+	} = {},
+): Promise<Response> {
+	const enableJsonResponse = options.enableJsonResponse ?? true;
+	const transport = new WebStandardStreamableHTTPServerTransport({
+		sessionIdGenerator: undefined,
+		enableJsonResponse,
+	});
+	const server = createMcpServer(auth);
+	await server.connect(transport);
+
+	try {
+		return await transport.handleRequest(request);
+	} finally {
+		// In stateless JSON mode the transport has completed all responses by return.
+		if (enableJsonResponse) {
+			try {
+				await server.close();
+			} catch (error) {
+				console.error(
+					"Error while closing stateless MCP server instance:",
+					error,
+				);
+			}
+		}
+	}
 }

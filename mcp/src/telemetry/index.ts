@@ -19,6 +19,7 @@ const METRIC_NAMES = {
 	setupScanCacheEventsTotal: "bardo_setup_scan_cache_events_total",
 	legacyFallbackReadsTotal: "bardo_legacy_fallback_reads_total",
 	legacyCompatWritesTotal: "bardo_legacy_compat_writes_total",
+	setupLegacyFieldEmitsTotal: "bardo_setup_legacy_field_emits_total",
 	evalLongRunRunsTotal: "bardo_eval_long_run_runs_total",
 	evalLongRunDurationMs: "bardo_eval_long_run_duration_ms",
 	evalLongRunInvariantFailuresTotal:
@@ -75,6 +76,9 @@ function registerDefaultMetrics(): void {
 	});
 	telemetryRegistry.registerCounter(METRIC_NAMES.legacyCompatWritesTotal, {
 		help: "Legacy compatibility state/history write operations by consumer and strict mode.",
+	});
+	telemetryRegistry.registerCounter(METRIC_NAMES.setupLegacyFieldEmitsTotal, {
+		help: "Deprecated setup prompt field emissions by source and field.",
 	});
 	telemetryRegistry.registerCounter(METRIC_NAMES.evalLongRunRunsTotal, {
 		help: "Total long-run campaign stability eval executions by outcome.",
@@ -272,6 +276,16 @@ export function recordLegacyCompatibilityWriteMetric(args: {
 		consumer: args.consumer,
 		artifact: args.artifact,
 		strictMode: args.strictMode,
+	});
+}
+
+export function recordSetupLegacyFieldEmitMetric(args: {
+	source: "init" | "player_action" | "init_orchestrator";
+	field: "setupQuestion" | "nextPrompts";
+}): void {
+	telemetryRegistry.inc(METRIC_NAMES.setupLegacyFieldEmitsTotal, {
+		source: args.source,
+		field: args.field,
 	});
 }
 

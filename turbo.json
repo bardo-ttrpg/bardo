@@ -24,6 +24,10 @@
 			"dependsOn": ["^typecheck"],
 			"outputs": []
 		},
+		"test": {
+			"dependsOn": ["^test"],
+			"outputs": []
+		},
 		"test:ga-gates": {
 			"dependsOn": ["^test:ga-gates"],
 			"outputs": []

@@ -5,6 +5,7 @@ export type ApiKeyValidatorMetadata = {
 	requiredScope?: "mcp" | "api";
 	providerId?: string | null;
 	modelId?: string | null;
+	workspaceRoot?: string | null;
 };
 
 export type ApiKeyValidator = (
@@ -23,6 +24,8 @@ type HostedValidatorConfig = {
 	introspectionUrl: string;
 	introspectionToken: string | null;
 	cacheTtlMs: number;
+	invalidCacheTtlMs?: number;
+	timeoutMs?: number;
 	fetchImpl?: typeof fetch;
 };
 
@@ -30,10 +33,31 @@ type HostedIntrospectionResponse =
 	| {
 			valid: true;
 			campaignBasePath: string;
+			subjectId?: string;
+			keyId?: string;
+			plan?: "free" | "solo" | "solo_plus";
+			mcpPeriodLimit?: number;
 	  }
 	| {
 			valid: false;
 	  };
+
+function normalizePositiveInteger(value: number | undefined, fallback: number) {
+	if (!Number.isFinite(value)) {
+		return fallback;
+	}
+	const normalized = Math.floor(value ?? fallback);
+	return normalized > 0 ? normalized : fallback;
+}
+
+function buildCacheKey(
+	apiKey: string,
+	metadata?: ApiKeyValidatorMetadata,
+): string {
+	const requiredScope = metadata?.requiredScope ?? "mcp";
+	const workspaceRoot = metadata?.workspaceRoot?.trim() ?? "";
+	return `${apiKey}::${requiredScope}::${workspaceRoot}`;
+}
 
 function normalizeProviderMode(
 	raw: string | undefined,
@@ -72,9 +96,34 @@ function parseHostedIntrospectionPayload(
 		return null;
 	}
 
+	const subjectId =
+		typeof record.subjectId === "string" && record.subjectId.trim().length > 0
+			? record.subjectId.trim()
+			: null;
+	const keyId =
+		typeof record.keyId === "string" && record.keyId.trim().length > 0
+			? record.keyId.trim()
+			: null;
+	const plan =
+		record.plan === "free" ||
+		record.plan === "solo" ||
+		record.plan === "solo_plus"
+			? record.plan
+			: null;
+	const mcpPeriodLimit =
+		typeof record.mcpPeriodLimit === "number" &&
+		Number.isFinite(record.mcpPeriodLimit) &&
+		record.mcpPeriodLimit > 0
+			? Math.floor(record.mcpPeriodLimit)
+			: null;
+
 	return {
 		apiKey: null,
 		campaignBasePath: path.resolve(projectRoot, record.campaignBasePath),
+		subjectId,
+		keyId,
+		plan,
+		mcpPeriodLimit,
 	};
 }
 
@@ -82,6 +131,12 @@ export function createHostedIntrospectionApiKeyValidator(
 	config: HostedValidatorConfig,
 	projectRoot: string,
 ): ApiKeyValidator {
+	const validCacheTtlMs = normalizePositiveInteger(config.cacheTtlMs, 120_000);
+	const invalidCacheTtlMs = normalizePositiveInteger(
+		config.invalidCacheTtlMs,
+		30_000,
+	);
+	const timeoutMs = normalizePositiveInteger(config.timeoutMs, 10_000);
 	const cache = new Map<
 		string,
 		{ expiresAt: number; value: AuthContext | null }
@@ -93,7 +148,8 @@ export function createHostedIntrospectionApiKeyValidator(
 		metadata?: ApiKeyValidatorMetadata,
 	): Promise<AuthContext | null> {
 		const now = Date.now();
-		const cached = cache.get(apiKey);
+		const cacheKey = buildCacheKey(apiKey, metadata);
+		const cached = cache.get(cacheKey);
 		if (cached && cached.expiresAt > now) {
 			if (!cached.value) return null;
 			return { ...cached.value, apiKey };
@@ -103,10 +159,12 @@ export function createHostedIntrospectionApiKeyValidator(
 			"content-type": "application/json",
 		});
 		if (config.introspectionToken) {
-			headers.set("authorization", `Bearer ${config.introspectionToken}`);
+			headers.set("x-bardo-introspection-token", config.introspectionToken);
 		}
 
 		let payload: unknown = null;
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), timeoutMs);
 		try {
 			const response = await fetchImpl(config.introspectionUrl, {
 				method: "POST",
@@ -116,22 +174,25 @@ export function createHostedIntrospectionApiKeyValidator(
 					requiredScope: metadata?.requiredScope ?? "mcp",
 					providerId: metadata?.providerId ?? undefined,
 					modelId: metadata?.modelId ?? undefined,
+					workspaceRoot: metadata?.workspaceRoot ?? undefined,
 				}),
+				signal: controller.signal,
 			});
 			if (!response.ok) {
-				cache.set(apiKey, {
-					expiresAt: now + config.cacheTtlMs,
-					value: null,
-				});
 				return null;
 			}
 			payload = (await response.json()) as HostedIntrospectionResponse;
 		} catch {
 			return null;
+		} finally {
+			clearTimeout(timeout);
 		}
 
 		const context = parseHostedIntrospectionPayload(payload, projectRoot);
-		cache.set(apiKey, { expiresAt: now + config.cacheTtlMs, value: context });
+		cache.set(cacheKey, {
+			expiresAt: now + (context ? validCacheTtlMs : invalidCacheTtlMs),
+			value: context,
+		});
 		if (!context) {
 			return null;
 		}
@@ -185,7 +246,15 @@ export function resolveRuntimeApiKeyValidator(args: {
 		{
 			introspectionUrl,
 			introspectionToken: env.BARDO_AUTH_INTROSPECTION_TOKEN?.trim() ?? null,
-			cacheTtlMs: parsePositiveInteger(env.BARDO_AUTH_CACHE_TTL_MS, 30_000),
+			cacheTtlMs: parsePositiveInteger(env.BARDO_AUTH_CACHE_TTL_MS, 120_000),
+			invalidCacheTtlMs: parsePositiveInteger(
+				env.BARDO_AUTH_INVALID_CACHE_TTL_MS,
+				30_000,
+			),
+			timeoutMs: parsePositiveInteger(
+				env.BARDO_AUTH_INTROSPECTION_TIMEOUT_MS,
+				10_000,
+			),
 		},
 		args.projectRoot,
 	);

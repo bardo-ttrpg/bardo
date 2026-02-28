@@ -8,12 +8,120 @@ import type { PlanTier } from "./user-billing";
 export function maxApiKeysForPlan(plan: PlanTier): number {
 	switch (plan) {
 		case "free":
-			return 10;
+			return 1;
 		case "solo":
-			return 50;
+			return 5;
 		case "solo_plus":
-			return 100;
-		case "party":
-			return 250;
+			return 10;
+	}
+}
+
+const DEFAULT_MCP_PERIOD_LIMIT: Record<PlanTier, number> = {
+	free: 100,
+	solo: 25_000,
+	solo_plus: 50_000,
+};
+
+const DEFAULT_DAILY_USER_VERIFICATION_LIMIT: Record<PlanTier, number> = {
+	free: 500,
+	solo: 7_500,
+	solo_plus: 13_000,
+};
+
+const DEFAULT_DAILY_KEY_VERIFICATION_LIMIT: Record<PlanTier, number> = {
+	free: 500,
+	solo: 2_000,
+	solo_plus: 3_000,
+};
+
+function readPositiveLimit(
+	value: string | undefined,
+	fallback: number,
+): number {
+	if (!value) return fallback;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed < 1) {
+		return fallback;
+	}
+	return Math.floor(parsed);
+}
+
+/**
+ * Daily cap for API key introspection verifications per user/account.
+ * Protects Clerk verification spend and blocks abusive key usage patterns.
+ */
+export function dailyUserVerificationLimitForPlan(
+	plan: PlanTier,
+	env: Record<string, string | undefined> = process.env,
+): number {
+	switch (plan) {
+		case "free":
+			return readPositiveLimit(
+				env.BARDO_DAILY_USER_VERIFICATIONS_FREE,
+				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.free,
+			);
+		case "solo":
+			return readPositiveLimit(
+				env.BARDO_DAILY_USER_VERIFICATIONS_SOLO,
+				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.solo,
+			);
+		case "solo_plus":
+			return readPositiveLimit(
+				env.BARDO_DAILY_USER_VERIFICATIONS_SOLO_PLUS,
+				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.solo_plus,
+			);
+	}
+}
+
+/**
+ * Daily cap for API key introspection verifications per key.
+ */
+export function dailyKeyVerificationLimitForPlan(
+	plan: PlanTier,
+	env: Record<string, string | undefined> = process.env,
+): number {
+	switch (plan) {
+		case "free":
+			return readPositiveLimit(
+				env.BARDO_DAILY_KEY_VERIFICATIONS_FREE,
+				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.free,
+			);
+		case "solo":
+			return readPositiveLimit(
+				env.BARDO_DAILY_KEY_VERIFICATIONS_SOLO,
+				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.solo,
+			);
+		case "solo_plus":
+			return readPositiveLimit(
+				env.BARDO_DAILY_KEY_VERIFICATIONS_SOLO_PLUS,
+				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.solo_plus,
+			);
+	}
+}
+
+/**
+ * Billing-period MCP usage cap per user plan.
+ * This is enforced by the MCP runtime after successful API key introspection.
+ */
+export function mcpPeriodLimitForPlan(
+	plan: PlanTier,
+	env: Record<string, string | undefined> = process.env,
+): number {
+	switch (plan) {
+		case "free":
+			return readPositiveLimit(
+				env.BARDO_MCP_PERIOD_LIMIT_FREE,
+				DEFAULT_MCP_PERIOD_LIMIT.free,
+			);
+		case "solo":
+			return readPositiveLimit(
+				env.BARDO_MCP_PERIOD_LIMIT_SOLO,
+				DEFAULT_MCP_PERIOD_LIMIT.solo,
+			);
+		case "solo_plus":
+			return readPositiveLimit(
+				env.BARDO_MCP_PERIOD_LIMIT_SOLO_PLUS,
+				DEFAULT_MCP_PERIOD_LIMIT.solo_plus,
+			);
 	}
 }

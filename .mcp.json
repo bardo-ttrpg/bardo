@@ -1,3 +1,25 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "clerk": {
+      "url": "https://mcp.clerk.com/mcp"
+    },
+    "greptile": {
+      "type": "http",
+      "url": "https://api.greptile.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GREPTILE_API_KEY}"
+      }
+    },
+    "upstash": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/mcp-server@latest",
+        "--email",
+        "<UPSTASH_EMAIL>",
+        "--api-key",
+        "<UPSTASH_API_KEY>"
+      ]
+    }
+  }
 }

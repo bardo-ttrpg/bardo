@@ -75,6 +75,7 @@ type BootstrapStepResult = {
 	includeValues: boolean;
 	answeredCount: number;
 	totalQuestions: number;
+	ignoredAnswerKeys: BootstrapAnswerKey[];
 };
 
 function toCleanText(value: unknown): string | undefined {
@@ -113,6 +114,30 @@ function mergeAnswers(
 		}
 	}
 	return merged;
+}
+
+function filterIncomingAnswersForPendingQuestion(args: {
+	existingAnswers: BootstrapAnswers;
+	incomingAnswers: BootstrapAnswers;
+	requiredQuestions: BootstrapAnswerKey[];
+}): { accepted: BootstrapAnswers; ignoredKeys: BootstrapAnswerKey[] } {
+	const pendingQuestionKey = getFirstMissingAnswer(
+		args.existingAnswers,
+		args.requiredQuestions,
+	);
+	if (!pendingQuestionKey) {
+		return { accepted: {}, ignoredKeys: [] };
+	}
+	const pendingValue = args.incomingAnswers[pendingQuestionKey];
+	const ignoredKeys = Object.keys(args.incomingAnswers).filter(
+		(key): key is BootstrapAnswerKey =>
+			key !== pendingQuestionKey &&
+			bootstrapQuestionOrder.includes(key as BootstrapAnswerKey),
+	);
+	return {
+		accepted: pendingValue ? { [pendingQuestionKey]: pendingValue } : {},
+		ignoredKeys,
+	};
 }
 
 async function writeIfMissing(
@@ -396,6 +421,7 @@ export async function runBootstrapStep(
 			includeValues,
 			answeredCount,
 			totalQuestions,
+			ignoredAnswerKeys: [],
 		};
 	}
 
@@ -404,9 +430,18 @@ export async function runBootstrapStep(
 		Boolean(soulRaw) ||
 		bootstrapState?.includeValues === true ||
 		Boolean(incomingAnswers.values);
-
-	const answers = mergeAnswers(bootstrapState?.answers ?? {}, incomingAnswers);
 	const requiredQuestions = getRequiredQuestions(includeValues);
+
+	const existingAnswers = bootstrapState?.answers ?? {};
+	const filteredIncomingAnswers = filterIncomingAnswersForPendingQuestion({
+		existingAnswers,
+		incomingAnswers,
+		requiredQuestions,
+	});
+	const answers = mergeAnswers(
+		existingAnswers,
+		filteredIncomingAnswers.accepted,
+	);
 	const totalQuestions = requiredQuestions.length;
 	const answeredCount = requiredQuestions.filter((key) =>
 		Boolean(answers[key]),
@@ -444,6 +479,7 @@ export async function runBootstrapStep(
 			includeValues,
 			answeredCount,
 			totalQuestions,
+			ignoredAnswerKeys: filteredIncomingAnswers.ignoredKeys,
 		};
 	}
 
@@ -470,5 +506,6 @@ export async function runBootstrapStep(
 		includeValues,
 		answeredCount: totalQuestions,
 		totalQuestions,
+		ignoredAnswerKeys: filteredIncomingAnswers.ignoredKeys,
 	};
 }

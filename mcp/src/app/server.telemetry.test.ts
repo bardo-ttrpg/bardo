@@ -15,6 +15,8 @@ function makePolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 		telemetryEnabled: true,
 		metricsRouteEnabled: true,
 		metricsRequireAuth: false,
+		transportMode: "stateful",
+		mcpEnableJsonResponse: false,
 		...overrides,
 	};
 }
@@ -24,6 +26,31 @@ afterEach(() => {
 });
 
 describe("createHttpServer telemetry route", () => {
+	test("accepts /api/mcp as MCP route alias", async () => {
+		const handler = createHttpRequestHandler({
+			securityPolicy: makePolicy({
+				authMode: "optional",
+			}),
+		});
+
+		const response = await handler(
+			new Request("http://localhost/api/mcp", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					accept: "application/json",
+				},
+				body: JSON.stringify({
+					jsonrpc: "2.0",
+					id: 1,
+					method: "ping",
+					params: {},
+				}),
+			}),
+		);
+		expect(response.status).not.toBe(404);
+	});
+
 	test("returns 404 when metrics route is disabled", async () => {
 		const handler = createHttpRequestHandler({
 			securityPolicy: makePolicy({ metricsRouteEnabled: false }),

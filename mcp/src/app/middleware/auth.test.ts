@@ -15,6 +15,8 @@ function createPolicy(overrides: Partial<SecurityPolicy> = {}): SecurityPolicy {
 		telemetryEnabled: true,
 		metricsRouteEnabled: true,
 		metricsRequireAuth: false,
+		transportMode: "stateful",
+		mcpEnableJsonResponse: false,
 		...overrides,
 	};
 }
@@ -35,6 +37,18 @@ async function responseBody(response: Response) {
 	return (await response.json()) as { error?: string };
 }
 
+function withDefaultIdentityFields<T extends Record<string, unknown>>(
+	value: T,
+) {
+	return {
+		...value,
+		subjectId: null,
+		keyId: null,
+		plan: null,
+		mcpPeriodLimit: null,
+	};
+}
+
 describe("createAuthenticator", () => {
 	test("returns optional unauthenticated context when auth is optional and no keys configured", async () => {
 		const authenticate = createAuthenticator({
@@ -48,7 +62,9 @@ describe("createAuthenticator", () => {
 			new Map(),
 		);
 		expect(result instanceof Response).toBe(false);
-		expect(result).toEqual({ apiKey: null, campaignBasePath: "/repo" });
+		expect(result).toEqual(
+			withDefaultIdentityFields({ apiKey: null, campaignBasePath: "/repo" }),
+		);
 	});
 
 	test("rejects when auth is required but no keys are configured", async () => {
@@ -101,10 +117,12 @@ describe("createAuthenticator", () => {
 		const result = await authenticate(request, new Map());
 
 		expect(result instanceof Response).toBe(false);
-		expect(result).toEqual({
-			apiKey: "key-1",
-			campaignBasePath: "/repo/customers/a",
-		});
+		expect(result).toEqual(
+			withDefaultIdentityFields({
+				apiKey: "key-1",
+				campaignBasePath: "/repo/customers/a",
+			}),
+		);
 	});
 
 	test("accepts BARDO_API_KEY header as primary auth header", async () => {
@@ -120,10 +138,12 @@ describe("createAuthenticator", () => {
 		const result = await authenticate(request, new Map());
 
 		expect(result instanceof Response).toBe(false);
-		expect(result).toEqual({
-			apiKey: "key-1",
-			campaignBasePath: "/repo/customers/a",
-		});
+		expect(result).toEqual(
+			withDefaultIdentityFields({
+				apiKey: "key-1",
+				campaignBasePath: "/repo/customers/a",
+			}),
+		);
 	});
 
 	test("accepts API key from hosted validator", async () => {
@@ -143,9 +163,73 @@ describe("createAuthenticator", () => {
 		const result = await authenticate(request, new Map());
 
 		expect(result instanceof Response).toBe(false);
-		expect(result).toEqual({
-			apiKey: "hosted-key",
-			campaignBasePath: "/repo/customers/hosted",
+		expect(result).toEqual(
+			withDefaultIdentityFields({
+				apiKey: "hosted-key",
+				campaignBasePath: "/repo/customers/hosted",
+			}),
+		);
+	});
+
+	test("reuses existing authenticated session when request API key matches", async () => {
+		let validateCalls = 0;
+		const authenticate = createAuthenticator({
+			apiKeyMap: new Map(),
+			policy: createPolicy({ authMode: "required" }),
+			projectRoot: "/repo",
+			validateApiKey: async (apiKey) => {
+				validateCalls += 1;
+				if (apiKey !== "key-1") return null;
+				return { apiKey, campaignBasePath: "/repo/customers/a" };
+			},
+		});
+
+		const sessions = new Map<string, Session>([
+			["session-1", createSession("key-1", "/repo/customers/a")],
+		]);
+		const request = new Request("http://localhost:3000/mcp", {
+			headers: {
+				"mcp-session-id": "session-1",
+				"x-api-key": "key-1",
+			},
+		});
+
+		const result = await authenticate(request, sessions);
+		expect(result instanceof Response).toBe(false);
+		expect(result).toEqual(
+			withDefaultIdentityFields({
+				apiKey: "key-1",
+				campaignBasePath: "/repo/customers/a",
+			}),
+		);
+		expect(validateCalls).toBe(0);
+	});
+
+	test("rejects workspace-root switch on existing session", async () => {
+		const authenticate = createAuthenticator({
+			apiKeyMap: new Map([["key-1", "/repo/customers/a"]]),
+			policy: createPolicy(),
+			projectRoot: "/repo",
+		});
+
+		const sessions = new Map<string, Session>([
+			["session-1", createSession("key-1", "/repo/customers/a")],
+		]);
+		const request = new Request("http://localhost:3000/mcp", {
+			headers: {
+				"mcp-session-id": "session-1",
+				"x-api-key": "key-1",
+				"x-bardo-workspace-root": "/repo/customers/other",
+			},
+		});
+
+		const result = await authenticate(request, sessions);
+		expect(result instanceof Response).toBe(true);
+		if (!(result instanceof Response)) return;
+		expect(result.status).toBe(409);
+		expect(await responseBody(result)).toEqual({
+			error:
+				"Workspace root differs from bound session. Start a new session to switch workspace.",
 		});
 	});
 
@@ -176,5 +260,35 @@ describe("createAuthenticator", () => {
 		expect(await responseBody(result)).toEqual({
 			error: "Session does not belong to this API key.",
 		});
+	});
+
+	test("enforces workspace root header when BARDO_REQUIRE_WORKSPACE_ROOT is enabled", async () => {
+		const previous = Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT;
+		Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT = "true";
+		try {
+			const authenticate = createAuthenticator({
+				apiKeyMap: new Map([["key-1", "/repo/customers/a"]]),
+				policy: createPolicy(),
+				projectRoot: "/repo",
+			});
+
+			const request = new Request("http://localhost:3000/mcp", {
+				headers: { "x-api-key": "key-1" },
+			});
+			const result = await authenticate(request, new Map());
+
+			expect(result instanceof Response).toBe(true);
+			if (!(result instanceof Response)) return;
+			expect(result.status).toBe(400);
+			expect(await responseBody(result)).toEqual({
+				error: "Missing required x-bardo-workspace-root header.",
+			});
+		} finally {
+			if (previous === undefined) {
+				delete Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT;
+			} else {
+				Bun.env.BARDO_REQUIRE_WORKSPACE_ROOT = previous;
+			}
+		}
 	});
 });

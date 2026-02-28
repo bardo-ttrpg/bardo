@@ -2,6 +2,7 @@ import {
 	type LoopDetectionPolicy,
 	validateLoopDetectionPolicy,
 } from "../../domain/config/loop-detection";
+import type { McpTransportMode } from "../../domain/config/security";
 import {
 	isToolAllowed,
 	resolveEffectiveToolPolicy,
@@ -9,7 +10,10 @@ import {
 } from "../../domain/config/tool-policy";
 import type { SessionRegistry } from "../../session/session-registry";
 import type { SessionStore } from "../../session/session-store";
-import { createAndHandleSessionRequest } from "../../session/transport-lifecycle";
+import {
+	createAndHandleSessionRequest,
+	createAndHandleStatelessRequest,
+} from "../../session/transport-lifecycle";
 import { recordJsonRpcMetric, recordToolCallMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import { corsHeaders, jsonRpcError, withCors } from "../middleware/cors";
@@ -141,6 +145,60 @@ function readHeaderValue(request: Request, name: string): string | null {
 	return value && value.length > 0 ? value : null;
 }
 
+function methodNotAllowedResponse(allow: string): Response {
+	return new Response("Method Not Allowed", {
+		status: 405,
+		headers: {
+			allow,
+			...corsHeaders(),
+		},
+	});
+}
+
+function buildPolicyBlockedResponse(
+	toolName: string,
+	resolvedProfile: string,
+	resolvedProviderRuleKey: string | null,
+): Response {
+	return jsonRpcError(
+		403,
+		-32020,
+		`Tool '${toolName}' is not allowed for the active tool policy (profile: ${resolvedProfile}${resolvedProviderRuleKey ? `, rule: ${resolvedProviderRuleKey}` : ""}).`,
+	);
+}
+
+function parseBooleanFlag(
+	value: string | undefined,
+	fallback: boolean,
+): boolean {
+	if (!value) return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return fallback;
+}
+
+function isStrictSetupContractEnforced(): boolean {
+	return parseBooleanFlag(Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED, false);
+}
+
+function buildSetupContractRequiredResponse(toolName: string): Response {
+	return jsonRpcError(
+		428,
+		-32031,
+		`Tool '${toolName}' requires setup contract v2. Send x-bardo-setup-contract-version: 2.0.`,
+	);
+}
+
+function requiresSetupContractV2(toolName: string): boolean {
+	return toolName === "init" || toolName === "player_action";
+}
+
+function hasSetupContractV2Header(request: Request): boolean {
+	const header = request.headers.get("x-bardo-setup-contract-version")?.trim();
+	return header === "2.0";
+}
+
 async function handleMcpPost(
 	request: Request,
 	auth: AuthContext,
@@ -196,6 +254,17 @@ async function handleMcpPost(
 			});
 
 			if (metadata.toolCalls.length > 0) {
+				if (
+					isStrictSetupContractEnforced() &&
+					!hasSetupContractV2Header(request)
+				) {
+					for (const toolCall of metadata.toolCalls) {
+						if (requiresSetupContractV2(toolCall.toolName)) {
+							recordMetrics("error");
+							return buildSetupContractRequiredResponse(toolCall.toolName);
+						}
+					}
+				}
 				const providerId = readHeaderValue(request, "x-provider-id");
 				const modelId = readHeaderValue(request, "x-model-id");
 				const resolvedPolicy = resolveEffectiveToolPolicy(toolPolicy, {
@@ -210,10 +279,10 @@ async function handleMcpPost(
 							toolName: toolCall.toolName,
 							status: "error",
 						});
-						return jsonRpcError(
-							403,
-							-32020,
-							`Tool '${toolCall.toolName}' is not allowed for the active tool policy (profile: ${resolvedPolicy.profile}${resolvedPolicy.providerRuleKey ? `, rule: ${resolvedPolicy.providerRuleKey}` : ""}).`,
+						return buildPolicyBlockedResponse(
+							toolCall.toolName,
+							resolvedPolicy.profile,
+							resolvedPolicy.providerRuleKey ?? null,
 						);
 					}
 
@@ -281,6 +350,86 @@ async function handleMcpPost(
 	}
 }
 
+async function handleMcpPostStateless(
+	request: Request,
+	auth: AuthContext,
+	toolPolicy: ToolPolicyConfig,
+	telemetryEnabled: boolean,
+	enableJsonResponse: boolean,
+): Promise<Response> {
+	const metadata = await readJsonRpcMetadata(request);
+	const startedAt = performance.now();
+	const recordMetrics = (status: "success" | "error") => {
+		if (!telemetryEnabled) {
+			return;
+		}
+		const durationMs = performance.now() - startedAt;
+		recordJsonRpcMetric({
+			method: metadata.method,
+			status,
+			durationMs,
+		});
+		if (metadata.toolCalls.length > 0) {
+			for (const toolCall of metadata.toolCalls) {
+				recordToolCallMetric({
+					tool: toolCall.toolName,
+					status,
+					durationMs,
+				});
+			}
+		} else if (metadata.toolName) {
+			recordToolCallMetric({
+				tool: metadata.toolName,
+				status,
+				durationMs,
+			});
+		}
+	};
+
+	try {
+		if (metadata.toolCalls.length > 0) {
+			if (
+				isStrictSetupContractEnforced() &&
+				!hasSetupContractV2Header(request)
+			) {
+				for (const toolCall of metadata.toolCalls) {
+					if (requiresSetupContractV2(toolCall.toolName)) {
+						recordMetrics("error");
+						return buildSetupContractRequiredResponse(toolCall.toolName);
+					}
+				}
+			}
+			const providerId = readHeaderValue(request, "x-provider-id");
+			const modelId = readHeaderValue(request, "x-model-id");
+			const resolvedPolicy = resolveEffectiveToolPolicy(toolPolicy, {
+				providerId,
+				modelId,
+			});
+			for (const toolCall of metadata.toolCalls) {
+				if (!isToolAllowed(resolvedPolicy, toolCall.toolName)) {
+					recordMetrics("error");
+					return buildPolicyBlockedResponse(
+						toolCall.toolName,
+						resolvedPolicy.profile,
+						resolvedPolicy.providerRuleKey ?? null,
+					);
+				}
+			}
+		}
+
+		const response = withCors(
+			await createAndHandleStatelessRequest(request, auth, {
+				enableJsonResponse,
+			}),
+		);
+		recordMetrics(response.ok ? "success" : "error");
+		return response;
+	} catch (error) {
+		recordMetrics("error");
+		throw error;
+	}
+}
+
 async function handleMcpGetOrDelete(
 	request: Request,
 	sessionStore: SessionStore,
@@ -309,8 +458,26 @@ export async function handleMcpRequest(
 	toolPolicy: ToolPolicyConfig,
 	loopPolicy: LoopDetectionPolicy,
 	telemetryEnabled = true,
+	options: {
+		transportMode?: McpTransportMode;
+		enableJsonResponse?: boolean;
+	} = {},
 ): Promise<Response> {
 	validateLoopDetectionPolicy(loopPolicy);
+	const transportMode = options.transportMode ?? "stateful";
+
+	if (transportMode === "stateless") {
+		if (request.method !== "POST") {
+			return methodNotAllowedResponse("POST, OPTIONS");
+		}
+		return handleMcpPostStateless(
+			request,
+			auth,
+			toolPolicy,
+			telemetryEnabled,
+			options.enableJsonResponse ?? true,
+		);
+	}
 
 	if (request.method === "POST") {
 		return handleMcpPost(
@@ -328,11 +495,5 @@ export async function handleMcpRequest(
 		return handleMcpGetOrDelete(request, sessionStore, sessionRegistry);
 	}
 
-	return new Response("Method Not Allowed", {
-		status: 405,
-		headers: {
-			allow: "GET, POST, DELETE, OPTIONS",
-			...corsHeaders(),
-		},
-	});
+	return methodNotAllowedResponse("GET, POST, DELETE, OPTIONS");
 }

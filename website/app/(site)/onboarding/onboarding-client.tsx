@@ -19,6 +19,7 @@ type BootstrapAnswerKey =
 
 type SetupAnswerKey =
 	| "ttrpgSystem"
+	| "theme"
 	| "systemUrl"
 	| "sourceMaterialsStatus"
 	| "diceRoller"
@@ -46,6 +47,7 @@ function isBootstrapAnswerKey(
 function isSetupAnswerKey(value: string | null): value is SetupAnswerKey {
 	return (
 		value === "ttrpgSystem" ||
+		value === "theme" ||
 		value === "systemUrl" ||
 		value === "sourceMaterialsStatus" ||
 		value === "diceRoller" ||
@@ -89,9 +91,14 @@ export function OnboardingClient({ initial }: Props) {
 		return total > 0 ? `${answered}/${total}` : "0/0";
 	}, [result.progress.answered, result.progress.total]);
 
+	const activeSetupPrompt = useMemo(() => {
+		return result.setupPrompt ?? result.setup?.setupPrompt ?? null;
+	}, [result.setupPrompt, result.setup?.setupPrompt]);
+
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		const questionKey = result.questionKey as QuestionKey | null;
+		const questionKey = (activeSetupPrompt?.questionKey ??
+			result.questionKey) as QuestionKey | null;
 		if (!questionKey) {
 			setError("No bootstrap question is active.");
 			return;
@@ -163,13 +170,37 @@ export function OnboardingClient({ initial }: Props) {
 				</p>
 			</div>
 			<div className="space-y-6 px-6 py-7">
-				{result.question ? (
-					<p className="text-sm leading-relaxed">{result.question}</p>
+				{(activeSetupPrompt?.prompt ?? result.question) ? (
+					<p className="text-sm leading-relaxed">
+						{activeSetupPrompt?.prompt ?? result.question}
+					</p>
 				) : (
 					<p className="text-sm text-muted-foreground">
 						Awaiting bootstrap question...
 					</p>
 				)}
+
+				{activeSetupPrompt &&
+				activeSetupPrompt.inputType === "single_choice_or_text" &&
+				activeSetupPrompt.choices.length > 0 ? (
+					<div className="grid gap-2">
+						{activeSetupPrompt.choices.map((choice) => (
+							<button
+								type="button"
+								key={choice.id}
+								onClick={() => setValue(choice.id)}
+								className="flex w-full items-start justify-between border border-border px-3 py-2 text-left font-mono text-xs transition-colors hover:border-foreground"
+							>
+								<span>{choice.label}</span>
+								{choice.recommended ? (
+									<span className="ml-3 text-[10px] uppercase tracking-widest text-foreground">
+										Recommended
+									</span>
+								) : null}
+							</button>
+						))}
+					</div>
+				) : null}
 
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<textarea

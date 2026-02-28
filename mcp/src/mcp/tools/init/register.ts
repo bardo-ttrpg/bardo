@@ -1,8 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveFeatureFlags } from "../../../domain/config/features";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
+import { recordSetupLegacyFieldEmitMetric } from "../../../telemetry";
 import type { AuthContext } from "../../../types/contracts";
 import { makeToolResult } from "../../tool-result";
+import { DICE_ROLLER_SETUP_QUESTION } from "./setup-prompts";
 import {
 	analyzeWorkspace,
 	buildInitFailureOutput,
@@ -27,6 +28,21 @@ import {
 
 const INIT_DEPRECATION_NOTICE =
 	"`init` remains available but the recommended primary entrypoint is `player_action`, which now auto-guides setup.";
+
+function recordLegacySetupPromptFields(output: InitOutput): void {
+	if (output.setupQuestion && output.setupQuestion.trim().length > 0) {
+		recordSetupLegacyFieldEmitMetric({
+			source: "init",
+			field: "setupQuestion",
+		});
+	}
+	if (Array.isArray(output.nextPrompts) && output.nextPrompts.length > 0) {
+		recordSetupLegacyFieldEmitMetric({
+			source: "init",
+			field: "nextPrompts",
+		});
+	}
+}
 
 export function registerInitTool(server: McpServer, auth: AuthContext): void {
 	server.registerTool(
@@ -99,7 +115,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			);
 
 			let resolvedDiceRoller = diceRoller ?? savedDiceRoller;
-			const resolvedTheme = normalizeTheme(theme) ?? savedTheme;
+			let resolvedTheme = normalizeTheme(theme) ?? savedTheme;
 			const resolvedOptionalSystems = mergeOptionalSystems(
 				savedOptionalSystems,
 				optionalSystems,
@@ -113,6 +129,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				| undefined;
 			let setupQuestionKey: string | null | undefined;
 			let setupQuestion: string | null | undefined;
+			let setupPrompt: InitOutput["setupPrompt"] = null;
 			let setupRevisionOutput: number | undefined;
 			let setupConflict:
 				| {
@@ -127,11 +144,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 						invalidPaths: string[];
 				  }
 				| undefined;
-			const guidedSetupEnabled = resolveFeatureFlags(
-				Bun.env,
-			).guidedSetupEnabled;
-
-			if (!bootstrapOnly && guidedSetupEnabled) {
+			if (!bootstrapOnly) {
 				const setup = await runGuidedSetupFlow({
 					campaignBasePath: auth.campaignBasePath,
 					nowIso,
@@ -143,16 +156,20 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				setupStatus = setup.status;
 				setupQuestionKey = setup.questionKey;
 				setupQuestion = setup.question;
+				setupPrompt = setup.setupPrompt;
 				setupRevisionOutput = setup.revision;
 				setupConflict = setup.conflict;
 				setupIntegrity = setup.integrity;
 				resolvedDiceRoller = resolvedDiceRoller ?? setup.answers.diceRoller;
+				resolvedTheme =
+					resolvedTheme ?? normalizeTheme(setup.answers.theme ?? undefined);
 
 				if (setup.status !== "complete") {
 					const output: InitOutput = {
 						success: true,
 						setupComplete: false,
 						requiresUserInput: true,
+						setupPrompt,
 						message: setup.message,
 						nextPrompts: setup.question ? [setup.question] : [],
 						rootPath: bardoRoot,
@@ -183,6 +200,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 						setupIntegrity,
 						deprecationNotice: INIT_DEPRECATION_NOTICE,
 					};
+					recordLegacySetupPromptFields(output);
 					return makeToolResult(output);
 				}
 			}
@@ -198,6 +216,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					success: true,
 					setupComplete: false,
 					requiresUserInput: true,
+					setupPrompt: null,
 					message:
 						"Initialization paused for bootstrap. Continue answering one prompt at a time.",
 					nextPrompts: bootstrap.nextPrompt ? [bootstrap.nextPrompt] : [],
@@ -242,6 +261,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					deprecationNotice: INIT_DEPRECATION_NOTICE,
 				};
 
+				recordLegacySetupPromptFields(output);
 				return makeToolResult(output);
 			}
 
@@ -250,6 +270,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					success: true,
 					setupComplete: true,
 					requiresUserInput: false,
+					setupPrompt: null,
 					message: bootstrap.alreadyInitialized
 						? "Bootstrap already complete."
 						: "Bootstrap complete.",
@@ -295,13 +316,12 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					deprecationNotice: INIT_DEPRECATION_NOTICE,
 				};
 
+				recordLegacySetupPromptFields(output);
 				return makeToolResult(output);
 			}
 
 			if (!resolvedDiceRoller) {
-				nextPrompts.push(
-					"Who should roll party character dice for this campaign: `player` or `bardo`?",
-				);
+				nextPrompts.push(DICE_ROLLER_SETUP_QUESTION);
 			}
 
 			const scene = await resolveStartingScene({
@@ -363,6 +383,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				success: true,
 				setupComplete,
 				requiresUserInput,
+				setupPrompt: null,
 				message,
 				nextPrompts: normalizedNextPrompts,
 				rootPath: bardoRoot,
@@ -409,6 +430,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				deprecationNotice: INIT_DEPRECATION_NOTICE,
 			};
 
+			recordLegacySetupPromptFields(output);
 			return makeToolResult(output);
 		},
 	);

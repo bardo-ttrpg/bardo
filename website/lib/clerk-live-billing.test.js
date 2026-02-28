@@ -58,7 +58,11 @@ describe("clerk-live-billing", () => {
 				},
 			},
 		};
-		const snapshot = await fetchLiveBillingSnapshotFromClerk(fakeClerk, "user_123", {});
+		const snapshot = await fetchLiveBillingSnapshotFromClerk(
+			fakeClerk,
+			"user_123",
+			{},
+		);
 		expect(snapshot.billingUnavailable).toBe(true);
 		expect(snapshot.plan).toBe("free");
 	});
@@ -73,7 +77,11 @@ describe("clerk-live-billing", () => {
 				}),
 			},
 		};
-		const snapshot = await fetchLiveBillingSnapshotFromClerk(fakeClerk, "user_123", {});
+		const snapshot = await fetchLiveBillingSnapshotFromClerk(
+			fakeClerk,
+			"user_123",
+			{},
+		);
 		expect(snapshot.billingUnavailable).toBe(false);
 	});
 

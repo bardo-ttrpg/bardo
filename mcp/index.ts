@@ -31,7 +31,7 @@ console.log(
 		: "API key auth disabled (BARDO_API_KEYS_JSON not configured or invalid)",
 );
 console.log(
-	`Security policy: authMode=${SECURITY_POLICY.authMode}, allowQueryApiKey=${SECURITY_POLICY.allowQueryApiKey}, sessionTtlMs=${SECURITY_POLICY.sessionTtlMs}, maxRequestBytes=${SECURITY_POLICY.maxRequestBytes}, telemetryEnabled=${SECURITY_POLICY.telemetryEnabled}, metricsRouteEnabled=${SECURITY_POLICY.metricsRouteEnabled}, metricsRequireAuth=${SECURITY_POLICY.metricsRequireAuth}`,
+	`Security policy: authMode=${SECURITY_POLICY.authMode}, allowQueryApiKey=${SECURITY_POLICY.allowQueryApiKey}, sessionTtlMs=${SECURITY_POLICY.sessionTtlMs}, maxRequestBytes=${SECURITY_POLICY.maxRequestBytes}, telemetryEnabled=${SECURITY_POLICY.telemetryEnabled}, metricsRouteEnabled=${SECURITY_POLICY.metricsRouteEnabled}, metricsRequireAuth=${SECURITY_POLICY.metricsRequireAuth}, transportMode=${SECURITY_POLICY.transportMode}, mcpEnableJsonResponse=${SECURITY_POLICY.mcpEnableJsonResponse}`,
 );
 console.log(
 	`Tool policy: profile=${TOOL_POLICY_CONFIG.defaultProfile}, baseAllow=${TOOL_POLICY_CONFIG.baseAllowTokens.length}, baseDeny=${TOOL_POLICY_CONFIG.baseDenyTokens.length}, providerRules=${Object.keys(TOOL_POLICY_CONFIG.byProvider).length}`,

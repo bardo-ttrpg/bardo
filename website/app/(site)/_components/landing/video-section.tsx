@@ -13,8 +13,8 @@ export default function VideoSection() {
 			<LazyHeroVideoDialog
 				animationStyle="from-center"
 				videoSrc="https://www.youtube.com/embed/qh3NGpYRG3I?si=4rb-zSdDkVK9qxxb"
-				thumbnailSrc="https://startup-template-sage.vercel.app/hero-light.png"
-				darkThumbnailSrc="https://startup-template-sage.vercel.app/hero-dark.png"
+				thumbnailSrc="https://img.youtube.com/vi/qh3NGpYRG3I/maxresdefault.jpg"
+				darkThumbnailSrc="https://img.youtube.com/vi/qh3NGpYRG3I/maxresdefault.jpg"
 				thumbnailAlt="Bardo demo video"
 			/>
 		</section>

@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
 		remotePatterns: [
 			{
 				protocol: "https",
-				hostname: "startup-template-sage.vercel.app",
+				hostname: "img.youtube.com",
 			},
 		],
 	},

@@ -447,7 +447,7 @@ describe("handleResolveTurnRequest", () => {
 		expect(payload.error).toContain("Tick blocked by runtime policy");
 	});
 
-	test("propagates strict canonical failures in in-process orchestrator flow", async () => {
+	test("auto-recovers strict canonical reads in in-process orchestrator flow when guided setup is disabled", async () => {
 		const previousStrict = Bun.env.BARDO_STRICT_CANONICAL_MODE;
 		const previousGuidedSetup = Bun.env.BARDO_GUIDED_SETUP_ENABLED;
 		const root = await mkdtemp(
@@ -488,15 +488,25 @@ describe("handleResolveTurnRequest", () => {
 			);
 			const payload = (await response.json()) as {
 				success: boolean;
-				error: string;
+				action: {
+					result?: {
+						requiresSetup?: boolean;
+						setupStatus?: string;
+					};
+				} | null;
+				consistency: { success?: boolean; errorCount?: number } | null;
+				state: unknown;
+				resources: unknown;
 			};
 
-			expect(response.status).toBe(502);
-			expect(payload.success).toBe(false);
-			expect(payload.error).toContain("player_action failed");
-			expect(payload.error).toContain(
-				"STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED",
-			);
+			expect(response.status).toBe(200);
+			expect(payload.success).toBe(true);
+			expect(payload.action?.result?.requiresSetup).toBe(false);
+			expect(payload.action?.result?.setupStatus).toBe("complete");
+			expect(payload.consistency?.success).toBe(true);
+			expect(payload.consistency?.errorCount).toBe(0);
+			expect(payload.state).toBeNull();
+			expect(payload.resources).toBeNull();
 		} finally {
 			if (previousStrict === undefined) {
 				delete Bun.env.BARDO_STRICT_CANONICAL_MODE;

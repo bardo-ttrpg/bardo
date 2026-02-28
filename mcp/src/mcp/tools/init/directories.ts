@@ -132,6 +132,7 @@ export function buildInitFailureOutput(args: {
 		success: false,
 		setupComplete: false,
 		requiresUserInput: false,
+		setupPrompt: null,
 		message: args.message,
 		nextPrompts: args.nextPrompts,
 		rootPath: args.rootPath,

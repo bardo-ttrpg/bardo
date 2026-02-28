@@ -37,8 +37,11 @@ export async function DELETE(
 		await clerk.apiKeys.delete(clerkKeyId);
 	} catch (err) {
 		console.error("[api/keys/[id]] clerk.apiKeys.delete failed:", err);
-		return NextResponse.json({ error: "Failed to delete key" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Failed to delete key" },
+			{ status: 500 },
+		);
 	}
 
-	return NextResponse.json({ deleted: true });
+	return NextResponse.json({ revoked: true, deleted: true });
 }

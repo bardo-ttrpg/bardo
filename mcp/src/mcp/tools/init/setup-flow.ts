@@ -24,6 +24,12 @@ import {
 import { ensureInitDirectories } from "./directories";
 import { type InitPaths, resolveInitPaths } from "./paths";
 import { readJsonMarkdown } from "./settings";
+import { buildSetupPrompt, type SetupPrompt } from "./setup-prompt";
+import {
+	DICE_ROLLER_SETUP_QUESTION,
+	SYSTEM_SETUP_QUESTION,
+	THEME_SETUP_QUESTION,
+} from "./setup-prompts";
 import type {
 	SetupAnswers,
 	SourceMaterialsStatus,
@@ -63,6 +69,7 @@ type SetupState = {
 	pendingAction: string | null;
 	answers: {
 		ttrpgSystem: string | null;
+		theme: string | null;
 		systemUrl: string | null;
 		sourceMaterialsStatus: SourceMaterialsStatus | null;
 		diceRoller: "player" | "bardo" | null;
@@ -111,6 +118,7 @@ export type GuidedSetupFlowResult = {
 	revision: number;
 	questionKey: string | null;
 	question: string | null;
+	setupPrompt: SetupPrompt | null;
 	progressAnswered: number;
 	progressTotal: number;
 	pendingAction: string | null;
@@ -140,12 +148,7 @@ export type GuidedSetupFlowResult = {
 	answers: SetupState["answers"];
 };
 
-const REQUIRED_SETUP_KEYS = [
-	"ttrpgSystem",
-	"sourceMaterialsStatus",
-	"diceRoller",
-	"playerCount",
-] as const;
+const REQUIRED_SETUP_KEYS = ["ttrpgSystem", "diceRoller", "theme"] as const;
 
 function defaultSetupState(): SetupState {
 	return {
@@ -154,6 +157,7 @@ function defaultSetupState(): SetupState {
 		pendingAction: null,
 		answers: {
 			ttrpgSystem: null,
+			theme: null,
 			systemUrl: null,
 			sourceMaterialsStatus: null,
 			diceRoller: null,
@@ -262,6 +266,7 @@ function normalizeSetupState(raw: unknown): SetupState {
 		pendingAction: toTrimmedString(record.pendingAction),
 		answers: {
 			ttrpgSystem: toTrimmedString(rawAnswers.ttrpgSystem),
+			theme: toTrimmedString(rawAnswers.theme),
 			systemUrl: toTrimmedString(rawAnswers.systemUrl),
 			sourceMaterialsStatus,
 			diceRoller,
@@ -881,8 +886,10 @@ async function persistSetupToSettings(
 		diceRoller:
 			setupState.answers.diceRoller ?? existingData.diceRoller ?? null,
 		ttrpgSystem: setupState.answers.ttrpgSystem ?? null,
+		theme: setupState.answers.theme ?? existingData.theme ?? null,
 		setup: {
 			ttrpgSystem: setupState.answers.ttrpgSystem,
+			theme: setupState.answers.theme,
 			systemUrl: setupState.answers.systemUrl,
 			sourceMaterialsStatus: setupState.answers.sourceMaterialsStatus,
 			diceRoller: setupState.answers.diceRoller,
@@ -936,6 +943,11 @@ function mergeSetupAnswers(
 	const ttrpgSystem = toTrimmedString(answers.ttrpgSystem);
 	if (ttrpgSystem && ttrpgSystem !== state.answers.ttrpgSystem) {
 		next.answers.ttrpgSystem = ttrpgSystem;
+		changed = true;
+	}
+	const theme = toTrimmedString(answers.theme);
+	if (theme && theme !== state.answers.theme) {
+		next.answers.theme = theme;
 		changed = true;
 	}
 	const systemUrl = toTrimmedString(answers.systemUrl);
@@ -997,45 +1009,47 @@ function mergeSetupAnswers(
 	return { state: next, changed };
 }
 
+function filterSetupAnswersForCurrentQuestion(args: {
+	answers: SetupAnswers | undefined;
+	questionKey: string | null;
+}): SetupAnswers | undefined {
+	if (!args.answers || !args.questionKey) {
+		return undefined;
+	}
+	const questionKey = args.questionKey as keyof SetupAnswers;
+	const value = args.answers[questionKey];
+	if (value === undefined || value === null) {
+		return undefined;
+	}
+	return { [questionKey]: value } as SetupAnswers;
+}
+
 function requiredAnswersCompleted(answers: SetupState["answers"]): boolean {
 	return REQUIRED_SETUP_KEYS.every((key) => answers[key] !== null);
 }
 
 function setupQuestionForState(
 	state: SetupState,
-	evidenceSummary: string[],
+	_evidenceSummary: string[],
 ): { key: string; question: string } | null {
 	if (!state.answers.ttrpgSystem) {
 		return {
 			key: "ttrpgSystem",
-			question:
-				"What ttrpg system are we playing? If possible, share a rulebook URL or file path so I can align mechanics accurately.",
-		};
-	}
-
-	if (!state.answers.sourceMaterialsStatus) {
-		const evidenceLine =
-			evidenceSummary.length > 0
-				? ` Detected materials: ${evidenceSummary.join("; ")}.`
-				: "";
-		return {
-			key: "sourceMaterialsStatus",
-			question: `Do you already have core materials (rulebook, character sheets, bestiary, expansions) available? Reply with \`complete\`, \`partial\`, or \`none\`.${evidenceLine}`,
+			question: SYSTEM_SETUP_QUESTION,
 		};
 	}
 
 	if (!state.answers.diceRoller) {
 		return {
 			key: "diceRoller",
-			question:
-				"Who should roll party character dice for this campaign: `player` or `bardo`?",
+			question: DICE_ROLLER_SETUP_QUESTION,
 		};
 	}
 
-	if (!state.answers.playerCount) {
+	if (!state.answers.theme) {
 		return {
-			key: "playerCount",
-			question: "How many players are in the party?",
+			key: "theme",
+			question: THEME_SETUP_QUESTION,
 		};
 	}
 
@@ -1069,6 +1083,10 @@ function flowResult(args: {
 		revision: args.state.revision,
 		questionKey: args.questionKey,
 		question: args.question,
+		setupPrompt: buildSetupPrompt({
+			questionKey: args.questionKey,
+			prompt: args.question,
+		}),
 		progressAnswered:
 			args.bootstrap.answeredCount + setupProgress(args.state.answers),
 		progressTotal: args.bootstrap.totalQuestions + REQUIRED_SETUP_KEYS.length,
@@ -1253,6 +1271,23 @@ export async function runGuidedSetupFlow(input: {
 			}
 
 			if (!bootstrap.complete) {
+				const bootstrapOnlyQuestionHint = bootstrap.pendingQuestionKey
+					? `Only answer the current questionKey: ${bootstrap.pendingQuestionKey}.`
+					: null;
+				const ignoredBootstrapInput =
+					bootstrap.ignoredAnswerKeys.length > 0 && bootstrapOnlyQuestionHint
+						? bootstrapOnlyQuestionHint
+						: null;
+				const message = ignoredBootstrapInput
+					? `Setup is waiting for bootstrap answers. ${ignoredBootstrapInput}`
+					: "Setup is waiting for bootstrap answers. Continue one question at a time.";
+				const nextWarnings = ignoredBootstrapInput
+					? upsertWarning(state.warnings, ignoredBootstrapInput)
+					: state.warnings;
+				if (nextWarnings !== state.warnings) {
+					state.warnings = nextWarnings;
+					changed = true;
+				}
 				if (changed || input.bootstrapAnswers || input.setupAnswers) {
 					state.revision += 1;
 					state.updatedAtISO = input.nowIso;
@@ -1264,8 +1299,7 @@ export async function runGuidedSetupFlow(input: {
 				return finalize(
 					flowResult({
 						status: "needs_input",
-						message:
-							"Setup is waiting for bootstrap answers. Continue one question at a time.",
+						message,
 						state,
 						questionKey: bootstrap.pendingQuestionKey,
 						question: bootstrap.nextPrompt,
@@ -1276,25 +1310,49 @@ export async function runGuidedSetupFlow(input: {
 				);
 			}
 
-			const merged = mergeSetupAnswers(state, input.setupAnswers);
+			const questionBeforeMerge = setupQuestionForState(
+				state,
+				state.evidenceSummary,
+			);
+			const acceptedSetupAnswers = filterSetupAnswersForCurrentQuestion({
+				answers: input.setupAnswers,
+				questionKey: questionBeforeMerge?.key ?? null,
+			});
+			const hasProvidedSetupAnswers =
+				typeof input.setupAnswers === "object" &&
+				input.setupAnswers !== null &&
+				Object.keys(input.setupAnswers).length > 0;
+			const ignoredSetupInputHint =
+				hasProvidedSetupAnswers &&
+				questionBeforeMerge?.key &&
+				!acceptedSetupAnswers
+					? `Only answer the current questionKey: ${questionBeforeMerge.key}.`
+					: null;
+			const merged = mergeSetupAnswers(state, acceptedSetupAnswers);
 			state = merged.state;
 			changed = changed || merged.changed;
+			if (ignoredSetupInputHint) {
+				state.warnings = upsertWarning(state.warnings, ignoredSetupInputHint);
+				changed = true;
+			}
 			state.status = "needs_input";
 
 			const question = setupQuestionForState(state, state.evidenceSummary);
 			if (question) {
-				if (changed || input.setupAnswers || input.bootstrapAnswers) {
+				if (changed || acceptedSetupAnswers || input.bootstrapAnswers) {
 					state.revision += 1;
 					state.updatedAtISO = input.nowIso;
 					await writeSetupState(paths, state);
 					await persistSetupToSettings(paths, state, input.nowIso);
 					await writeMaterialsIndex(paths, input.nowIso, state, byCategory);
 				}
+				const message = ignoredSetupInputHint
+					? `Setup is partially complete. ${ignoredSetupInputHint}`
+					: "Setup is partially complete. Answer the next question to continue.";
 				return finalize(
 					flowResult({
 						status: "needs_input",
-						message:
-							"Setup is partially complete. Answer the next question to continue.",
+						message,
 						state,
 						questionKey: question.key,
 						question: question.question,
@@ -1317,7 +1375,7 @@ export async function runGuidedSetupFlow(input: {
 				changed = true;
 			}
 
-			if (changed || input.setupAnswers || input.bootstrapAnswers) {
+			if (changed || acceptedSetupAnswers || input.bootstrapAnswers) {
 				state.revision += 1;
 				state.updatedAtISO = input.nowIso;
 				await writeSetupState(paths, state);

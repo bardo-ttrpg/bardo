@@ -102,6 +102,59 @@ describe("runBootstrapStep", () => {
 		expect(repeatResult.requiresUserInput).toBe(false);
 	});
 
+	test("does not advance bootstrap when pending question answer is missing", async () => {
+		const root = await makeTempRoot("bardo-bootstrap-strict-missing-");
+		const bardoRoot = path.join(root, "bardo");
+		await mkdir(bardoRoot, { recursive: true });
+		const paths = resolveInitPaths(bardoRoot);
+
+		const first = await runBootstrapStep({
+			paths,
+			nowIso: "2026-02-20T00:00:00.000Z",
+		});
+		expect(first.pendingQuestionKey).toBe("purpose");
+
+		const second = await runBootstrapStep({
+			paths,
+			nowIso: "2026-02-20T00:00:01.000Z",
+		});
+		expect(second.pendingQuestionKey).toBe("purpose");
+		expect(second.answeredCount).toBe(0);
+	});
+
+	test("ignores out-of-order bootstrap answers until pending key is answered", async () => {
+		const root = await makeTempRoot("bardo-bootstrap-strict-order-");
+		const bardoRoot = path.join(root, "bardo");
+		await mkdir(bardoRoot, { recursive: true });
+		const paths = resolveInitPaths(bardoRoot);
+
+		const first = await runBootstrapStep({
+			paths,
+			nowIso: "2026-02-20T00:00:00.000Z",
+		});
+		expect(first.pendingQuestionKey).toBe("purpose");
+
+		const outOfOrder = await runBootstrapStep({
+			paths,
+			nowIso: "2026-02-20T00:00:01.000Z",
+			bootstrapAnswers: {
+				userProfile: "This should not be accepted yet.",
+			},
+		});
+		expect(outOfOrder.pendingQuestionKey).toBe("purpose");
+		expect(outOfOrder.answeredCount).toBe(0);
+
+		const inOrder = await runBootstrapStep({
+			paths,
+			nowIso: "2026-02-20T00:00:02.000Z",
+			bootstrapAnswers: {
+				purpose: "Now the required first answer is provided.",
+			},
+		});
+		expect(inOrder.pendingQuestionKey).toBe("userProfile");
+		expect(inOrder.answeredCount).toBe(1);
+	});
+
 	test("requires values answer when SOUL.md exists", async () => {
 		const root = await makeTempRoot("bardo-bootstrap-soul-");
 		const bardoRoot = path.join(root, "bardo");

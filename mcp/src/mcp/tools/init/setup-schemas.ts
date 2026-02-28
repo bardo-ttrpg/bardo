@@ -14,6 +14,7 @@ export const sourcePolicySchema = z.enum([
 export const setupAnswersSchema = z
 	.object({
 		ttrpgSystem: z.string().trim().min(2).max(160).optional(),
+		theme: z.string().trim().min(2).max(120).optional(),
 		systemUrl: z.string().trim().max(2_000).optional(),
 		sourceMaterialsStatus: sourceMaterialsStatusSchema.optional(),
 		diceRoller: z.enum(["player", "bardo"]).optional(),

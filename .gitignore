@@ -43,3 +43,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # local browser/profiling artifacts
 .agent-browser-sock/
 C:\\Users\\*\\AppData\\Local\\lighthouse.*/
+
+# local runtime data (never commit)
+customers/
+website/.bun-tmp/
+website/.bun-install/
+.env
+.codex/

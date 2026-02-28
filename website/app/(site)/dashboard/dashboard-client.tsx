@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { DashboardSignOutButton } from "./signout-button";
 
+const READ_REQUEST_TIMEOUT_MS =
+	process.env.NODE_ENV === "development" ? 30_000 : 10_000;
+const MUTATION_REQUEST_TIMEOUT_MS =
+	process.env.NODE_ENV === "development" ? 90_000 : 30_000;
+
 type ConnectionClient =
 	| "claude"
 	| "opencode"
@@ -46,17 +51,55 @@ type BillingState = {
 	mcpCallsThisPeriod: number;
 	apiKeyCallsTotal: number;
 	apiKeyCallsThisPeriod: number;
-	partySeats: number;
 };
 
 type DashboardData = {
 	billing: BillingState | null;
-	keyPolicy: { maxAllowed: number };
+	keyPolicy: {
+		maxAllowed: number;
+		dailyUserVerificationLimit: number;
+		dailyKeyVerificationLimit: number;
+		mcpPeriodLimit: number;
+	};
 };
 
 function formatDate(value: number | null | undefined): string {
 	if (!value) return "Never";
 	return new Date(value).toLocaleString();
+}
+
+async function fetchWithTimeout(
+	input: RequestInfo | URL,
+	init?: RequestInit,
+	timeoutMs = READ_REQUEST_TIMEOUT_MS,
+) {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		return await fetch(input, {
+			...init,
+			signal: controller.signal,
+		});
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toUiError(error: unknown, fallback: string): string {
+	if (
+		(error instanceof DOMException && error.name === "AbortError") ||
+		(error instanceof Error && error.name === "AbortError")
+	) {
+		return "Request timed out. Please retry.";
+	}
+	if (error instanceof Error && error.message.trim().length > 0) {
+		return error.message;
+	}
+	return fallback;
 }
 
 export function DashboardClient() {
@@ -70,7 +113,6 @@ export function DashboardClient() {
 	const [keysLoading, setKeysLoading] = useState(true);
 
 	const [name, setName] = useState("Default key");
-	const [workspacePath, setWorkspacePath] = useState("");
 	const [busyId, setBusyId] = useState<string | null>(null);
 	const [lastSecret, setLastSecret] = useState<string | null>(null);
 	const [lastSecretLabel, setLastSecretLabel] = useState<string | null>(null);
@@ -78,24 +120,30 @@ export function DashboardClient() {
 	const [copied, setCopied] = useState(false);
 	const [connectionClient, setConnectionClient] =
 		useState<ConnectionClient>("codex");
-	const [connectionMode, setConnectionMode] =
-		useState<ConnectionMode>("remote");
+	const [connectionMode, setConnectionMode] = useState<ConnectionMode>("local");
 	const [snippet, setSnippet] = useState<string>("");
 	const [snippetLoading, setSnippetLoading] = useState(false);
 
 	const billing = dashboardData?.billing ?? null;
-	const keyPolicy = dashboardData?.keyPolicy ?? { maxAllowed: 0 };
+	const keyPolicy = dashboardData?.keyPolicy ?? {
+		maxAllowed: 0,
+		dailyUserVerificationLimit: 0,
+		dailyKeyVerificationLimit: 0,
+		mcpPeriodLimit: 0,
+	};
 
 	const activeCount = keys.filter((k) => k.status === "active").length;
 
 	const fetchBilling = useCallback(async () => {
 		setBillingLoading(true);
 		try {
-			const res = await fetch("/api/billing");
+			const res = await fetchWithTimeout("/api/billing");
 			if (res.ok) {
 				const payload = (await res.json()) as DashboardData;
 				setDashboardData(payload);
 			}
+		} catch {
+			// Keep existing UI state on transient network errors.
 		} finally {
 			setBillingLoading(false);
 		}
@@ -104,11 +152,13 @@ export function DashboardClient() {
 	const fetchKeys = useCallback(async () => {
 		setKeysLoading(true);
 		try {
-			const res = await fetch("/api/keys");
+			const res = await fetchWithTimeout("/api/keys");
 			if (res.ok) {
 				const payload = (await res.json()) as { keys: ApiKey[] };
 				setKeys(payload.keys ?? []);
 			}
+		} catch {
+			// Keep existing UI state on transient network errors.
 		} finally {
 			setKeysLoading(false);
 		}
@@ -126,7 +176,7 @@ export function DashboardClient() {
 			url.searchParams.set("client", connectionClient);
 			url.searchParams.set("mode", connectionMode);
 			url.searchParams.set("apiKey", secret);
-			const response = await fetch(url, { cache: "no-store" });
+			const response = await fetchWithTimeout(url, { cache: "no-store" });
 			const payload = (await response.json()) as { snippet?: string };
 			setSnippet(payload.snippet ?? "");
 		} finally {
@@ -142,15 +192,18 @@ export function DashboardClient() {
 		setMutationError(null);
 		setBusyId("create");
 		try {
-			const res = await fetch("/api/keys", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					name,
-					workspacePath: workspacePath.trim() || undefined,
-					scopes: ["mcp"],
-				}),
-			});
+			const res = await fetchWithTimeout(
+				"/api/keys",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						name,
+						scopes: ["mcp"],
+					}),
+				},
+				MUTATION_REQUEST_TIMEOUT_MS,
+			);
 			const payload = (await res.json()) as {
 				key?: ApiKey;
 				secret?: string;
@@ -167,7 +220,7 @@ export function DashboardClient() {
 			}
 			await fetchKeys();
 		} catch (err) {
-			setMutationError(err instanceof Error ? err.message : String(err));
+			setMutationError(toUiError(err, "Failed to create key"));
 		} finally {
 			setBusyId(null);
 		}
@@ -177,7 +230,15 @@ export function DashboardClient() {
 		setMutationError(null);
 		setBusyId(keyId);
 		try {
-			const res = await fetch(`/api/keys/${keyId}`, { method: "DELETE" });
+			const res = await fetchWithTimeout(
+				"/api/keys/revoke",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ id: keyId }),
+				},
+				MUTATION_REQUEST_TIMEOUT_MS,
+			);
 			const payload = (await res.json()) as {
 				revoked?: boolean;
 				error?: string;
@@ -192,7 +253,7 @@ export function DashboardClient() {
 				setLastSecretLabel(null);
 			}
 		} catch (err) {
-			setMutationError(err instanceof Error ? err.message : String(err));
+			setMutationError(toUiError(err, "Failed to delete key"));
 		} finally {
 			setBusyId(null);
 		}
@@ -207,23 +268,50 @@ export function DashboardClient() {
 		setBusyId(keyId);
 		try {
 			// Clerk has no rotate primitive — revoke old and create new.
-			const revokeRes = await fetch(`/api/keys/${keyId}`, {
-				method: "DELETE",
-			});
+			const revokeRes = await fetchWithTimeout(
+				"/api/keys/revoke",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ id: keyId }),
+				},
+				MUTATION_REQUEST_TIMEOUT_MS,
+			);
 			if (!revokeRes.ok) {
 				const p = (await revokeRes.json()) as { error?: string };
 				setMutationError(p.error ?? "Failed to delete old key during rotation");
 				return;
 			}
-			const createRes = await fetch("/api/keys", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					name: keyName,
-					workspacePath: keyWorkspacePath ?? undefined,
-					scopes: ["mcp"],
-				}),
-			});
+			let createRes = await fetchWithTimeout(
+				"/api/keys",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						name: keyName,
+						workspacePath: keyWorkspacePath ?? undefined,
+						scopes: ["mcp"],
+					}),
+				},
+				MUTATION_REQUEST_TIMEOUT_MS,
+			);
+			if (!createRes.ok) {
+				// Retry once on transient create failure after successful revoke.
+				await sleep(350);
+				createRes = await fetchWithTimeout(
+					"/api/keys",
+					{
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							name: keyName,
+							workspacePath: keyWorkspacePath ?? undefined,
+							scopes: ["mcp"],
+						}),
+					},
+					MUTATION_REQUEST_TIMEOUT_MS,
+				);
+			}
 			const payload = (await createRes.json()) as {
 				key?: ApiKey;
 				secret?: string;
@@ -240,7 +328,7 @@ export function DashboardClient() {
 			}
 			await fetchKeys();
 		} catch (err) {
-			setMutationError(err instanceof Error ? err.message : String(err));
+			setMutationError(toUiError(err, "Failed to rotate key"));
 		} finally {
 			setBusyId(null);
 		}
@@ -273,6 +361,14 @@ export function DashboardClient() {
 							<p className="text-sm">
 								Credits: {billing.creditsTotal.toLocaleString()} total
 							</p>
+							<p className="text-sm">
+								MCP calls this period:{" "}
+								<strong>{billing.mcpCallsThisPeriod.toLocaleString()}</strong> /{" "}
+								{keyPolicy.mcpPeriodLimit.toLocaleString()}
+							</p>
+							<p className="text-sm text-muted-foreground">
+								MCP calls total: {billing.mcpCallsTotal.toLocaleString()}
+							</p>
 						</div>
 					) : (
 						<p className="text-sm text-muted-foreground">
@@ -285,17 +381,11 @@ export function DashboardClient() {
 					<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 						Create API Key
 					</p>
-					<div className="grid gap-3 sm:grid-cols-2">
+					<div className="grid gap-3 sm:grid-cols-1">
 						<input
 							value={name}
 							onChange={(event) => setName(event.target.value)}
 							placeholder="Key name"
-							className="border border-border bg-background px-3 py-2 text-sm"
-						/>
-						<input
-							value={workspacePath}
-							onChange={(event) => setWorkspacePath(event.target.value)}
-							placeholder="./customers/your-workspace (optional)"
 							className="border border-border bg-background px-3 py-2 text-sm"
 						/>
 					</div>
@@ -311,7 +401,18 @@ export function DashboardClient() {
 						Keys are shown once on create/rotate. Store them securely.
 					</p>
 					<p className="mt-1 text-xs text-muted-foreground">
+						Workspace location is managed automatically per account.
+					</p>
+					<p className="mt-1 text-xs text-muted-foreground">
 						Active keys: {activeCount} / {keyPolicy.maxAllowed}
+					</p>
+					<p className="mt-1 text-xs text-muted-foreground">
+						Daily verifications (account): up to{" "}
+						{keyPolicy.dailyUserVerificationLimit.toLocaleString()} / day
+					</p>
+					<p className="mt-1 text-xs text-muted-foreground">
+						Daily verifications (per key): up to{" "}
+						{keyPolicy.dailyKeyVerificationLimit.toLocaleString()} / day
 					</p>
 					{mutationError ? (
 						<p className="mt-2 text-xs text-destructive">{mutationError}</p>
@@ -332,6 +433,8 @@ export function DashboardClient() {
 								<th className="px-6 py-3 font-medium">Name</th>
 								<th className="px-6 py-3 font-medium">Scopes</th>
 								<th className="px-6 py-3 font-medium">Status</th>
+								<th className="px-6 py-3 font-medium">MCP period</th>
+								<th className="px-6 py-3 font-medium">MCP total</th>
 								<th className="px-6 py-3 font-medium">Workspace</th>
 								<th className="px-6 py-3 font-medium">Last used</th>
 								<th className="px-6 py-3 font-medium">Actions</th>
@@ -342,7 +445,7 @@ export function DashboardClient() {
 								<tr>
 									<td
 										className="px-6 py-6 text-sm text-muted-foreground"
-										colSpan={6}
+										colSpan={8}
 									>
 										Loading keys…
 									</td>
@@ -351,7 +454,7 @@ export function DashboardClient() {
 								<tr>
 									<td
 										className="px-6 py-6 text-sm text-muted-foreground"
-										colSpan={6}
+										colSpan={8}
 									>
 										No keys yet. Create your first API key above.
 									</td>
@@ -364,6 +467,12 @@ export function DashboardClient() {
 											{key.scopes.join(",")}
 										</td>
 										<td className="px-6 py-3 uppercase">{key.status}</td>
+										<td className="px-6 py-3 font-mono text-xs">
+											{key.callsThisPeriod.toLocaleString()}
+										</td>
+										<td className="px-6 py-3 font-mono text-xs">
+											{key.callsTotal.toLocaleString()}
+										</td>
 										<td className="px-6 py-3 font-mono text-xs text-muted-foreground">
 											{key.workspacePath ?? "—"}
 										</td>
@@ -403,6 +512,10 @@ export function DashboardClient() {
 			<div className="mt-6 border border-border p-6">
 				<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 					Connection Snippet Generator
+				</p>
+				<p className="mb-3 text-xs text-muted-foreground">
+					Recommended: local mode via the @bardo/mcp adapter for maximum
+					compatibility across MCP clients.
 				</p>
 				<div className="flex flex-wrap gap-3">
 					<select
