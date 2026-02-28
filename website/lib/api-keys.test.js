@@ -3,6 +3,7 @@ import {
 	dailyKeyVerificationLimitForPlan,
 	dailyUserVerificationLimitForPlan,
 	maxApiKeysForPlan,
+	mcpPeriodLimitForPlan,
 } from "./api-keys";
 
 describe("maxApiKeysForPlan", () => {
@@ -48,5 +49,24 @@ describe("dailyKeyVerificationLimitForPlan", () => {
 		expect(dailyKeyVerificationLimitForPlan("free", env)).toBe(80);
 		expect(dailyKeyVerificationLimitForPlan("solo", env)).toBe(1500);
 		expect(dailyKeyVerificationLimitForPlan("solo_plus", env)).toBe(2500);
+	});
+});
+
+describe("mcpPeriodLimitForPlan", () => {
+	test("returns default billing-period MCP limits by plan", () => {
+		expect(mcpPeriodLimitForPlan("free")).toBe(100);
+		expect(mcpPeriodLimitForPlan("solo")).toBe(25_000);
+		expect(mcpPeriodLimitForPlan("solo_plus")).toBe(50_000);
+	});
+
+	test("supports env overrides", () => {
+		const env = {
+			BARDO_MCP_PERIOD_LIMIT_FREE: "250",
+			BARDO_MCP_PERIOD_LIMIT_SOLO: "20000",
+			BARDO_MCP_PERIOD_LIMIT_SOLO_PLUS: "75000",
+		};
+		expect(mcpPeriodLimitForPlan("free", env)).toBe(250);
+		expect(mcpPeriodLimitForPlan("solo", env)).toBe(20000);
+		expect(mcpPeriodLimitForPlan("solo_plus", env)).toBe(75000);
 	});
 });

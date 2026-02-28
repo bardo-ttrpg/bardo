@@ -40,6 +40,8 @@ export type DailyVerificationConsumeResult = {
 	backend: "memory" | "upstash";
 };
 
+export type PreAuthKeyConsumeResult = DailyVerificationConsumeResult;
+
 function dayKey(nowMs: number): string {
 	return new Date(nowMs).toISOString().slice(0, 10);
 }
@@ -58,6 +60,18 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 	if (normalized === "true") return true;
 	if (normalized === "false") return false;
 	return fallback;
+}
+
+function parsePositiveInteger(
+	value: string | undefined,
+	fallback: number,
+): number {
+	if (!value) return fallback;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return fallback;
+	}
+	return Math.floor(parsed);
 }
 
 function readUpstashConfig(
@@ -122,14 +136,18 @@ async function upstashIncrement(
 	key: string,
 	config: UpstashConfig,
 	fetchImpl: typeof fetch,
+	timeoutMs: number,
 ): Promise<number | null> {
 	const endpoint = `${config.url}/incr/${encodeURIComponent(key)}`;
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
 	try {
 		const response = await fetchImpl(endpoint, {
 			method: "POST",
 			headers: {
 				authorization: `Bearer ${config.token}`,
 			},
+			signal: controller.signal,
 		});
 		if (!response.ok) {
 			return null;
@@ -144,27 +162,35 @@ async function upstashIncrement(
 		return Math.floor(payload.result);
 	} catch {
 		return null;
+	} finally {
+		clearTimeout(timeout);
 	}
 }
 
-async function upstashExpireIfFirstUse(
+async function upstashEnsureExpiry(
 	key: string,
-	isFirstUse: boolean,
 	config: UpstashConfig,
 	fetchImpl: typeof fetch,
-): Promise<void> {
-	if (!isFirstUse) return;
+	timeoutMs: number,
+): Promise<boolean> {
 	const endpoint = `${config.url}/expire/${encodeURIComponent(key)}/86400`;
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
 	try {
-		await fetchImpl(endpoint, {
+		const response = await fetchImpl(endpoint, {
 			method: "POST",
 			headers: {
 				authorization: `Bearer ${config.token}`,
 			},
+			signal: controller.signal,
 		});
+		return response.ok;
 	} catch {
-		// Ignore expiry failures; key will still be counted and may naturally reset
-		// if a later request successfully applies expiry.
+		// Ignore expiry failures; the caller will retry on later requests until
+		// this key has a confirmed TTL for the current process lifetime.
+		return false;
+	} finally {
+		clearTimeout(timeout);
 	}
 }
 
@@ -180,6 +206,16 @@ export function createDailyVerificationBudgetLimiter(
 		env.BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK,
 		env.NODE_ENV !== "production",
 	);
+	const upstashTimeoutMs = parsePositiveInteger(
+		env.BARDO_UPSTASH_TIMEOUT_MS,
+		1200,
+	);
+	const blockedCacheMs = parsePositiveInteger(
+		env.BARDO_VERIFY_BLOCK_CACHE_MS,
+		30_000,
+	);
+	const blockedCache = new Map<string, number>();
+	const ttlConfirmedKeys = new Set<string>();
 
 	async function consume(
 		scope: VerificationCounterScope,
@@ -187,26 +223,60 @@ export function createDailyVerificationBudgetLimiter(
 		plan: PlanTier,
 	): Promise<DailyVerificationConsumeResult> {
 		const limit = limitForScope(scope, plan, env);
-		const day = dayKey(now());
+		const nowMs = now();
+		const day = dayKey(nowMs);
 		const safeId = id.trim() || "unknown";
+		const blockedKey = `${scope}:${safeId}:${day}`;
+		const blockedUntil = blockedCache.get(blockedKey);
+		if (blockedUntil && blockedUntil > nowMs) {
+			return {
+				allowed: false,
+				limit,
+				used: limit,
+				remaining: 0,
+				backend: upstash ? "upstash" : "memory",
+			};
+		}
 		if (!upstash) {
 			return memoryConsume(usageByCounter, `${scope}:${safeId}`, day, limit);
 		}
 
 		const key = counterKey(scope, safeId, day);
-		const used = await upstashIncrement(key, upstash, fetchImpl);
+		const used = await upstashIncrement(
+			key,
+			upstash,
+			fetchImpl,
+			upstashTimeoutMs,
+		);
 		if (used !== null) {
-			await upstashExpireIfFirstUse(key, used === 1, upstash, fetchImpl);
-			return {
+			if (!ttlConfirmedKeys.has(key)) {
+				const expiryConfirmed = await upstashEnsureExpiry(
+					key,
+					upstash,
+					fetchImpl,
+					upstashTimeoutMs,
+				);
+				if (expiryConfirmed) {
+					ttlConfirmedKeys.add(key);
+				}
+			}
+			const result: DailyVerificationConsumeResult = {
 				allowed: used <= limit,
 				limit,
 				used,
 				remaining: Math.max(0, limit - used),
 				backend: "upstash",
 			};
+			if (!result.allowed) {
+				blockedCache.set(blockedKey, nowMs + blockedCacheMs);
+			} else {
+				blockedCache.delete(blockedKey);
+			}
+			return result;
 		}
 
 		if (!allowMemoryFallback) {
+			blockedCache.set(blockedKey, nowMs + blockedCacheMs);
 			return {
 				allowed: false,
 				limit,
@@ -216,10 +286,27 @@ export function createDailyVerificationBudgetLimiter(
 			};
 		}
 
-		return memoryConsume(usageByCounter, `${scope}:${safeId}`, day, limit);
+		const memoryResult = memoryConsume(
+			usageByCounter,
+			`${scope}:${safeId}`,
+			day,
+			limit,
+		);
+		if (!memoryResult.allowed) {
+			blockedCache.set(blockedKey, nowMs + blockedCacheMs);
+		} else {
+			blockedCache.delete(blockedKey);
+		}
+		return memoryResult;
 	}
 
 	return {
+		consumePreAuthKey(
+			secretHash: string,
+			plan: PlanTier = "free",
+		): Promise<PreAuthKeyConsumeResult> {
+			return consume("key", `preauth:${secretHash}`, plan);
+		},
 		consumeUser(
 			subject: string,
 			plan: PlanTier,
@@ -234,6 +321,7 @@ export function createDailyVerificationBudgetLimiter(
 		},
 		reset(): void {
 			usageByCounter.clear();
+			blockedCache.clear();
 		},
 	};
 }

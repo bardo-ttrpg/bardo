@@ -14,6 +14,7 @@ type BootstrapAnswers = Partial<
 type SetupAnswers = Partial<
 	Record<
 		| "ttrpgSystem"
+		| "theme"
 		| "systemUrl"
 		| "sourceMaterialsStatus"
 		| "diceRoller"
@@ -25,11 +26,41 @@ type SetupAnswers = Partial<
 	>
 >;
 
+type SetupPrompt = {
+	version: "2.0";
+	questionKey:
+		| "purpose"
+		| "userProfile"
+		| "agentProfile"
+		| "workingPreferences"
+		| "boundaries"
+		| "successCriteria"
+		| "values"
+		| "ttrpgSystem"
+		| "diceRoller"
+		| "theme";
+	prompt: string;
+	inputType: "single_choice_or_text" | "free_text";
+	choices: Array<{
+		id: string;
+		label: string;
+		description?: string;
+		recommended?: boolean;
+	}>;
+	allowCustomText: boolean;
+	validation: {
+		minLength?: number;
+		maxLength?: number;
+		allowedChoiceIds?: string[];
+	};
+};
+
 export type InitBootstrapResponse = {
 	success: boolean;
 	status: "needs_input" | "complete" | "error";
 	questionKey: string | null;
 	question: string | null;
+	setupPrompt: SetupPrompt | null;
 	progress: {
 		answered: number;
 		total: number;
@@ -52,6 +83,7 @@ export type InitBootstrapResponse = {
 		status: string | null;
 		questionKey: string | null;
 		question: string | null;
+		setupPrompt?: SetupPrompt | null;
 		revision: number | null;
 	};
 	error?: string;
@@ -109,6 +141,7 @@ export async function requestInitBootstrap(args?: {
 			status: "error",
 			questionKey: null,
 			question: null,
+			setupPrompt: null,
 			progress: { answered: 0, total: 0 },
 			bootstrap: {
 				complete: false,
@@ -158,6 +191,17 @@ export async function requestInitBootstrap(args?: {
 		questionKey:
 			typeof payload.questionKey === "string" ? payload.questionKey : null,
 		question: typeof payload.question === "string" ? payload.question : null,
+		setupPrompt:
+			typeof payload.setupPrompt === "object" &&
+			payload.setupPrompt !== null &&
+			(payload.setupPrompt as Record<string, unknown>).version === "2.0"
+				? (payload.setupPrompt as SetupPrompt)
+				: typeof setupRecord.setupPrompt === "object" &&
+						setupRecord.setupPrompt !== null &&
+						(setupRecord.setupPrompt as Record<string, unknown>).version ===
+							"2.0"
+					? (setupRecord.setupPrompt as SetupPrompt)
+					: null,
 		progress: {
 			answered:
 				typeof progressRecord.answered === "number"
@@ -204,6 +248,12 @@ export async function requestInitBootstrap(args?: {
 					: null,
 			question:
 				typeof setupRecord.question === "string" ? setupRecord.question : null,
+			setupPrompt:
+				typeof setupRecord.setupPrompt === "object" &&
+				setupRecord.setupPrompt !== null &&
+				(setupRecord.setupPrompt as Record<string, unknown>).version === "2.0"
+					? (setupRecord.setupPrompt as SetupPrompt)
+					: null,
 			revision:
 				typeof setupRecord.revision === "number" ? setupRecord.revision : null,
 		},

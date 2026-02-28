@@ -68,6 +68,44 @@ describe("createDailyVerificationBudgetLimiter", () => {
 		expect(result.allowed).toBe(true);
 		expect(result.used).toBe(1);
 	});
+
+	test("retries Upstash expiry until it succeeds", async () => {
+		const counters = new Map();
+		let expireCalls = 0;
+		const fetchImpl = async (input) => {
+			const url = typeof input === "string" ? input : input.toString();
+			if (url.includes("/incr/")) {
+				const encodedKey = url.slice(url.indexOf("/incr/") + "/incr/".length);
+				const key = decodeURIComponent(encodedKey);
+				const next = (counters.get(key) ?? 0) + 1;
+				counters.set(key, next);
+				return new Response(JSON.stringify({ result: next }), { status: 200 });
+			}
+			if (url.includes("/expire/")) {
+				expireCalls += 1;
+				if (expireCalls === 1) {
+					throw new Error("transient expire failure");
+				}
+				return new Response(JSON.stringify({ result: 1 }), { status: 200 });
+			}
+			throw new Error(`unexpected url: ${url}`);
+		};
+		const limiter = createDailyVerificationBudgetLimiter({
+			env: {
+				NODE_ENV: "production",
+				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+				UPSTASH_REDIS_REST_TOKEN: "token",
+			},
+			fetchImpl,
+		});
+
+		const first = await limiter.consumeUser("user_upstash_retry", "free");
+		const second = await limiter.consumeUser("user_upstash_retry", "free");
+
+		expect(first.allowed).toBe(true);
+		expect(second.allowed).toBe(true);
+		expect(expireCalls).toBe(2);
+	});
 });
 
 describe("createSubjectPlanCache", () => {

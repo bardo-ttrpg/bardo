@@ -58,75 +58,95 @@ function captureStateGetHandler(args: { auth: AuthContext }): StateGetHandler {
 
 describe("state_get tool", () => {
 	test("prefers projection current-state when path is omitted", async () => {
+		const previousStrict = Bun.env.BARDO_STRICT_CANONICAL_MODE;
 		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-state-get-proj-"));
 		const bardoRoot = path.join(root, "bardo");
 		const projectionPath = path.join(bardoRoot, "projections/current-state.md");
-		await mkdir(path.dirname(projectionPath), { recursive: true });
-		await Bun.write(
-			projectionPath,
-			renderMarkdown(
-				{
-					title: "Current State Projection",
-					description: "Derived state",
-				},
-				JSON.stringify(
+		Bun.env.BARDO_STRICT_CANONICAL_MODE = "false";
+		try {
+			await mkdir(path.dirname(projectionPath), { recursive: true });
+			await Bun.write(
+				projectionPath,
+				renderMarkdown(
 					{
-						currentLocation: "projection-town",
+						title: "Current State Projection",
+						description: "Derived state",
 					},
-					null,
-					2,
+					JSON.stringify(
+						{
+							currentLocation: "projection-town",
+						},
+						null,
+						2,
+					),
 				),
-			),
-		);
-		const handler = captureStateGetHandler({ auth: createAuth(root) });
+			);
+			const handler = captureStateGetHandler({ auth: createAuth(root) });
 
-		const result = await handler({});
-		expect(result.isError).toBe(false);
-		expect(result.structuredContent.success).toBe(true);
-		expect(result.structuredContent.stateSource).toBe("projection");
-		expect(result.structuredContent.state.currentLocation).toBe(
-			"projection-town",
-		);
-
-		await rm(root, { recursive: true, force: true });
+			const result = await handler({});
+			expect(result.isError).toBe(false);
+			expect(result.structuredContent.success).toBe(true);
+			expect(result.structuredContent.stateSource).toBe("projection");
+			expect(result.structuredContent.state.currentLocation).toBe(
+				"projection-town",
+			);
+		} finally {
+			if (previousStrict === undefined) {
+				delete Bun.env.BARDO_STRICT_CANONICAL_MODE;
+			} else {
+				Bun.env.BARDO_STRICT_CANONICAL_MODE = previousStrict;
+			}
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	test("falls back to legacy state file when projection is missing", async () => {
+		const previousStrict = Bun.env.BARDO_STRICT_CANONICAL_MODE;
 		resetTelemetryForTests();
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-state-get-legacy-"),
 		);
 		const bardoRoot = path.join(root, "bardo");
 		const legacyPath = path.join(bardoRoot, "state/current.md");
-		await mkdir(path.dirname(legacyPath), { recursive: true });
-		await Bun.write(
-			legacyPath,
-			renderMarkdown(
-				{
-					title: "Campaign State",
-					description: "Legacy state",
-				},
-				JSON.stringify(
+		Bun.env.BARDO_STRICT_CANONICAL_MODE = "false";
+		try {
+			await mkdir(path.dirname(legacyPath), { recursive: true });
+			await Bun.write(
+				legacyPath,
+				renderMarkdown(
 					{
-						currentLocation: "legacy-town",
+						title: "Campaign State",
+						description: "Legacy state",
 					},
-					null,
-					2,
+					JSON.stringify(
+						{
+							currentLocation: "legacy-town",
+						},
+						null,
+						2,
+					),
 				),
-			),
-		);
-		const handler = captureStateGetHandler({ auth: createAuth(root) });
+			);
+			const handler = captureStateGetHandler({ auth: createAuth(root) });
 
-		const result = await handler({});
-		expect(result.isError).toBe(false);
-		expect(result.structuredContent.success).toBe(true);
-		expect(result.structuredContent.stateSource).toBe("legacy_state");
-		expect(result.structuredContent.state.currentLocation).toBe("legacy-town");
-		expect(renderPrometheusMetrics()).toContain(
-			'bardo_legacy_fallback_reads_total{consumer="state_get",outcome="used",strictmode="false"} 1',
-		);
-
-		await rm(root, { recursive: true, force: true });
+			const result = await handler({});
+			expect(result.isError).toBe(false);
+			expect(result.structuredContent.success).toBe(true);
+			expect(result.structuredContent.stateSource).toBe("legacy_state");
+			expect(result.structuredContent.state.currentLocation).toBe(
+				"legacy-town",
+			);
+			expect(renderPrometheusMetrics()).toContain(
+				'bardo_legacy_fallback_reads_total{consumer="state_get",outcome="used",strictmode="false"} 1',
+			);
+		} finally {
+			if (previousStrict === undefined) {
+				delete Bun.env.BARDO_STRICT_CANONICAL_MODE;
+			} else {
+				Bun.env.BARDO_STRICT_CANONICAL_MODE = previousStrict;
+			}
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	test("reads explicit markdown path unchanged", async () => {

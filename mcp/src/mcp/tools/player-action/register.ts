@@ -833,7 +833,6 @@ export function registerPlayerActionTool(
 				setupAnswers,
 				setupRevision,
 				idempotencyKey,
-				guidedSetupEnabled: true,
 			});
 			return makeToolResult(output, !output.success);
 		},

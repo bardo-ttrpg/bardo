@@ -7,8 +7,15 @@ import {
 import {
 	createDailyVerificationBudgetLimiter,
 	createSubjectPlanCache,
+	type DailyVerificationConsumeResult,
 } from "@/lib/api-key-verification-policy";
+import { mcpPeriodLimitForPlan } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import {
+	createIntrospectionTelemetry,
+	type IntrospectionTelemetry,
+} from "@/lib/introspection-telemetry";
+import { createIntrospectionVerifyCache } from "@/lib/introspection-verify-cache";
 import type { PlanTier } from "@/lib/user-billing";
 
 export const runtime = "nodejs";
@@ -19,6 +26,56 @@ type IntrospectRequest = {
 	providerId?: string;
 	modelId?: string;
 	workspaceRoot?: string;
+};
+
+type VerifiedKeyRecord = {
+	id?: string;
+	subject?: string;
+	claims?: unknown;
+	scopes?: unknown;
+};
+
+type ClerkApiKeyVerifier = {
+	verify(secret: string): Promise<VerifiedKeyRecord>;
+};
+
+type ClerkLikeClient = {
+	apiKeys: ClerkApiKeyVerifier;
+};
+
+type VerificationLimiter = {
+	consumePreAuthKey(
+		secretHash: string,
+		plan?: PlanTier,
+	): Promise<DailyVerificationConsumeResult>;
+	consumeUser(
+		subject: string,
+		plan: PlanTier,
+	): Promise<DailyVerificationConsumeResult>;
+	consumeKey(
+		keyId: string,
+		plan: PlanTier,
+	): Promise<DailyVerificationConsumeResult>;
+};
+
+type SubjectPlanCache = {
+	resolve(subject: string, lookup: () => Promise<PlanTier>): Promise<PlanTier>;
+};
+
+type IntrospectionDeps = {
+	introspectionSecret: string | undefined;
+	allowWorkspaceRootOverrideEnv: string | undefined;
+	workspaceRootAllowlistEnv: string | undefined;
+	verificationLimiter: VerificationLimiter;
+	subjectPlanCache: SubjectPlanCache;
+	introspectionVerifyCache: ReturnType<typeof createIntrospectionVerifyCache>;
+	telemetry: IntrospectionTelemetry;
+	createClerkClient: () => Promise<ClerkLikeClient>;
+	resolvePlanForSubject: (
+		clerk: ClerkLikeClient,
+		subject: string,
+	) => Promise<PlanTier>;
+	mcpPeriodLimitResolver: (plan: PlanTier) => number;
 };
 
 function parsePositiveInteger(
@@ -63,6 +120,34 @@ function extractVerifiedKeyId(
 	return `ak:${apiKeySecret.slice(0, 16)}`;
 }
 
+function extractErrorStatus(error: unknown): number | null {
+	if (
+		error &&
+		typeof error === "object" &&
+		"status" in error &&
+		typeof (error as { status?: unknown }).status === "number"
+	) {
+		const status = (error as { status: number }).status;
+		if (status >= 100 && status <= 599) {
+			return status;
+		}
+	}
+	return null;
+}
+
+function shouldCacheInvalidVerificationError(error: unknown): boolean {
+	const status = extractErrorStatus(error);
+	return status === 400 || status === 401 || status === 403 || status === 404;
+}
+
+async function hashApiKeySecret(secret: string): Promise<string> {
+	const encoded = new TextEncoder().encode(secret);
+	const digest = await crypto.subtle.digest("SHA-256", encoded);
+	return Array.from(new Uint8Array(digest), (value) =>
+		value.toString(16).padStart(2, "0"),
+	).join("");
+}
+
 const verificationLimiter = createDailyVerificationBudgetLimiter();
 const subjectPlanCache = createSubjectPlanCache({
 	ttlMs: parsePositiveInteger(
@@ -70,117 +155,235 @@ const subjectPlanCache = createSubjectPlanCache({
 		300_000,
 	),
 });
+const introspectionVerifyCache = createIntrospectionVerifyCache({
+	validTtlMs: parsePositiveInteger(
+		process.env.BARDO_INTROSPECTION_VERIFY_CACHE_TTL_MS,
+		120_000,
+	),
+	invalidTtlMs: parsePositiveInteger(
+		process.env.BARDO_INTROSPECTION_INVALID_CACHE_TTL_MS,
+		20_000,
+	),
+});
+const introspectionTelemetry = createIntrospectionTelemetry();
 
-export async function POST(request: Request) {
-	// Validate the server-to-server introspection secret.
-	const authorize = createIntrospectionSecretValidator(
-		process.env.BARDO_AUTH_INTROSPECTION_TOKEN,
-	);
-	if (!authorize(request.headers)) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+const defaultDeps: IntrospectionDeps = {
+	introspectionSecret: process.env.BARDO_AUTH_INTROSPECTION_TOKEN,
+	allowWorkspaceRootOverrideEnv:
+		process.env.BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE,
+	workspaceRootAllowlistEnv: process.env.BARDO_WORKSPACE_ROOT_ALLOWLIST,
+	verificationLimiter,
+	subjectPlanCache,
+	introspectionVerifyCache,
+	telemetry: introspectionTelemetry,
+	createClerkClient: async () =>
+		(await clerkClient()) as unknown as ClerkLikeClient,
+	resolvePlanForSubject: async (clerk, subject) => {
+		const live = await fetchLiveBillingSnapshotFromClerk(
+			clerk as never,
+			subject,
+		);
+		return live.billingUnavailable ? "free" : live.plan;
+	},
+	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
+};
 
-	let body: IntrospectRequest = {};
-	try {
-		body = (await request.json()) as IntrospectRequest;
-	} catch {
-		body = {};
-	}
+export function createIntrospectPostHandler(
+	overrides: Partial<IntrospectionDeps> = {},
+) {
+	const deps: IntrospectionDeps = {
+		...defaultDeps,
+		...overrides,
+	};
 
-	const secret = body.apiKey?.trim();
-	if (!secret) {
-		return NextResponse.json({ valid: false }, { status: 200 });
-	}
+	return async function post(request: Request) {
+		const authorize = createIntrospectionSecretValidator(
+			deps.introspectionSecret,
+		);
+		if (!authorize(request.headers)) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-	const requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
-		rawWorkspaceRoot: body.workspaceRoot,
-		allowOverrideEnv: process.env.BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE,
-		allowlistEnv: process.env.BARDO_WORKSPACE_ROOT_ALLOWLIST,
-	});
+		let body: IntrospectRequest = {};
+		try {
+			body = (await request.json()) as IntrospectRequest;
+		} catch {
+			body = {};
+		}
 
-	// ── Validate via Clerk API keys ──────────────────────────────────────────
-	const clerk = await clerkClient();
-	let clerkKey: Awaited<
-		ReturnType<Awaited<ReturnType<typeof clerkClient>>["apiKeys"]["verify"]>
-	>;
-	try {
-		clerkKey = await clerk.apiKeys.verify(secret);
-	} catch {
-		return NextResponse.json({ valid: false }, { status: 200 });
-	}
+		const secret = body.apiKey?.trim();
+		if (!secret) {
+			return NextResponse.json({ valid: false }, { status: 200 });
+		}
 
-	const keyRecord = clerkKey as unknown as Record<string, unknown>;
-	const subject = extractSubjectFromVerifiedKey(keyRecord);
-	let plan: PlanTier = "free";
-	if (subject) {
-		plan = await subjectPlanCache.resolve(subject, async () => {
-			const live = await fetchLiveBillingSnapshotFromClerk(clerk, subject);
-			return live.billingUnavailable ? "free" : live.plan;
+		const requiredScope = body.requiredScope?.trim() || "mcp";
+		const requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
+			rawWorkspaceRoot: body.workspaceRoot,
+			allowOverrideEnv: deps.allowWorkspaceRootOverrideEnv,
+			allowlistEnv: deps.workspaceRootAllowlistEnv,
 		});
-	}
 
-	const userUsage = subject
-		? await verificationLimiter.consumeUser(subject, plan)
-		: null;
-	if (userUsage && !userUsage.allowed) {
-		return NextResponse.json(
-			{
-				valid: false,
-				reason: "daily_user_verification_limit_reached",
+		const cachedVerification = deps.introspectionVerifyCache.get(secret);
+		if (cachedVerification?.kind === "invalid") {
+			deps.telemetry.increment("cache_hit_invalid");
+			return NextResponse.json(
+				{ valid: false, reason: "cached_invalid_api_key" },
+				{ status: 200 },
+			);
+		}
+		if (cachedVerification?.kind === "valid") {
+			deps.telemetry.increment("cache_hit_valid");
+			if (!cachedVerification.value.scopes.includes(requiredScope)) {
+				return NextResponse.json({ valid: false }, { status: 200 });
+			}
+			const campaignBasePath =
+				requestedWorkspaceRoot ?? cachedVerification.value.workspacePath;
+			if (!campaignBasePath) {
+				return NextResponse.json({ valid: false }, { status: 200 });
+			}
+			deps.telemetry.increment("success");
+			return NextResponse.json({
+				valid: true,
+				campaignBasePath,
+				keyPrefix: cachedVerification.value.keyId.slice(0, 15),
+				subjectId: cachedVerification.value.subjectId,
+				keyId: cachedVerification.value.keyId,
+				plan: cachedVerification.value.plan,
+				mcpPeriodLimit: deps.mcpPeriodLimitResolver(
+					cachedVerification.value.plan,
+				),
 				verification: {
-					user: userUsage,
+					cached: true,
+					user: null,
 					key: null,
 				},
-			},
-			{ status: 200 },
-		);
-	}
-	const keyUsage = await verificationLimiter.consumeKey(
-		extractVerifiedKeyId(keyRecord, secret),
-		plan,
-	);
-	if (!keyUsage.allowed) {
-		return NextResponse.json(
-			{
-				valid: false,
-				reason: "daily_key_verification_limit_reached",
-				verification: {
-					user: userUsage,
-					key: keyUsage,
+			});
+		}
+
+		const preliminaryKeyUsage =
+			await deps.verificationLimiter.consumePreAuthKey(
+				await hashApiKeySecret(secret),
+				"free",
+			);
+		if (!preliminaryKeyUsage.allowed) {
+			deps.telemetry.increment("budget_block_key");
+			deps.introspectionVerifyCache.setInvalid(secret);
+			return NextResponse.json(
+				{
+					valid: false,
+					reason: "daily_key_verification_limit_reached",
+					verification: {
+						user: null,
+						key: preliminaryKeyUsage,
+					},
 				},
+				{ status: 200 },
+			);
+		}
+
+		const clerk = await deps.createClerkClient();
+		let clerkKey: VerifiedKeyRecord;
+		deps.telemetry.increment("clerk_verify_called");
+		try {
+			clerkKey = await clerk.apiKeys.verify(secret);
+		} catch (error) {
+			deps.telemetry.increment("clerk_verify_invalid");
+			if (shouldCacheInvalidVerificationError(error)) {
+				deps.introspectionVerifyCache.setInvalid(secret);
+			}
+			return NextResponse.json({ valid: false }, { status: 200 });
+		}
+
+		const keyRecord = clerkKey as Record<string, unknown>;
+		const subject = extractSubjectFromVerifiedKey(keyRecord);
+		const keyId = extractVerifiedKeyId(keyRecord, secret);
+		const scopes = Array.isArray(clerkKey.scopes)
+			? clerkKey.scopes.filter(
+					(scope): scope is string =>
+						typeof scope === "string" && scope.trim().length > 0,
+				)
+			: [];
+		let plan: PlanTier = "free";
+		if (subject) {
+			plan = await deps.subjectPlanCache.resolve(subject, async () => {
+				return await deps.resolvePlanForSubject(clerk, subject);
+			});
+		}
+
+		const userUsage = subject
+			? await deps.verificationLimiter.consumeUser(subject, plan)
+			: null;
+		if (userUsage && !userUsage.allowed) {
+			deps.telemetry.increment("budget_block_user");
+			deps.introspectionVerifyCache.setInvalid(secret);
+			return NextResponse.json(
+				{
+					valid: false,
+					reason: "daily_user_verification_limit_reached",
+					verification: {
+						user: userUsage,
+						key: null,
+					},
+				},
+				{ status: 200 },
+			);
+		}
+
+		const keyUsage = await deps.verificationLimiter.consumeKey(keyId, plan);
+		if (!keyUsage.allowed) {
+			deps.telemetry.increment("budget_block_key");
+			deps.introspectionVerifyCache.setInvalid(secret);
+			return NextResponse.json(
+				{
+					valid: false,
+					reason: "daily_key_verification_limit_reached",
+					verification: {
+						user: userUsage,
+						key: keyUsage,
+					},
+				},
+				{ status: 200 },
+			);
+		}
+
+		const claims =
+			typeof clerkKey.claims === "object" && clerkKey.claims !== null
+				? (clerkKey.claims as Record<string, unknown>)
+				: {};
+		const workspacePath =
+			typeof claims.workspacePath === "string" ? claims.workspacePath : null;
+
+		deps.introspectionVerifyCache.setValid(secret, {
+			subjectId: subject,
+			keyId,
+			plan,
+			scopes,
+			workspacePath,
+		});
+
+		if (!scopes.includes(requiredScope)) {
+			return NextResponse.json({ valid: false }, { status: 200 });
+		}
+
+		if (!workspacePath && !requestedWorkspaceRoot) {
+			return NextResponse.json({ valid: false }, { status: 200 });
+		}
+
+		deps.telemetry.increment("success");
+		return NextResponse.json({
+			valid: true,
+			campaignBasePath: requestedWorkspaceRoot ?? workspacePath,
+			keyPrefix: keyId.slice(0, 15),
+			subjectId: subject,
+			keyId,
+			plan,
+			mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+			verification: {
+				user: userUsage,
+				key: keyUsage,
 			},
-			{ status: 200 },
-		);
-	}
-
-	// Verify the required scope is present on this key.
-	const requiredScope = body.requiredScope?.trim() || "mcp";
-	if (!clerkKey.scopes?.includes(requiredScope)) {
-		return NextResponse.json({ valid: false }, { status: 200 });
-	}
-
-	// ── Read workspacePath from Clerk API key claims ─────────────────────────
-	const claims =
-		typeof clerkKey.claims === "object" && clerkKey.claims !== null
-			? (clerkKey.claims as Record<string, unknown>)
-			: {};
-	const workspacePath =
-		typeof claims.workspacePath === "string" ? claims.workspacePath : null;
-
-	if (!workspacePath && !requestedWorkspaceRoot) {
-		// Key has no workspacePath metadata — treat as invalid (created outside
-		// this system or metadata missing).
-		return NextResponse.json({ valid: false }, { status: 200 });
-	}
-
-	return NextResponse.json({
-		valid: true,
-		campaignBasePath: requestedWorkspaceRoot ?? workspacePath,
-		keyPrefix: clerkKey.id.slice(0, 15),
-		plan,
-		verification: {
-			user: userUsage,
-			key: keyUsage,
-		},
-	});
+		});
+	};
 }
+
+export const POST = createIntrospectPostHandler();
