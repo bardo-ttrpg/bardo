@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { maxApiKeysForPlan } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import { createMcpUsageReader } from "@/lib/mcp-usage";
 
 export const runtime = "nodejs";
 
@@ -42,31 +43,54 @@ function clerkErrorStatus(err: unknown): number {
 	return 500;
 }
 
-// Rejects absolute paths and path-traversal segments so user-supplied
-// workspacePath cannot escape the intended tenant directory on the MCP host.
-function sanitizeWorkspacePath(
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+	if (!value) return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return fallback;
+}
+
+// Resolve workspace path using managed-user-root defaults.
+// By default custom workspace paths are disabled.
+function resolveWorkspacePath(
 	raw: string | undefined,
-	fallback: string,
+	userId: string,
+	env: Record<string, string | undefined> = process.env,
 ): string {
+	const userRoot = `./customers/${userId}`;
+	const allowCustom = parseBoolean(
+		env.BARDO_ALLOW_CUSTOM_WORKSPACE_PATH,
+		false,
+	);
+	if (!allowCustom) {
+		return userRoot;
+	}
+
 	const trimmed = raw?.trim();
-	if (!trimmed) return fallback;
+	if (!trimmed) return userRoot;
 	// Reject absolute paths (Unix and Windows) and null bytes.
 	if (
 		trimmed.startsWith("/") ||
 		/^[a-zA-Z]:[\\/]/.test(trimmed) ||
 		trimmed.includes("\0")
 	) {
-		return fallback;
+		return userRoot;
 	}
 	// Walk each path segment; reject if any is "..".
 	const segments = trimmed.replace(/\\/g, "/").split("/");
 	const clean: string[] = [];
 	for (const seg of segments) {
-		if (seg === "..") return fallback;
+		if (seg === "..") return userRoot;
 		if (seg === "." || seg === "") continue;
 		clean.push(seg);
 	}
-	return clean.length > 0 ? `./${clean.join("/")}` : fallback;
+	const normalized = clean.length > 0 ? `./${clean.join("/")}` : userRoot;
+	const allowedPrefix = `${userRoot}/`;
+	if (normalized === userRoot || normalized.startsWith(allowedPrefix)) {
+		return normalized;
+	}
+	return userRoot;
 }
 
 // ─── GET /api/keys ────────────────────────────────────────────────────────────
@@ -79,6 +103,7 @@ export async function GET() {
 	}
 
 	const clerk = await clerkClient();
+	const usageReader = createMcpUsageReader();
 
 	let clerkKeys: Awaited<ReturnType<(typeof clerk)["apiKeys"]["list"]>>;
 	try {
@@ -91,26 +116,39 @@ export async function GET() {
 		);
 	}
 
-	const keys = clerkKeys.data.map((k) => {
-		const claims =
-			typeof k.claims === "object" && k.claims !== null
-				? (k.claims as Record<string, unknown>)
-				: {};
-		return {
-			id: k.id,
-			name: k.name,
-			status: keyStatusFromFlags(k),
-			scopes: k.scopes ?? [],
-			createdAt: k.createdAt,
-			workspacePath:
-				typeof claims.workspacePath === "string" ? claims.workspacePath : null,
-			callsTotal: 0,
-			callsThisPeriod: 0,
-			lastUsedAt: null,
-			lastUsedProviderId: null,
-			lastUsedModelId: null,
-		};
-	});
+	const liveBilling = await fetchLiveBillingSnapshotFromClerk(clerk, userId);
+	const periodStartMs = liveBilling.billingUnavailable
+		? Date.now()
+		: liveBilling.periodStart;
+
+	const keys = await Promise.all(
+		clerkKeys.data.map(async (k) => {
+			const claims =
+				typeof k.claims === "object" && k.claims !== null
+					? (k.claims as Record<string, unknown>)
+					: {};
+			const usage = await usageReader.readKeyUsage({
+				keyId: k.id,
+				periodStartMs,
+			});
+			return {
+				id: k.id,
+				name: k.name,
+				status: keyStatusFromFlags(k),
+				scopes: k.scopes ?? [],
+				createdAt: k.createdAt,
+				workspacePath:
+					typeof claims.workspacePath === "string"
+						? claims.workspacePath
+						: null,
+				callsTotal: usage.total,
+				callsThisPeriod: usage.thisPeriod,
+				lastUsedAt: usage.lastUsedAt,
+				lastUsedProviderId: usage.lastUsedProviderId,
+				lastUsedModelId: usage.lastUsedModelId,
+			};
+		}),
+	);
 
 	return NextResponse.json({ keys });
 }
@@ -170,10 +208,7 @@ export async function POST(request: Request) {
 	}
 
 	const name = body.name?.trim() || "Default key";
-	const workspacePath = sanitizeWorkspacePath(
-		body.workspacePath,
-		`./customers/${userId}`,
-	);
+	const workspacePath = resolveWorkspacePath(body.workspacePath, userId);
 	const scopes =
 		Array.isArray(body.scopes) && body.scopes.length > 0
 			? body.scopes

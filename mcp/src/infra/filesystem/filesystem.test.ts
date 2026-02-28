@@ -1,6 +1,36 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
-import { resolvePathInsideRoot } from "./filesystem";
+import { resolveBardoRoot, resolvePathInsideRoot } from "./filesystem";
+
+describe("resolveBardoRoot", () => {
+	test("uses nested bardo directory by default", () => {
+		delete process.env.BARDO_WORKSPACE_LAYOUT;
+		expect(resolveBardoRoot("/repo/customer-a")).toBe(
+			path.resolve("/repo/customer-a", "bardo"),
+		);
+	});
+
+	test("keeps existing bardo root unchanged in nested mode", () => {
+		delete process.env.BARDO_WORKSPACE_LAYOUT;
+		expect(resolveBardoRoot("/repo/customer-a/bardo")).toBe(
+			"/repo/customer-a/bardo",
+		);
+	});
+
+	test("uses flat workspace root when BARDO_WORKSPACE_LAYOUT=flat", () => {
+		const previous = process.env.BARDO_WORKSPACE_LAYOUT;
+		process.env.BARDO_WORKSPACE_LAYOUT = "flat";
+		try {
+			expect(resolveBardoRoot("/repo/customer-a")).toBe("/repo/customer-a");
+		} finally {
+			if (previous === undefined) {
+				delete process.env.BARDO_WORKSPACE_LAYOUT;
+			} else {
+				process.env.BARDO_WORKSPACE_LAYOUT = previous;
+			}
+		}
+	});
+});
 
 describe("resolvePathInsideRoot", () => {
 	test("decodes percent-encoded path segments", () => {

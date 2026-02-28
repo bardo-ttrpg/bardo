@@ -3,7 +3,6 @@
 	"build": {
 		"watchPatterns": [
 			"/mcp/**",
-			"/packages/bardo-mcp/**",
 			"/package.json",
 			"/bun.lock",
 			"/tsconfig.base.json"

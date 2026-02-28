@@ -20,6 +20,7 @@ import {
 } from "../telemetry";
 import { authenticateRequest } from "./middleware/auth";
 import { corsHeaders, jsonRpcError, withCors } from "./middleware/cors";
+import { createMcpUsageLimiter } from "./middleware/mcp-usage-limiter";
 import { createRateLimiter } from "./middleware/rate-limiter";
 import {
 	getRateLimitKey,
@@ -108,6 +109,7 @@ export function createHttpRequestHandler({
 		maxRequests: securityPolicy.rateLimitMaxRequests,
 		failClosed: securityPolicy.rateLimitFailClosed,
 	});
+	const usageLimiter = createMcpUsageLimiter();
 
 	return async function handleRequest(
 		request: Request,
@@ -240,6 +242,46 @@ export function createHttpRequestHandler({
 
 			if (securityPolicy.telemetryEnabled) {
 				recordRateLimitEventMetric("allowed");
+			}
+
+			const shouldMeterUsage =
+				request.method === "POST" &&
+				(isMcpRoute ||
+					isTurnsApiRoute ||
+					isInitBootstrapApiRoute ||
+					isWorldTickApiRoute);
+			if (shouldMeterUsage) {
+				const usage = await usageLimiter.consume({
+					subjectId: auth.subjectId ?? null,
+					keyId: auth.keyId ?? null,
+					plan: auth.plan ?? null,
+					mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
+					providerId: request.headers.get("x-provider-id")?.trim() ?? null,
+					modelId: request.headers.get("x-model-id")?.trim() ?? null,
+				});
+				if (!usage.allowed) {
+					return finalize(
+						withCors(
+							new Response(
+								JSON.stringify({
+									error: "MCP usage limit reached for current plan.",
+									usage: {
+										limit: usage.limit,
+										used: usage.usedThisPeriod,
+										remaining: usage.remaining,
+										period: usage.period,
+									},
+								}),
+								{
+									status: 429,
+									headers: {
+										"content-type": "application/json",
+									},
+								},
+							),
+						),
+					);
+				}
 			}
 
 			if (isMcpRoute) {

@@ -42,6 +42,18 @@ export type DailyVerificationConsumeResult = {
 
 export type PreAuthKeyConsumeResult = DailyVerificationConsumeResult;
 
+export function rotateConfirmedKeyWindow(args: {
+	confirmedKeys: Set<string>;
+	activeDay: string | null;
+	currentDay: string;
+}): string {
+	if (args.activeDay === args.currentDay) {
+		return args.currentDay;
+	}
+	args.confirmedKeys.clear();
+	return args.currentDay;
+}
+
 function dayKey(nowMs: number): string {
 	return new Date(nowMs).toISOString().slice(0, 10);
 }
@@ -216,6 +228,7 @@ export function createDailyVerificationBudgetLimiter(
 	);
 	const blockedCache = new Map<string, number>();
 	const ttlConfirmedKeys = new Set<string>();
+	let ttlConfirmedDay: string | null = null;
 
 	async function consume(
 		scope: VerificationCounterScope,
@@ -225,6 +238,11 @@ export function createDailyVerificationBudgetLimiter(
 		const limit = limitForScope(scope, plan, env);
 		const nowMs = now();
 		const day = dayKey(nowMs);
+		ttlConfirmedDay = rotateConfirmedKeyWindow({
+			confirmedKeys: ttlConfirmedKeys,
+			activeDay: ttlConfirmedDay,
+			currentDay: day,
+		});
 		const safeId = id.trim() || "unknown";
 		const blockedKey = `${scope}:${safeId}:${day}`;
 		const blockedUntil = blockedCache.get(blockedKey);

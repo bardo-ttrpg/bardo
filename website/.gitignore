@@ -6,3 +6,5 @@ playwright-report/
 test-results/
 
 .env.local
+.bun-tmp/
+.bun-install/

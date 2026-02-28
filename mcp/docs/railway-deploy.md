@@ -1,47 +1,26 @@
-# Railway Deployment (Bun Monorepo)
+# Railway Deployment (MCP Only)
 
-This repo is now Railway-first for production.
+Production topology:
 
-## Services
+1. Website: Vercel (`website`)
+1. MCP: Railway (`mcp`)
 
-Create two Railway services from the same GitHub repo:
+Only the MCP service is deployed on Railway.
 
-1. `website` service
-1. `mcp` service
+## Railway service setup (MCP)
 
-Set each service root directory in Railway:
+Create one Railway service from this monorepo:
 
-1. Website root: `website`
-1. MCP root: `mcp`
+1. Service name: `mcp`
+1. Root directory: `mcp`
 
-Both services include `railway.json` files with the expected build/start/health settings.
 `mcp/railway.json` is pinned to `numReplicas=1` for stateful session correctness.
 
-If you keep service root at repo root instead, set:
+If you keep Railway service root at repo root instead, set:
 
-1. Website service variable: `RAILWAY_CONFIG_FILE=/app/website/railway.json`
-1. MCP service variable: `RAILWAY_CONFIG_FILE=/app/mcp/railway.json`
+1. `RAILWAY_CONFIG_FILE=/app/mcp/railway.json`
 
-## Required env vars
-
-### Website service (`website`)
-
-Required:
-
-1. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-1. `CLERK_SECRET_KEY`
-1. `CLERK_BILLING_PLAN_SOLO`
-1. `CLERK_BILLING_PLAN_SOLO_PLUS`
-1. `NEXT_PUBLIC_APP_URL` (website public URL)
-1. `BARDO_AUTH_INTROSPECTION_TOKEN` (shared secret with MCP)
-1. `BARDO_MCP_BASE_URL` (MCP public base URL, no path)
-
-Recommended:
-
-1. `UPSTASH_REDIS_REST_URL`
-1. `UPSTASH_REDIS_REST_TOKEN`
-
-### MCP service (`mcp`)
+## Required env vars (Railway MCP service)
 
 Required:
 
@@ -52,6 +31,7 @@ Required:
 1. `BARDO_AUTH_INTROSPECTION_URL=https://<website-domain>/api/auth/introspect-key`
 1. `BARDO_AUTH_INTROSPECTION_TOKEN` (must exactly match website secret)
 1. `BARDO_STRICT_CANONICAL_MODE=true`
+1. `BARDO_DEFAULT_RULESET=d20_v1`
 
 Recommended:
 
@@ -63,6 +43,16 @@ Recommended:
 1. `BARDO_METRICS_REQUIRE_AUTH=true`
 1. `UPSTASH_REDIS_REST_URL`
 1. `UPSTASH_REDIS_REST_TOKEN`
+
+## Website requirements (Vercel)
+
+The website must expose:
+
+1. `POST /api/auth/introspect-key`
+
+The website and MCP must share the same:
+
+1. `BARDO_AUTH_INTROSPECTION_TOKEN`
 
 ## Persistent storage
 
@@ -80,7 +70,7 @@ This path works with current key claims (`./customers/<userId>`) and keeps per-u
 1. Keep MCP on a single replica while using `stateful` mode.
 1. If you need horizontal MCP scaling, switch to `BARDO_MCP_TRANSPORT_MODE=stateless`.
 1. Keep Upstash enabled for verification budgets and distributed limits.
-1. Keep website and MCP as separate Railway services to isolate deploy cadence and resource usage.
+1. Keep website on Vercel and MCP on Railway to isolate deploy cadence and resource usage.
 
 ## Smoke checks
 

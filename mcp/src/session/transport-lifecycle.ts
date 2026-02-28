@@ -49,6 +49,10 @@ export async function createAndHandleSessionRequest(
 			sessionStore.set(sessionId, {
 				apiKey: auth.apiKey,
 				campaignBasePath: auth.campaignBasePath,
+				subjectId: auth.subjectId ?? null,
+				keyId: auth.keyId ?? null,
+				plan: auth.plan ?? null,
+				mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
 				server,
 				transport,
 			});

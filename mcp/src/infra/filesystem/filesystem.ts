@@ -21,7 +21,17 @@ export async function inspectPath(targetPath: string): Promise<{
 	}
 }
 
+function useFlatWorkspaceLayout(
+	env: Record<string, string | undefined> = process.env,
+): boolean {
+	const raw = env.BARDO_WORKSPACE_LAYOUT?.trim().toLowerCase();
+	return raw === "flat";
+}
+
 export function resolveBardoRoot(campaignBasePath: string): string {
+	if (useFlatWorkspaceLayout()) {
+		return campaignBasePath;
+	}
 	return path.basename(campaignBasePath) === "bardo"
 		? campaignBasePath
 		: path.resolve(campaignBasePath, "bardo");

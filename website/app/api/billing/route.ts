@@ -4,8 +4,10 @@ import {
 	dailyKeyVerificationLimitForPlan,
 	dailyUserVerificationLimitForPlan,
 	maxApiKeysForPlan,
+	mcpPeriodLimitForPlan,
 } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import { createMcpUsageReader } from "@/lib/mcp-usage";
 import { planCreditsFor } from "@/lib/user-billing";
 
 export const runtime = "nodejs";
@@ -28,14 +30,19 @@ export async function GET() {
 		);
 	}
 	const creditsTotal = planCreditsFor(live.plan);
+	const usageReader = createMcpUsageReader();
+	const usage = await usageReader.readUserUsage({
+		subjectId: userId,
+		periodStartMs: live.periodStart,
+	});
 
 	const billing = {
 		plan: live.plan,
 		creditsTotal,
 		creditsUsed: 0,
 		periodStart: live.periodStart,
-		mcpCallsTotal: 0,
-		mcpCallsThisPeriod: 0,
+		mcpCallsTotal: usage.total,
+		mcpCallsThisPeriod: usage.thisPeriod,
 		apiKeyCallsTotal: 0,
 		apiKeyCallsThisPeriod: 0,
 		subscriptionStatus: live.subscriptionStatus,
@@ -50,6 +57,7 @@ export async function GET() {
 		live.plan,
 	);
 	const dailyKeyVerificationLimit = dailyKeyVerificationLimitForPlan(live.plan);
+	const mcpPeriodLimit = mcpPeriodLimitForPlan(live.plan);
 
 	return NextResponse.json({
 		billing,
@@ -57,6 +65,7 @@ export async function GET() {
 			maxAllowed,
 			dailyUserVerificationLimit,
 			dailyKeyVerificationLimit,
+			mcpPeriodLimit,
 		},
 	});
 }

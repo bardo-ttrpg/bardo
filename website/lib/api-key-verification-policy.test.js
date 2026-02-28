@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	createDailyVerificationBudgetLimiter,
 	createSubjectPlanCache,
+	rotateConfirmedKeyWindow,
 } from "./api-key-verification-policy";
 
 describe("createDailyVerificationBudgetLimiter", () => {
@@ -105,6 +106,22 @@ describe("createDailyVerificationBudgetLimiter", () => {
 		expect(first.allowed).toBe(true);
 		expect(second.allowed).toBe(true);
 		expect(expireCalls).toBe(2);
+	});
+
+	test("clears confirmed ttl keys when the day window changes", () => {
+		const confirmedKeys = new Set([
+			"bardo:verify:user:user_a:2026-02-26",
+			"bardo:verify:key:key_a:2026-02-26",
+		]);
+
+		const currentDay = rotateConfirmedKeyWindow({
+			confirmedKeys,
+			activeDay: "2026-02-26",
+			currentDay: "2026-02-27",
+		});
+
+		expect(currentDay).toBe("2026-02-27");
+		expect([...confirmedKeys]).toEqual([]);
 	});
 });
 

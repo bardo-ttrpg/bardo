@@ -43,5 +43,5 @@ export async function DELETE(
 		);
 	}
 
-	return NextResponse.json({ deleted: true });
+	return NextResponse.json({ revoked: true, deleted: true });
 }

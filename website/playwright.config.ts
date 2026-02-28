@@ -10,6 +10,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? defaultBaseUrl;
 export default defineConfig({
 	testDir: "./e2e",
 	testMatch: "**/*.e2e.ts",
+	outputDir: ".playwright/test-results",
 	timeout: 30_000,
 	expect: {
 		timeout: 10_000,
