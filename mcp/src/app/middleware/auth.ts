@@ -107,7 +107,14 @@ function resolveDefaultApiKeyContext(
 		return null;
 	}
 
-	return { apiKey: defaultApiKey, campaignBasePath: mappedPath };
+	return {
+		apiKey: defaultApiKey,
+		campaignBasePath: mappedPath,
+		subjectId: null,
+		keyId: null,
+		plan: null,
+		mcpPeriodLimit: null,
+	};
 }
 
 function readApiKey(
@@ -192,13 +199,27 @@ export function createAuthenticator({
 		if (validateApiKey) {
 			const validated = await validateApiKey(apiKey, metadata);
 			if (validated) {
-				return { apiKey, campaignBasePath: validated.campaignBasePath };
+				return {
+					apiKey,
+					campaignBasePath: validated.campaignBasePath,
+					subjectId: validated.subjectId ?? null,
+					keyId: validated.keyId ?? null,
+					plan: validated.plan ?? null,
+					mcpPeriodLimit: validated.mcpPeriodLimit ?? null,
+				};
 			}
 		}
 
 		const mapped = apiKeyMap.get(apiKey);
 		if (!mapped) return null;
-		return { apiKey, campaignBasePath: mapped };
+		return {
+			apiKey,
+			campaignBasePath: mapped,
+			subjectId: null,
+			keyId: null,
+			plan: null,
+			mcpPeriodLimit: null,
+		};
 	}
 
 	return async function authenticateRequest(
@@ -214,7 +235,14 @@ export function createAuthenticator({
 		}
 
 		if (!hasApiKeyBackend) {
-			return { apiKey: null, campaignBasePath: projectRoot };
+			return {
+				apiKey: null,
+				campaignBasePath: projectRoot,
+				subjectId: null,
+				keyId: null,
+				plan: null,
+				mcpPeriodLimit: null,
+			};
 		}
 
 		const sessionId = request.headers.get("mcp-session-id");
@@ -231,6 +259,19 @@ export function createAuthenticator({
 		}
 
 		if (existingSession) {
+			const requestedWorkspaceRoot = workspaceRoot
+				? path.resolve(workspaceRoot)
+				: null;
+			if (
+				requestedWorkspaceRoot &&
+				existingSession.campaignBasePath !== requestedWorkspaceRoot
+			) {
+				return authError(
+					409,
+					"Workspace root differs from bound session. Start a new session to switch workspace.",
+				);
+			}
+
 			if (existingSession.apiKey === null) {
 				return authError(
 					403,
@@ -242,6 +283,10 @@ export function createAuthenticator({
 				return {
 					apiKey: existingSession.apiKey,
 					campaignBasePath: existingSession.campaignBasePath,
+					subjectId: existingSession.subjectId ?? null,
+					keyId: existingSession.keyId ?? null,
+					plan: existingSession.plan ?? null,
+					mcpPeriodLimit: existingSession.mcpPeriodLimit ?? null,
 				};
 			}
 
@@ -251,6 +296,10 @@ export function createAuthenticator({
 				return {
 					apiKey: existingSession.apiKey,
 					campaignBasePath: existingSession.campaignBasePath,
+					subjectId: existingSession.subjectId ?? null,
+					keyId: existingSession.keyId ?? null,
+					plan: existingSession.plan ?? null,
+					mcpPeriodLimit: existingSession.mcpPeriodLimit ?? null,
 				};
 			}
 
