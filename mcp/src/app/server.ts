@@ -152,13 +152,18 @@ export function createHttpRequestHandler({
 		setRequestTimeout(request, 0);
 
 		if (request.method === "OPTIONS") {
-			return finalize(new Response(null, { status: 204, headers: corsHeaders() }));
+			return finalize(
+				new Response(null, { status: 204, headers: corsHeaders() }),
+			);
 		}
 
 		store.sweepExpired();
 
 		if (isMetricsRoute) {
-			if (!securityPolicy.metricsRouteEnabled || !securityPolicy.telemetryEnabled) {
+			if (
+				!securityPolicy.metricsRouteEnabled ||
+				!securityPolicy.telemetryEnabled
+			) {
 				return finalize(withCors(new Response("Not Found", { status: 404 })));
 			}
 
@@ -218,7 +223,9 @@ export function createHttpRequestHandler({
 								status: 429,
 								headers: {
 									"content-type": "application/json",
-									"retry-after": String(Math.ceil(limitResult.retryAfterMs / 1000)),
+									"retry-after": String(
+										Math.ceil(limitResult.retryAfterMs / 1000),
+									),
 									"x-ratelimit-limit": String(limitResult.limit),
 									"x-ratelimit-remaining": String(limitResult.remaining),
 									"x-ratelimit-reset": String(
