@@ -11,24 +11,28 @@ export const DICE_ROLLER_SETUP_QUESTION = [
 
 export const THEME_SETUP_QUESTION = [
 	"What theme are we playing?",
-	"High Fantasy",
+	"Fantasy",
 	"",
-	"Post Apocalyptic",
+	"Sci-Fi",
 	"",
-	"Sci-fi",
+	"Horror",
 	"",
-	"Investigation",
+	"Post-Apocalyptic",
+	"",
+	"Mystery & Investigation",
 	"",
 	"Type your own answer",
 ].join("\n");
 
 export const SYSTEM_SETUP_QUESTION = [
 	"What system are we using?",
-	"Standard dice rolling",
+	"D20",
 	"",
-	"Narrative only",
+	"Narrative",
 	"",
-	"Custom system",
+	"Dice pool",
+	"",
+	"Custom",
 	"",
 	"Type your own answer",
 ].join("\n");

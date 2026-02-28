@@ -45,10 +45,11 @@ describe("resolveStartingScene", () => {
 
 		expect(result.startingSceneSource).toBe("not_available");
 		expect(nextPrompts[0]).toContain("What theme are we playing?");
-		expect(nextPrompts[0]).toContain("High Fantasy");
-		expect(nextPrompts[0]).toContain("Post Apocalyptic");
-		expect(nextPrompts[0]).toContain("Sci-fi");
-		expect(nextPrompts[0]).toContain("Investigation");
+		expect(nextPrompts[0]).toContain("Fantasy");
+		expect(nextPrompts[0]).toContain("Sci-Fi");
+		expect(nextPrompts[0]).toContain("Horror");
+		expect(nextPrompts[0]).toContain("Post-Apocalyptic");
+		expect(nextPrompts[0]).toContain("Mystery & Investigation");
 		expect(nextPrompts[0]).toContain("Type your own answer");
 
 		await rm(root, { recursive: true, force: true });

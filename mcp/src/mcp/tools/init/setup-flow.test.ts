@@ -85,10 +85,20 @@ describe("runGuidedSetupFlow", () => {
 
 		expect(result.status).toBe("needs_input");
 		expect(result.questionKey).toBe("ttrpgSystem");
+		expect(result.setupPrompt?.version).toBe("2.0");
+		expect(result.setupPrompt?.questionKey).toBe("ttrpgSystem");
+		expect(result.setupPrompt?.inputType).toBe("single_choice_or_text");
+		expect(result.setupPrompt?.choices.map((choice) => choice.id)).toEqual([
+			"d20",
+			"narrative",
+			"dice_pool",
+			"custom",
+		]);
 		expect(result.question).toContain("What system are we using?");
-		expect(result.question).toContain("Standard dice rolling");
-		expect(result.question).toContain("Narrative only");
-		expect(result.question).toContain("Custom system");
+		expect(result.question).toContain("D20");
+		expect(result.question).toContain("Narrative");
+		expect(result.question).toContain("Dice pool");
+		expect(result.question).toContain("Custom");
 		expect(result.question).toContain("Type your own answer");
 		expect(result.pendingAction).toBe("I enter the tavern");
 
@@ -137,13 +147,17 @@ describe("runGuidedSetupFlow", () => {
 			nowIso: "2026-02-22T00:00:01.000Z",
 			expectedRevision: first.revision,
 			setupAnswers: {
-				ttrpgSystem: "Standard dice rolling",
-				sourceMaterialsStatus: "none",
+				ttrpgSystem: "D20",
 			},
 		});
 
 		expect(second.status).toBe("needs_input");
 		expect(second.questionKey).toBe("diceRoller");
+		expect(second.setupPrompt?.questionKey).toBe("diceRoller");
+		expect(second.setupPrompt?.choices.map((choice) => choice.id)).toEqual([
+			"player",
+			"bardo",
+		]);
 		expect(second.question).toContain("Who rolls the dice?");
 		expect(second.question).toContain(
 			"Every player rolls his own character dice (Recommended)",
@@ -154,7 +168,129 @@ describe("runGuidedSetupFlow", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
-	test("completes setup and returns pending action in same call", async () => {
+	test("ignores out-of-order setup answers until current question is answered", async () => {
+		const root = await makeTempRoot("bardo-setup-strict-order-");
+		const campaignRoot = root;
+		const bardoRoot = resolveBardoRoot(campaignRoot);
+		await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
+		await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+		await writeFile(
+			path.join(bardoRoot, "_settings/settings.md"),
+			renderMarkdown(
+				{ title: "Settings", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{ title: "State", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/history.md"),
+			renderMarkdown({ title: "History", description: "test" }, ""),
+			"utf8",
+		);
+		await markBootstrapComplete(bardoRoot);
+
+		const first = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:00.000Z",
+		});
+		expect(first.questionKey).toBe("ttrpgSystem");
+
+		const outOfOrder = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:01.000Z",
+			expectedRevision: first.revision,
+			setupAnswers: {
+				diceRoller: "player",
+				theme: "Fantasy",
+			},
+		});
+		expect(outOfOrder.questionKey).toBe("ttrpgSystem");
+		expect(outOfOrder.answers.diceRoller).toBeNull();
+		expect(outOfOrder.answers.theme).toBeNull();
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("asks theme question after system and dice roller", async () => {
+		const root = await makeTempRoot("bardo-setup-theme-question-");
+		const campaignRoot = root;
+		const bardoRoot = resolveBardoRoot(campaignRoot);
+		await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
+		await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+		await writeFile(
+			path.join(bardoRoot, "_settings/settings.md"),
+			renderMarkdown(
+				{ title: "Settings", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{ title: "State", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/history.md"),
+			renderMarkdown({ title: "History", description: "test" }, ""),
+			"utf8",
+		);
+		await markBootstrapComplete(bardoRoot);
+
+		const first = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:00.000Z",
+		});
+		const second = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:01.000Z",
+			expectedRevision: first.revision,
+			setupAnswers: {
+				ttrpgSystem: "D20",
+			},
+		});
+		const third = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:02.000Z",
+			expectedRevision: second.revision,
+			setupAnswers: {
+				diceRoller: "player",
+			},
+		});
+
+		expect(third.status).toBe("needs_input");
+		expect(third.questionKey).toBe("theme");
+		expect(third.setupPrompt?.questionKey).toBe("theme");
+		expect(third.setupPrompt?.choices.map((choice) => choice.id)).toEqual([
+			"fantasy",
+			"sci_fi",
+			"horror",
+			"post_apocalyptic",
+			"mystery_investigation",
+		]);
+		expect(third.question).toContain("What theme are we playing?");
+		expect(third.question).toContain("Fantasy");
+		expect(third.question).toContain("Sci-Fi");
+		expect(third.question).toContain("Horror");
+		expect(third.question).toContain("Post-Apocalyptic");
+		expect(third.question).toContain("Mystery & Investigation");
+		expect(third.question).toContain("Type your own answer");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("completes setup and returns pending action after required answers", async () => {
 		const root = await makeTempRoot("bardo-setup-complete-");
 		const campaignRoot = root;
 		const bardoRoot = resolveBardoRoot(campaignRoot);
@@ -190,15 +326,28 @@ describe("runGuidedSetupFlow", () => {
 		});
 		expect(first.status).toBe("needs_input");
 
-		const completed = await runGuidedSetupFlow({
+		const second = await runGuidedSetupFlow({
 			campaignBasePath: campaignRoot,
 			nowIso: "2026-02-22T00:00:01.000Z",
 			expectedRevision: first.revision,
 			setupAnswers: {
-				ttrpgSystem: "Dungeons & Dragons 5e",
-				sourceMaterialsStatus: "partial",
+				ttrpgSystem: "D20",
+			},
+		});
+		const third = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:02.000Z",
+			expectedRevision: second.revision,
+			setupAnswers: {
 				diceRoller: "player",
-				playerCount: 4,
+			},
+		});
+		const completed = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:03.000Z",
+			expectedRevision: third.revision,
+			setupAnswers: {
+				theme: "Fantasy",
 			},
 		});
 

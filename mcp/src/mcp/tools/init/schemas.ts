@@ -202,6 +202,40 @@ const bootstrapOutputSchema = z.object({
 		.describe("Total required bootstrap questions in this workspace."),
 });
 
+const setupPromptChoiceSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	description: z.string().optional(),
+	recommended: z.boolean().optional(),
+});
+
+const setupPromptValidationSchema = z.object({
+	minLength: z.number().int().positive().optional(),
+	maxLength: z.number().int().positive().optional(),
+	allowedChoiceIds: z.array(z.string()).optional(),
+});
+
+const setupPromptSchema = z.object({
+	version: z.literal("2.0"),
+	questionKey: z.enum([
+		"purpose",
+		"userProfile",
+		"agentProfile",
+		"workingPreferences",
+		"boundaries",
+		"successCriteria",
+		"values",
+		"ttrpgSystem",
+		"diceRoller",
+		"theme",
+	]),
+	prompt: z.string(),
+	inputType: z.enum(["single_choice_or_text", "free_text"]),
+	choices: z.array(setupPromptChoiceSchema),
+	allowCustomText: z.boolean(),
+	validation: setupPromptValidationSchema,
+});
+
 export const initOutputSchema = z.object({
 	success: z.boolean().describe("True when initialization operation completed"),
 	setupComplete: z
@@ -213,6 +247,11 @@ export const initOutputSchema = z.object({
 		.boolean()
 		.describe(
 			"True when the assistant should ask the user for missing setup details",
+		),
+	setupPrompt: z
+		.union([setupPromptSchema, z.null()])
+		.describe(
+			"Structured setup question contract (v2). Clients must render this directly instead of synthesizing options.",
 		),
 	message: z.string().describe("Human-readable summary"),
 	nextPrompts: z

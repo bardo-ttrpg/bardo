@@ -100,6 +100,26 @@ describe("runPlayerAction", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
+	test("returns strict setup prompt contract when setup is incomplete", async () => {
+		const root = await makeTempRoot("bardo-player-action-setup-prompt-");
+		const auth = authFor(root);
+
+		const result = await runPlayerAction({
+			auth,
+			action: "I enter the settlement.",
+			guidedSetupEnabled: true,
+			nowIso: "2026-02-22T00:00:00.000Z",
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.requiresSetup).toBe(true);
+		expect(result.setupPrompt?.version).toBe("2.0");
+		expect(result.setupPrompt?.questionKey).toBe("purpose");
+		expect(result.setupPrompt?.inputType).toBe("free_text");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
 	test("resolves deterministic mechanics for combat actions before final action event", async () => {
 		const root = await makeTempRoot("bardo-player-action-combat-");
 		const auth = authFor(root);
@@ -209,7 +229,7 @@ describe("runPlayerAction", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
-	test("blocks legacy fallback reads in strict canonical mode before mutations", async () => {
+	test("auto-regenerates projection in strict canonical mode when legacy fallback would be blocked", async () => {
 		resetTelemetryForTests();
 		const root = await makeTempRoot("bardo-player-action-strict-legacy-");
 		const auth = authFor(root);
@@ -238,12 +258,10 @@ describe("runPlayerAction", () => {
 				nowIso: "2026-02-23T06:00:00.000Z",
 			});
 
-			expect(result.success).toBe(false);
-			expect(result.message).toContain(
-				"STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED",
-			);
+			expect(result.success).toBe(true);
+			expect(result.message).toContain("Action processed");
 			const events = await readCanonicalEvents({ bardoRoot });
-			expect(events.length).toBe(0);
+			expect(events.length).toBeGreaterThan(0);
 			expect(renderPrometheusMetrics()).toContain(
 				'bardo_legacy_fallback_reads_total{consumer="player_action",outcome="blocked",strictmode="true"} 1',
 			);
