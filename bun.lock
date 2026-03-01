@@ -14,6 +14,7 @@
       "name": "mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.26.0",
+        "@sentry/bun": "10.40.0",
         "@upstash/ratelimit": "^2.0.8",
         "@upstash/redis": "^1.36.2",
         "zod": "^4.3.6",
@@ -415,6 +416,8 @@
     "@sentry/babel-plugin-component-annotate": ["@sentry/babel-plugin-component-annotate@5.1.1", "", {}, "sha512-x2wEpBHwsTyTF2rWsLKJlzrRF1TTIGOfX+ngdE+Yd5DBkoS58HwQv824QOviPGQRla4/ypISqAXzjdDPL/zalg=="],
 
     "@sentry/browser": ["@sentry/browser@10.40.0", "", { "dependencies": { "@sentry-internal/browser-utils": "10.40.0", "@sentry-internal/feedback": "10.40.0", "@sentry-internal/replay": "10.40.0", "@sentry-internal/replay-canvas": "10.40.0", "@sentry/core": "10.40.0" } }, "sha512-nCt3FKUMFad0C6xl5wCK0Jz+qT4Vev4fv6HJRn0YoNRRDQCfsUVxAz7pNyyiPNGM/WCDp9wJpGJsRvbBRd2anw=="],
+
+    "@sentry/bun": ["@sentry/bun@10.40.0", "", { "dependencies": { "@sentry/core": "10.40.0", "@sentry/node": "10.40.0" } }, "sha512-BuREnR9svxhtN4Y64IxdZVcY5o6RLUh+6qUQF9LI/rwIaL3+Pk155T7VTZjj0WoH45KHp2NdxnyG2zfcA19ZMw=="],
 
     "@sentry/bundler-plugin-core": ["@sentry/bundler-plugin-core@5.1.1", "", { "dependencies": { "@babel/core": "^7.18.5", "@sentry/babel-plugin-component-annotate": "5.1.1", "@sentry/cli": "^2.58.5", "dotenv": "^16.3.1", "find-up": "^5.0.0", "glob": "^13.0.6", "magic-string": "~0.30.8" } }, "sha512-F+itpwR9DyQR7gEkrXd2tigREPTvtF5lC8qu6e4anxXYRTui1+dVR0fXNwjpyAZMhIesLfXRN7WY7ggdj7hi0Q=="],
 
