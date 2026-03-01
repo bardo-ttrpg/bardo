@@ -1,4 +1,5 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -74,11 +75,22 @@ export async function POST(request: Request) {
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 		if (message.includes("timed out")) {
+			Sentry.logger.warn("website.api_keys.lookup_timed_out", {
+				"bardo.service": "website",
+				"bardo.route": "/api/keys/revoke",
+				"bardo.operation": "clerk.apiKeys.get",
+			});
 			return NextResponse.json(
 				{ error: "Key lookup timed out. Please retry." },
 				{ status: 504 },
 			);
 		}
+		Sentry.captureException(err);
+		Sentry.logger.error("website.api_keys.lookup_failed", {
+			"bardo.service": "website",
+			"bardo.route": "/api/keys/revoke",
+			"bardo.operation": "clerk.apiKeys.get",
+		});
 		return NextResponse.json({ error: "Not found" }, { status: 404 });
 	}
 
@@ -96,11 +108,22 @@ export async function POST(request: Request) {
 		const message = err instanceof Error ? err.message : String(err);
 		console.error("[api/keys/revoke] clerk.apiKeys.delete failed:", message);
 		if (message.includes("timed out")) {
+			Sentry.logger.warn("website.api_keys.delete_timed_out", {
+				"bardo.service": "website",
+				"bardo.route": "/api/keys/revoke",
+				"bardo.operation": "clerk.apiKeys.delete",
+			});
 			return NextResponse.json(
 				{ error: "Key deletion timed out. Please retry." },
 				{ status: 504 },
 			);
 		}
+		Sentry.captureException(err);
+		Sentry.logger.error("website.api_keys.delete_failed", {
+			"bardo.service": "website",
+			"bardo.route": "/api/keys/revoke",
+			"bardo.operation": "clerk.apiKeys.delete",
+		});
 		return NextResponse.json(
 			{ error: "Failed to delete key" },
 			{ status: 500 },

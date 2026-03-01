@@ -16,6 +16,12 @@ import {
 	type IntrospectionTelemetry,
 } from "@/lib/introspection-telemetry";
 import { createIntrospectionVerifyCache } from "@/lib/introspection-verify-cache";
+import {
+	applySpanAttributes,
+	buildIntrospectionSpanAttributes,
+	createIntrospectionTracing,
+	type IntrospectionTracing,
+} from "@/lib/sentry-introspection";
 import type { PlanTier } from "@/lib/user-billing";
 
 export const runtime = "nodejs";
@@ -76,6 +82,7 @@ type IntrospectionDeps = {
 		subject: string,
 	) => Promise<PlanTier>;
 	mcpPeriodLimitResolver: (plan: PlanTier) => number;
+	tracing: IntrospectionTracing;
 };
 
 function parsePositiveInteger(
@@ -155,6 +162,7 @@ const subjectPlanCache = createSubjectPlanCache({
 		300_000,
 	),
 });
+const introspectionTracing = createIntrospectionTracing();
 const introspectionVerifyCache = createIntrospectionVerifyCache({
 	validTtlMs: parsePositiveInteger(
 		process.env.BARDO_INTROSPECTION_VERIFY_CACHE_TTL_MS,
@@ -165,7 +173,13 @@ const introspectionVerifyCache = createIntrospectionVerifyCache({
 		20_000,
 	),
 });
-const introspectionTelemetry = createIntrospectionTelemetry();
+const introspectionTelemetry = createIntrospectionTelemetry({
+	logger: {
+		info(message, attributes) {
+			introspectionTracing.logInfo(message, attributes);
+		},
+	},
+});
 
 const defaultDeps: IntrospectionDeps = {
 	introspectionSecret: process.env.BARDO_AUTH_INTROSPECTION_TOKEN,
@@ -186,6 +200,7 @@ const defaultDeps: IntrospectionDeps = {
 		return live.billingUnavailable ? "free" : live.plan;
 	},
 	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
+	tracing: introspectionTracing,
 };
 
 export function createIntrospectPostHandler(
@@ -197,13 +212,6 @@ export function createIntrospectPostHandler(
 	};
 
 	return async function post(request: Request) {
-		const authorize = createIntrospectionSecretValidator(
-			deps.introspectionSecret,
-		);
-		if (!authorize(request.headers)) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-
 		let body: IntrospectRequest = {};
 		try {
 			body = (await request.json()) as IntrospectRequest;
@@ -211,178 +219,383 @@ export function createIntrospectPostHandler(
 			body = {};
 		}
 
+		const authorize = createIntrospectionSecretValidator(
+			deps.introspectionSecret,
+		);
 		const secret = body.apiKey?.trim();
-		if (!secret) {
-			return NextResponse.json({ valid: false }, { status: 200 });
-		}
-
 		const requiredScope = body.requiredScope?.trim() || "mcp";
+		const workspaceOverrideRequested =
+			typeof body.workspaceRoot === "string" &&
+			body.workspaceRoot.trim().length > 0;
 		const requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
 			rawWorkspaceRoot: body.workspaceRoot,
 			allowOverrideEnv: deps.allowWorkspaceRootOverrideEnv,
 			allowlistEnv: deps.workspaceRootAllowlistEnv,
 		});
 
-		const cachedVerification = deps.introspectionVerifyCache.get(secret);
-		if (cachedVerification?.kind === "invalid") {
-			deps.telemetry.increment("cache_hit_invalid");
-			return NextResponse.json(
-				{ valid: false, reason: "cached_invalid_api_key" },
-				{ status: 200 },
-			);
-		}
-		if (cachedVerification?.kind === "valid") {
-			deps.telemetry.increment("cache_hit_valid");
-			if (!cachedVerification.value.scopes.includes(requiredScope)) {
-				return NextResponse.json({ valid: false }, { status: 200 });
-			}
-			const campaignBasePath =
-				requestedWorkspaceRoot ?? cachedVerification.value.workspacePath;
-			if (!campaignBasePath) {
-				return NextResponse.json({ valid: false }, { status: 200 });
-			}
-			deps.telemetry.increment("success");
-			return NextResponse.json({
-				valid: true,
-				campaignBasePath,
-				keyPrefix: cachedVerification.value.keyId.slice(0, 15),
-				subjectId: cachedVerification.value.subjectId,
-				keyId: cachedVerification.value.keyId,
-				plan: cachedVerification.value.plan,
-				mcpPeriodLimit: deps.mcpPeriodLimitResolver(
-					cachedVerification.value.plan,
-				),
-				verification: {
-					cached: true,
-					user: null,
-					key: null,
-				},
-			});
-		}
-
-		const preliminaryKeyUsage =
-			await deps.verificationLimiter.consumePreAuthKey(
-				await hashApiKeySecret(secret),
-				"free",
-			);
-		if (!preliminaryKeyUsage.allowed) {
-			deps.telemetry.increment("budget_block_key");
-			deps.introspectionVerifyCache.setInvalid(secret);
-			return NextResponse.json(
-				{
-					valid: false,
-					reason: "daily_key_verification_limit_reached",
-					verification: {
-						user: null,
-						key: preliminaryKeyUsage,
-					},
-				},
-				{ status: 200 },
-			);
-		}
-
-		const clerk = await deps.createClerkClient();
-		let clerkKey: VerifiedKeyRecord;
-		deps.telemetry.increment("clerk_verify_called");
-		try {
-			clerkKey = await clerk.apiKeys.verify(secret);
-		} catch (error) {
-			deps.telemetry.increment("clerk_verify_invalid");
-			if (shouldCacheInvalidVerificationError(error)) {
-				deps.introspectionVerifyCache.setInvalid(secret);
-			}
-			return NextResponse.json({ valid: false }, { status: 200 });
-		}
-
-		const keyRecord = clerkKey as Record<string, unknown>;
-		const subject = extractSubjectFromVerifiedKey(keyRecord);
-		const keyId = extractVerifiedKeyId(keyRecord, secret);
-		const scopes = Array.isArray(clerkKey.scopes)
-			? clerkKey.scopes.filter(
-					(scope): scope is string =>
-						typeof scope === "string" && scope.trim().length > 0,
-				)
-			: [];
-		let plan: PlanTier = "free";
-		if (subject) {
-			plan = await deps.subjectPlanCache.resolve(subject, async () => {
-				return await deps.resolvePlanForSubject(clerk, subject);
-			});
-		}
-
-		const userUsage = subject
-			? await deps.verificationLimiter.consumeUser(subject, plan)
-			: null;
-		if (userUsage && !userUsage.allowed) {
-			deps.telemetry.increment("budget_block_user");
-			deps.introspectionVerifyCache.setInvalid(secret);
-			return NextResponse.json(
-				{
-					valid: false,
-					reason: "daily_user_verification_limit_reached",
-					verification: {
-						user: userUsage,
-						key: null,
-					},
-				},
-				{ status: 200 },
-			);
-		}
-
-		const keyUsage = await deps.verificationLimiter.consumeKey(keyId, plan);
-		if (!keyUsage.allowed) {
-			deps.telemetry.increment("budget_block_key");
-			deps.introspectionVerifyCache.setInvalid(secret);
-			return NextResponse.json(
-				{
-					valid: false,
-					reason: "daily_key_verification_limit_reached",
-					verification: {
-						user: userUsage,
-						key: keyUsage,
-					},
-				},
-				{ status: 200 },
-			);
-		}
-
-		const claims =
-			typeof clerkKey.claims === "object" && clerkKey.claims !== null
-				? (clerkKey.claims as Record<string, unknown>)
-				: {};
-		const workspacePath =
-			typeof claims.workspacePath === "string" ? claims.workspacePath : null;
-
-		deps.introspectionVerifyCache.setValid(secret, {
-			subjectId: subject,
-			keyId,
-			plan,
-			scopes,
-			workspacePath,
-		});
-
-		if (!scopes.includes(requiredScope)) {
-			return NextResponse.json({ valid: false }, { status: 200 });
-		}
-
-		if (!workspacePath && !requestedWorkspaceRoot) {
-			return NextResponse.json({ valid: false }, { status: 200 });
-		}
-
-		deps.telemetry.increment("success");
-		return NextResponse.json({
-			valid: true,
-			campaignBasePath: requestedWorkspaceRoot ?? workspacePath,
-			keyPrefix: keyId.slice(0, 15),
-			subjectId: subject,
-			keyId,
-			plan,
-			mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
-			verification: {
-				user: userUsage,
-				key: keyUsage,
+		return await deps.tracing.withRequestSpan(
+			{
+				requiredScope,
+				workspaceOverrideRequested,
 			},
-		});
+			async (span) => {
+				function finalize(
+					response: NextResponse,
+					args: {
+						result:
+							| "success"
+							| "invalid"
+							| "blocked"
+							| "unauthorized"
+							| "error";
+						cachedVerification: boolean;
+						preAuthBackend?: "memory" | "upstash" | null;
+						userBudgetBackend?: "memory" | "upstash" | null;
+						keyBudgetBackend?: "memory" | "upstash" | null;
+						plan?: PlanTier | null;
+					},
+				): NextResponse {
+					applySpanAttributes(
+						span,
+						buildIntrospectionSpanAttributes({
+							requiredScope,
+							workspaceOverrideRequested,
+							result: args.result,
+							cachedVerification: args.cachedVerification,
+							preAuthBackend: args.preAuthBackend,
+							userBudgetBackend: args.userBudgetBackend,
+							keyBudgetBackend: args.keyBudgetBackend,
+							plan: args.plan,
+							telemetrySnapshot: deps.telemetry.snapshot(),
+						}),
+					);
+					return response;
+				}
+
+				if (!authorize(request.headers)) {
+					deps.tracing.logWarn("bardo.auth_introspection.unauthorized", {
+						"bardo.required_scope": requiredScope,
+						"bardo.workspace_override_requested": workspaceOverrideRequested,
+					});
+					return finalize(
+						NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+						{
+							result: "unauthorized",
+							cachedVerification: false,
+						},
+					);
+				}
+
+				if (!secret) {
+					return finalize(
+						NextResponse.json({ valid: false }, { status: 200 }),
+						{
+							result: "invalid",
+							cachedVerification: false,
+						},
+					);
+				}
+
+				const cachedVerification = deps.introspectionVerifyCache.get(secret);
+				if (cachedVerification?.kind === "invalid") {
+					deps.telemetry.increment("cache_hit_invalid");
+					return finalize(
+						NextResponse.json(
+							{ valid: false, reason: "cached_invalid_api_key" },
+							{ status: 200 },
+						),
+						{
+							result: "invalid",
+							cachedVerification: true,
+						},
+					);
+				}
+				if (cachedVerification?.kind === "valid") {
+					deps.telemetry.increment("cache_hit_valid");
+					if (!cachedVerification.value.scopes.includes(requiredScope)) {
+						return finalize(
+							NextResponse.json({ valid: false }, { status: 200 }),
+							{
+								result: "invalid",
+								cachedVerification: true,
+								plan: cachedVerification.value.plan,
+							},
+						);
+					}
+					const campaignBasePath =
+						requestedWorkspaceRoot ?? cachedVerification.value.workspacePath;
+					if (!campaignBasePath) {
+						return finalize(
+							NextResponse.json({ valid: false }, { status: 200 }),
+							{
+								result: "invalid",
+								cachedVerification: true,
+								plan: cachedVerification.value.plan,
+							},
+						);
+					}
+					deps.telemetry.increment("success");
+					return finalize(
+						NextResponse.json({
+							valid: true,
+							campaignBasePath,
+							keyPrefix: cachedVerification.value.keyId.slice(0, 15),
+							subjectId: cachedVerification.value.subjectId,
+							keyId: cachedVerification.value.keyId,
+							plan: cachedVerification.value.plan,
+							mcpPeriodLimit: deps.mcpPeriodLimitResolver(
+								cachedVerification.value.plan,
+							),
+							verification: {
+								cached: true,
+								user: null,
+								key: null,
+							},
+						}),
+						{
+							result: "success",
+							cachedVerification: true,
+							plan: cachedVerification.value.plan,
+						},
+					);
+				}
+
+				const preliminaryKeyUsage =
+					await deps.verificationLimiter.consumePreAuthKey(
+						await hashApiKeySecret(secret),
+						"free",
+					);
+				if (!preliminaryKeyUsage.allowed) {
+					deps.telemetry.increment("budget_block_key");
+					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.tracing.logWarn("bardo.auth_introspection.pre_auth_blocked", {
+						"bardo.required_scope": requiredScope,
+						"bardo.workspace_override_requested": workspaceOverrideRequested,
+						"bardo.result": "blocked",
+						"bardo.introspection.pre_auth_backend": preliminaryKeyUsage.backend,
+					});
+					return finalize(
+						NextResponse.json(
+							{
+								valid: false,
+								reason: "daily_key_verification_limit_reached",
+								verification: {
+									user: null,
+									key: preliminaryKeyUsage,
+								},
+							},
+							{ status: 200 },
+						),
+						{
+							result: "blocked",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+						},
+					);
+				}
+
+				const clerk = await deps.createClerkClient();
+				let clerkKey: VerifiedKeyRecord;
+				deps.telemetry.increment("clerk_verify_called");
+				try {
+					clerkKey = await deps.tracing.withClerkVerifySpan(() =>
+						clerk.apiKeys.verify(secret),
+					);
+				} catch (error) {
+					deps.telemetry.increment("clerk_verify_invalid");
+					if (shouldCacheInvalidVerificationError(error)) {
+						deps.introspectionVerifyCache.setInvalid(secret);
+						deps.tracing.logWarn("bardo.auth_introspection.invalid_key", {
+							"bardo.required_scope": requiredScope,
+							"bardo.workspace_override_requested": workspaceOverrideRequested,
+							"bardo.result": "invalid",
+							"http.status_code": extractErrorStatus(error) ?? undefined,
+							"bardo.introspection.pre_auth_backend":
+								preliminaryKeyUsage.backend,
+						});
+					} else {
+						deps.tracing.captureException(error);
+						deps.tracing.logError("bardo.auth_introspection.verify_failed", {
+							"bardo.required_scope": requiredScope,
+							"bardo.workspace_override_requested": workspaceOverrideRequested,
+							"bardo.result": "error",
+							"http.status_code": extractErrorStatus(error) ?? undefined,
+							"bardo.introspection.pre_auth_backend":
+								preliminaryKeyUsage.backend,
+						});
+					}
+					return finalize(
+						NextResponse.json({ valid: false }, { status: 200 }),
+						{
+							result: "invalid",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+						},
+					);
+				}
+
+				const keyRecord = clerkKey as Record<string, unknown>;
+				const subject = extractSubjectFromVerifiedKey(keyRecord);
+				const keyId = extractVerifiedKeyId(keyRecord, secret);
+				const scopes = Array.isArray(clerkKey.scopes)
+					? clerkKey.scopes.filter(
+							(scope): scope is string =>
+								typeof scope === "string" && scope.trim().length > 0,
+						)
+					: [];
+				let plan: PlanTier = "free";
+				if (subject) {
+					plan = await deps.tracing.withPlanLookupSpan(() =>
+						deps.subjectPlanCache.resolve(subject, async () => {
+							return await deps.resolvePlanForSubject(clerk, subject);
+						}),
+					);
+				}
+
+				const userUsage = subject
+					? await deps.verificationLimiter.consumeUser(subject, plan)
+					: null;
+				if (userUsage && !userUsage.allowed) {
+					deps.telemetry.increment("budget_block_user");
+					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.tracing.logWarn("bardo.auth_introspection.user_budget_blocked", {
+						"bardo.required_scope": requiredScope,
+						"bardo.workspace_override_requested": workspaceOverrideRequested,
+						"bardo.result": "blocked",
+						"bardo.introspection.pre_auth_backend": preliminaryKeyUsage.backend,
+						"bardo.introspection.user_budget_backend": userUsage.backend,
+						"bardo.introspection.plan": plan,
+					});
+					return finalize(
+						NextResponse.json(
+							{
+								valid: false,
+								reason: "daily_user_verification_limit_reached",
+								verification: {
+									user: userUsage,
+									key: null,
+								},
+							},
+							{ status: 200 },
+						),
+						{
+							result: "blocked",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+							userBudgetBackend: userUsage.backend,
+							plan,
+						},
+					);
+				}
+
+				const keyUsage = await deps.verificationLimiter.consumeKey(keyId, plan);
+				if (!keyUsage.allowed) {
+					deps.telemetry.increment("budget_block_key");
+					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.tracing.logWarn("bardo.auth_introspection.key_budget_blocked", {
+						"bardo.required_scope": requiredScope,
+						"bardo.workspace_override_requested": workspaceOverrideRequested,
+						"bardo.result": "blocked",
+						"bardo.introspection.pre_auth_backend": preliminaryKeyUsage.backend,
+						"bardo.introspection.user_budget_backend":
+							userUsage?.backend ?? null,
+						"bardo.introspection.key_budget_backend": keyUsage.backend,
+						"bardo.introspection.plan": plan,
+					});
+					return finalize(
+						NextResponse.json(
+							{
+								valid: false,
+								reason: "daily_key_verification_limit_reached",
+								verification: {
+									user: userUsage,
+									key: keyUsage,
+								},
+							},
+							{ status: 200 },
+						),
+						{
+							result: "blocked",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+							userBudgetBackend: userUsage?.backend ?? null,
+							keyBudgetBackend: keyUsage.backend,
+							plan,
+						},
+					);
+				}
+
+				const claims =
+					typeof clerkKey.claims === "object" && clerkKey.claims !== null
+						? (clerkKey.claims as Record<string, unknown>)
+						: {};
+				const workspacePath =
+					typeof claims.workspacePath === "string"
+						? claims.workspacePath
+						: null;
+
+				deps.introspectionVerifyCache.setValid(secret, {
+					subjectId: subject,
+					keyId,
+					plan,
+					scopes,
+					workspacePath,
+				});
+
+				if (!scopes.includes(requiredScope)) {
+					return finalize(
+						NextResponse.json({ valid: false }, { status: 200 }),
+						{
+							result: "invalid",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+							userBudgetBackend: userUsage?.backend ?? null,
+							keyBudgetBackend: keyUsage.backend,
+							plan,
+						},
+					);
+				}
+
+				if (!workspacePath && !requestedWorkspaceRoot) {
+					return finalize(
+						NextResponse.json({ valid: false }, { status: 200 }),
+						{
+							result: "invalid",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+							userBudgetBackend: userUsage?.backend ?? null,
+							keyBudgetBackend: keyUsage.backend,
+							plan,
+						},
+					);
+				}
+
+				deps.telemetry.increment("success");
+				return finalize(
+					NextResponse.json({
+						valid: true,
+						campaignBasePath: requestedWorkspaceRoot ?? workspacePath,
+						keyPrefix: keyId.slice(0, 15),
+						subjectId: subject,
+						keyId,
+						plan,
+						mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+						verification: {
+							user: userUsage,
+							key: keyUsage,
+						},
+					}),
+					{
+						result: "success",
+						cachedVerification: false,
+						preAuthBackend: preliminaryKeyUsage.backend,
+						userBudgetBackend: userUsage?.backend ?? null,
+						keyBudgetBackend: keyUsage.backend,
+						plan,
+					},
+				);
+			},
+		);
 	};
 }
 

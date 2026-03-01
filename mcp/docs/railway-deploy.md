@@ -7,6 +7,12 @@ Production topology:
 
 Only the MCP service is deployed on Railway.
 
+Current Railway target:
+
+1. Project name: `bardo-mcp`
+1. Project ID: `ec9ed69c-b1e0-44a0-a5fe-08877b0c4d67`
+1. Environment: `production`
+
 ## Railway service setup (MCP)
 
 Create one Railway service from this monorepo:
@@ -32,12 +38,19 @@ Required:
 1. `BARDO_AUTH_INTROSPECTION_TOKEN` (must exactly match website secret)
 1. `BARDO_STRICT_CANONICAL_MODE=true`
 1. `BARDO_DEFAULT_RULESET=d20_v1`
+1. `BARDO_SENTRY_ENABLED=true`
+1. `SENTRY_DSN` (project `bardo-mcp`)
+1. `SENTRY_ENVIRONMENT=production`
+1. `SENTRY_RELEASE=<git sha or deployment release>`
 
 Recommended:
 
 1. `BARDO_MCP_TRANSPORT_MODE=stateful`
 1. `BARDO_SESSION_TTL_MS=3600000`
 1. `BARDO_AUTH_CACHE_TTL_MS=120000`
+1. `BARDO_AUTH_INVALID_CACHE_TTL_MS=30000`
+1. `BARDO_AUTH_INTROSPECTION_TIMEOUT_MS=10000`
+1. `BARDO_SENTRY_TRACES_SAMPLE_RATE=0.1`
 1. `BARDO_TELEMETRY_ENABLED=true`
 1. `BARDO_METRICS_ROUTE_ENABLED=true`
 1. `BARDO_METRICS_REQUIRE_AUTH=true`
@@ -53,6 +66,16 @@ The website must expose:
 The website and MCP must share the same:
 
 1. `BARDO_AUTH_INTROSPECTION_TOKEN`
+
+Recommended website-side Sentry config:
+
+1. `SENTRY_ORG=bardo`
+1. `SENTRY_PROJECT=bardo-website`
+1. `SENTRY_DSN`
+1. `NEXT_PUBLIC_SENTRY_DSN`
+1. `SENTRY_ENVIRONMENT=production`
+1. `SENTRY_RELEASE=<git sha or deployment release>`
+1. `SENTRY_AUTH_TOKEN` for source-map upload
 
 ## Persistent storage
 
@@ -77,6 +100,8 @@ This path works with current key claims (`./customers/<userId>`) and keeps per-u
 1. `GET https://<mcp-domain>/health` returns `200`.
 1. Website `POST /api/auth/introspect-key` returns `{ "valid": true }` for a valid key.
 1. MCP initialize request returns `mcp-session-id`.
+1. Sentry receives MCP startup logs under project `bardo-mcp`.
+1. Sentry receives website introspection logs under project `bardo-website`.
 1. MCP `tools/list` works with:
    `accept: application/json, text/event-stream`
    `mcp-protocol-version: 2025-06-18`

@@ -5,12 +5,24 @@ import { LOOP_DETECTION_POLICY } from "./src/domain/config/loop-detection";
 import { SECURITY_POLICY } from "./src/domain/config/security";
 import { validateRuntimeConfiguration } from "./src/domain/config/strict-config";
 import { TOOL_POLICY_CONFIG } from "./src/domain/config/tool-policy";
+import { captureSentryException, logSentryMessage } from "./src/telemetry";
+import { initSentry } from "./src/telemetry/sentry";
+
+initSentry();
 
 process.on("unhandledRejection", (reason) => {
+	captureSentryException(reason);
+	logSentryMessage("error", "mcp.process.unhandled_rejection", {
+		"bardo.service": "mcp",
+	});
 	console.error("Unhandled rejection:", reason);
 });
 
 process.on("uncaughtException", (error) => {
+	captureSentryException(error);
+	logSentryMessage("error", "mcp.process.uncaught_exception", {
+		"bardo.service": "mcp",
+	});
 	console.error("Uncaught exception:", error);
 });
 
@@ -21,6 +33,15 @@ validateRuntimeConfiguration({
 });
 
 const server = createHttpServer({ port: PORT });
+
+logSentryMessage("info", "mcp.startup.config", {
+	"bardo.service": "mcp",
+	"bardo.auth.mode": SECURITY_POLICY.authMode,
+	"bardo.transport_mode": SECURITY_POLICY.transportMode,
+	"bardo.telemetry_enabled": SECURITY_POLICY.telemetryEnabled,
+	"bardo.metrics_route_enabled": SECURITY_POLICY.metricsRouteEnabled,
+	"bardo.metrics_require_auth": SECURITY_POLICY.metricsRequireAuth,
+});
 
 console.log(
 	`MCP server listening at ${new URL("/mcp", server.url).toString()}`,

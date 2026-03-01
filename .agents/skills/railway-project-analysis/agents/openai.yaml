@@ -1,0 +1,4 @@
+version: 1
+display_name: Railway Project Analysis
+short_description: Assess repo and service readiness for Railway.
+default_prompt: Analyze the repository structure and Railway target setup, identify the deployable units, required variables, storage needs, and service roots, and produce a concrete Railway setup checklist with risks and verification steps.

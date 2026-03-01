@@ -1,10 +1,16 @@
 {
 	"name": "@bardo/mcp",
 	"version": "0.1.0",
-	"private": true,
+	"description": "Bardo MCP local adapter for Bun-based MCP clients.",
 	"type": "module",
 	"bin": {
 		"bardo-mcp": "./src/cli.ts"
+	},
+	"files": [
+		"src"
+	],
+	"publishConfig": {
+		"access": "public"
 	},
 	"scripts": {
 		"start": "bun run src/cli.ts"

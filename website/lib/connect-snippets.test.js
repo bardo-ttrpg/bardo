@@ -25,7 +25,7 @@ describe("buildConnectionSnippet", () => {
 
 	test("renders Claude local command with @bardo/mcp adapter", () => {
 		const snippet = render("claude", "local");
-		expect(snippet).toContain("npx -y @bardo/mcp");
+		expect(snippet).toContain("bunx --bun --package @bardo/mcp bardo-mcp");
 		expect(snippet).toContain("--api-key");
 		expect(snippet).toContain(apiKey);
 	});
@@ -45,10 +45,20 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('"Authorization": "Bearer');
 	});
 
+	test("renders OpenCode local JSON with bunx adapter command", () => {
+		const snippet = render("opencode", "local");
+		expect(snippet).toContain('"type": "local"');
+		expect(snippet).toContain('"command": ["bunx"');
+		expect(snippet).toContain('"--bun"');
+		expect(snippet).toContain('"bardo-mcp"');
+	});
+
 	test("renders Codex local TOML", () => {
 		const snippet = render("codex", "local");
 		expect(snippet).toContain("[mcp_servers.bardo]");
-		expect(snippet).toContain('command = "npx"');
+		expect(snippet).toContain('command = "bunx"');
 		expect(snippet).toContain("@bardo/mcp");
+		expect(snippet).toContain('"--bun"');
+		expect(snippet).toContain('"bardo-mcp"');
 	});
 });

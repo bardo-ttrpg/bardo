@@ -1,0 +1,4 @@
+version: 1
+display_name: Sentry Setup Logging
+short_description: Enable and improve Sentry logging.
+default_prompt: Configure Sentry logging for the relevant runtime, improve log quality for debugging, avoid sensitive data leakage, run targeted verification, and summarize the monitoring impact.

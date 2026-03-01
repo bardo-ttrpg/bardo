@@ -1,4 +1,11 @@
 import { Redis } from "@upstash/redis";
+import {
+	applySpanAttributes,
+	buildUsageLimitSpanAttributes,
+	captureSentryException,
+	logSentryMessage,
+	withUsageLimitSpan,
+} from "../../telemetry";
 
 type MeteredPlan = "free" | "solo" | "solo_plus";
 
@@ -222,7 +229,12 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 				period,
 				backend: "upstash",
 			};
-		} catch {
+		} catch (error) {
+			captureSentryException(error);
+			logSentryMessage("error", "mcp.usage_limiter.upstash_error", {
+				"bardo.service": "mcp",
+				"bardo.usage.backend": "upstash",
+			});
 			return null;
 		}
 	}
@@ -277,67 +289,97 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 
 	return {
 		async consume(identity: UsageIdentity): Promise<McpUsageConsumeResult> {
-			const subjectId = identity.subjectId?.trim() || null;
-			const keyId = identity.keyId?.trim() || null;
-			const plan = normalizePlan(identity.plan);
-			const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
-			if (!subjectId || !keyId || !plan || !limit) {
-				return emptyResult();
-			}
+			return await withUsageLimitSpan(async (span) => {
+				const subjectId = identity.subjectId?.trim() || null;
+				const keyId = identity.keyId?.trim() || null;
+				const plan = normalizePlan(identity.plan);
+				const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
 
-			const nowMsValue = now();
-			const period = normalizePeriod(nowMsValue);
-			const blockedKey = `${subjectId}:${period}`;
-			const blockedUntil = blockedCache.get(blockedKey);
-			if (blockedUntil && blockedUntil > nowMsValue) {
-				return {
-					allowed: false,
+				function annotate(
+					result: McpUsageConsumeResult,
+					blockCacheHit: boolean,
+				): McpUsageConsumeResult {
+					applySpanAttributes(
+						span,
+						buildUsageLimitSpanAttributes({
+							plan,
+							backend: result.backend,
+							limitPresent: limit !== null,
+							allowed: result.allowed,
+							period: result.period,
+							blockCacheHit,
+							writeTotalsEnabled: writeTotals,
+							writeLastUsedEnabled: writeLastUsed,
+							writeModelMetadataEnabled: writeModelMetadata,
+						}),
+					);
+					return result;
+				}
+
+				if (!subjectId || !keyId || !plan || !limit) {
+					return annotate(emptyResult(), false);
+				}
+
+				const nowMsValue = now();
+				const period = normalizePeriod(nowMsValue);
+				const blockedKey = `${subjectId}:${period}`;
+				const blockedUntil = blockedCache.get(blockedKey);
+				if (blockedUntil && blockedUntil > nowMsValue) {
+					return annotate(
+						{
+							allowed: false,
+							limit,
+							usedThisPeriod: limit,
+							remaining: 0,
+							period,
+							backend: redis ? "upstash" : "memory",
+						},
+						true,
+					);
+				}
+				const upstashResult = await consumeUpstash(
+					{
+						subjectId,
+						keyId,
+						providerId: identity.providerId ?? null,
+						modelId: identity.modelId ?? null,
+					},
 					limit,
-					usedThisPeriod: limit,
-					remaining: 0,
 					period,
-					backend: redis ? "upstash" : "memory",
-				};
-			}
-			const upstashResult = await consumeUpstash(
-				{
-					subjectId,
-					keyId,
-					providerId: identity.providerId ?? null,
-					modelId: identity.modelId ?? null,
-				},
-				limit,
-				period,
-				nowMsValue,
-			);
-			if (upstashResult) {
-				if (!upstashResult.allowed) {
+					nowMsValue,
+				);
+				if (upstashResult) {
+					if (!upstashResult.allowed) {
+						blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+					} else {
+						blockedCache.delete(blockedKey);
+					}
+					return annotate(upstashResult, false);
+				}
+
+				if (!allowMemoryFallback) {
+					blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+					return annotate(
+						{
+							allowed: false,
+							limit,
+							usedThisPeriod: limit,
+							remaining: 0,
+							period,
+							backend: "upstash",
+						},
+						false,
+					);
+				}
+
+				const result = consumeMemory({ subjectId, keyId }, limit, period);
+				if (!result.allowed) {
 					blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
 				} else {
 					blockedCache.delete(blockedKey);
 				}
-				return upstashResult;
-			}
-
-			if (!allowMemoryFallback) {
-				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
-				return {
-					allowed: false,
-					limit,
-					usedThisPeriod: limit,
-					remaining: 0,
-					period,
-					backend: "upstash",
-				};
-			}
-
-			const result = consumeMemory({ subjectId, keyId }, limit, period);
-			if (!result.allowed) {
-				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
-			} else {
-				blockedCache.delete(blockedKey);
-			}
-			return result;
+				return annotate(result, false);
+			});
 		},
 		reset(): void {
 			userMemory.clear();

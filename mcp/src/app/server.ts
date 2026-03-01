@@ -14,9 +14,14 @@ import {
 import { SessionRegistry } from "../session/session-registry";
 import { SessionStore } from "../session/session-store";
 import {
+	applySpanAttributes,
+	buildRequestSpanAttributes,
+	captureSentryException,
+	logSentryMessage,
 	normalizeRouteLabel,
 	recordHttpRequestMetric,
 	recordRateLimitEventMetric,
+	withRequestSpan,
 } from "../telemetry";
 import { authenticateRequest } from "./middleware/auth";
 import { corsHeaders, jsonRpcError, withCors } from "./middleware/cors";
@@ -124,230 +129,270 @@ export function createHttpRequestHandler({
 		const isInitBootstrapApiRoute = url.pathname === "/api/v1/init/bootstrap";
 		const isWorldTickApiRoute = url.pathname === "/api/v1/world/tick";
 		const isMetricsRoute = url.pathname === "/metrics";
+		return withRequestSpan(
+			{
+				route,
+				method,
+				transportMode: securityPolicy.transportMode,
+				metricsRouteAuthRequired: securityPolicy.metricsRequireAuth,
+			},
+			async (span) => {
+				let rateLimitOutcome: "allowed" | "blocked" | "error" | undefined;
+				let usageLimitOutcome: "allowed" | "blocked" | "skipped" = "skipped";
 
-		const finalize = (response: Response): Response => {
-			if (securityPolicy.telemetryEnabled) {
-				recordHttpRequestMetric({
-					route,
-					method,
-					status: response.status,
-					durationMs: performance.now() - startedAt,
-				});
-			}
-			return response;
-		};
-
-		if (url.pathname === "/health") {
-			return finalize(handleHealthRequest());
-		}
-
-		if (
-			!isMcpRoute &&
-			!isTurnsApiRoute &&
-			!isInitBootstrapApiRoute &&
-			!isWorldTickApiRoute &&
-			!isMetricsRoute
-		) {
-			return finalize(withCors(new Response("Not Found", { status: 404 })));
-		}
-
-		setRequestTimeout(request, 0);
-
-		if (request.method === "OPTIONS") {
-			return finalize(
-				new Response(null, { status: 204, headers: corsHeaders() }),
-			);
-		}
-
-		store.sweepExpired();
-
-		if (isMetricsRoute) {
-			if (
-				!securityPolicy.metricsRouteEnabled ||
-				!securityPolicy.telemetryEnabled
-			) {
-				return finalize(withCors(new Response("Not Found", { status: 404 })));
-			}
-
-			if (request.method !== "GET") {
-				return finalize(
-					withCors(
-						new Response("Method Not Allowed", {
-							status: 405,
-							headers: {
-								allow: "GET, OPTIONS",
-							},
+				const finalize = (response: Response): Response => {
+					if (securityPolicy.telemetryEnabled) {
+						recordHttpRequestMetric({
+							route,
+							method,
+							status: response.status,
+							durationMs: performance.now() - startedAt,
+						});
+					}
+					applySpanAttributes(
+						span,
+						buildRequestSpanAttributes({
+							route,
+							method,
+							status: response.status,
+							authMode: securityPolicy.authMode,
+							rateLimitOutcome,
+							usageLimitOutcome,
+							transportMode: securityPolicy.transportMode,
+							metricsRouteAuthRequired: securityPolicy.metricsRequireAuth,
 						}),
-					),
-				);
-			}
+					);
+					return response;
+				};
 
-			if (securityPolicy.metricsRequireAuth) {
-				const auth = await authenticateRequest(request, store.asMap());
-				if (auth instanceof Response) {
-					return finalize(auth);
+				if (url.pathname === "/health") {
+					return finalize(handleHealthRequest());
 				}
-				if (!auth.apiKey) {
-					return finalize(metricsAuthRequiredResponse());
+
+				if (
+					!isMcpRoute &&
+					!isTurnsApiRoute &&
+					!isInitBootstrapApiRoute &&
+					!isWorldTickApiRoute &&
+					!isMetricsRoute
+				) {
+					return finalize(withCors(new Response("Not Found", { status: 404 })));
 				}
-			}
 
-			return finalize(handleMetricsRequest());
-		}
+				setRequestTimeout(request, 0);
 
-		if (
-			request.method === "POST" &&
-			isRequestPayloadTooLarge(request, securityPolicy.maxRequestBytes)
-		) {
-			return finalize(jsonRpcError(413, -32010, "Request payload too large"));
-		}
-
-		try {
-			const auth = await authenticateRequest(request, store.asMap());
-			if (auth instanceof Response) {
-				return finalize(auth);
-			}
-
-			const limitKey = getRateLimitKey(request, auth.apiKey);
-			const limitResult = await rateLimiter.limiter.consume(limitKey);
-			if (!limitResult.allowed) {
-				if (securityPolicy.telemetryEnabled) {
-					recordRateLimitEventMetric("blocked");
-				}
-				return finalize(
-					withCors(
-						new Response(
-							JSON.stringify({
-								error: "Rate limit exceeded.",
-								retryAfterMs: limitResult.retryAfterMs,
-							}),
-							{
-								status: 429,
-								headers: {
-									"content-type": "application/json",
-									"retry-after": String(
-										Math.ceil(limitResult.retryAfterMs / 1000),
-									),
-									"x-ratelimit-limit": String(limitResult.limit),
-									"x-ratelimit-remaining": String(limitResult.remaining),
-									"x-ratelimit-reset": String(
-										Math.ceil(limitResult.reset / 1000),
-									),
-								},
-							},
-						),
-					),
-				);
-			}
-
-			if (securityPolicy.telemetryEnabled) {
-				recordRateLimitEventMetric("allowed");
-			}
-
-			const shouldMeterUsage =
-				request.method === "POST" &&
-				(isMcpRoute ||
-					isTurnsApiRoute ||
-					isInitBootstrapApiRoute ||
-					isWorldTickApiRoute);
-			if (shouldMeterUsage) {
-				const usage = await usageLimiter.consume({
-					subjectId: auth.subjectId ?? null,
-					keyId: auth.keyId ?? null,
-					plan: auth.plan ?? null,
-					mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
-					providerId: request.headers.get("x-provider-id")?.trim() ?? null,
-					modelId: request.headers.get("x-model-id")?.trim() ?? null,
-				});
-				if (!usage.allowed) {
+				if (request.method === "OPTIONS") {
 					return finalize(
-						withCors(
-							new Response(
-								JSON.stringify({
-									error: "MCP usage limit reached for current plan.",
-									usage: {
-										limit: usage.limit,
-										used: usage.usedThisPeriod,
-										remaining: usage.remaining,
-										period: usage.period,
-									},
-								}),
-								{
-									status: 429,
-									headers: {
-										"content-type": "application/json",
-									},
-								},
-							),
-						),
+						new Response(null, { status: 204, headers: corsHeaders() }),
 					);
 				}
-			}
 
-			if (isMcpRoute) {
-				return finalize(
-					await handleMcpRequest(
-						request,
-						auth,
-						store,
-						sessionRegistry,
-						toolPolicy,
-						loopPolicy,
-						securityPolicy.telemetryEnabled,
-						{
-							transportMode: securityPolicy.transportMode,
-							enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
-						},
-					),
-				);
-			}
+				store.sweepExpired();
 
-			if (request.method !== "POST") {
-				return finalize(
-					withCors(
-						new Response("Method Not Allowed", {
-							status: 405,
-							headers: {
-								allow: "POST, OPTIONS",
-							},
-						}),
-					),
-				);
-			}
+				if (isMetricsRoute) {
+					if (
+						!securityPolicy.metricsRouteEnabled ||
+						!securityPolicy.telemetryEnabled
+					) {
+						return finalize(
+							withCors(new Response("Not Found", { status: 404 })),
+						);
+					}
 
-			if (isTurnsApiRoute) {
-				return finalize(
-					await handleResolveTurnRequest(
-						request,
-						auth,
-						securityPolicy.telemetryEnabled,
-					),
-				);
-			}
+					if (request.method !== "GET") {
+						return finalize(
+							withCors(
+								new Response("Method Not Allowed", {
+									status: 405,
+									headers: {
+										allow: "GET, OPTIONS",
+									},
+								}),
+							),
+						);
+					}
 
-			if (isInitBootstrapApiRoute) {
-				return finalize(
-					await handleInitBootstrapRequest(
-						request,
-						auth,
-						securityPolicy.telemetryEnabled,
-					),
-				);
-			}
+					if (securityPolicy.metricsRequireAuth) {
+						const auth = await authenticateRequest(request, store.asMap());
+						if (auth instanceof Response) {
+							return finalize(auth);
+						}
+						if (!auth.apiKey) {
+							return finalize(metricsAuthRequiredResponse());
+						}
+					}
 
-			return finalize(
-				await handleWorldTickRequest(
-					request,
-					auth,
-					securityPolicy.telemetryEnabled,
-				),
-			);
-		} catch (error) {
-			if (securityPolicy.telemetryEnabled) {
-				recordRateLimitEventMetric("error");
-			}
-			console.error("Unhandled /mcp error:", error);
-			return finalize(jsonRpcError(500, -32603, "Internal server error"));
-		}
+					return finalize(handleMetricsRequest());
+				}
+
+				if (
+					request.method === "POST" &&
+					isRequestPayloadTooLarge(request, securityPolicy.maxRequestBytes)
+				) {
+					return finalize(
+						jsonRpcError(413, -32010, "Request payload too large"),
+					);
+				}
+
+				try {
+					const auth = await authenticateRequest(request, store.asMap());
+					if (auth instanceof Response) {
+						return finalize(auth);
+					}
+
+					const limitKey = getRateLimitKey(request, auth.apiKey);
+					const limitResult = await rateLimiter.limiter.consume(limitKey);
+					if (!limitResult.allowed) {
+						rateLimitOutcome = "blocked";
+						if (securityPolicy.telemetryEnabled) {
+							recordRateLimitEventMetric("blocked");
+						}
+						return finalize(
+							withCors(
+								new Response(
+									JSON.stringify({
+										error: "Rate limit exceeded.",
+										retryAfterMs: limitResult.retryAfterMs,
+									}),
+									{
+										status: 429,
+										headers: {
+											"content-type": "application/json",
+											"retry-after": String(
+												Math.ceil(limitResult.retryAfterMs / 1000),
+											),
+											"x-ratelimit-limit": String(limitResult.limit),
+											"x-ratelimit-remaining": String(limitResult.remaining),
+											"x-ratelimit-reset": String(
+												Math.ceil(limitResult.reset / 1000),
+											),
+										},
+									},
+								),
+							),
+						);
+					}
+
+					rateLimitOutcome = "allowed";
+					if (securityPolicy.telemetryEnabled) {
+						recordRateLimitEventMetric("allowed");
+					}
+
+					const shouldMeterUsage =
+						request.method === "POST" &&
+						(isMcpRoute ||
+							isTurnsApiRoute ||
+							isInitBootstrapApiRoute ||
+							isWorldTickApiRoute);
+					if (shouldMeterUsage) {
+						const usage = await usageLimiter.consume({
+							subjectId: auth.subjectId ?? null,
+							keyId: auth.keyId ?? null,
+							plan: auth.plan ?? null,
+							mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
+							providerId: request.headers.get("x-provider-id")?.trim() ?? null,
+							modelId: request.headers.get("x-model-id")?.trim() ?? null,
+						});
+						usageLimitOutcome = usage.allowed ? "allowed" : "blocked";
+						if (!usage.allowed) {
+							return finalize(
+								withCors(
+									new Response(
+										JSON.stringify({
+											error: "MCP usage limit reached for current plan.",
+											usage: {
+												limit: usage.limit,
+												used: usage.usedThisPeriod,
+												remaining: usage.remaining,
+												period: usage.period,
+											},
+										}),
+										{
+											status: 429,
+											headers: {
+												"content-type": "application/json",
+											},
+										},
+									),
+								),
+							);
+						}
+					}
+
+					if (isMcpRoute) {
+						return finalize(
+							await handleMcpRequest(
+								request,
+								auth,
+								store,
+								sessionRegistry,
+								toolPolicy,
+								loopPolicy,
+								securityPolicy.telemetryEnabled,
+								{
+									transportMode: securityPolicy.transportMode,
+									enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
+								},
+							),
+						);
+					}
+
+					if (request.method !== "POST") {
+						return finalize(
+							withCors(
+								new Response("Method Not Allowed", {
+									status: 405,
+									headers: {
+										allow: "POST, OPTIONS",
+									},
+								}),
+							),
+						);
+					}
+
+					if (isTurnsApiRoute) {
+						return finalize(
+							await handleResolveTurnRequest(
+								request,
+								auth,
+								securityPolicy.telemetryEnabled,
+							),
+						);
+					}
+
+					if (isInitBootstrapApiRoute) {
+						return finalize(
+							await handleInitBootstrapRequest(
+								request,
+								auth,
+								securityPolicy.telemetryEnabled,
+							),
+						);
+					}
+
+					return finalize(
+						await handleWorldTickRequest(
+							request,
+							auth,
+							securityPolicy.telemetryEnabled,
+						),
+					);
+				} catch (error) {
+					rateLimitOutcome ??= "error";
+					if (securityPolicy.telemetryEnabled) {
+						recordRateLimitEventMetric("error");
+					}
+					captureSentryException(error);
+					logSentryMessage("error", "mcp.request.unhandled_error", {
+						"bardo.service": "mcp",
+						"bardo.route": route,
+						"http.method": method,
+						"bardo.transport_mode": securityPolicy.transportMode,
+					});
+					console.error("Unhandled /mcp error:", error);
+					return finalize(jsonRpcError(500, -32603, "Internal server error"));
+				}
+			},
+		);
 	};
 }
