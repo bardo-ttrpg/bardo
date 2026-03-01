@@ -1,17 +1,24 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number.parseInt(process.env.PORT ?? "3001", 10);
-const defaultHost = process.env.PLAYWRIGHT_LOOPBACK_HOST ?? "::1";
+const port = Number.parseInt(
+	process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3001",
+	10,
+);
+const defaultHost = process.env.PLAYWRIGHT_LOOPBACK_HOST ?? "127.0.0.1";
 const defaultBaseUrl = defaultHost.includes(":")
 	? `http://[${defaultHost}]:${String(port)}`
 	: `http://${defaultHost}:${String(port)}`;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? defaultBaseUrl;
+const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${defaultHost} PORT=${String(port)} bun run dev:e2e`;
 
 export default defineConfig({
 	testDir: "./e2e",
 	testMatch: "**/*.e2e.ts",
 	outputDir: ".playwright/test-results",
 	timeout: 30_000,
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 2 : 0,
+	workers: process.env.CI ? 1 : undefined,
 	expect: {
 		timeout: 10_000,
 	},
@@ -29,10 +36,9 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		command: "bun run dev",
+		command: webServerCommand,
 		url: baseURL,
-		// Force deterministic startup to avoid long probe hangs on some local runtimes (e.g. WSL).
-		reuseExistingServer: false,
+		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
 		stdout: "pipe",
 		stderr: "pipe",

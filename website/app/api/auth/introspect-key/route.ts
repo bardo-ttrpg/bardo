@@ -212,26 +212,14 @@ export function createIntrospectPostHandler(
 	};
 
 	return async function post(request: Request) {
-		let body: IntrospectRequest = {};
-		try {
-			body = (await request.json()) as IntrospectRequest;
-		} catch {
-			body = {};
-		}
-
 		const authorize = createIntrospectionSecretValidator(
 			deps.introspectionSecret,
 		);
-		const secret = body.apiKey?.trim();
-		const requiredScope = body.requiredScope?.trim() || "mcp";
-		const workspaceOverrideRequested =
-			typeof body.workspaceRoot === "string" &&
-			body.workspaceRoot.trim().length > 0;
-		const requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
-			rawWorkspaceRoot: body.workspaceRoot,
-			allowOverrideEnv: deps.allowWorkspaceRootOverrideEnv,
-			allowlistEnv: deps.workspaceRootAllowlistEnv,
-		});
+		let body: IntrospectRequest = {};
+		let secret: string | undefined;
+		let requiredScope = "mcp";
+		let workspaceOverrideRequested = false;
+		let requestedWorkspaceRoot: string | null = null;
 
 		return await deps.tracing.withRequestSpan(
 			{
@@ -286,6 +274,23 @@ export function createIntrospectPostHandler(
 					);
 				}
 
+				try {
+					body = (await request.json()) as IntrospectRequest;
+				} catch {
+					body = {};
+				}
+
+				secret = body.apiKey?.trim();
+				requiredScope = body.requiredScope?.trim() || "mcp";
+				workspaceOverrideRequested =
+					typeof body.workspaceRoot === "string" &&
+					body.workspaceRoot.trim().length > 0;
+				requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
+					rawWorkspaceRoot: body.workspaceRoot,
+					allowOverrideEnv: deps.allowWorkspaceRootOverrideEnv,
+					allowlistEnv: deps.workspaceRootAllowlistEnv,
+				});
+
 				if (!secret) {
 					return finalize(
 						NextResponse.json({ valid: false }, { status: 200 }),
@@ -295,8 +300,10 @@ export function createIntrospectPostHandler(
 						},
 					);
 				}
+				const apiKeySecret = secret;
 
-				const cachedVerification = deps.introspectionVerifyCache.get(secret);
+				const cachedVerification =
+					deps.introspectionVerifyCache.get(apiKeySecret);
 				if (cachedVerification?.kind === "invalid") {
 					deps.telemetry.increment("cache_hit_invalid");
 					return finalize(
@@ -362,12 +369,12 @@ export function createIntrospectPostHandler(
 
 				const preliminaryKeyUsage =
 					await deps.verificationLimiter.consumePreAuthKey(
-						await hashApiKeySecret(secret),
+						await hashApiKeySecret(apiKeySecret),
 						"free",
 					);
 				if (!preliminaryKeyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");
-					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
 					deps.tracing.logWarn("bardo.auth_introspection.pre_auth_blocked", {
 						"bardo.required_scope": requiredScope,
 						"bardo.workspace_override_requested": workspaceOverrideRequested,
@@ -399,12 +406,12 @@ export function createIntrospectPostHandler(
 				deps.telemetry.increment("clerk_verify_called");
 				try {
 					clerkKey = await deps.tracing.withClerkVerifySpan(() =>
-						clerk.apiKeys.verify(secret),
+						clerk.apiKeys.verify(apiKeySecret),
 					);
 				} catch (error) {
 					deps.telemetry.increment("clerk_verify_invalid");
 					if (shouldCacheInvalidVerificationError(error)) {
-						deps.introspectionVerifyCache.setInvalid(secret);
+						deps.introspectionVerifyCache.setInvalid(apiKeySecret);
 						deps.tracing.logWarn("bardo.auth_introspection.invalid_key", {
 							"bardo.required_scope": requiredScope,
 							"bardo.workspace_override_requested": workspaceOverrideRequested,
@@ -436,7 +443,7 @@ export function createIntrospectPostHandler(
 
 				const keyRecord = clerkKey as Record<string, unknown>;
 				const subject = extractSubjectFromVerifiedKey(keyRecord);
-				const keyId = extractVerifiedKeyId(keyRecord, secret);
+				const keyId = extractVerifiedKeyId(keyRecord, apiKeySecret);
 				const scopes = Array.isArray(clerkKey.scopes)
 					? clerkKey.scopes.filter(
 							(scope): scope is string =>
@@ -457,7 +464,7 @@ export function createIntrospectPostHandler(
 					: null;
 				if (userUsage && !userUsage.allowed) {
 					deps.telemetry.increment("budget_block_user");
-					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
 					deps.tracing.logWarn("bardo.auth_introspection.user_budget_blocked", {
 						"bardo.required_scope": requiredScope,
 						"bardo.workspace_override_requested": workspaceOverrideRequested,
@@ -491,7 +498,7 @@ export function createIntrospectPostHandler(
 				const keyUsage = await deps.verificationLimiter.consumeKey(keyId, plan);
 				if (!keyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");
-					deps.introspectionVerifyCache.setInvalid(secret);
+					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
 					deps.tracing.logWarn("bardo.auth_introspection.key_budget_blocked", {
 						"bardo.required_scope": requiredScope,
 						"bardo.workspace_override_requested": workspaceOverrideRequested,
@@ -534,7 +541,7 @@ export function createIntrospectPostHandler(
 						? claims.workspacePath
 						: null;
 
-				deps.introspectionVerifyCache.setValid(secret, {
+				deps.introspectionVerifyCache.setValid(apiKeySecret, {
 					subjectId: subject,
 					keyId,
 					plan,

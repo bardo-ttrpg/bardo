@@ -18,6 +18,69 @@ function buildRequest(secret: string, apiKey: string): Request {
 }
 
 describe("POST /api/auth/introspect-key", () => {
+	test("rejects unauthorized requests before reading the request body", async () => {
+		let jsonCalled = false;
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 10_000,
+		});
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async () => {
+					throw new Error(
+						"consumePreAuthKey should not run for unauthorized requests",
+					);
+				},
+				consumeUser: async () => {
+					throw new Error(
+						"consumeUser should not run for unauthorized requests",
+					);
+				},
+				consumeKey: async () => {
+					throw new Error(
+						"consumeKey should not run for unauthorized requests",
+					);
+				},
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						throw new Error(
+							"Clerk verification should not run for unauthorized requests",
+						);
+					},
+				},
+			}),
+			resolvePlanForSubject: async () => "free",
+			mcpPeriodLimitResolver: () => 100,
+		});
+
+		const response = await handler({
+			headers: new Headers({
+				"content-type": "application/json",
+				"x-bardo-introspection-token": "wrong-secret",
+			}),
+			json: async () => {
+				jsonCalled = true;
+				return {
+					apiKey: "ak_test_unauthorized",
+					requiredScope: "mcp",
+				};
+			},
+		} as unknown as Request);
+
+		expect(response.status).toBe(401);
+		expect(jsonCalled).toBe(false);
+	});
+
 	test("uses verify cache on second call and avoids repeated Clerk verification", async () => {
 		let verifyCalls = 0;
 		let consumeKeyCalls = 0;
