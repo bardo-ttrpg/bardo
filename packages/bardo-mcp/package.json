@@ -7,9 +7,10 @@
 		"bun": ">=1.3.10"
 	},
 	"bin": {
-		"bardo-mcp": "./src/cli.ts"
+		"bardo-mcp": "./bin/bardo-mcp.js"
 	},
 	"files": [
+		"bin",
 		"src"
 	],
 	"publishConfig": {

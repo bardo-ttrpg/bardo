@@ -35,6 +35,8 @@ Set these in the website deployment:
 1. `SENTRY_PROJECT=bardo-website`
 1. `SENTRY_AUTH_TOKEN=<sentry-auth-token>`
 
+`NEXT_PUBLIC_SENTRY_ENVIRONMENT` is required whenever `NEXT_PUBLIC_SENTRY_DSN` is enabled. The browser SDK is now intentionally disabled in non-development builds until that public environment value is set, so staging cannot silently report as production.
+
 Simple check:
 
 1. Open the website.

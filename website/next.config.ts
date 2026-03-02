@@ -1,6 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
-import { resolveSentryRelease } from "./lib/sentry-config";
+import { resolveSentryRelease } from "./lib/sentry-server-config";
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
