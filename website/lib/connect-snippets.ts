@@ -17,8 +17,36 @@ export type BuildConnectionSnippetArgs = {
 	serverName?: string;
 };
 
+const LOCAL_ADAPTER_PACKAGE = "@bardo/mcp";
+const LOCAL_ADAPTER_BIN = "bardo-mcp";
+const LOCAL_ADAPTER_COMMAND = "bunx";
+const LOCAL_ADAPTER_PREFIX_ARGS = [
+	"--bun",
+	"--package",
+	LOCAL_ADAPTER_PACKAGE,
+	LOCAL_ADAPTER_BIN,
+] as const;
+
 function quote(value: string): string {
 	return value.replaceAll('"', '\\"');
+}
+
+function buildLocalAdapterArgs(apiKey: string, baseUrl: string): string[] {
+	return [...LOCAL_ADAPTER_PREFIX_ARGS, "--api-key", apiKey, "--url", baseUrl];
+}
+
+function buildLocalAdapterShellCommand(
+	apiKey: string,
+	baseUrl: string,
+): string {
+	return buildLocalAdapterCommandParts(apiKey, baseUrl).join(" ");
+}
+
+function buildLocalAdapterCommandParts(
+	apiKey: string,
+	baseUrl: string,
+): string[] {
+	return [LOCAL_ADAPTER_COMMAND, ...buildLocalAdapterArgs(apiKey, baseUrl)];
 }
 
 export function buildConnectionSnippet(
@@ -83,16 +111,18 @@ Header: Authorization: Bearer ${apiKey}`;
 		}
 	}
 
-	const localCommand = `npx -y @bardo/mcp --api-key ${apiKey} --url ${baseUrl}`;
+	const localArgs = buildLocalAdapterArgs(apiKey, baseUrl);
+	const localCommandParts = buildLocalAdapterCommandParts(apiKey, baseUrl);
+	const localCommand = buildLocalAdapterShellCommand(apiKey, baseUrl);
 	switch (args.client) {
 		case "claude":
-			return `claude mcp add --scope user ${serverName} -- npx -y @bardo/mcp --api-key ${apiKey} --url ${baseUrl}`;
+			return `claude mcp add --scope user ${serverName} -- ${localCommand}`;
 		case "opencode":
 			return `{
   "mcp": {
     "${serverName}": {
       "type": "local",
-      "command": ["npx", "-y", "@bardo/mcp", "--api-key", "${apiKey}", "--url", "${baseUrl}"],
+      "command": ${JSON.stringify(localCommandParts)},
       "enabled": true
     }
   }
@@ -102,23 +132,23 @@ Header: Authorization: Bearer ${apiKey}`;
 			return `{
   "mcpServers": {
     "${serverName}": {
-      "command": "npx",
-      "args": ["-y", "@bardo/mcp", "--api-key", "${apiKey}", "--url", "${baseUrl}"]
+      "command": "${LOCAL_ADAPTER_COMMAND}",
+      "args": ${JSON.stringify(localArgs)}
     }
   }
 }`;
 		case "codex":
 			return `[mcp_servers.${serverName}]
-command = "npx"
-args = ["-y", "@bardo/mcp", "--api-key", "${quote(apiKey)}", "--url", "${baseUrl}"]`;
+command = "${LOCAL_ADAPTER_COMMAND}"
+args = ${JSON.stringify(localArgs.map((value) => quote(value)))}`;
 		case "vscode":
 			return `{
   "mcp": {
     "servers": {
       "${serverName}": {
         "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@bardo/mcp", "--api-key", "${apiKey}", "--url", "${baseUrl}"]
+        "command": "${LOCAL_ADAPTER_COMMAND}",
+        "args": ${JSON.stringify(localArgs)}
       }
     }
   }

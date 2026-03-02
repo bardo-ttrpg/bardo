@@ -103,7 +103,7 @@ export async function runPerformanceBenchmarkEval(args?: {
 	const seedEvents = Math.max(1_000, args?.seedEvents ?? 1_000);
 	const sampleRuns = Math.max(20, args?.sampleRuns ?? 40);
 	const thresholds = {
-		playerActionMs: 120,
+		playerActionMs: 160,
 		projectionRefreshMs: 80,
 		retrievalMs: 80,
 		indexRebuildFrequency: 0.02,

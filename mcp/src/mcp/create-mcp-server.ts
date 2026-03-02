@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SessionRegistry } from "../session/session-registry";
+import { maybeWrapMcpServerWithSentry } from "../telemetry/sentry";
 import type { AuthContext } from "../types/contracts";
 import { registerCoreResourcesAndPrompts } from "./core-capabilities";
 import { registerAppendEventTool } from "./tools/append-event";
@@ -81,5 +82,5 @@ export function createMcpServer(
 		});
 	}
 
-	return server;
+	return maybeWrapMcpServerWithSentry(server);
 }

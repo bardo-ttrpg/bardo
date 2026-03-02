@@ -3,8 +3,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "next dev --turbopack -p 3001",
-		"build": "next build --turbopack",
+		"dev": "next dev -p ${PORT:-3001}",
+		"dev:e2e": "next dev --hostname ${PLAYWRIGHT_LOOPBACK_HOST:-127.0.0.1} -p ${PORT:-3001}",
+		"build": "next build",
 		"start": "next start -p ${PORT:-3001}",
 		"lint": "biome check .",
 		"typecheck": "tsc --noEmit",
@@ -15,6 +16,7 @@
 	},
 	"dependencies": {
 		"@clerk/nextjs": "6.38.1",
+		"@sentry/nextjs": "10.40.0",
 		"@tailwindcss/postcss": "^4.2.0",
 		"clsx": "^2.1.1",
 		"dotted-map": "^2.2.3",

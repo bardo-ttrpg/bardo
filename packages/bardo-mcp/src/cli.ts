@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -51,7 +51,7 @@ function printHelp(): void {
 	process.stderr.write(`Bardo MCP local adapter
 
 Usage:
-  npx -y @bardo/mcp --api-key <key> [--url <mcp-url>] [--workspace-root <abs-path>]
+  bunx --bun --package @bardo/mcp bardo-mcp --api-key <key> [--url <mcp-url>] [--workspace-root <abs-path>]
 
 Options:
   --api-key, -k   API key used as Authorization: Bearer

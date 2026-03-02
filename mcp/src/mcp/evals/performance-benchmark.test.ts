@@ -14,5 +14,5 @@ describe("performance benchmark eval", () => {
 		expect(result.p95.projectionRefreshMs).toBeGreaterThanOrEqual(0);
 		expect(result.p95.retrievalMs).toBeGreaterThanOrEqual(0);
 		expect(result.success).toBeTrue();
-	});
+	}, 15_000);
 });

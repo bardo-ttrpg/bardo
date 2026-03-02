@@ -1,4 +1,5 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { maxApiKeysForPlan } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
@@ -109,6 +110,12 @@ export async function GET() {
 	try {
 		clerkKeys = await clerk.apiKeys.list({ subject: userId, limit: 100 });
 	} catch (err) {
+		Sentry.captureException(err);
+		Sentry.logger.error("website.api_keys.list_failed", {
+			"bardo.service": "website",
+			"bardo.route": "/api/keys",
+			"bardo.operation": "clerk.apiKeys.list",
+		});
 		console.error("[api/keys] clerk.apiKeys.list failed:", err);
 		return NextResponse.json(
 			{ error: clerkErrorMessage(err) },
@@ -190,6 +197,12 @@ export async function POST(request: Request) {
 		const probe = await clerk.apiKeys.list({ subject: userId, limit: 1 });
 		activeCount = probe.totalCount;
 	} catch (err) {
+		Sentry.captureException(err);
+		Sentry.logger.error("website.api_keys.limit_probe_failed", {
+			"bardo.service": "website",
+			"bardo.route": "/api/keys",
+			"bardo.operation": "clerk.apiKeys.list",
+		});
 		console.error(
 			"[api/keys] clerk.apiKeys.list failed:",
 			clerkErrorMessage(err),
@@ -226,6 +239,12 @@ export async function POST(request: Request) {
 		});
 	} catch (err) {
 		const msg = clerkErrorMessage(err);
+		Sentry.captureException(err);
+		Sentry.logger.error("website.api_keys.create_failed", {
+			"bardo.service": "website",
+			"bardo.route": "/api/keys",
+			"bardo.operation": "clerk.apiKeys.create",
+		});
 		console.error("[api/keys] clerk.apiKeys.create failed:", msg);
 		return NextResponse.json({ error: msg }, { status: clerkErrorStatus(err) });
 	}

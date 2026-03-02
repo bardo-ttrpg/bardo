@@ -6,6 +6,7 @@ import {
 } from "next/server";
 import { isClerkAuthConfigured } from "./lib/clerk-config";
 import { shouldRedirectToCanonicalLocalhost } from "./lib/local-domain";
+import { shouldUseClerkOnlyProxyPathname } from "./lib/proxy-config";
 
 const isProtectedRoute = createRouteMatcher([
 	"/dashboard(.*)",
@@ -70,6 +71,18 @@ export default async function proxy(
 	request: NextRequest,
 	event: NextFetchEvent,
 ) {
+	const isClerkOnlyPath = shouldUseClerkOnlyProxyPathname(
+		request.nextUrl.pathname,
+	);
+	if (isClerkOnlyPath) {
+		if (!IS_CLERK_AUTH_CONFIGURED) {
+			return NextResponse.next();
+		}
+
+		const clerkResult = await clerkHandler(request, event);
+		return clerkResult instanceof Response ? clerkResult : NextResponse.next();
+	}
+
 	const localDomainRedirect = maybeRedirectToCanonicalLocalhost(request);
 	if (localDomainRedirect) {
 		return localDomainRedirect;
@@ -89,9 +102,14 @@ export default async function proxy(
 
 export const config = {
 	matcher: [
-		// Skip Next.js internals and static files
-		"/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-		// Always run for API routes
+		{
+			source:
+				"/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+			missing: [
+				{ type: "header", key: "next-router-prefetch" },
+				{ type: "header", key: "purpose", value: "prefetch" },
+			],
+		},
 		"/(api|trpc)(.*)",
 	],
 };

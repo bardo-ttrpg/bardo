@@ -1,4 +1,11 @@
 import path from "node:path";
+import {
+	applySpanAttributes,
+	buildHostedAuthSpanAttributes,
+	captureSentryException,
+	logSentryMessage,
+	withHostedAuthSpan,
+} from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 
 export type ApiKeyValidatorMetadata = {
@@ -147,56 +154,143 @@ export function createHostedIntrospectionApiKeyValidator(
 		apiKey: string,
 		metadata?: ApiKeyValidatorMetadata,
 	): Promise<AuthContext | null> {
-		const now = Date.now();
-		const cacheKey = buildCacheKey(apiKey, metadata);
-		const cached = cache.get(cacheKey);
-		if (cached && cached.expiresAt > now) {
-			if (!cached.value) return null;
-			return { ...cached.value, apiKey };
-		}
+		const requiredScope = metadata?.requiredScope ?? "mcp";
+		const workspaceOverrideRequested = Boolean(metadata?.workspaceRoot?.trim());
+		return await withHostedAuthSpan(
+			{
+				provider: "hosted",
+				cacheHit: false,
+				requiredScope,
+				workspaceOverrideRequested,
+			},
+			async (span) => {
+				const now = Date.now();
+				const cacheKey = buildCacheKey(apiKey, metadata);
+				const cached = cache.get(cacheKey);
+				if (cached && cached.expiresAt > now) {
+					applySpanAttributes(
+						span,
+						buildHostedAuthSpanAttributes({
+							provider: "hosted",
+							cacheHit: true,
+							requiredScope,
+							workspaceOverrideRequested,
+							result: cached.value ? "valid" : "invalid",
+							httpOk: cached.value ? true : undefined,
+							timeout: false,
+						}),
+					);
+					if (!cached.value) return null;
+					return { ...cached.value, apiKey };
+				}
 
-		const headers = new Headers({
-			"content-type": "application/json",
-		});
-		if (config.introspectionToken) {
-			headers.set("x-bardo-introspection-token", config.introspectionToken);
-		}
+				const headers = new Headers({
+					"content-type": "application/json",
+				});
+				if (config.introspectionToken) {
+					headers.set("x-bardo-introspection-token", config.introspectionToken);
+				}
 
-		let payload: unknown = null;
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), timeoutMs);
-		try {
-			const response = await fetchImpl(config.introspectionUrl, {
-				method: "POST",
-				headers,
-				body: JSON.stringify({
-					apiKey,
-					requiredScope: metadata?.requiredScope ?? "mcp",
-					providerId: metadata?.providerId ?? undefined,
-					modelId: metadata?.modelId ?? undefined,
-					workspaceRoot: metadata?.workspaceRoot ?? undefined,
-				}),
-				signal: controller.signal,
-			});
-			if (!response.ok) {
-				return null;
-			}
-			payload = (await response.json()) as HostedIntrospectionResponse;
-		} catch {
-			return null;
-		} finally {
-			clearTimeout(timeout);
-		}
+				let payload: unknown = null;
+				let httpOk = false;
+				let timedOut = false;
+				const controller = new AbortController();
+				const timeout = setTimeout(() => controller.abort(), timeoutMs);
+				try {
+					const response = await fetchImpl(config.introspectionUrl, {
+						method: "POST",
+						headers,
+						body: JSON.stringify({
+							apiKey,
+							requiredScope,
+							providerId: metadata?.providerId ?? undefined,
+							modelId: metadata?.modelId ?? undefined,
+							workspaceRoot: metadata?.workspaceRoot ?? undefined,
+						}),
+						signal: controller.signal,
+					});
+					httpOk = response.ok;
+					if (!response.ok) {
+						logSentryMessage("warn", "mcp.hosted_auth.invalid_response", {
+							"bardo.service": "mcp",
+							"bardo.auth.provider": "hosted",
+							"bardo.auth.required_scope": requiredScope,
+							"bardo.auth.workspace_override_requested":
+								workspaceOverrideRequested,
+							"http.status_code": response.status,
+						});
+						applySpanAttributes(
+							span,
+							buildHostedAuthSpanAttributes({
+								provider: "hosted",
+								cacheHit: false,
+								requiredScope,
+								workspaceOverrideRequested,
+								httpOk,
+								timeout: false,
+								result: "invalid",
+							}),
+						);
+						return null;
+					}
+					payload = (await response.json()) as HostedIntrospectionResponse;
+				} catch (error) {
+					timedOut = error instanceof Error && error.name === "AbortError";
+					if (!timedOut) {
+						captureSentryException(error);
+					}
+					logSentryMessage(
+						timedOut ? "warn" : "error",
+						"mcp.hosted_auth.fetch_failed",
+						{
+							"bardo.service": "mcp",
+							"bardo.auth.provider": "hosted",
+							"bardo.auth.required_scope": requiredScope,
+							"bardo.auth.workspace_override_requested":
+								workspaceOverrideRequested,
+							"bardo.auth.introspection_timeout": timedOut,
+						},
+					);
+					applySpanAttributes(
+						span,
+						buildHostedAuthSpanAttributes({
+							provider: "hosted",
+							cacheHit: false,
+							requiredScope,
+							workspaceOverrideRequested,
+							httpOk,
+							timeout: timedOut,
+							result: "error",
+						}),
+					);
+					return null;
+				} finally {
+					clearTimeout(timeout);
+				}
 
-		const context = parseHostedIntrospectionPayload(payload, projectRoot);
-		cache.set(cacheKey, {
-			expiresAt: now + (context ? validCacheTtlMs : invalidCacheTtlMs),
-			value: context,
-		});
-		if (!context) {
-			return null;
-		}
-		return { ...context, apiKey };
+				const context = parseHostedIntrospectionPayload(payload, projectRoot);
+				cache.set(cacheKey, {
+					expiresAt: now + (context ? validCacheTtlMs : invalidCacheTtlMs),
+					value: context,
+				});
+				applySpanAttributes(
+					span,
+					buildHostedAuthSpanAttributes({
+						provider: "hosted",
+						cacheHit: false,
+						requiredScope,
+						workspaceOverrideRequested,
+						httpOk,
+						timeout: timedOut,
+						result: context ? "valid" : "invalid",
+					}),
+				);
+				if (!context) {
+					return null;
+				}
+				return { ...context, apiKey };
+			},
+		);
 	};
 }
 
