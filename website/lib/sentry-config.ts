@@ -80,9 +80,7 @@ export function createBrowserSentryOptions(env: SentryEnv = process.env) {
 		dsn: normalizeString(env.NEXT_PUBLIC_SENTRY_DSN),
 		enabled: Boolean(normalizeString(env.NEXT_PUBLIC_SENTRY_DSN)),
 		environment:
-			normalizeString(env.NEXT_PUBLIC_SENTRY_ENVIRONMENT) ??
-			normalizeString(env.SENTRY_ENVIRONMENT) ??
-			env.NODE_ENV,
+			normalizeString(env.NEXT_PUBLIC_SENTRY_ENVIRONMENT) ?? env.NODE_ENV,
 		release: resolveBrowserSentryRelease(env),
 		tracesSampleRate: parseSampleRate(
 			env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,

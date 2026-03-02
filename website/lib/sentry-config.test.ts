@@ -57,6 +57,16 @@ describe("createBrowserSentryOptions", () => {
 		expect(options.environment).toBe("staging");
 	});
 
+	test("ignores server-only SENTRY_ENVIRONMENT in browser config", () => {
+		const options = createBrowserSentryOptions({
+			NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/2",
+			SENTRY_ENVIRONMENT: "staging",
+			NODE_ENV: "production",
+		});
+
+		expect(options.environment).toBe("production");
+	});
+
 	test("does not infer browser release from server-only git sha variables", () => {
 		const options = createBrowserSentryOptions({
 			NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/2",
