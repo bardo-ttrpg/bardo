@@ -71,8 +71,8 @@ Current repo and live infra facts:
      `097e85bdddf962f401826fec7352b2bf346268ed`
 9. Website production sourcemap upload is enabled through:
    - `SENTRY_AUTH_TOKEN`
-   - explicit debug-id injection
-   - artifact bundle upload during `website` build
+   - `withSentryConfig(...)` in the Next.js build
+   - release metadata on the website deployment
 10. Current staging server-to-server bridge:
    - Railway MCP reaches the protected Vercel Preview introspection route by
      using Vercel's automation bypass support
@@ -189,6 +189,7 @@ You need these things before touching staging or production:
 3. Vercel access for the website project
 4. Railway access for the `bardo-mcp` project
 5. Clerk access for publishable key, secret key, and billing plan IDs
+   - production must use `pk_live_...` and `sk_live_...`
 6. Sentry access for:
    - `bardo-website`
    - `bardo-mcp`
@@ -215,6 +216,8 @@ These are the repo files to trust when configuring environments:
    - MCP-specific Railway notes
 5. [website/next.config.ts](/home/armando/projects/bardo/website/next.config.ts)
    - website Sentry build integration and Next.js config
+9. [website/scripts/validate-deploy-env.ts](/home/armando/projects/bardo/website/scripts/validate-deploy-env.ts)
+   - blocks Vercel production builds that still use Clerk test keys
 6. [website/instrumentation-client.ts](/home/armando/projects/bardo/website/instrumentation-client.ts)
    - browser Sentry startup
 7. [website/sentry.server.config.ts](/home/armando/projects/bardo/website/sentry.server.config.ts)
@@ -379,6 +382,14 @@ If your current Vercel plan does not support custom environments, this Preview d
 2. `CLERK_SECRET_KEY`
 3. `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
 4. `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+
+Important:
+
+1. production must use Clerk live keys:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` must start with `pk_live_`
+   - `CLERK_SECRET_KEY` must start with `sk_live_`
+2. the website build now warns on Vercel production if test keys are still configured
+3. set `BARDO_ENFORCE_LIVE_CLERK_KEYS=true` when you want production builds to hard-fail on test keys
 5. `CLERK_BILLING_PLAN_SOLO`
 6. `CLERK_BILLING_PLAN_SOLO_PLUS`
 

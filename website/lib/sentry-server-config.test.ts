@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
 	createServerSentryOptions,
-	resolveSentryOrgSlug,
 	resolveSentryRelease,
 } from "./sentry-server-config";
 
@@ -47,41 +46,5 @@ describe("resolveSentryRelease", () => {
 				VERCEL_GIT_COMMIT_SHA: "ignored-sha",
 			}),
 		).toBe("website@explicit-release");
-	});
-});
-
-describe("resolveSentryOrgSlug", () => {
-	test("resolves an accessible organization slug from the configured org name", () => {
-		expect(
-			resolveSentryOrgSlug(
-				{
-					SENTRY_ORG: "bardo",
-					SENTRY_AUTH_TOKEN: "token",
-				},
-				() => [
-					{
-						slug: "bardo-1k",
-						name: "bardo",
-					},
-				],
-			),
-		).toBe("bardo-1k");
-	});
-
-	test("keeps the configured org when no accessible organization matches", () => {
-		expect(
-			resolveSentryOrgSlug(
-				{
-					SENTRY_ORG: "bardo",
-					SENTRY_AUTH_TOKEN: "token",
-				},
-				() => [
-					{
-						slug: "other-org",
-						name: "other",
-					},
-				],
-			),
-		).toBe("bardo");
 	});
 });
