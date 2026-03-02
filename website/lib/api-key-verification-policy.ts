@@ -40,8 +40,6 @@ export type DailyVerificationConsumeResult = {
 	backend: "memory" | "upstash";
 };
 
-export type PreAuthKeyConsumeResult = DailyVerificationConsumeResult;
-
 export function rotateConfirmedKeyWindow(args: {
 	confirmedKeys: Set<string>;
 	activeDay: string | null;
@@ -322,7 +320,7 @@ export function createDailyVerificationBudgetLimiter(
 		consumePreAuthKey(
 			secretHash: string,
 			plan: PlanTier = "free",
-		): Promise<PreAuthKeyConsumeResult> {
+		): Promise<DailyVerificationConsumeResult> {
 			return consume("key", `preauth:${secretHash}`, plan);
 		},
 		consumeUser(

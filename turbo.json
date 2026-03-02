@@ -11,7 +11,14 @@
 			"outputs": []
 		},
 		"website#build": {
-			"outputs": [".next/**", "!.next/cache/**"]
+			"outputs": [".next/**", "!.next/cache/**"],
+			"env": [
+				"NEXT_PUBLIC_*",
+				"CLERK_*",
+				"BARDO_*",
+				"SENTRY_*",
+				"UPSTASH_*"
+			]
 		},
 		"mcp#build": {
 			"outputs": []

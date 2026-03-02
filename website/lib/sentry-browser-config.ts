@@ -58,5 +58,3 @@ export function createBrowserSentryOptions(
 		sendDefaultPii: false,
 	};
 }
-
-export type { BrowserSentryEnv };

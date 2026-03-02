@@ -2,12 +2,13 @@
 	"$schema": "https://railway.com/railway.schema.json",
 	"build": {
 		"watchPatterns": [
-			"/mcp/**",
+			"/index.ts",
+			"/src/**",
 			"/package.json",
-			"/bun.lock",
-			"/tsconfig.base.json"
+			"/tsconfig.json",
+			"/railway.json"
 		],
-		"buildCommand": "bun --cwd .. install --frozen-lockfile"
+		"buildCommand": "bun install"
 	},
 	"deploy": {
 		"startCommand": "bun run start",

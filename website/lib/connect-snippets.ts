@@ -9,7 +9,7 @@ export type ConnectionClient =
 
 export type ConnectionMode = "remote" | "local";
 
-export type BuildConnectionSnippetArgs = {
+type BuildConnectionSnippetArgs = {
 	client: ConnectionClient;
 	mode: ConnectionMode;
 	baseUrl: string;

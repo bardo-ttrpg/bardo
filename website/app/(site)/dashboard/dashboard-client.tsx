@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useReducer } from "react";
+import { useEffect, useReducer } from "react";
+import {
+	copySecret,
+	createKey,
+	getDashboardViewModel,
+	loadDashboardData,
+	loadKeys,
+	refreshSnippet,
+	revokeKey,
+	rotateKey,
+} from "./dashboard-controller";
 import {
 	CLIENT_OPTIONS,
 	type ConnectionClient,
@@ -12,48 +22,9 @@ import {
 } from "./dashboard-state";
 import { DashboardSignOutButton } from "./signout-button";
 
-const READ_REQUEST_TIMEOUT_MS =
-	process.env.NODE_ENV === "development" ? 30_000 : 10_000;
-const MUTATION_REQUEST_TIMEOUT_MS =
-	process.env.NODE_ENV === "development" ? 90_000 : 30_000;
-
 function formatDate(value: number | null | undefined): string {
 	if (!value) return "Never";
 	return new Date(value).toLocaleString();
-}
-
-async function fetchWithTimeout(
-	input: RequestInfo | URL,
-	init?: RequestInit,
-	timeoutMs = READ_REQUEST_TIMEOUT_MS,
-) {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
-	try {
-		return await fetch(input, {
-			...init,
-			signal: controller.signal,
-		});
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function toUiError(error: unknown, fallback: string): string {
-	if (
-		(error instanceof DOMException && error.name === "AbortError") ||
-		(error instanceof Error && error.name === "AbortError")
-	) {
-		return "Request timed out. Please retry.";
-	}
-	if (error instanceof Error && error.message.trim().length > 0) {
-		return error.message;
-	}
-	return fallback;
 }
 
 function BillingPlanCard({
@@ -81,12 +52,13 @@ function BillingPlanCard({
 						Credits: {billing.creditsTotal.toLocaleString()} total
 					</p>
 					<p className="text-sm">
-						MCP calls this period:{" "}
+						Billable MCP tool calls this period:{" "}
 						<strong>{billing.mcpCallsThisPeriod.toLocaleString()}</strong> /{" "}
 						{mcpPeriodLimit.toLocaleString()}
 					</p>
 					<p className="text-sm text-muted-foreground">
-						MCP calls total: {billing.mcpCallsTotal.toLocaleString()}
+						Billable MCP tool calls total:{" "}
+						{billing.mcpCallsTotal.toLocaleString()}
 					</p>
 				</div>
 			) : (
@@ -141,6 +113,10 @@ function CreateApiKeyCard({
 			</p>
 			<p className="mt-1 text-xs text-muted-foreground">
 				Workspace location is managed automatically per account.
+			</p>
+			<p className="mt-1 text-xs text-muted-foreground">
+				Hosted staging and production workspaces live on the MCP server, not in
+				your local editor folder.
 			</p>
 			<p className="mt-1 text-xs text-muted-foreground">
 				Active keys: {activeCount} / {keyPolicy.maxAllowed}
@@ -300,8 +276,10 @@ function ConnectionSnippetPanel({
 				Connection Snippet Generator
 			</p>
 			<p className="mb-3 text-xs text-muted-foreground">
-				Recommended for production right now: remote mode. Use local mode after
-				publishing the Bun adapter package.
+				Remote mode connects your client straight to the Railway MCP. Local mode
+				runs a tiny Bun adapter on your machine, but with the current hosted
+				setup the workspace still lives on the MCP server unless workspace
+				overrides are explicitly enabled.
 			</p>
 			<div className="flex flex-wrap gap-3">
 				<select
@@ -376,156 +354,44 @@ export function DashboardClient() {
 		undefined,
 		createDashboardState,
 	);
-
-	const billing = state.dashboardData?.billing ?? null;
-	const keyPolicy = state.dashboardData?.keyPolicy ?? {
-		maxAllowed: 0,
-		dailyUserVerificationLimit: 0,
-		dailyKeyVerificationLimit: 0,
-		mcpPeriodLimit: 0,
-	};
-	const activeCount = state.keys.filter(
-		(key) => key.status === "active",
-	).length;
-
-	const loadDashboardData = useCallback(async () => {
-		dispatch({ type: "dashboard_loading", billingLoading: true });
-		try {
-			const response = await fetchWithTimeout("/api/billing");
-			if (response.ok) {
-				const payload = (await response.json()) as DashboardData;
-				dispatch({ type: "dashboard_loaded", dashboardData: payload });
-				return;
-			}
-		} catch {
-			// Keep existing UI state on transient network errors.
-		}
-		dispatch({ type: "dashboard_loading", billingLoading: false });
-	}, []);
-
-	const loadKeys = useCallback(async () => {
-		dispatch({ type: "keys_loading", keysLoading: true });
-		try {
-			const response = await fetchWithTimeout("/api/keys");
-			if (response.ok) {
-				const payload = (await response.json()) as { keys: DashboardKey[] };
-				dispatch({ type: "keys_loaded", keys: payload.keys ?? [] });
-				return;
-			}
-		} catch {
-			// Keep existing UI state on transient network errors.
-		}
-		dispatch({ type: "keys_loading", keysLoading: false });
-	}, []);
+	const { billing, keyPolicy, activeCount } = getDashboardViewModel(state);
 
 	useEffect(() => {
-		void loadDashboardData();
-		void loadKeys();
-	}, [loadDashboardData, loadKeys]);
+		void loadDashboardData({ dispatch });
+		void loadKeys({ dispatch });
+	}, []);
 
-	async function refreshSnippet(secret: string) {
-		dispatch({ type: "snippet_loading", snippetLoading: true });
-		try {
-			const url = new URL("/api/connect/snippets", window.location.origin);
-			url.searchParams.set("client", state.connectionClient);
-			url.searchParams.set("mode", state.connectionMode);
-			url.searchParams.set("apiKey", secret);
-			const response = await fetchWithTimeout(url, { cache: "no-store" });
-			const payload = (await response.json()) as { snippet?: string };
-			dispatch({ type: "snippet_loaded", snippet: payload.snippet ?? "" });
-		} finally {
-			dispatch({ type: "snippet_loading", snippetLoading: false });
-		}
+	async function refreshCurrentSnippet(secret: string) {
+		await refreshSnippet({
+			dispatch,
+			connectionClient: state.connectionClient,
+			connectionMode: state.connectionMode,
+			secret,
+		});
+	}
+
+	async function reloadKeys() {
+		await loadKeys({ dispatch });
 	}
 
 	async function onCreateKey() {
-		if (activeCount >= keyPolicy.maxAllowed) {
-			dispatch({
-				type: "mutation_error",
-				mutationError: "You've reached your plan's API key limit",
-			});
-			return;
-		}
-		dispatch({ type: "mutation_error", mutationError: null });
-		dispatch({ type: "busy_changed", busyId: "create" });
-		try {
-			const response = await fetchWithTimeout(
-				"/api/keys",
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({
-						name: state.name,
-						scopes: ["mcp"],
-					}),
-				},
-				MUTATION_REQUEST_TIMEOUT_MS,
-			);
-			const payload = (await response.json()) as {
-				key?: DashboardKey;
-				secret?: string;
-				error?: string;
-			};
-			if (!response.ok || payload.error) {
-				dispatch({
-					type: "mutation_error",
-					mutationError: payload.error ?? "Failed to create key",
-				});
-				return;
-			}
-			if (payload.secret) {
-				dispatch({
-					type: "secret_received",
-					secret: payload.secret,
-					label: `Created ${payload.key?.name ?? state.name}`,
-				});
-				await refreshSnippet(payload.secret);
-			}
-			await loadKeys();
-		} catch (error) {
-			dispatch({
-				type: "mutation_error",
-				mutationError: toUiError(error, "Failed to create key"),
-			});
-		} finally {
-			dispatch({ type: "busy_changed", busyId: null });
-		}
+		await createKey({
+			state,
+			activeCount,
+			keyPolicy,
+			dispatch,
+			loadKeys: reloadKeys,
+			refreshSnippet: refreshCurrentSnippet,
+		});
 	}
 
 	async function onRevokeKey(keyId: string, keyName: string) {
-		dispatch({ type: "mutation_error", mutationError: null });
-		dispatch({ type: "busy_changed", busyId: keyId });
-		try {
-			const response = await fetchWithTimeout(
-				"/api/keys/revoke",
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ id: keyId }),
-				},
-				MUTATION_REQUEST_TIMEOUT_MS,
-			);
-			const payload = (await response.json()) as {
-				revoked?: boolean;
-				error?: string;
-			};
-			if (!response.ok || payload.error) {
-				dispatch({
-					type: "mutation_error",
-					mutationError: payload.error ?? "Failed to delete key",
-				});
-				return;
-			}
-			await loadKeys();
-			dispatch({ type: "key_deleted", keyName });
-		} catch (error) {
-			dispatch({
-				type: "mutation_error",
-				mutationError: toUiError(error, "Failed to delete key"),
-			});
-		} finally {
-			dispatch({ type: "busy_changed", busyId: null });
-		}
+		await revokeKey({
+			keyId,
+			keyName,
+			dispatch,
+			loadKeys: reloadKeys,
+		});
 	}
 
 	async function onRotateKey(
@@ -533,98 +399,21 @@ export function DashboardClient() {
 		keyName: string,
 		keyWorkspacePath: string | null,
 	) {
-		dispatch({ type: "mutation_error", mutationError: null });
-		dispatch({ type: "busy_changed", busyId: keyId });
-		try {
-			const revokeResponse = await fetchWithTimeout(
-				"/api/keys/revoke",
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ id: keyId }),
-				},
-				MUTATION_REQUEST_TIMEOUT_MS,
-			);
-			if (!revokeResponse.ok) {
-				const payload = (await revokeResponse.json()) as { error?: string };
-				dispatch({
-					type: "mutation_error",
-					mutationError:
-						payload.error ?? "Failed to delete old key during rotation",
-				});
-				return;
-			}
-
-			let createResponse = await fetchWithTimeout(
-				"/api/keys",
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({
-						name: keyName,
-						workspacePath: keyWorkspacePath ?? undefined,
-						scopes: ["mcp"],
-					}),
-				},
-				MUTATION_REQUEST_TIMEOUT_MS,
-			);
-			if (!createResponse.ok) {
-				await sleep(350);
-				createResponse = await fetchWithTimeout(
-					"/api/keys",
-					{
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							name: keyName,
-							workspacePath: keyWorkspacePath ?? undefined,
-							scopes: ["mcp"],
-						}),
-					},
-					MUTATION_REQUEST_TIMEOUT_MS,
-				);
-			}
-
-			const payload = (await createResponse.json()) as {
-				key?: DashboardKey;
-				secret?: string;
-				error?: string;
-			};
-			if (!createResponse.ok || payload.error) {
-				dispatch({
-					type: "mutation_error",
-					mutationError: payload.error ?? "Failed to create replacement key",
-				});
-				return;
-			}
-			if (payload.secret) {
-				dispatch({
-					type: "secret_received",
-					secret: payload.secret,
-					label: `Rotated ${keyName}`,
-				});
-				await refreshSnippet(payload.secret);
-			}
-			await loadKeys();
-		} catch (error) {
-			dispatch({
-				type: "mutation_error",
-				mutationError: toUiError(error, "Failed to rotate key"),
-			});
-		} finally {
-			dispatch({ type: "busy_changed", busyId: null });
-		}
+		await rotateKey({
+			keyId,
+			keyName,
+			keyWorkspacePath,
+			dispatch,
+			loadKeys: reloadKeys,
+			refreshSnippet: refreshCurrentSnippet,
+		});
 	}
 
-	function onCopySecret() {
-		if (!state.lastSecret) {
-			return;
-		}
-		navigator.clipboard.writeText(state.lastSecret);
-		dispatch({ type: "copied_changed", copied: true });
-		window.setTimeout(() => {
-			dispatch({ type: "copied_changed", copied: false });
-		}, 2_000);
+	async function onCopySecret() {
+		await copySecret({
+			secret: state.lastSecret,
+			dispatch,
+		});
 	}
 
 	return (
@@ -682,7 +471,9 @@ export function DashboardClient() {
 					})
 				}
 				onGenerateSnippet={() =>
-					state.lastSecret ? void refreshSnippet(state.lastSecret) : undefined
+					state.lastSecret
+						? void refreshCurrentSnippet(state.lastSecret)
+						: undefined
 				}
 				lastSecret={state.lastSecret}
 				lastSecretLabel={state.lastSecretLabel}

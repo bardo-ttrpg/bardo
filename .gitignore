@@ -50,3 +50,4 @@ website/.bun-tmp/
 website/.bun-install/
 .env
 .codex/
+.vercel

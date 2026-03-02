@@ -10,9 +10,9 @@ type CacheStateInvalid = {
 	kind: "invalid";
 };
 
-export type IntrospectionVerifyCacheState = CacheStateValid | CacheStateInvalid;
+type IntrospectionVerifyCacheState = CacheStateValid | CacheStateInvalid;
 
-export type IntrospectionVerifiedKeySnapshot = {
+type IntrospectionVerifiedKeySnapshot = {
 	subjectId: string | null;
 	keyId: string;
 	plan: PlanTier;
