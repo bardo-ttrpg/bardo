@@ -1,6 +1,9 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
-import { resolveSentryRelease } from "./lib/sentry-server-config";
+import {
+	resolveSentryOrgSlug,
+	resolveSentryRelease,
+} from "./lib/sentry-server-config";
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
@@ -24,11 +27,12 @@ const nextConfig: NextConfig = {
 };
 
 const sentryRelease = resolveSentryRelease(process.env);
+const sentryOrg = resolveSentryOrgSlug(process.env);
 
 export default withSentryConfig(nextConfig, {
 	silent: true,
 	authToken: process.env.SENTRY_AUTH_TOKEN,
-	org: process.env.SENTRY_ORG,
+	org: sentryOrg,
 	project: process.env.SENTRY_PROJECT,
 	release: sentryRelease ? { name: sentryRelease } : undefined,
 });

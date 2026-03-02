@@ -60,6 +60,7 @@ Recommended:
 1. `BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK=true` until Upstash is configured
 1. `UPSTASH_REDIS_REST_URL`
 1. `UPSTASH_REDIS_REST_TOKEN`
+1. use `bardo-staging` for staging and `bardo-production` for production if you create dedicated Upstash databases
 
 ## Website requirements (Vercel)
 
@@ -129,5 +130,4 @@ Important Sentry note:
 
 1. `SENTRY_RELEASE` should still be set on MCP even if Sentry does not show a
    release immediately
-1. in the current live staging state, `bardo-mcp` still has no visible Sentry release
-1. treat that as an observability follow-up, not as proof that the Railway deploy is broken
+1. current live staging and production both have visible `bardo-mcp` Sentry releases

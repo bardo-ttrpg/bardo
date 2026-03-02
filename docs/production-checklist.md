@@ -43,8 +43,10 @@ Current repo and live infra facts:
 
 1. Vercel website project exists:
    - project name: `bardo-website`
-   - current staging Preview URL:
-     `https://bardo-website-6dbva400a-armando-andre-projects.vercel.app`
+   - current staging alias:
+     `https://bardo-website-armando-andre-armando-andre-projects.vercel.app`
+   - current production alias:
+     `https://bardo-two.vercel.app`
    - Preview protection is enabled
 2. Railway project exists:
    - name: `bardo-mcp`
@@ -53,23 +55,32 @@ Current repo and live infra facts:
 4. Railway MCP service exists:
    - service name: `mcp`
    - staging public domain: `https://mcp-staging-67d7.up.railway.app`
+   - production public domain: `https://mcp-production-e07f.up.railway.app`
 5. Railway staging volume is mounted at:
    - `/app/customers`
-6. Sentry projects exist:
+6. Upstash Redis databases are split by environment:
+   - staging DB: `bardo-staging`
+   - production DB: `bardo-production`
+7. Sentry projects exist:
    - `bardo-website`
    - `bardo-mcp`
-7. Current Sentry release state:
-   - `bardo-website` has staging release
-     `75261f6ce526d185dd17186db98cec88dea5ac04`
-   - `bardo-mcp` has no release yet
-8. Current staging server-to-server bridge:
+8. Current Sentry release state:
+   - `bardo-website` has release
+     `097e85bdddf962f401826fec7352b2bf346268ed`
+   - `bardo-mcp` has release
+     `097e85bdddf962f401826fec7352b2bf346268ed`
+9. Website production sourcemap upload is enabled through:
+   - `SENTRY_AUTH_TOKEN`
+   - explicit debug-id injection
+   - artifact bundle upload during `website` build
+10. Current staging server-to-server bridge:
    - Railway MCP reaches the protected Vercel Preview introspection route by
      using Vercel's automation bypass support
-9. MCP is currently designed around:
+11. MCP is currently designed around:
    - `BARDO_MCP_TRANSPORT_MODE=stateful`
    - `numReplicas=1`
    - persistent data written under `./customers`
-10. Browser Sentry in the website requires `NEXT_PUBLIC_SENTRY_ENVIRONMENT` outside local development.
+12. Browser Sentry in the website requires `NEXT_PUBLIC_SENTRY_ENVIRONMENT` outside local development.
 
 ## 2.1 Current Verified Staging Checks
 
@@ -87,12 +98,12 @@ These checks have already been verified against the live staging endpoints:
 5. MCP `POST /mcp` without an API key returns `401`
 6. MCP `POST /mcp` with an invalid API key returns `403 Invalid API key`
 
-Still waiting on manual authenticated staging checks:
+Completed staging checks:
 
 1. Clerk sign-in through the staging website
 2. API key creation from `/dashboard`
 3. a real valid staging API key working against the staging MCP
-4. a visible `bardo-mcp` Sentry release after its first real captured event or explicit release creation workflow
+4. a visible `bardo-mcp` Sentry release
 
 ## 3. Environment Model
 
@@ -408,6 +419,8 @@ Only turn this on when you need shared/distributed counters:
 2. `UPSTASH_REDIS_REST_TOKEN`
 3. `BARDO_UPSTASH_TIMEOUT_MS=1200`
 4. `BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK=false`
+5. recommended DB name in staging: `bardo-staging`
+6. recommended DB name in production: `bardo-production`
 
 ### 11.3 Why `NEXT_PUBLIC_SENTRY_ENVIRONMENT` matters
 
@@ -593,6 +606,8 @@ Turn this on only when you need shared counters or future multi-instance behavio
 2. `UPSTASH_REDIS_REST_TOKEN`
 3. `BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK=true` until Upstash is live
 4. `BARDO_MCP_USAGE_BLOCK_CACHE_MS=30000`
+5. recommended DB name in staging: `bardo-staging`
+6. recommended DB name in production: `bardo-production`
 
 Important:
 
@@ -801,6 +816,8 @@ Set these values in the Railway `production` environment.
 1. `UPSTASH_REDIS_REST_URL`
 2. `UPSTASH_REDIS_REST_TOKEN`
 3. `BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK=true` until Upstash is live
+4. recommended DB name in staging: `bardo-staging`
+5. recommended DB name in production: `bardo-production`
 
 ## 17. Production Smoke Tests
 
