@@ -1,5 +1,6 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,12 @@ export async function DELETE(
 	_request: Request,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/keys/[id]");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}

@@ -1,4 +1,4 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import {
 	dailyKeyVerificationLimitForPlan,
@@ -7,6 +7,7 @@ import {
 	mcpPeriodLimitForPlan,
 } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 import { createMcpUsageReader } from "@/lib/mcp-usage";
 import { planCreditsFor } from "@/lib/user-billing";
 
@@ -16,7 +17,12 @@ export const runtime = "nodejs";
 // Returns billing state derived live from Clerk billing APIs.
 
 export async function GET() {
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/billing");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}

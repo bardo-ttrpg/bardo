@@ -4,6 +4,7 @@ import {
 	logSentryMessage,
 	maybeWrapMcpServerWithSentry,
 	resolveSentryRelease,
+	shouldIgnoreSentryErrorEvent,
 } from "./sentry";
 
 describe("maybeWrapMcpServerWithSentry", () => {
@@ -60,7 +61,30 @@ describe("initSentry", () => {
 			tracesSampleRate: 0.1,
 			enableLogs: true,
 			sendDefaultPii: false,
+			beforeSend: expect.any(Function),
 		});
+
+		const calls = init.mock.calls as unknown as Array<
+			[Record<string, unknown>]
+		>;
+		const firstCall = calls[0];
+		if (!firstCall) {
+			throw new Error("expected Sentry.init to be called");
+		}
+		const [options] = firstCall;
+		const beforeSend = options.beforeSend as (event: unknown) => unknown;
+		expect(
+			beforeSend({
+				exception: {
+					values: [
+						{
+							value:
+								"JsonRpcError_-32603: STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED: projections/current-state.md is required in strict canonical mode.",
+						},
+					],
+				},
+			}),
+		).toBeNull();
 	});
 });
 
@@ -101,5 +125,32 @@ describe("resolveSentryRelease", () => {
 				RAILWAY_GIT_COMMIT_SHA: "ignored",
 			}),
 		).toBe("mcp@explicit");
+	});
+});
+
+describe("shouldIgnoreSentryErrorEvent", () => {
+	test("ignores expected strict canonical MCP tool errors", () => {
+		expect(
+			shouldIgnoreSentryErrorEvent({
+				exception: {
+					values: [
+						{
+							value:
+								"JsonRpcError_-32603: STRICT_CANONICAL_STALE_PROJECTION: projection metadata is stale.",
+						},
+					],
+				},
+			}),
+		).toBe(true);
+	});
+
+	test("keeps unrelated errors", () => {
+		expect(
+			shouldIgnoreSentryErrorEvent({
+				exception: {
+					values: [{ value: "TypeError: boom" }],
+				},
+			}),
+		).toBe(false);
 	});
 });

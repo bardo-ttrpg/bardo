@@ -38,6 +38,23 @@ type SentrySdkLike = {
 	logger?: SentryLoggerLike;
 };
 
+type SentryEventLike = {
+	exception?: {
+		values?: Array<{
+			value?: string | null;
+			type?: string | null;
+		}>;
+	};
+	logentry?: {
+		message?: string | null;
+	};
+};
+
+const IGNORED_JSON_RPC_ERROR_PREFIXES = [
+	"JsonRpcError_-32603: STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED",
+	"JsonRpcError_-32603: STRICT_CANONICAL_STALE_PROJECTION",
+];
+
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 	if (!value) return fallback;
 	const normalized = value.trim().toLowerCase();
@@ -60,6 +77,23 @@ function parseSampleRate(value: string | undefined, fallback: number): number {
 function normalizeString(value: string | undefined): string | undefined {
 	const normalized = value?.trim();
 	return normalized ? normalized : undefined;
+}
+
+function extractEventMessage(event: SentryEventLike): string | undefined {
+	return (
+		event.exception?.values?.[0]?.value ?? event.logentry?.message ?? undefined
+	);
+}
+
+export function shouldIgnoreSentryErrorEvent(event: SentryEventLike): boolean {
+	const message = extractEventMessage(event);
+	if (!message) {
+		return false;
+	}
+
+	return IGNORED_JSON_RPC_ERROR_PREFIXES.some((prefix) =>
+		message.startsWith(prefix),
+	);
 }
 
 export function resolveSentryRelease(
@@ -103,6 +137,12 @@ export function initSentry(
 		),
 		enableLogs: true,
 		sendDefaultPii: false,
+		beforeSend(event: SentryEventLike) {
+			if (shouldIgnoreSentryErrorEvent(event)) {
+				return null;
+			}
+			return event;
+		},
 	});
 }
 

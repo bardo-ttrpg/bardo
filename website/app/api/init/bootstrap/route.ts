@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import type { NextRequest } from "next/server";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
+import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 import { requestInitBootstrap } from "@/lib/mcp-orchestrator";
 
 export const runtime = "nodejs";
@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
 		return json(503, { error: "Auth is not configured." });
 	}
 
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/init/bootstrap");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return json(401, { error: "Authentication required." });
 	}

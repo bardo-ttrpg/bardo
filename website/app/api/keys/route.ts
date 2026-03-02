@@ -1,8 +1,9 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { maxApiKeysForPlan } from "@/lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 import { createMcpUsageReader } from "@/lib/mcp-usage";
 
 export const runtime = "nodejs";
@@ -98,7 +99,12 @@ function resolveWorkspacePath(
 // Lists all Clerk API keys for the authenticated user.
 
 export async function GET() {
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/keys");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
@@ -165,7 +171,12 @@ export async function GET() {
 // The secret is returned once and must be saved by the caller.
 
 export async function POST(request: Request) {
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/keys");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}

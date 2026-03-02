@@ -1,6 +1,7 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,12 @@ async function withTimeout<T>(
 }
 
 export async function POST(request: Request) {
-	const { userId } = await auth();
+	const authState = await resolveRouteUserId("/api/keys/revoke");
+	if (authState.response) {
+		return authState.response;
+	}
+
+	const { userId } = authState;
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
