@@ -46,7 +46,7 @@ Current repo and live infra facts:
    - current staging alias:
      `https://bardo-website-armando-andre-armando-andre-projects.vercel.app`
    - current production alias:
-     `https://bardo-two.vercel.app`
+     `https://bardo.gg`
    - Preview protection is enabled
 2. Railway project exists:
    - name: `bardo-mcp`
@@ -55,7 +55,7 @@ Current repo and live infra facts:
 4. Railway MCP service exists:
    - service name: `mcp`
    - staging public domain: `https://mcp-staging-67d7.up.railway.app`
-   - production public domain: `https://mcp-production-e07f.up.railway.app`
+   - production public domain: `https://mcp.bardo.gg`
 5. Railway staging volume is mounted at:
    - `/app/customers`
 6. Upstash Redis databases are split by environment:
