@@ -47,5 +47,3 @@ export function createServerSentryOptions(env: ServerSentryEnv = process.env) {
 		sendDefaultPii: false,
 	};
 }
-
-export type { ServerSentryEnv };

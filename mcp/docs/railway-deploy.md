@@ -11,7 +11,9 @@ Current Railway target:
 
 1. Project name: `bardo-mcp`
 1. Project ID: `ec9ed69c-b1e0-44a0-a5fe-08877b0c4d67`
-1. Environment: `production`
+1. Production environment: `production`
+1. Current staging environment: `staging`
+1. Current staging public domain: `https://mcp-staging-67d7.up.railway.app`
 
 ## Railway service setup (MCP)
 
@@ -21,6 +23,7 @@ Create one Railway service from this monorepo:
 1. Root directory: `mcp`
 
 `mcp/railway.json` is pinned to `numReplicas=1` for stateful session correctness.
+The current repo config assumes Railway is building from the `mcp` directory itself, not from the monorepo root.
 
 If you keep Railway service root at repo root instead, set:
 
@@ -54,6 +57,7 @@ Recommended:
 1. `BARDO_TELEMETRY_ENABLED=true`
 1. `BARDO_METRICS_ROUTE_ENABLED=true`
 1. `BARDO_METRICS_REQUIRE_AUTH=true`
+1. `BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK=true` until Upstash is configured
 1. `UPSTASH_REDIS_REST_URL`
 1. `UPSTASH_REDIS_REST_TOKEN`
 
@@ -66,6 +70,10 @@ The website must expose:
 The website and MCP must share the same:
 
 1. `BARDO_AUTH_INTROSPECTION_TOKEN`
+
+If staging uses a protected Vercel Preview deployment, the MCP introspection URL must use Vercel's automation bypass support. The simplest current setup is:
+
+1. `BARDO_AUTH_INTROSPECTION_URL=https://<preview-url>/api/auth/introspect-key?x-vercel-protection-bypass=<secret>`
 
 Recommended website-side Sentry config:
 
@@ -88,12 +96,22 @@ To avoid data loss between deploys/restarts, mount a Railway Volume at:
 
 This path works with current key claims (`./customers/<userId>`) and keeps per-user campaign state durable.
 
+Current verified staging state:
+
+1. the Railway volume is mounted at `/app/customers`
+1. `GET https://mcp-staging-67d7.up.railway.app/health` returns `200`
+1. `POST /mcp` without an API key returns `401`
+1. `POST /mcp` with an invalid API key returns `403 Invalid API key`
+1. the MCP can reach the protected Vercel Preview introspection route when
+   `BARDO_AUTH_INTROSPECTION_URL` includes the Vercel automation bypass secret
+
 ## Cost + UX tuning
 
 1. Keep MCP in `stateful` mode for lower auth/introspection overhead.
 1. Keep MCP on a single replica while using `stateful` mode.
 1. If you need horizontal MCP scaling, switch to `BARDO_MCP_TRANSPORT_MODE=stateless`.
-1. Keep Upstash enabled for verification budgets and distributed limits.
+1. If Upstash is not enabled yet, keep `BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK=true`.
+1. Enable Upstash when you need shared/distributed usage limits across instances.
 1. Keep website on Vercel and MCP on Railway to isolate deploy cadence and resource usage.
 
 ## Smoke checks
@@ -106,3 +124,10 @@ This path works with current key claims (`./customers/<userId>`) and keeps per-u
 1. MCP `tools/list` works with:
    `accept: application/json, text/event-stream`
    `mcp-protocol-version: 2025-06-18`
+
+Important Sentry note:
+
+1. `SENTRY_RELEASE` should still be set on MCP even if Sentry does not show a
+   release immediately
+1. in the current live staging state, `bardo-mcp` still has no visible Sentry release
+1. treat that as an observability follow-up, not as proof that the Railway deploy is broken

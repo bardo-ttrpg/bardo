@@ -32,18 +32,18 @@ type SentryLike = {
 
 type SpanAttributes = Record<string, SpanAttributeValue>;
 
-export type IntrospectionSpanResult =
+type IntrospectionSpanResult =
 	| "success"
 	| "invalid"
 	| "blocked"
 	| "unauthorized"
 	| "error";
 
-export type IntrospectionTelemetrySnapshot = ReturnType<
+type IntrospectionTelemetrySnapshot = ReturnType<
 	IntrospectionTelemetry["snapshot"]
 >;
 
-export type IntrospectionSpanAttributesArgs = {
+type IntrospectionSpanAttributesArgs = {
 	requiredScope: string;
 	workspaceOverrideRequested: boolean;
 	result: IntrospectionSpanResult;

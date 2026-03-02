@@ -23,9 +23,13 @@ import {
 	recordRateLimitEventMetric,
 	withRequestSpan,
 } from "../telemetry";
+import type { JsonRpcMetadata } from "./jsonrpc-metadata";
 import { authenticateRequest } from "./middleware/auth";
 import { corsHeaders, jsonRpcError, withCors } from "./middleware/cors";
-import { createMcpUsageLimiter } from "./middleware/mcp-usage-limiter";
+import {
+	createMcpUsageLimiter,
+	type McpUsageLimiter,
+} from "./middleware/mcp-usage-limiter";
 import { createRateLimiter } from "./middleware/rate-limiter";
 import {
 	getRateLimitKey,
@@ -37,6 +41,7 @@ import { handleMcpRequest } from "./routes/mcp";
 import { handleMetricsRequest } from "./routes/metrics";
 import { handleResolveTurnRequest } from "./routes/turns-orchestrator";
 import { handleWorldTickRequest } from "./routes/world-tick-orchestrator";
+import { resolveUsageMetering } from "./usage-metering";
 
 type ServerOptions = {
 	port?: number;
@@ -45,6 +50,7 @@ type ServerOptions = {
 	securityPolicy?: SecurityPolicy;
 	toolPolicy?: ToolPolicyConfig;
 	loopPolicy?: LoopDetectionPolicy;
+	usageLimiter?: McpUsageLimiter;
 };
 
 type RequestTimeoutFn = (request: Request, timeoutSeconds: number) => void;
@@ -98,6 +104,7 @@ export function createHttpRequestHandler({
 	loopPolicy = LOOP_DETECTION_POLICY,
 	sessionRegistry = new SessionRegistry({ loopPolicy }),
 	sessionStore,
+	usageLimiter,
 }: Omit<ServerOptions, "port"> = {}) {
 	const store =
 		sessionStore ??
@@ -114,7 +121,7 @@ export function createHttpRequestHandler({
 		maxRequests: securityPolicy.rateLimitMaxRequests,
 		failClosed: securityPolicy.rateLimitFailClosed,
 	});
-	const usageLimiter = createMcpUsageLimiter();
+	const meteringLimiter = usageLimiter ?? createMcpUsageLimiter();
 
 	return async function handleRequest(
 		request: Request,
@@ -139,6 +146,7 @@ export function createHttpRequestHandler({
 			async (span) => {
 				let rateLimitOutcome: "allowed" | "blocked" | "error" | undefined;
 				let usageLimitOutcome: "allowed" | "blocked" | "skipped" = "skipped";
+				let jsonRpcMetadata: JsonRpcMetadata | null = null;
 
 				const finalize = (response: Response): Response => {
 					if (securityPolicy.telemetryEnabled) {
@@ -278,20 +286,22 @@ export function createHttpRequestHandler({
 						recordRateLimitEventMetric("allowed");
 					}
 
-					const shouldMeterUsage =
-						request.method === "POST" &&
-						(isMcpRoute ||
-							isTurnsApiRoute ||
-							isInitBootstrapApiRoute ||
-							isWorldTickApiRoute);
-					if (shouldMeterUsage) {
-						const usage = await usageLimiter.consume({
+					const usageMetering = await resolveUsageMetering(request, {
+						isMcpRoute,
+						isTurnsApiRoute,
+						isInitBootstrapApiRoute,
+						isWorldTickApiRoute,
+					});
+					jsonRpcMetadata = usageMetering.metadata;
+					if (usageMetering.units > 0) {
+						const usage = await meteringLimiter.consume({
 							subjectId: auth.subjectId ?? null,
 							keyId: auth.keyId ?? null,
 							plan: auth.plan ?? null,
 							mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
 							providerId: request.headers.get("x-provider-id")?.trim() ?? null,
 							modelId: request.headers.get("x-model-id")?.trim() ?? null,
+							units: usageMetering.units,
 						});
 						usageLimitOutcome = usage.allowed ? "allowed" : "blocked";
 						if (!usage.allowed) {
@@ -332,6 +342,7 @@ export function createHttpRequestHandler({
 								{
 									transportMode: securityPolicy.transportMode,
 									enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
+									metadata: jsonRpcMetadata,
 								},
 							),
 						);

@@ -2,7 +2,6 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import OptionalClerkProvider from "@/components/optional-clerk-provider";
 import ThemeToggle from "@/components/theme-toggle";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 
@@ -234,9 +233,5 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 		return themedBody;
 	}
 
-	return (
-		<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
-			{themedBody}
-		</OptionalClerkProvider>
-	);
+	return themedBody;
 }

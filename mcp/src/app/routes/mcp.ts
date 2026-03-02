@@ -16,129 +16,8 @@ import {
 } from "../../session/transport-lifecycle";
 import { recordJsonRpcMetric, recordToolCallMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
+import { type JsonRpcMetadata, readJsonRpcMetadata } from "../jsonrpc-metadata";
 import { corsHeaders, jsonRpcError, withCors } from "../middleware/cors";
-
-type JsonRpcMetadata = {
-	method: string;
-	toolName: string | null;
-	toolArgsHash: string | null;
-	toolCalls: Array<{
-		toolName: string;
-		toolArgsHash: string;
-	}>;
-};
-
-function stableSerialize(value: unknown): string {
-	if (value === null || typeof value !== "object") {
-		return JSON.stringify(value);
-	}
-
-	if (Array.isArray(value)) {
-		return `[${value.map((item) => stableSerialize(item)).join(",")}]`;
-	}
-
-	const record = value as Record<string, unknown>;
-	const keys = Object.keys(record).sort((a, b) => a.localeCompare(b));
-	return `{${keys
-		.map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
-		.join(",")}}`;
-}
-
-function hashText(input: string): string {
-	let hash = 2166136261;
-	for (let index = 0; index < input.length; index += 1) {
-		hash ^= input.charCodeAt(index) ?? 0;
-		hash = Math.imul(hash, 16777619);
-	}
-	return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-function parseToolCallMetadata(payload: unknown): {
-	toolName: string;
-	toolArgsHash: string;
-} | null {
-	if (typeof payload !== "object" || payload === null) {
-		return null;
-	}
-	const methodValue =
-		typeof (payload as { method?: unknown }).method === "string"
-			? (payload as { method: string }).method
-			: "unknown";
-	if (methodValue !== "tools/call") {
-		return null;
-	}
-	const params = (payload as { params?: unknown }).params;
-	if (typeof params !== "object" || params === null) {
-		return null;
-	}
-	const paramsRecord = params as { name?: unknown; arguments?: unknown };
-	if (
-		typeof paramsRecord.name !== "string" ||
-		paramsRecord.name.trim().length < 1
-	) {
-		return null;
-	}
-	return {
-		toolName: paramsRecord.name.trim(),
-		toolArgsHash:
-			paramsRecord.arguments !== undefined
-				? hashText(stableSerialize(paramsRecord.arguments))
-				: hashText("{}"),
-	};
-}
-
-function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
-	if (Array.isArray(payload)) {
-		const toolCalls = payload
-			.map((item) => parseToolCallMetadata(item))
-			.filter(
-				(value): value is { toolName: string; toolArgsHash: string } =>
-					value !== null,
-			);
-		return {
-			method: "batch",
-			toolName: null,
-			toolArgsHash: null,
-			toolCalls,
-		};
-	}
-
-	if (typeof payload !== "object" || payload === null) {
-		return {
-			method: "unknown",
-			toolName: null,
-			toolArgsHash: null,
-			toolCalls: [],
-		};
-	}
-
-	const methodValue =
-		typeof (payload as { method?: unknown }).method === "string"
-			? (payload as { method: string }).method
-			: "unknown";
-	const toolCall = parseToolCallMetadata(payload);
-
-	return {
-		method: methodValue,
-		toolName: toolCall?.toolName ?? null,
-		toolArgsHash: toolCall?.toolArgsHash ?? null,
-		toolCalls: toolCall ? [toolCall] : [],
-	};
-}
-
-async function readJsonRpcMetadata(request: Request): Promise<JsonRpcMetadata> {
-	try {
-		const payload = await request.clone().json();
-		return parseJsonRpcMetadata(payload);
-	} catch {
-		return {
-			method: "unknown",
-			toolName: null,
-			toolArgsHash: null,
-			toolCalls: [],
-		};
-	}
-}
 
 function readHeaderValue(request: Request, name: string): string | null {
 	const value = request.headers.get(name)?.trim();
@@ -207,8 +86,9 @@ async function handleMcpPost(
 	toolPolicy: ToolPolicyConfig,
 	loopPolicy: LoopDetectionPolicy,
 	telemetryEnabled: boolean,
+	metadata: JsonRpcMetadata | null = null,
 ): Promise<Response> {
-	const metadata = await readJsonRpcMetadata(request);
+	const jsonRpcMetadata = metadata ?? (await readJsonRpcMetadata(request));
 	const startedAt = performance.now();
 	const recordMetrics = (status: "success" | "error") => {
 		if (!telemetryEnabled) {
@@ -216,21 +96,21 @@ async function handleMcpPost(
 		}
 		const durationMs = performance.now() - startedAt;
 		recordJsonRpcMetric({
-			method: metadata.method,
+			method: jsonRpcMetadata.method,
 			status,
 			durationMs,
 		});
-		if (metadata.toolCalls.length > 0) {
-			for (const toolCall of metadata.toolCalls) {
+		if (jsonRpcMetadata.toolCalls.length > 0) {
+			for (const toolCall of jsonRpcMetadata.toolCalls) {
 				recordToolCallMetric({
 					tool: toolCall.toolName,
 					status,
 					durationMs,
 				});
 			}
-		} else if (metadata.toolName) {
+		} else if (jsonRpcMetadata.toolName) {
 			recordToolCallMetric({
-				tool: metadata.toolName,
+				tool: jsonRpcMetadata.toolName,
 				status,
 				durationMs,
 			});
@@ -249,16 +129,16 @@ async function handleMcpPost(
 			sessionRegistry.touchSession(existingSessionId);
 			sessionRegistry.recordJsonRpc({
 				sessionId: existingSessionId,
-				method: metadata.method,
-				toolName: metadata.toolName,
+				method: jsonRpcMetadata.method,
+				toolName: jsonRpcMetadata.toolName,
 			});
 
-			if (metadata.toolCalls.length > 0) {
+			if (jsonRpcMetadata.toolCalls.length > 0) {
 				if (
 					isStrictSetupContractEnforced() &&
 					!hasSetupContractV2Header(request)
 				) {
-					for (const toolCall of metadata.toolCalls) {
+					for (const toolCall of jsonRpcMetadata.toolCalls) {
 						if (requiresSetupContractV2(toolCall.toolName)) {
 							recordMetrics("error");
 							return buildSetupContractRequiredResponse(toolCall.toolName);
@@ -271,7 +151,7 @@ async function handleMcpPost(
 					providerId,
 					modelId,
 				});
-				for (const toolCall of metadata.toolCalls) {
+				for (const toolCall of jsonRpcMetadata.toolCalls) {
 					if (!isToolAllowed(resolvedPolicy, toolCall.toolName)) {
 						recordMetrics("error");
 						sessionRegistry.recordToolOutcome({
@@ -314,8 +194,8 @@ async function handleMcpPost(
 				await existing.transport.handleRequest(request),
 			);
 			recordMetrics(response.ok ? "success" : "error");
-			if (metadata.toolCalls.length > 0) {
-				for (const toolCall of metadata.toolCalls) {
+			if (jsonRpcMetadata.toolCalls.length > 0) {
+				for (const toolCall of jsonRpcMetadata.toolCalls) {
 					sessionRegistry.recordToolOutcome({
 						sessionId: existingSessionId,
 						toolName: toolCall.toolName,
@@ -339,8 +219,8 @@ async function handleMcpPost(
 		if (newSessionId) {
 			sessionRegistry.recordJsonRpc({
 				sessionId: newSessionId,
-				method: metadata.method,
-				toolName: metadata.toolName,
+				method: jsonRpcMetadata.method,
+				toolName: jsonRpcMetadata.toolName,
 			});
 		}
 		return response;
@@ -356,8 +236,9 @@ async function handleMcpPostStateless(
 	toolPolicy: ToolPolicyConfig,
 	telemetryEnabled: boolean,
 	enableJsonResponse: boolean,
+	metadata: JsonRpcMetadata | null = null,
 ): Promise<Response> {
-	const metadata = await readJsonRpcMetadata(request);
+	const jsonRpcMetadata = metadata ?? (await readJsonRpcMetadata(request));
 	const startedAt = performance.now();
 	const recordMetrics = (status: "success" | "error") => {
 		if (!telemetryEnabled) {
@@ -365,21 +246,21 @@ async function handleMcpPostStateless(
 		}
 		const durationMs = performance.now() - startedAt;
 		recordJsonRpcMetric({
-			method: metadata.method,
+			method: jsonRpcMetadata.method,
 			status,
 			durationMs,
 		});
-		if (metadata.toolCalls.length > 0) {
-			for (const toolCall of metadata.toolCalls) {
+		if (jsonRpcMetadata.toolCalls.length > 0) {
+			for (const toolCall of jsonRpcMetadata.toolCalls) {
 				recordToolCallMetric({
 					tool: toolCall.toolName,
 					status,
 					durationMs,
 				});
 			}
-		} else if (metadata.toolName) {
+		} else if (jsonRpcMetadata.toolName) {
 			recordToolCallMetric({
-				tool: metadata.toolName,
+				tool: jsonRpcMetadata.toolName,
 				status,
 				durationMs,
 			});
@@ -387,12 +268,12 @@ async function handleMcpPostStateless(
 	};
 
 	try {
-		if (metadata.toolCalls.length > 0) {
+		if (jsonRpcMetadata.toolCalls.length > 0) {
 			if (
 				isStrictSetupContractEnforced() &&
 				!hasSetupContractV2Header(request)
 			) {
-				for (const toolCall of metadata.toolCalls) {
+				for (const toolCall of jsonRpcMetadata.toolCalls) {
 					if (requiresSetupContractV2(toolCall.toolName)) {
 						recordMetrics("error");
 						return buildSetupContractRequiredResponse(toolCall.toolName);
@@ -405,7 +286,7 @@ async function handleMcpPostStateless(
 				providerId,
 				modelId,
 			});
-			for (const toolCall of metadata.toolCalls) {
+			for (const toolCall of jsonRpcMetadata.toolCalls) {
 				if (!isToolAllowed(resolvedPolicy, toolCall.toolName)) {
 					recordMetrics("error");
 					return buildPolicyBlockedResponse(
@@ -461,6 +342,7 @@ export async function handleMcpRequest(
 	options: {
 		transportMode?: McpTransportMode;
 		enableJsonResponse?: boolean;
+		metadata?: JsonRpcMetadata | null;
 	} = {},
 ): Promise<Response> {
 	validateLoopDetectionPolicy(loopPolicy);
@@ -476,6 +358,7 @@ export async function handleMcpRequest(
 			toolPolicy,
 			telemetryEnabled,
 			options.enableJsonResponse ?? true,
+			options.metadata ?? null,
 		);
 	}
 
@@ -488,6 +371,7 @@ export async function handleMcpRequest(
 			toolPolicy,
 			loopPolicy,
 			telemetryEnabled,
+			options.metadata ?? null,
 		);
 	}
 

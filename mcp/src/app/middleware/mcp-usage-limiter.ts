@@ -9,13 +9,14 @@ import {
 
 type MeteredPlan = "free" | "solo" | "solo_plus";
 
-type UsageIdentity = {
+export type McpUsageIdentity = {
 	subjectId: string | null;
 	keyId: string | null;
 	plan: string | null;
 	mcpPeriodLimit: number | null;
 	providerId?: string | null;
 	modelId?: string | null;
+	units?: number;
 };
 
 type MemoryCounter = {
@@ -41,6 +42,11 @@ type McpUsageLimiterOptions = {
 type UpstashConfig = {
 	url: string;
 	token: string;
+};
+
+export type McpUsageLimiter = {
+	consume(identity: McpUsageIdentity): Promise<McpUsageConsumeResult>;
+	reset(): void;
 };
 
 function readUpstashConfig(
@@ -80,6 +86,12 @@ function normalizePositiveLimit(value: number | null): number | null {
 	if (!Number.isFinite(value)) return null;
 	const normalized = Math.floor(value ?? 0);
 	return normalized > 0 ? normalized : null;
+}
+
+function normalizeUnits(value: number | undefined): number {
+	if (!Number.isFinite(value)) return 1;
+	const normalized = Math.floor(value ?? 1);
+	return normalized > 0 ? normalized : 1;
 }
 
 function normalizePlan(value: string | null): MeteredPlan | null {
@@ -178,16 +190,18 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 		limit: number,
 		period: string,
 		nowMsValue: number,
+		units: number,
 	): Promise<McpUsageConsumeResult | null> {
 		if (!redis) return null;
 
 		try {
 			const subjectId = identity.subjectId;
 			const keyId = identity.keyId;
-			const userPeriodCounter = await redis.incr(
-				userMonthKey(subjectId, period),
-			);
-			if (userPeriodCounter === 1) {
+			let userPeriodCounter = 0;
+			for (let index = 0; index < units; index += 1) {
+				userPeriodCounter = await redis.incr(userMonthKey(subjectId, period));
+			}
+			if (userPeriodCounter <= units) {
 				await redis.expire(userMonthKey(subjectId, period), 60 * 60 * 24 * 400);
 			}
 
@@ -203,13 +217,18 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 				};
 			}
 
-			const keyPeriodCounter = await redis.incr(keyMonthKey(keyId, period));
-			if (keyPeriodCounter === 1) {
+			let keyPeriodCounter = 0;
+			for (let index = 0; index < units; index += 1) {
+				keyPeriodCounter = await redis.incr(keyMonthKey(keyId, period));
+			}
+			if (keyPeriodCounter <= units) {
 				await redis.expire(keyMonthKey(keyId, period), 60 * 60 * 24 * 400);
 			}
 			if (writeTotals) {
-				await redis.incr(userTotalKey(subjectId));
-				await redis.incr(keyTotalKey(keyId));
+				for (let index = 0; index < units; index += 1) {
+					await redis.incr(userTotalKey(subjectId));
+					await redis.incr(keyTotalKey(keyId));
+				}
 			}
 			if (writeLastUsed) {
 				await redis.set(keyLastUsedAtKey(keyId), String(nowMsValue));
@@ -243,13 +262,14 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 		identity: { subjectId: string; keyId: string },
 		limit: number,
 		period: string,
+		units: number,
 	): McpUsageConsumeResult {
 		const currentUser = userMemory.get(identity.subjectId);
 		const userCounter =
 			currentUser && currentUser.period === period
 				? currentUser
 				: { period, used: 0 };
-		userCounter.used += 1;
+		userCounter.used += units;
 		userMemory.set(identity.subjectId, userCounter);
 
 		if (userCounter.used > limit) {
@@ -268,14 +288,14 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 			currentKey && currentKey.period === period
 				? currentKey
 				: { period, used: 0 };
-		keyCounter.used += 1;
+		keyCounter.used += units;
 		keyMemory.set(identity.keyId, keyCounter);
 
 		userTotals.set(
 			identity.subjectId,
-			(userTotals.get(identity.subjectId) ?? 0) + 1,
+			(userTotals.get(identity.subjectId) ?? 0) + units,
 		);
-		keyTotals.set(identity.keyId, (keyTotals.get(identity.keyId) ?? 0) + 1);
+		keyTotals.set(identity.keyId, (keyTotals.get(identity.keyId) ?? 0) + units);
 
 		return {
 			allowed: true,
@@ -288,12 +308,13 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 	}
 
 	return {
-		async consume(identity: UsageIdentity): Promise<McpUsageConsumeResult> {
+		async consume(identity: McpUsageIdentity): Promise<McpUsageConsumeResult> {
 			return await withUsageLimitSpan(async (span) => {
 				const subjectId = identity.subjectId?.trim() || null;
 				const keyId = identity.keyId?.trim() || null;
 				const plan = normalizePlan(identity.plan);
 				const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
+				const units = normalizeUnits(identity.units);
 
 				function annotate(
 					result: McpUsageConsumeResult,
@@ -347,6 +368,7 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 					limit,
 					period,
 					nowMsValue,
+					units,
 				);
 				if (upstashResult) {
 					if (!upstashResult.allowed) {
@@ -372,7 +394,12 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 					);
 				}
 
-				const result = consumeMemory({ subjectId, keyId }, limit, period);
+				const result = consumeMemory(
+					{ subjectId, keyId },
+					limit,
+					period,
+					units,
+				);
 				if (!result.allowed) {
 					blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
 				} else {
@@ -388,5 +415,5 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 			keyTotals.clear();
 			blockedCache.clear();
 		},
-	};
+	} satisfies McpUsageLimiter;
 }
