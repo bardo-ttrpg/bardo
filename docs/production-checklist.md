@@ -29,6 +29,7 @@ Set these in the website deployment:
 1. `SENTRY_DSN=<bardo-website-dsn>`
 1. `NEXT_PUBLIC_SENTRY_DSN=<bardo-website-dsn>`
 1. `SENTRY_ENVIRONMENT=production`
+1. `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`
 1. `SENTRY_RELEASE=<git-sha-or-release-name>`
 1. `SENTRY_ORG=bardo`
 1. `SENTRY_PROJECT=bardo-website`

@@ -4,7 +4,9 @@ type SentryEnv = Partial<
 		| "SENTRY_DSN"
 		| "NEXT_PUBLIC_SENTRY_DSN"
 		| "SENTRY_ENVIRONMENT"
+		| "NEXT_PUBLIC_SENTRY_ENVIRONMENT"
 		| "SENTRY_RELEASE"
+		| "NEXT_PUBLIC_SENTRY_RELEASE"
 		| "SENTRY_TRACES_SAMPLE_RATE"
 		| "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE"
 		| "VERCEL_GIT_COMMIT_SHA"
@@ -49,6 +51,15 @@ export function resolveSentryRelease(
 	);
 }
 
+function resolveBrowserSentryRelease(
+	env: SentryEnv = process.env,
+): string | undefined {
+	return (
+		normalizeString(env.NEXT_PUBLIC_SENTRY_RELEASE) ??
+		normalizeString(env.SENTRY_RELEASE)
+	);
+}
+
 export function createServerSentryOptions(env: SentryEnv = process.env) {
 	return {
 		dsn: normalizeString(env.SENTRY_DSN),
@@ -68,8 +79,11 @@ export function createBrowserSentryOptions(env: SentryEnv = process.env) {
 	return {
 		dsn: normalizeString(env.NEXT_PUBLIC_SENTRY_DSN),
 		enabled: Boolean(normalizeString(env.NEXT_PUBLIC_SENTRY_DSN)),
-		environment: normalizeString(env.SENTRY_ENVIRONMENT) ?? env.NODE_ENV,
-		release: resolveSentryRelease(env),
+		environment:
+			normalizeString(env.NEXT_PUBLIC_SENTRY_ENVIRONMENT) ??
+			normalizeString(env.SENTRY_ENVIRONMENT) ??
+			env.NODE_ENV,
+		release: resolveBrowserSentryRelease(env),
 		tracesSampleRate: parseSampleRate(
 			env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
 			defaultSampleRate(env.NODE_ENV),

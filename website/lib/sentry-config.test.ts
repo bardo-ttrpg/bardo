@@ -30,7 +30,7 @@ describe("createBrowserSentryOptions", () => {
 	test("uses public env values for browser release health", () => {
 		const options = createBrowserSentryOptions({
 			NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/2",
-			SENTRY_ENVIRONMENT: "production",
+			NEXT_PUBLIC_SENTRY_ENVIRONMENT: "production",
 			SENTRY_RELEASE: "website@def456",
 			NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "0.1",
 		});
@@ -44,6 +44,27 @@ describe("createBrowserSentryOptions", () => {
 			enableLogs: true,
 			sendDefaultPii: false,
 		});
+	});
+
+	test("prefers NEXT_PUBLIC_SENTRY_ENVIRONMENT for browser events", () => {
+		const options = createBrowserSentryOptions({
+			NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/2",
+			NEXT_PUBLIC_SENTRY_ENVIRONMENT: "staging",
+			SENTRY_ENVIRONMENT: "production",
+			SENTRY_RELEASE: "website@staging",
+		});
+
+		expect(options.environment).toBe("staging");
+	});
+
+	test("does not infer browser release from server-only git sha variables", () => {
+		const options = createBrowserSentryOptions({
+			NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/2",
+			NEXT_PUBLIC_SENTRY_ENVIRONMENT: "production",
+			RAILWAY_GIT_COMMIT_SHA: "railway-only-sha",
+		});
+
+		expect(options.release).toBeUndefined();
 	});
 
 	test("falls back to disabled config when no public dsn exists", () => {

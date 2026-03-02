@@ -74,6 +74,7 @@ Recommended website-side Sentry config:
 1. `SENTRY_DSN`
 1. `NEXT_PUBLIC_SENTRY_DSN`
 1. `SENTRY_ENVIRONMENT=production`
+1. `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`
 1. `SENTRY_RELEASE=<git sha or deployment release>`
 1. `SENTRY_AUTH_TOKEN` for source-map upload
 
