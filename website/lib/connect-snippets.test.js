@@ -26,10 +26,9 @@ describe("buildConnectionSnippet", () => {
 	test("renders Claude local command with @bardo/mcp adapter", () => {
 		const snippet = render("claude", "local");
 		expect(snippet).toContain(
-			"bunx --bun --package @bardo/mcp bardo mcp serve",
+			"bunx --bun --package '@bardo/mcp' 'bardo' mcp serve",
 		);
-		expect(snippet).toContain("--api-key");
-		expect(snippet).toContain(apiKey);
+		expect(snippet).toContain(`--api-key '${apiKey}'`);
 		expect(snippet).toContain('--workspace-root "$PWD"');
 	});
 
@@ -66,5 +65,21 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('"--bun"');
 		expect(snippet).toContain('"bardo"');
 		expect(snippet).toContain('"--workspace-root"');
+	});
+
+	test("quotes shell-sensitive Claude local command arguments", () => {
+		const snippet = buildConnectionSnippet({
+			client: "claude",
+			mode: "local",
+			baseUrl: "https://mcp.bardo.ai/mcp?name=campaign&mode=solo",
+			apiKey: "token with space ' quote",
+			serverName: "bardo dev",
+		});
+
+		expect(snippet).toContain("claude mcp add --scope user 'bardo dev' --");
+		expect(snippet).toContain("--api-key 'token with space '\"'\"' quote'");
+		expect(snippet).toContain(
+			"--url 'https://mcp.bardo.ai/mcp?name=campaign&mode=solo'",
+		);
 	});
 });

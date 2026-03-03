@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { CliLoginReplayStoreError } from "../../../../lib/cli-login-store";
 import { createCliExchangePostHandler } from "./route";
 
 describe("POST /api/connect/cli-exchange", () => {
@@ -83,5 +84,32 @@ describe("POST /api/connect/cli-exchange", () => {
 
 		expect(response.status).toBe(409);
 		expect(body.error).toContain("already been used");
+	});
+
+	test("returns 500 when the replay store is misconfigured", async () => {
+		const handler = createCliExchangePostHandler({
+			decodeToken: async () => ({
+				apiKey: "bardo_live_token",
+				mcpUrl: "https://mcp.bardo.ai/mcp",
+				serverName: "bardo",
+				issuedAtISO: "2099-03-03T00:00:00.000Z",
+				expiresAtISO: "2099-03-03T00:10:00.000Z",
+			}),
+			consumeToken: async () => {
+				throw new CliLoginReplayStoreError("replay store unavailable");
+			},
+		});
+
+		const response = await handler(
+			new Request("http://localhost:3001/api/connect/cli-exchange", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: "valid_token" }),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(500);
+		expect(body.error).toContain("replay store unavailable");
 	});
 });

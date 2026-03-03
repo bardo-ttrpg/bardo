@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createCliLoginTokenStore } from "../../../../lib/cli-login-store";
+import {
+	CliLoginReplayStoreError,
+	createCliLoginTokenStore,
+} from "../../../../lib/cli-login-store";
 import {
 	type CliLoginExchangePayload,
 	createCliLoginTokenCodec,
@@ -67,7 +70,8 @@ export function createCliExchangePostHandler(
 			return NextResponse.json(payload);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return NextResponse.json({ error: message }, { status: 401 });
+			const status = error instanceof CliLoginReplayStoreError ? 500 : 401;
+			return NextResponse.json({ error: message }, { status });
 		}
 	};
 }

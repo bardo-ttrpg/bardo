@@ -29,8 +29,12 @@ const LOCAL_ADAPTER_PREFIX_ARGS = [
 	"serve",
 ] as const;
 
-function quote(value: string): string {
+function escapeDoubleQuoted(value: string): string {
 	return value.replaceAll('"', '\\"');
+}
+
+function shellQuote(value: string): string {
+	return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function buildLocalAdapterArgs(apiKey: string, baseUrl: string): string[] {
@@ -49,7 +53,9 @@ function buildLocalAdapterShellCommand(
 	apiKey: string,
 	baseUrl: string,
 ): string {
-	return buildLocalAdapterCommandParts(apiKey, baseUrl).join(" ");
+	return buildLocalAdapterCommandParts(apiKey, baseUrl)
+		.map((part) => shellQuote(part))
+		.join(" ");
 }
 
 function buildLocalAdapterCommandParts(
@@ -69,8 +75,8 @@ export function buildConnectionSnippet(
 	if (args.mode === "remote") {
 		switch (args.client) {
 			case "claude":
-				return `claude mcp add --scope user --transport http ${serverName} ${baseUrl} \\
---header "Authorization: Bearer ${apiKey}"`;
+				return `claude mcp add --scope user --transport http ${shellQuote(serverName)} ${shellQuote(baseUrl)} \\
+--header ${shellQuote(`Authorization: Bearer ${apiKey}`)}`;
 			case "opencode":
 				return `{
   "mcp": {
@@ -100,7 +106,7 @@ export function buildConnectionSnippet(
 			case "codex":
 				return `[mcp_servers.${serverName}]
 url = "${baseUrl}"
-http_headers = { "Authorization" = "Bearer ${quote(apiKey)}" }`;
+http_headers = { "Authorization" = "Bearer ${escapeDoubleQuoted(apiKey)}" }`;
 			case "vscode":
 				return `{
   "mcp": {
@@ -126,7 +132,7 @@ Header: Authorization: Bearer ${apiKey}`;
 	const localCommand = buildLocalAdapterShellCommand(apiKey, baseUrl);
 	switch (args.client) {
 		case "claude":
-			return `claude mcp add --scope user ${serverName} -- ${LOCAL_ADAPTER_COMMAND} --bun --package ${LOCAL_ADAPTER_PACKAGE} ${LOCAL_ADAPTER_BIN} mcp serve --api-key ${apiKey} --url ${baseUrl} --workspace-root "$PWD"`;
+			return `claude mcp add --scope user ${shellQuote(serverName)} -- ${LOCAL_ADAPTER_COMMAND} --bun --package ${shellQuote(LOCAL_ADAPTER_PACKAGE)} ${shellQuote(LOCAL_ADAPTER_BIN)} mcp serve --api-key ${shellQuote(apiKey)} --url ${shellQuote(baseUrl)} --workspace-root "$PWD"`;
 		case "opencode":
 			return `{
   "mcp": {
@@ -150,7 +156,7 @@ Header: Authorization: Bearer ${apiKey}`;
 		case "codex":
 			return `[mcp_servers.${serverName}]
 command = "${LOCAL_ADAPTER_COMMAND}"
-args = ${JSON.stringify(localArgs.map((value) => quote(value)))}`;
+args = ${JSON.stringify(localArgs.map((value) => escapeDoubleQuoted(value)))}`;
 		case "vscode":
 			return `{
   "mcp": {

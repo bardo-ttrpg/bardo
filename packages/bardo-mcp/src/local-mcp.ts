@@ -72,6 +72,21 @@ type RemoteToolDefinition = {
 	annotations?: Record<string, unknown>;
 };
 
+type RemoteConnectionResult = {
+	client: Client | null;
+	tools: RemoteToolDefinition[];
+};
+
+type RemoteConnectionCoordinatorOptions = {
+	apiKey?: string | null;
+	stderr: Writer;
+	getWorkspaceContext: () => Promise<WorkspaceContext>;
+	connectRemoteClient: (
+		workspaceRoot: string,
+	) => Promise<RemoteConnectionResult>;
+	closeRemoteClient: (client: Client | null) => Promise<void>;
+};
+
 const BARDO_ROOT_DIRNAME = "bardo";
 const CANONICAL_DIRECTORIES = [
 	"_settings",
@@ -207,7 +222,8 @@ async function ensureWorkspaceCoreFiles(args: {
 	);
 }
 
-async function maybeImportRulebook(args: {
+export async function maybeImportRulebook(args: {
+	workspaceRoot: string;
 	bardoRoot: string;
 	rulebookPath: string | null;
 }): Promise<string[]> {
@@ -215,7 +231,10 @@ async function maybeImportRulebook(args: {
 		return [];
 	}
 
-	const absoluteSource = path.resolve(args.rulebookPath);
+	const absoluteSource = resolveScopedPath(
+		args.workspaceRoot,
+		args.rulebookPath,
+	);
 	const sourceContents = await readFile(absoluteSource, "utf8");
 	const target = path.join(
 		args.bardoRoot,
@@ -236,6 +255,78 @@ function makeToolResult(
 		content: [{ type: "text" as const, text: message }],
 		structuredContent,
 		isError,
+	};
+}
+
+export function createRemoteConnectionCoordinator(
+	options: RemoteConnectionCoordinatorOptions,
+) {
+	let remoteClient: Client | null = null;
+	let remoteTools: RemoteToolDefinition[] = [];
+	let remoteWorkspaceRoot: string | null = null;
+	let connectingPromise: Promise<RemoteConnectionResult> | null = null;
+
+	async function resetRemoteConnection(): Promise<void> {
+		connectingPromise = null;
+		await options.closeRemoteClient(remoteClient);
+		remoteClient = null;
+		remoteTools = [];
+		remoteWorkspaceRoot = null;
+	}
+
+	return {
+		async invalidate(): Promise<void> {
+			await resetRemoteConnection();
+		},
+		async ensureRemoteConnection(): Promise<RemoteConnectionResult> {
+			if (!options.apiKey) {
+				return { client: null, tools: [] };
+			}
+
+			const context = await options.getWorkspaceContext();
+			if (remoteClient && remoteWorkspaceRoot === context.workspaceRoot) {
+				return { client: remoteClient, tools: remoteTools };
+			}
+
+			if (
+				remoteClient &&
+				remoteWorkspaceRoot &&
+				remoteWorkspaceRoot !== context.workspaceRoot
+			) {
+				await resetRemoteConnection();
+			}
+
+			if (!connectingPromise) {
+				connectingPromise = (async () => {
+					try {
+						const remote = await options.connectRemoteClient(
+							context.workspaceRoot,
+						);
+						remoteClient = remote.client;
+						remoteTools = remote.tools;
+						remoteWorkspaceRoot = context.workspaceRoot;
+						return {
+							client: remoteClient,
+							tools: remoteTools,
+						};
+					} catch (error) {
+						remoteClient = null;
+						remoteTools = [];
+						remoteWorkspaceRoot = null;
+						options.stderr.write(
+							`remote MCP unavailable, continuing with local workspace tools only: ${
+								error instanceof Error ? error.message : String(error)
+							}\n`,
+						);
+						return { client: null, tools: [] };
+					} finally {
+						connectingPromise = null;
+					}
+				})();
+			}
+
+			return connectingPromise;
+		},
 	};
 }
 
@@ -356,6 +447,7 @@ function localToolDefinitions(
 				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
 				await ensureWorkspaceDirectories(bardoRoot);
 				const importedRulebooks = await maybeImportRulebook({
+					workspaceRoot: context.workspaceRoot,
 					bardoRoot,
 					rulebookPath:
 						typeof args.rulebookPath === "string" ? args.rulebookPath : null,
@@ -560,9 +652,6 @@ export async function startLocalMcpServer(
 	options: LocalMcpServerOptions,
 ): Promise<void> {
 	const stderr = options.stderr ?? process.stderr;
-	let remoteClient: Client | null = null;
-	let remoteTools: RemoteToolDefinition[] = [];
-	let remoteWorkspaceRoot: string | null = null;
 
 	const server = new Server(
 		{
@@ -586,50 +675,17 @@ export async function startLocalMcpServer(
 	});
 	const localTools = localToolDefinitions(manager);
 	const localToolMap = new Map(localTools.map((tool) => [tool.name, tool]));
-
-	async function ensureRemoteConnection(): Promise<{
-		client: Client | null;
-		tools: RemoteToolDefinition[];
-	}> {
-		if (!options.apiKey) {
-			return { client: null, tools: [] };
-		}
-
-		const context = await manager.getWorkspaceContext();
-		if (remoteClient && remoteWorkspaceRoot === context.workspaceRoot) {
-			return { client: remoteClient, tools: remoteTools };
-		}
-
-		if (remoteClient && remoteWorkspaceRoot !== context.workspaceRoot) {
-			await closeRemoteClient(remoteClient);
-			remoteClient = null;
-			remoteTools = [];
-			remoteWorkspaceRoot = null;
-		}
-
-		if (!remoteClient) {
-			try {
-				const remote = await connectRemoteClient({
-					...options,
-					workspaceRoot: context.workspaceRoot,
-				});
-				remoteClient = remote.client;
-				remoteTools = remote.tools;
-				remoteWorkspaceRoot = context.workspaceRoot;
-			} catch (error) {
-				remoteClient = null;
-				remoteTools = [];
-				remoteWorkspaceRoot = null;
-				stderr.write(
-					`remote MCP unavailable, continuing with local workspace tools only: ${
-						error instanceof Error ? error.message : String(error)
-					}\n`,
-				);
-			}
-		}
-
-		return { client: remoteClient, tools: remoteTools };
-	}
+	const remoteConnection = createRemoteConnectionCoordinator({
+		apiKey: options.apiKey,
+		stderr,
+		getWorkspaceContext: () => manager.getWorkspaceContext(),
+		connectRemoteClient: async (workspaceRoot) =>
+			connectRemoteClient({
+				...options,
+				workspaceRoot,
+			}),
+		closeRemoteClient,
+	});
 
 	server.oninitialized = () => {
 		void manager.refreshFromClientRoots();
@@ -638,10 +694,11 @@ export async function startLocalMcpServer(
 		RootsListChangedNotificationSchema,
 		async () => {
 			await manager.refreshFromClientRoots();
+			await remoteConnection.invalidate();
 		},
 	);
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
-		const remote = await ensureRemoteConnection();
+		const remote = await remoteConnection.ensureRemoteConnection();
 		return {
 			tools: [
 				...localTools.map((tool) => ({
@@ -672,8 +729,8 @@ export async function startLocalMcpServer(
 			}
 		}
 
-		const remote = await ensureRemoteConnection();
-		if (!remoteClient) {
+		const remote = await remoteConnection.ensureRemoteConnection();
+		if (!remote.client) {
 			return makeToolResult(
 				"Remote MCP is not connected. Run `bardo login` first.",
 				{ success: false },
@@ -688,10 +745,7 @@ export async function startLocalMcpServer(
 					(request.params.arguments as Record<string, unknown>) ?? undefined,
 			});
 		} catch (error) {
-			await closeRemoteClient(remoteClient);
-			remoteClient = null;
-			remoteTools = [];
-			remoteWorkspaceRoot = null;
+			await remoteConnection.invalidate();
 			return makeToolResult(
 				error instanceof Error ? error.message : String(error),
 				{ success: false },
