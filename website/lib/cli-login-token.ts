@@ -3,6 +3,7 @@ const TOKEN_VERSION = 1;
 export type CliLoginExchangePayload = {
 	apiKey: string;
 	mcpUrl: string;
+	statusUrl: string;
 	serverName: string;
 	issuedAtISO: string;
 	expiresAtISO: string;
@@ -101,6 +102,7 @@ export function createCliLoginTokenCodec(secret: string) {
 			if (
 				typeof parsed.apiKey !== "string" ||
 				typeof parsed.mcpUrl !== "string" ||
+				typeof parsed.statusUrl !== "string" ||
 				typeof parsed.serverName !== "string" ||
 				typeof parsed.issuedAtISO !== "string" ||
 				typeof parsed.expiresAtISO !== "string"
@@ -116,6 +118,7 @@ export function createCliLoginTokenCodec(secret: string) {
 			return {
 				apiKey: parsed.apiKey,
 				mcpUrl: parsed.mcpUrl,
+				statusUrl: parsed.statusUrl,
 				serverName: parsed.serverName,
 				issuedAtISO: parsed.issuedAtISO,
 				expiresAtISO: parsed.expiresAtISO,

@@ -17,10 +17,14 @@ describe("POST /api/connect/cli-token", () => {
 			createToken: async (payload) => {
 				expect(payload.apiKey).toBe("bardo_live_created");
 				expect(payload.mcpUrl).toBe("https://mcp.bardo.ai/mcp");
+				expect(payload.statusUrl).toBe(
+					"https://app.bardo.ai/api/connect/runtime-status",
+				);
 				return "encrypted_cli_token";
 			},
 			resolveMcpUrl: () => "https://mcp.bardo.ai/mcp",
 			exchangeUrl: "https://app.bardo.ai/api/connect/cli-exchange",
+			statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 			now: () => new Date("2026-03-03T00:00:00.000Z"),
 			ttlMs: 300_000,
 		});
@@ -40,6 +44,9 @@ describe("POST /api/connect/cli-token", () => {
 			"https://app.bardo.ai/api/connect/cli-exchange",
 		);
 		expect(body.mcpUrl).toBe("https://mcp.bardo.ai/mcp");
+		expect(body.statusUrl).toBe(
+			"https://app.bardo.ai/api/connect/runtime-status",
+		);
 	});
 
 	test("ignores unapproved scopes and falls back to the mcp scope", async () => {
@@ -55,6 +62,7 @@ describe("POST /api/connect/cli-token", () => {
 			createToken: async () => "encrypted_cli_token",
 			resolveMcpUrl: () => "https://mcp.bardo.ai/mcp",
 			exchangeUrl: "https://app.bardo.ai/api/connect/cli-exchange",
+			statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 			now: () => new Date("2026-03-03T00:00:00.000Z"),
 			ttlMs: 300_000,
 		});
@@ -83,6 +91,7 @@ describe("POST /api/connect/cli-token", () => {
 			createToken: async () => "should_not_be_used",
 			resolveMcpUrl: () => "https://mcp.bardo.ai/mcp",
 			exchangeUrl: "https://app.bardo.ai/api/connect/cli-exchange",
+			statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 			now: () => new Date("2026-03-03T00:00:00.000Z"),
 			ttlMs: 300_000,
 		});

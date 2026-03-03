@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+	createRemoteToolAccessController,
 	createWorkspaceRootManager,
 	resolveWorkspaceRootFromRoots,
 } from "./local-mcp";
@@ -263,5 +264,34 @@ describe("local MCP workspace roots", () => {
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
+	});
+
+	test("hides premium remote tools from lower plans using annotations and env overrides", async () => {
+		const access = createRemoteToolAccessController({
+			plan: "free",
+			env: {
+				BARDO_PREMIUM_REMOTE_TOOLS: "remote_env_solo",
+				BARDO_SOLO_PLUS_REMOTE_TOOLS: "remote_env_plus",
+			},
+		});
+
+		const visible = access.filterTools([
+			{ name: "remote_free" },
+			{
+				name: "remote_annotated_solo",
+				annotations: { "x-bardo-min-plan": "solo" },
+			},
+			{ name: "remote_env_solo" },
+			{ name: "remote_env_plus" },
+		]);
+
+		expect(visible.map((tool) => tool.name)).toEqual(["remote_free"]);
+		expect(
+			access.isAllowed({
+				name: "remote_annotated_solo",
+				annotations: { "x-bardo-min-plan": "solo" },
+			}),
+		).toBe(false);
+		expect(access.blockedMessage("remote_env_plus")).toContain("solo_plus");
 	});
 });

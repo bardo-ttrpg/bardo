@@ -8,6 +8,7 @@ function payload(overrides: Partial<CliLoginExchangePayload> = {}) {
 	return {
 		apiKey: "bardo_live_test",
 		mcpUrl: "https://mcp.bardo.ai/mcp",
+		statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 		serverName: "bardo",
 		issuedAtISO: "2026-03-03T00:00:00.000Z",
 		expiresAtISO: "2026-03-03T00:10:00.000Z",
@@ -26,6 +27,9 @@ describe("cli login token codec", () => {
 
 		expect(decoded.apiKey).toBe("bardo_live_test");
 		expect(decoded.mcpUrl).toBe("https://mcp.bardo.ai/mcp");
+		expect(decoded.statusUrl).toBe(
+			"https://app.bardo.ai/api/connect/runtime-status",
+		);
 		expect(decoded.serverName).toBe("bardo");
 	});
 

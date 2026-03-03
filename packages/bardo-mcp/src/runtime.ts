@@ -1,6 +1,7 @@
 import {
 	access,
 	copyFile,
+	cp,
 	mkdir,
 	readFile,
 	rm,
@@ -25,13 +26,18 @@ type SavedConfig = {
 	url: string;
 	updatedAtISO: string;
 	serverName?: string;
+	statusUrl?: string;
 };
+
+type PlanTier = "free" | "solo" | "solo_plus";
 
 type LoginCommandOptions = {
 	apiKey: string | null;
 	url: string | null;
 	token: string | null;
 	exchangeUrl: string | null;
+	statusUrl: string | null;
+	startUrl: string | null;
 };
 
 type WorkspaceCommandOptions = {
@@ -41,6 +47,22 @@ type WorkspaceCommandOptions = {
 type InitCommandOptions = WorkspaceCommandOptions & {
 	rulebookPath: string | null;
 	ruleset: string | null;
+};
+
+type InstallCommandOptions = WorkspaceCommandOptions & {
+	client: string | null;
+	mode: string | null;
+	configPath: string | null;
+	serverName: string | null;
+	dryRun: boolean;
+};
+
+type ExportCommandOptions = WorkspaceCommandOptions & {
+	outputPath: string | null;
+};
+
+type PackDebugCommandOptions = WorkspaceCommandOptions & {
+	outputPath: string | null;
 };
 
 type DoctorCommandOptions = WorkspaceCommandOptions & {
@@ -57,6 +79,9 @@ type ParsedCliCommand =
 	| { command: "login"; options: LoginCommandOptions }
 	| { command: "logout" }
 	| { command: "init"; options: InitCommandOptions }
+	| { command: "install"; options: InstallCommandOptions }
+	| { command: "export"; options: ExportCommandOptions }
+	| { command: "pack-debug"; options: PackDebugCommandOptions }
 	| { command: "doctor"; options: DoctorCommandOptions }
 	| { command: "mcp-serve"; options: ServeCommandOptions };
 
@@ -69,12 +94,14 @@ export type CliRuntimeDeps = {
 	fetch?: FetchLike;
 	startBridge?: (options: ResolvedServeOptions) => Promise<void>;
 	now?: () => Date;
+	sleep?: (ms: number) => Promise<void>;
 };
 
 type ResolvedServeOptions = {
 	apiKey: string;
 	url: string;
 	workspaceRoot: string;
+	plan: PlanTier | null;
 };
 
 type DoctorOutput = {
@@ -82,6 +109,7 @@ type DoctorOutput = {
 		configured: boolean;
 		source: "env" | "config" | "none";
 		url: string | null;
+		statusUrl: string | null;
 	};
 	workspace: {
 		workspaceRoot: string;
@@ -96,6 +124,19 @@ type DoctorOutput = {
 			status: number | null;
 			error: string | null;
 		};
+	};
+	account: {
+		fetched: boolean;
+		ok: boolean;
+		statusUrl: string | null;
+		keyId: string | null;
+		subjectId: string | null;
+		scopes: string[];
+		workspacePath: string | null;
+		plan: string | null;
+		mcpPeriodLimit: number | null;
+		billingUnavailable: boolean;
+		error: string | null;
 	};
 };
 
@@ -131,6 +172,27 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 		};
 	}
 
+	if (first === "install") {
+		return {
+			command: "install",
+			options: parseInstallOptions(argv.slice(1)),
+		};
+	}
+
+	if (first === "export") {
+		return {
+			command: "export",
+			options: parseExportOptions(argv.slice(1)),
+		};
+	}
+
+	if (first === "pack-debug") {
+		return {
+			command: "pack-debug",
+			options: parsePackDebugOptions(argv.slice(1)),
+		};
+	}
+
 	if (first === "doctor") {
 		return {
 			command: "doctor",
@@ -160,6 +222,8 @@ function parseLoginOptions(argv: string[]): LoginCommandOptions {
 	let url: string | null = null;
 	let token: string | null = null;
 	let exchangeUrl: string | null = null;
+	let statusUrl: string | null = null;
+	let startUrl: string | null = null;
 
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -187,10 +251,20 @@ function parseLoginOptions(argv: string[]): LoginCommandOptions {
 		if (arg === "--exchange-url" && typeof argv[index + 1] === "string") {
 			exchangeUrl = argv[index + 1] ?? null;
 			index += 1;
+			continue;
+		}
+		if (arg === "--status-url" && typeof argv[index + 1] === "string") {
+			statusUrl = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--start-url" && typeof argv[index + 1] === "string") {
+			startUrl = argv[index + 1] ?? null;
+			index += 1;
 		}
 	}
 
-	return { apiKey, url, token, exchangeUrl };
+	return { apiKey, url, token, exchangeUrl, statusUrl, startUrl };
 }
 
 function parseWorkspaceRootOption(
@@ -261,6 +335,99 @@ function parseDoctorOptions(argv: string[]): DoctorCommandOptions {
 	return { workspaceRoot, json };
 }
 
+function parseInstallOptions(argv: string[]): InstallCommandOptions {
+	let workspaceRoot: string | null = null;
+	let client: string | null = null;
+	let mode: string | null = null;
+	let configPath: string | null = null;
+	let serverName: string | null = null;
+	let dryRun = false;
+
+	for (let index = 0; index < argv.length; index += 1) {
+		const workspace = parseWorkspaceRootOption(argv, index);
+		if (workspace.workspaceRoot) {
+			workspaceRoot = workspace.workspaceRoot;
+			index = workspace.nextIndex;
+			continue;
+		}
+
+		const arg = argv[index];
+		if (arg === "--client" && typeof argv[index + 1] === "string") {
+			client = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--mode" && typeof argv[index + 1] === "string") {
+			mode = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--config-path" && typeof argv[index + 1] === "string") {
+			configPath = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--server-name" && typeof argv[index + 1] === "string") {
+			serverName = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--dry-run") {
+			dryRun = true;
+		}
+	}
+
+	return { workspaceRoot, client, mode, configPath, serverName, dryRun };
+}
+
+function parseExportOptions(argv: string[]): ExportCommandOptions {
+	let workspaceRoot: string | null = null;
+	let outputPath: string | null = null;
+
+	for (let index = 0; index < argv.length; index += 1) {
+		const workspace = parseWorkspaceRootOption(argv, index);
+		if (workspace.workspaceRoot) {
+			workspaceRoot = workspace.workspaceRoot;
+			index = workspace.nextIndex;
+			continue;
+		}
+		const arg = argv[index];
+		if (
+			(arg === "--output" || arg === "-o") &&
+			typeof argv[index + 1] === "string"
+		) {
+			outputPath = argv[index + 1] ?? null;
+			index += 1;
+		}
+	}
+
+	return { workspaceRoot, outputPath };
+}
+
+function parsePackDebugOptions(argv: string[]): PackDebugCommandOptions {
+	let workspaceRoot: string | null = null;
+	let outputPath: string | null = null;
+
+	for (let index = 0; index < argv.length; index += 1) {
+		const workspace = parseWorkspaceRootOption(argv, index);
+		if (workspace.workspaceRoot) {
+			workspaceRoot = workspace.workspaceRoot;
+			index = workspace.nextIndex;
+			continue;
+		}
+		const arg = argv[index];
+		if (
+			(arg === "--output" || arg === "-o") &&
+			typeof argv[index + 1] === "string"
+		) {
+			outputPath = argv[index + 1] ?? null;
+			index += 1;
+		}
+	}
+
+	return { workspaceRoot, outputPath };
+}
+
 function parseServeOptions(argv: string[]): ServeCommandOptions {
 	let apiKey: string | null = null;
 	let url: string | null = null;
@@ -313,6 +480,12 @@ export async function runCli(
 			return handleLogout(deps, stdout);
 		case "init":
 			return handleInit(parsed.options, deps, stdout, stderr);
+		case "install":
+			return handleInstall(parsed.options, deps, stdout, stderr);
+		case "export":
+			return handleExport(parsed.options, deps, stdout, stderr);
+		case "pack-debug":
+			return handlePackDebug(parsed.options, deps, stdout, stderr);
 		case "doctor":
 			return handleDoctor(parsed.options, deps, stdout, stderr);
 		case "mcp-serve":
@@ -325,9 +498,13 @@ function renderHelp(): string {
 
 Usage:
   bardo login --api-key <key> [--url <mcp-url>]
-  bardo login --token <login-token> --exchange-url <https-url>
+  bardo login --token <login-token> --exchange-url <https-url> [--status-url <https-url>]
+  bardo login [--start-url <https-url>]
   bardo logout
   bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
+  bardo install --client <codex|cursor|windsurf|vscode> [--mode <local|remote>] [--config-path <path>] [--dry-run]
+  bardo export --output <path> [--workspace-root <path>]
+  bardo pack-debug --output <path> [--workspace-root <path>]
   bardo doctor [--workspace-root <path>] [--json]
   bardo mcp serve [--api-key <key>] [--url <mcp-url>] [--workspace-root <path>]
 
@@ -336,6 +513,8 @@ Compatibility:
 
 Notes:
   login accepts either an API key directly or a short-lived website-issued login token.
+  Without arguments, login can start a browser approval flow against the website control plane.
+  --status-url lets doctor fetch plan and key status details from the website control plane.
   The workspace root defaults to the current working directory.
 `;
 }
@@ -350,6 +529,8 @@ async function handleLogin(
 	let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
 	let url = options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
 	let serverName: string | undefined;
+	let statusUrl =
+		options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
 
 	if (!apiKey && options.token?.trim()) {
 		const exchange = await exchangeLoginToken({
@@ -363,6 +544,25 @@ async function handleLogin(
 		apiKey = exchange.apiKey;
 		url = exchange.mcpUrl;
 		serverName = exchange.serverName;
+		statusUrl = exchange.statusUrl ?? statusUrl;
+	}
+
+	if (!apiKey && !options.token?.trim()) {
+		const interactive = await runInteractiveLoginFlow({
+			startUrl:
+				options.startUrl?.trim() ||
+				env.BARDO_LOGIN_START_URL?.trim() ||
+				"https://app.bardo.ai/api/connect/cli-session/start",
+			fetchImpl: deps.fetch ?? fetch,
+			sleep:
+				deps.sleep ??
+				(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+			stdout,
+		});
+		apiKey = interactive.apiKey;
+		url = interactive.mcpUrl;
+		statusUrl = interactive.statusUrl ?? statusUrl;
+		serverName = interactive.serverName;
 	}
 
 	if (!apiKey) {
@@ -378,6 +578,7 @@ async function handleLogin(
 		url,
 		updatedAtISO: now,
 		serverName,
+		statusUrl: statusUrl ?? undefined,
 	});
 	stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
 	return 0;
@@ -428,6 +629,147 @@ async function handleInit(
 	}
 }
 
+async function handleInstall(
+	options: InstallCommandOptions,
+	deps: CliRuntimeDeps,
+	stdout: Writer,
+	stderr: Writer,
+): Promise<number> {
+	try {
+		const env = deps.env ?? process.env;
+		const config = await readConfig(resolveConfigPath(deps));
+		const workspaceRoot = resolveWorkspaceRoot(
+			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
+			deps.cwd ?? process.cwd(),
+		);
+		const client = normalizeInstallClient(options.client);
+		const mode = normalizeInstallMode(options.mode);
+		const credentials = resolveStoredCredentials(config, env);
+		if (!credentials.apiKey || !credentials.url) {
+			throw new Error("Missing saved credentials. Run `bardo login` first.");
+		}
+
+		const serverName =
+			options.serverName?.trim() || config?.serverName || "bardo";
+		const configPath = resolveInstallConfigPath({
+			client,
+			workspaceRoot,
+			configPath: options.configPath,
+		});
+		const nextContent = await buildClientConfigContent({
+			client,
+			mode,
+			serverName,
+			apiKey: credentials.apiKey,
+			url: credentials.url,
+			configPath,
+		});
+
+		if (options.dryRun) {
+			stdout.write(`${nextContent}\n`);
+			return 0;
+		}
+
+		await mkdir(path.dirname(configPath), { recursive: true });
+		await writeFile(configPath, nextContent, "utf8");
+		stdout.write(`Installed Bardo MCP config at ${configPath}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
+		return 1;
+	}
+}
+
+async function handleExport(
+	options: ExportCommandOptions,
+	deps: CliRuntimeDeps,
+	stdout: Writer,
+	stderr: Writer,
+): Promise<number> {
+	try {
+		const env = deps.env ?? process.env;
+		const workspaceRoot = resolveWorkspaceRoot(
+			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
+			deps.cwd ?? process.cwd(),
+		);
+		const bardoRoot = resolveBardoRoot(workspaceRoot, env);
+		const outputPath = options.outputPath?.trim();
+		if (!outputPath) {
+			throw new Error("Missing output path. Pass --output <path>.");
+		}
+
+		const resolvedOutputRoot = path.resolve(outputPath);
+		const targetPath = path.join(resolvedOutputRoot, path.basename(bardoRoot));
+		await mkdir(resolvedOutputRoot, { recursive: true });
+		await rm(targetPath, { recursive: true, force: true });
+		await cp(bardoRoot, targetPath, { recursive: true });
+		stdout.write(`Exported Bardo workspace to ${targetPath}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
+		return 1;
+	}
+}
+
+async function handlePackDebug(
+	options: PackDebugCommandOptions,
+	deps: CliRuntimeDeps,
+	stdout: Writer,
+	stderr: Writer,
+): Promise<number> {
+	try {
+		const env = deps.env ?? process.env;
+		const outputPath = options.outputPath?.trim();
+		if (!outputPath) {
+			throw new Error("Missing output path. Pass --output <path>.");
+		}
+
+		const config = await readConfig(resolveConfigPath(deps));
+		const doctor = await buildDoctorReport(
+			{
+				workspaceRoot: options.workspaceRoot,
+				json: true,
+			},
+			deps,
+		);
+		const workspaceRoot = resolveWorkspaceRoot(
+			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
+			deps.cwd ?? process.cwd(),
+		);
+		const bardoRoot = resolveBardoRoot(workspaceRoot, env);
+		const manifest = await readExistingJson(
+			path.join(bardoRoot, "manifest.json"),
+		);
+
+		const payload = {
+			generatedAtISO: (deps.now ?? (() => new Date()))().toISOString(),
+			config: {
+				apiKeyRedacted: Boolean(config?.apiKey),
+				apiKeyPreview: redactApiKey(config?.apiKey ?? null),
+				url: config?.url ?? null,
+				statusUrl: config?.statusUrl ?? null,
+				serverName: config?.serverName ?? null,
+				updatedAtISO: config?.updatedAtISO ?? null,
+			},
+			doctor,
+			manifest,
+		};
+
+		const resolvedOutputPath = path.resolve(outputPath);
+		await mkdir(path.dirname(resolvedOutputPath), { recursive: true });
+		await writeFile(
+			resolvedOutputPath,
+			JSON.stringify(payload, null, 2),
+			"utf8",
+		);
+		stdout.write(`Wrote Bardo debug bundle to ${resolvedOutputPath}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
+		return 1;
+	}
+}
+
 async function handleDoctor(
 	options: DoctorCommandOptions,
 	deps: CliRuntimeDeps,
@@ -456,6 +798,8 @@ async function handleServe(
 ): Promise<number> {
 	const env = deps.env ?? process.env;
 	const config = await readConfig(resolveConfigPath(deps));
+	const statusUrl =
+		env.BARDO_RUNTIME_STATUS_URL?.trim() || config?.statusUrl?.trim() || null;
 	const resolved = {
 		apiKey:
 			options.apiKey?.trim() ||
@@ -471,6 +815,17 @@ async function handleServe(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		),
+		plan: await resolveServePlan({
+			apiKey:
+				options.apiKey?.trim() ||
+				env.BARDO_API_KEY?.trim() ||
+				config?.apiKey?.trim() ||
+				"",
+			statusUrl,
+			env,
+			fetchImpl: deps.fetch ?? fetch,
+			stderr,
+		}),
 	};
 
 	try {
@@ -481,6 +836,8 @@ async function handleServe(
 					apiKey: bridgeOptions.apiKey || null,
 					url: bridgeOptions.url,
 					workspaceRoot: bridgeOptions.workspaceRoot,
+					plan: bridgeOptions.plan,
+					env,
 					stderr,
 				}));
 		await startBridge(resolved);
@@ -493,6 +850,60 @@ async function handleServe(
 
 function resolveWorkspaceRoot(input: string | null, cwd: string): string {
 	return path.resolve(input?.trim() || cwd);
+}
+
+function normalizePlan(value: unknown): PlanTier | null {
+	switch (typeof value === "string" ? value.trim().toLowerCase() : "") {
+		case "free":
+			return "free";
+		case "solo":
+			return "solo";
+		case "solo_plus":
+		case "solo-plus":
+		case "soloplus":
+			return "solo_plus";
+		default:
+			return null;
+	}
+}
+
+async function resolveServePlan(args: {
+	apiKey: string;
+	statusUrl: string | null;
+	env: Record<string, string | undefined>;
+	fetchImpl: FetchLike;
+	stderr: Writer;
+}): Promise<PlanTier | null> {
+	const envPlan = normalizePlan(args.env.BARDO_PLAN);
+	if (envPlan) {
+		return envPlan;
+	}
+	if (!args.apiKey || !args.statusUrl) {
+		return null;
+	}
+
+	try {
+		const response = await args.fetchImpl(args.statusUrl, {
+			headers: {
+				authorization: `Bearer ${args.apiKey}`,
+			},
+		});
+		if (!response.ok) {
+			args.stderr.write(
+				`runtime status request failed with status ${response.status}; continuing without plan-aware filtering.\n`,
+			);
+			return null;
+		}
+		const payload = (await response.json()) as { plan?: unknown };
+		return normalizePlan(payload.plan);
+	} catch (error) {
+		args.stderr.write(
+			`runtime status request failed; continuing without plan-aware filtering: ${toErrorMessage(
+				error,
+			)}\n`,
+		);
+		return null;
+	}
 }
 
 async function ensureWorkspaceDirectories(
@@ -668,6 +1079,8 @@ async function readConfig(filePath: string): Promise<SavedConfig | null> {
 			url: parsed.url,
 			serverName:
 				typeof parsed.serverName === "string" ? parsed.serverName : undefined,
+			statusUrl:
+				typeof parsed.statusUrl === "string" ? parsed.statusUrl : undefined,
 			updatedAtISO:
 				typeof parsed.updatedAtISO === "string"
 					? parsed.updatedAtISO
@@ -678,6 +1091,239 @@ async function readConfig(filePath: string): Promise<SavedConfig | null> {
 	}
 }
 
+function resolveStoredCredentials(
+	config: SavedConfig | null,
+	env: Record<string, string | undefined>,
+) {
+	return {
+		apiKey: env.BARDO_API_KEY?.trim() || config?.apiKey || null,
+		url: env.BARDO_MCP_URL?.trim() || config?.url || null,
+	};
+}
+
+function normalizeInstallClient(
+	value: string | null,
+): "codex" | "cursor" | "windsurf" | "vscode" {
+	switch (value?.trim().toLowerCase()) {
+		case "codex":
+		case "cursor":
+		case "windsurf":
+		case "vscode":
+			return value.trim().toLowerCase() as
+				| "codex"
+				| "cursor"
+				| "windsurf"
+				| "vscode";
+		default:
+			throw new Error(
+				"Unsupported client. Use codex, cursor, windsurf, or vscode.",
+			);
+	}
+}
+
+function normalizeInstallMode(value: string | null): "local" | "remote" {
+	const normalized = value?.trim().toLowerCase() || "local";
+	if (normalized === "local" || normalized === "remote") {
+		return normalized;
+	}
+	throw new Error("Unsupported mode. Use local or remote.");
+}
+
+function resolveInstallConfigPath(args: {
+	client: "codex" | "cursor" | "windsurf" | "vscode";
+	workspaceRoot: string;
+	configPath: string | null;
+}): string {
+	if (args.configPath?.trim()) {
+		return path.resolve(args.workspaceRoot, args.configPath.trim());
+	}
+
+	switch (args.client) {
+		case "codex":
+			return path.join(args.workspaceRoot, ".codex/config.toml");
+		case "cursor":
+			return path.join(args.workspaceRoot, ".cursor/mcp.json");
+		case "windsurf":
+			return path.join(args.workspaceRoot, ".windsurf/mcp.json");
+		case "vscode":
+			return path.join(args.workspaceRoot, ".vscode/settings.json");
+	}
+}
+
+async function buildClientConfigContent(args: {
+	client: "codex" | "cursor" | "windsurf" | "vscode";
+	mode: "local" | "remote";
+	serverName: string;
+	apiKey: string;
+	url: string;
+	configPath: string;
+}): Promise<string> {
+	if (args.client === "codex") {
+		const block = buildCodexServerBlock(args);
+		const existing = await readFile(args.configPath, "utf8").catch(() => "");
+		return upsertTomlTable(existing, `mcp_servers.${args.serverName}`, block);
+	}
+
+	const existing = await readFile(args.configPath, "utf8")
+		.then((raw) => JSON.parse(raw) as Record<string, unknown>)
+		.catch(() => ({}));
+	const next = mergeClientJsonConfig(existing, args);
+	return `${JSON.stringify(next, null, 2)}\n`;
+}
+
+function buildCodexServerBlock(args: {
+	mode: "local" | "remote";
+	serverName: string;
+	apiKey: string;
+	url: string;
+}) {
+	if (args.mode === "remote") {
+		return [
+			`[mcp_servers.${args.serverName}]`,
+			`url = ${JSON.stringify(args.url)}`,
+			`http_headers = { "Authorization" = ${JSON.stringify(
+				`Bearer ${args.apiKey}`,
+			)} }`,
+			"",
+		].join("\n");
+	}
+
+	return [
+		`[mcp_servers.${args.serverName}]`,
+		`command = "bunx"`,
+		`args = ${JSON.stringify([
+			"--bun",
+			"--package",
+			"@bardo/mcp",
+			"bardo",
+			"mcp",
+			"serve",
+			"--api-key",
+			args.apiKey,
+			"--url",
+			args.url,
+			"--workspace-root",
+			".",
+		])}`,
+		"",
+	].join("\n");
+}
+
+function upsertTomlTable(
+	existing: string,
+	tableName: string,
+	replacementBlock: string,
+): string {
+	const escapedTable = tableName.replaceAll(".", "\\.");
+	const pattern = new RegExp(
+		String.raw`^\[${escapedTable}\]\n(?:.*\n)*?(?=^\[|\s*$)`,
+		"m",
+	);
+	if (pattern.test(existing)) {
+		return existing.replace(pattern, replacementBlock);
+	}
+	const trimmed = existing.trimEnd();
+	return trimmed.length > 0
+		? `${trimmed}\n\n${replacementBlock}`
+		: replacementBlock;
+}
+
+function mergeClientJsonConfig(
+	existing: Record<string, unknown>,
+	args: {
+		client: "cursor" | "windsurf" | "vscode";
+		mode: "local" | "remote";
+		serverName: string;
+		apiKey: string;
+		url: string;
+	},
+): Record<string, unknown> {
+	if (args.client === "vscode") {
+		const root = structuredClone(existing);
+		const mcp =
+			typeof root.mcp === "object" && root.mcp !== null
+				? (root.mcp as Record<string, unknown>)
+				: {};
+		const servers =
+			typeof mcp.servers === "object" && mcp.servers !== null
+				? (mcp.servers as Record<string, unknown>)
+				: {};
+		servers[args.serverName] =
+			args.mode === "remote"
+				? {
+						type: "http",
+						url: args.url,
+						headers: {
+							Authorization: `Bearer ${args.apiKey}`,
+						},
+					}
+				: {
+						type: "stdio",
+						command: "bunx",
+						args: [
+							"--bun",
+							"--package",
+							"@bardo/mcp",
+							"bardo",
+							"mcp",
+							"serve",
+							"--api-key",
+							args.apiKey,
+							"--url",
+							args.url,
+							"--workspace-root",
+							".",
+						],
+					};
+		mcp.servers = servers;
+		root.mcp = mcp;
+		return root;
+	}
+
+	const root = structuredClone(existing);
+	const servers =
+		typeof root.mcpServers === "object" && root.mcpServers !== null
+			? (root.mcpServers as Record<string, unknown>)
+			: {};
+	servers[args.serverName] =
+		args.mode === "remote"
+			? {
+					url: args.url,
+					headers: {
+						Authorization: `Bearer ${args.apiKey}`,
+					},
+				}
+			: {
+					command: "bunx",
+					args: [
+						"--bun",
+						"--package",
+						"@bardo/mcp",
+						"bardo",
+						"mcp",
+						"serve",
+						"--api-key",
+						args.apiKey,
+						"--url",
+						args.url,
+						"--workspace-root",
+						".",
+					],
+				};
+	root.mcpServers = servers;
+	return root;
+}
+
+function redactApiKey(apiKey: string | null): string | null {
+	if (!apiKey) {
+		return null;
+	}
+	if (apiKey.length <= 10) {
+		return `${apiKey.slice(0, 2)}***${apiKey.slice(-2)}`;
+	}
+	return `${apiKey.slice(0, 10)}***${apiKey.slice(-4)}`;
+}
+
 async function exchangeLoginToken(args: {
 	token: string;
 	exchangeUrl: string | null;
@@ -685,6 +1331,7 @@ async function exchangeLoginToken(args: {
 }): Promise<{
 	apiKey: string;
 	mcpUrl: string;
+	statusUrl?: string;
 	serverName?: string;
 }> {
 	if (!args.exchangeUrl) {
@@ -704,6 +1351,7 @@ async function exchangeLoginToken(args: {
 	const body = (await response.json().catch(() => ({}))) as {
 		apiKey?: string;
 		mcpUrl?: string;
+		statusUrl?: string;
 		serverName?: string;
 		error?: string;
 	};
@@ -721,9 +1369,115 @@ async function exchangeLoginToken(args: {
 	return {
 		apiKey: body.apiKey,
 		mcpUrl: body.mcpUrl,
+		statusUrl: typeof body.statusUrl === "string" ? body.statusUrl : undefined,
 		serverName:
 			typeof body.serverName === "string" ? body.serverName : undefined,
 	};
+}
+
+async function runInteractiveLoginFlow(args: {
+	startUrl: string;
+	fetchImpl: FetchLike;
+	sleep: (ms: number) => Promise<void>;
+	stdout: Writer;
+}): Promise<{
+	apiKey: string;
+	mcpUrl: string;
+	statusUrl?: string;
+	serverName?: string;
+}> {
+	const startResponse = await args.fetchImpl(args.startUrl, {
+		method: "POST",
+		headers: {
+			accept: "application/json",
+		},
+	});
+	const startBody = (await startResponse.json().catch(() => ({}))) as Partial<{
+		sessionId: string;
+		userCode: string;
+		verificationUrl: string;
+		pollUrl: string;
+		intervalMs: number;
+		error: string;
+	}>;
+	if (!startResponse.ok) {
+		throw new Error(
+			startBody.error ||
+				`CLI login start failed with status ${startResponse.status}.`,
+		);
+	}
+	if (
+		typeof startBody.verificationUrl !== "string" ||
+		typeof startBody.pollUrl !== "string"
+	) {
+		throw new Error("CLI login start returned an invalid payload.");
+	}
+
+	args.stdout.write(
+		`Open this URL to approve Bardo CLI:\n${startBody.verificationUrl}\n`,
+	);
+	if (typeof startBody.userCode === "string") {
+		args.stdout.write(`Approval code: ${startBody.userCode}\n`);
+	}
+	args.stdout.write("Waiting for browser approval...\n");
+
+	const intervalMs =
+		typeof startBody.intervalMs === "number" && startBody.intervalMs > 0
+			? Math.floor(startBody.intervalMs)
+			: 3000;
+
+	for (;;) {
+		const pollResponse = await args.fetchImpl(startBody.pollUrl, {
+			method: "GET",
+			headers: {
+				accept: "application/json",
+			},
+		});
+		const pollBody = (await pollResponse.json().catch(() => ({}))) as Partial<{
+			status: string;
+			apiKey: string;
+			mcpUrl: string;
+			statusUrl: string;
+			serverName: string;
+			error: string;
+			intervalMs: number;
+		}>;
+
+		if (pollResponse.ok && pollBody.status === "approved") {
+			if (
+				typeof pollBody.apiKey !== "string" ||
+				typeof pollBody.mcpUrl !== "string"
+			) {
+				throw new Error("CLI login poll returned an invalid approved payload.");
+			}
+			return {
+				apiKey: pollBody.apiKey,
+				mcpUrl: pollBody.mcpUrl,
+				statusUrl:
+					typeof pollBody.statusUrl === "string"
+						? pollBody.statusUrl
+						: undefined,
+				serverName:
+					typeof pollBody.serverName === "string"
+						? pollBody.serverName
+						: undefined,
+			};
+		}
+
+		if (pollResponse.ok && pollBody.status === "pending") {
+			await args.sleep(
+				typeof pollBody.intervalMs === "number" && pollBody.intervalMs > 0
+					? Math.floor(pollBody.intervalMs)
+					: intervalMs,
+			);
+			continue;
+		}
+
+		throw new Error(
+			pollBody.error ||
+				`CLI login approval failed with status ${pollResponse.status}.`,
+		);
+	}
 }
 
 async function buildDoctorReport(
@@ -741,8 +1495,10 @@ async function buildDoctorReport(
 	const manifest = await readExistingJson(manifestPath);
 	const envApiKey = env.BARDO_API_KEY?.trim() || null;
 	const envUrl = env.BARDO_MCP_URL?.trim() || null;
+	const envStatusUrl = env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
 	const url = envUrl || config?.url || null;
 	const apiKey = envApiKey || config?.apiKey || null;
+	const statusUrl = envStatusUrl || config?.statusUrl || null;
 	const source: DoctorOutput["auth"]["source"] = envApiKey
 		? "env"
 		: config?.apiKey
@@ -750,12 +1506,18 @@ async function buildDoctorReport(
 			: "none";
 
 	const health = await checkHealth(url, deps.fetch ?? fetch);
+	const account = await checkAccountStatus({
+		statusUrl,
+		apiKey,
+		fetchImpl: deps.fetch ?? fetch,
+	});
 
 	return {
 		auth: {
 			configured: Boolean(apiKey),
 			source,
 			url,
+			statusUrl,
 		},
 		workspace: {
 			workspaceRoot,
@@ -766,7 +1528,111 @@ async function buildDoctorReport(
 		connectivity: {
 			health,
 		},
+		account,
 	};
+}
+
+async function checkAccountStatus(args: {
+	statusUrl: string | null;
+	apiKey: string | null;
+	fetchImpl: FetchLike;
+}): Promise<DoctorOutput["account"]> {
+	if (!args.statusUrl || !args.apiKey) {
+		return {
+			fetched: false,
+			ok: false,
+			statusUrl: args.statusUrl,
+			keyId: null,
+			subjectId: null,
+			scopes: [],
+			workspacePath: null,
+			plan: null,
+			mcpPeriodLimit: null,
+			billingUnavailable: false,
+			error: args.statusUrl
+				? "Missing API key."
+				: "Missing runtime status URL.",
+		};
+	}
+
+	try {
+		const response = await args.fetchImpl(args.statusUrl, {
+			method: "GET",
+			headers: {
+				accept: "application/json",
+				authorization: `Bearer ${args.apiKey}`,
+			},
+		});
+		const payload = (await response.json().catch(() => ({}))) as Partial<{
+			valid: boolean;
+			keyId: string | null;
+			subjectId: string | null;
+			scopes: string[];
+			workspacePath: string | null;
+			plan: string | null;
+			mcpPeriodLimit: number | null;
+			billingUnavailable: boolean;
+			error: string;
+		}>;
+
+		if (!response.ok || payload.valid !== true) {
+			return {
+				fetched: true,
+				ok: false,
+				statusUrl: args.statusUrl,
+				keyId: null,
+				subjectId: null,
+				scopes: [],
+				workspacePath: null,
+				plan: null,
+				mcpPeriodLimit: null,
+				billingUnavailable: false,
+				error:
+					payload.error ||
+					`Runtime status check failed with status ${response.status}.`,
+			};
+		}
+
+		return {
+			fetched: true,
+			ok: true,
+			statusUrl: args.statusUrl,
+			keyId: typeof payload.keyId === "string" ? payload.keyId : null,
+			subjectId:
+				typeof payload.subjectId === "string" ? payload.subjectId : null,
+			scopes: Array.isArray(payload.scopes)
+				? payload.scopes.filter(
+						(scope): scope is string =>
+							typeof scope === "string" && scope.trim().length > 0,
+					)
+				: [],
+			workspacePath:
+				typeof payload.workspacePath === "string"
+					? payload.workspacePath
+					: null,
+			plan: typeof payload.plan === "string" ? payload.plan : null,
+			mcpPeriodLimit:
+				typeof payload.mcpPeriodLimit === "number"
+					? payload.mcpPeriodLimit
+					: null,
+			billingUnavailable: payload.billingUnavailable === true,
+			error: null,
+		};
+	} catch (error) {
+		return {
+			fetched: true,
+			ok: false,
+			statusUrl: args.statusUrl,
+			keyId: null,
+			subjectId: null,
+			scopes: [],
+			workspacePath: null,
+			plan: null,
+			mcpPeriodLimit: null,
+			billingUnavailable: false,
+			error: toErrorMessage(error),
+		};
+	}
 }
 
 async function checkHealth(
@@ -822,6 +1688,7 @@ function renderDoctorReport(report: DoctorOutput): string {
 		"",
 		`Auth: ${report.auth.configured ? "configured" : "missing"} (${report.auth.source})`,
 		`MCP URL: ${report.auth.url ?? "not configured"}`,
+		`Runtime status URL: ${report.auth.statusUrl ?? "not configured"}`,
 		`Workspace root: ${report.workspace.workspaceRoot}`,
 		`Bardo root: ${report.workspace.bardoRoot}`,
 		`Workspace initialized: ${report.workspace.initialized ? "yes" : "no"}`,
@@ -829,6 +1696,17 @@ function renderDoctorReport(report: DoctorOutput): string {
 			report.connectivity.health.ok
 				? `ok (${report.connectivity.health.status})`
 				: (report.connectivity.health.error ?? "failed")
+		}`,
+		`Account status: ${
+			!report.account.fetched
+				? "not checked"
+				: report.account.ok
+					? `ok (${report.account.plan ?? "unknown"}${
+							report.account.mcpPeriodLimit
+								? `, limit ${report.account.mcpPeriodLimit}`
+								: ""
+						})`
+					: (report.account.error ?? "failed")
 		}`,
 	];
 	return `${lines.join("\n")}\n`;

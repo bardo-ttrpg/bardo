@@ -50,6 +50,8 @@ type LocalMcpServerOptions = {
 	apiKey?: string | null;
 	url: string;
 	workspaceRoot: string;
+	plan?: PlanTier | null;
+	env?: Record<string, string | undefined>;
 	stderr?: Writer;
 };
 
@@ -73,9 +75,16 @@ type RemoteToolDefinition = {
 	annotations?: Record<string, unknown>;
 };
 
+type PlanTier = "free" | "solo" | "solo_plus";
+
 type RemoteConnectionResult = {
 	client: Client | null;
 	tools: RemoteToolDefinition[];
+};
+
+type RemoteToolAccessControllerOptions = {
+	plan: PlanTier | null;
+	env?: Record<string, string | undefined>;
 };
 
 type RemoteConnectionCoordinatorOptions = {
@@ -323,6 +332,109 @@ export function createRemoteConnectionCoordinator(
 			}
 
 			return connectingPromise;
+		},
+	};
+}
+
+function normalizePlan(value: unknown): PlanTier | null {
+	switch (typeof value === "string" ? value.trim().toLowerCase() : "") {
+		case "free":
+			return "free";
+		case "solo":
+			return "solo";
+		case "solo_plus":
+		case "solo-plus":
+		case "soloplus":
+			return "solo_plus";
+		default:
+			return null;
+	}
+}
+
+function planRank(plan: PlanTier): number {
+	switch (plan) {
+		case "free":
+			return 0;
+		case "solo":
+			return 1;
+		case "solo_plus":
+			return 2;
+	}
+}
+
+function parseToolNameList(value: string | undefined): Set<string> {
+	return new Set(
+		(value ?? "")
+			.split(",")
+			.map((entry) => entry.trim())
+			.filter((entry) => entry.length > 0),
+	);
+}
+
+function annotatedToolPlan(tool: RemoteToolDefinition): PlanTier | null {
+	const annotations =
+		typeof tool.annotations === "object" && tool.annotations !== null
+			? tool.annotations
+			: {};
+	for (const key of [
+		"x-bardo-min-plan",
+		"bardo:min-plan",
+		"bardo_min_plan",
+		"bardoMinPlan",
+		"requiredPlan",
+	]) {
+		const plan = normalizePlan((annotations as Record<string, unknown>)[key]);
+		if (plan) {
+			return plan;
+		}
+	}
+	return null;
+}
+
+function requiredPlanForTool(
+	tool: RemoteToolDefinition,
+	options: RemoteToolAccessControllerOptions,
+): PlanTier {
+	const annotated = annotatedToolPlan(tool);
+	if (annotated) {
+		return annotated;
+	}
+
+	const env = options.env ?? process.env;
+	const soloPlusTools = parseToolNameList(env.BARDO_SOLO_PLUS_REMOTE_TOOLS);
+	if (soloPlusTools.has(tool.name)) {
+		return "solo_plus";
+	}
+	const premiumTools = parseToolNameList(env.BARDO_PREMIUM_REMOTE_TOOLS);
+	if (premiumTools.has(tool.name)) {
+		return "solo";
+	}
+	return "free";
+}
+
+export function createRemoteToolAccessController(
+	options: RemoteToolAccessControllerOptions,
+) {
+	function isAllowed(tool: RemoteToolDefinition): boolean {
+		if (!options.plan) {
+			return true;
+		}
+		const requiredPlan = requiredPlanForTool(tool, options);
+		return planRank(options.plan) >= planRank(requiredPlan);
+	}
+
+	return {
+		filterTools(tools: RemoteToolDefinition[]): RemoteToolDefinition[] {
+			return tools.filter((tool) => isAllowed(tool));
+		},
+		isAllowed,
+		blockedMessage(toolName: string, tool?: RemoteToolDefinition): string {
+			const requiredPlan = requiredPlanForTool(
+				tool ?? { name: toolName },
+				options,
+			);
+			const currentPlan = options.plan ?? "unknown";
+			return `Remote tool "${toolName}" requires the ${requiredPlan} plan. Current plan: ${currentPlan}.`;
 		},
 	};
 }
@@ -649,6 +761,10 @@ export async function startLocalMcpServer(
 	options: LocalMcpServerOptions,
 ): Promise<void> {
 	const stderr = options.stderr ?? process.stderr;
+	const toolAccess = createRemoteToolAccessController({
+		plan: options.plan ?? null,
+		env: options.env ?? process.env,
+	});
 
 	const server = new Server(
 		{
@@ -705,7 +821,7 @@ export async function startLocalMcpServer(
 					inputSchema: tool.inputSchema,
 					annotations: tool.annotations,
 				})),
-				...remote.tools,
+				...toolAccess.filterTools(remote.tools),
 			],
 		};
 	});
@@ -731,6 +847,23 @@ export async function startLocalMcpServer(
 			return makeToolResult(
 				"Remote MCP is not connected. Run `bardo login` first.",
 				{ success: false },
+				true,
+			);
+		}
+
+		const remoteTool = remote.tools.find(
+			(tool) => tool.name === request.params.name,
+		);
+		if (remoteTool && !toolAccess.isAllowed(remoteTool)) {
+			return makeToolResult(
+				toolAccess.blockedMessage(request.params.name, remoteTool),
+				{
+					success: false,
+					requiredPlan: requiredPlanForTool(remoteTool, {
+						plan: options.plan ?? null,
+						env: options.env ?? process.env,
+					}),
+				},
 				true,
 			);
 		}

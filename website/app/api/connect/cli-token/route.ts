@@ -30,12 +30,14 @@ type CliTokenDeps = {
 	createToken: (payload: {
 		apiKey: string;
 		mcpUrl: string;
+		statusUrl: string;
 		serverName: string;
 		issuedAtISO: string;
 		expiresAtISO: string;
 	}) => Promise<string>;
 	resolveMcpUrl: (request: Request) => string;
 	exchangeUrl: string | null;
+	statusUrl: string | null;
 	ttlMs: number;
 	now: () => Date;
 };
@@ -67,6 +69,15 @@ function resolveExchangeUrl(request: Request): string {
 	}
 
 	return new URL("/api/connect/cli-exchange", request.url).toString();
+}
+
+function resolveStatusUrl(request: Request): string {
+	const envValue = process.env.BARDO_RUNTIME_STATUS_URL?.trim();
+	if (envValue) {
+		return envValue;
+	}
+
+	return new URL("/api/connect/runtime-status", request.url).toString();
 }
 
 function parseScopes(value: unknown): string[] {
@@ -122,6 +133,7 @@ const defaultDeps: CliTokenDeps = {
 	},
 	resolveMcpUrl,
 	exchangeUrl: null,
+	statusUrl: null,
 	ttlMs: Number(process.env.BARDO_CLI_LOGIN_TTL_MS ?? 300_000),
 	now: () => new Date(),
 };
@@ -152,11 +164,13 @@ export function createCliTokenPostHandler(
 				throw new Error("CLI login API key secret is missing.");
 			}
 			const mcpUrl = deps.resolveMcpUrl(request);
+			const statusUrl = deps.statusUrl ?? resolveStatusUrl(request);
 			const issuedAtISO = now.toISOString();
 			const expiresAtISO = new Date(now.getTime() + deps.ttlMs).toISOString();
 			const loginToken = await deps.createToken({
 				apiKey: key.secret,
 				mcpUrl,
+				statusUrl,
 				serverName: "bardo",
 				issuedAtISO,
 				expiresAtISO,
@@ -166,6 +180,7 @@ export function createCliTokenPostHandler(
 				loginToken,
 				exchangeUrl: deps.exchangeUrl ?? resolveExchangeUrl(request),
 				mcpUrl,
+				statusUrl,
 				serverName: "bardo",
 				expiresAtISO,
 				keyName: key.name,

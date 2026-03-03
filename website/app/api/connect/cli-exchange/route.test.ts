@@ -14,6 +14,7 @@ describe("POST /api/connect/cli-exchange", () => {
 				return {
 					apiKey: "bardo_live_token",
 					mcpUrl: "https://mcp.bardo.ai/mcp",
+					statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 					serverName: "bardo",
 					issuedAtISO: "2099-03-03T00:00:00.000Z",
 					expiresAtISO: "2099-03-03T00:10:00.000Z",
@@ -34,6 +35,9 @@ describe("POST /api/connect/cli-exchange", () => {
 		expect(response.status).toBe(200);
 		expect(body.apiKey).toBe("bardo_live_token");
 		expect(body.mcpUrl).toBe("https://mcp.bardo.ai/mcp");
+		expect(body.statusUrl).toBe(
+			"https://app.bardo.ai/api/connect/runtime-status",
+		);
 	});
 
 	test("rejects invalid login tokens", async () => {
@@ -66,6 +70,7 @@ describe("POST /api/connect/cli-exchange", () => {
 			decodeToken: async () => ({
 				apiKey: "bardo_live_token",
 				mcpUrl: "https://mcp.bardo.ai/mcp",
+				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 				serverName: "bardo",
 				issuedAtISO: "2026-03-03T00:00:00.000Z",
 				expiresAtISO: "2026-03-03T00:10:00.000Z",
@@ -91,6 +96,7 @@ describe("POST /api/connect/cli-exchange", () => {
 			decodeToken: async () => ({
 				apiKey: "bardo_live_token",
 				mcpUrl: "https://mcp.bardo.ai/mcp",
+				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 				serverName: "bardo",
 				issuedAtISO: "2099-03-03T00:00:00.000Z",
 				expiresAtISO: "2099-03-03T00:10:00.000Z",
