@@ -164,10 +164,6 @@ export const AUTO_INSTALL_CONNECTION_CLIENTS: readonly AutoInstallConnectionClie
 		(client): client is AutoInstallConnectionClient => client !== "generic",
 	);
 
-function escapeRegex(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function escapeDoubleQuoted(value: string): string {
 	return value.replaceAll('"', '\\"');
 }
@@ -234,7 +230,7 @@ function upsertTomlTable(
 	tableName: string,
 	replacementBlock: string,
 ): string {
-	const escapedTable = escapeRegex(tableName);
+	const escapedTable = tableName.replaceAll(".", "\\.");
 	const pattern = new RegExp(
 		String.raw`^\[${escapedTable}\]\n(?:.*\n)*?(?=^\[|\s*$)`,
 		"m",
@@ -390,16 +386,9 @@ export function buildInstallConfigContent(args: {
 		adapter.installVariant === "vscode" ||
 		adapter.installVariant === "opencode"
 	) {
-		let existing: Record<string, unknown> = {};
-		if (args.existingContent.trim().length) {
-			try {
-				existing = JSON.parse(args.existingContent) as Record<string, unknown>;
-			} catch {
-				throw new Error(
-					"Existing config is not valid JSON. Fix or delete it before running install.",
-				);
-			}
-		}
+		const existing = args.existingContent.trim().length
+			? (JSON.parse(args.existingContent) as Record<string, unknown>)
+			: {};
 		return `${JSON.stringify(
 			mergeJsonVariant({
 				variant: adapter.installVariant,

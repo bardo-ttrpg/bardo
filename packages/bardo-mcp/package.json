@@ -3,9 +3,6 @@
 	"version": "0.1.0",
 	"description": "Bardo MCP local adapter for Bun-based MCP clients.",
 	"type": "module",
-	"exports": {
-		"./client-adapters": "./src/client-adapters.ts"
-	},
 	"engines": {
 		"bun": ">=1.3.10"
 	},

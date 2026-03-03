@@ -4,7 +4,6 @@ import { resolveSentryRelease } from "./lib/sentry-server-config";
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
-	transpilePackages: ["@bardo/mcp"],
 	allowedDevOrigins: [
 		"127.0.0.1",
 		"localhost",

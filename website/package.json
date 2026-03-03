@@ -17,7 +17,6 @@
 		"test:e2e:headed": "playwright test --headed"
 	},
 	"dependencies": {
-		"@bardo/mcp": "workspace:*",
 		"@clerk/nextjs": "6.38.1",
 		"@sentry/nextjs": "10.40.0",
 		"@tailwindcss/postcss": "^4.2.0",
