@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const ORIGINAL_NEXT_PUBLIC_MCP_BASE_URL = process.env.NEXT_PUBLIC_MCP_BASE_URL;
 const ORIGINAL_BARDO_MCP_BASE_URL = process.env.BARDO_MCP_BASE_URL;
@@ -55,5 +55,27 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 		const response = await GET(request);
 		const body = await response.json();
 		expect(body.baseUrl).toBe("http://localhost:3000/mcp");
+	});
+
+	test("POST accepts connection params in the request body", async () => {
+		process.env.BARDO_MCP_BASE_URL = "https://mcp.bardo.ai";
+		const response = await POST(
+			new Request("https://app.bardo.ai/api/connect/snippets", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					client: "claude",
+					mode: "local",
+					apiKey: "secret-value",
+				}),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.baseUrl).toBe("https://mcp.bardo.ai/mcp");
+		expect(body.client).toBe("claude");
+		expect(body.mode).toBe("local");
+		expect(body.snippet).toContain("secret-value");
 	});
 });

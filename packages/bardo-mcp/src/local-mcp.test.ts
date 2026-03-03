@@ -177,4 +177,91 @@ describe("local MCP workspace roots", () => {
 		expect(firstResult.tools).toEqual([{ name: "remote_tool" }]);
 		expect(secondResult.tools).toEqual([{ name: "remote_tool" }]);
 	});
+
+	test("preserves existing workspace core files when bootstrap runs twice", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, "bardo");
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.ensureWorkspaceCoreFiles).toBe("function");
+
+			const ensureWorkspaceCoreFiles = mod.ensureWorkspaceCoreFiles as (args: {
+				bardoRoot: string;
+				workspaceRoot: string;
+				ruleset: string | null;
+				nowIso: string;
+				importedRulebooks: string[];
+			}) => Promise<void>;
+
+			await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
+			await writeFile(
+				path.join(bardoRoot, "manifest.json"),
+				JSON.stringify(
+					{
+						version: 1,
+						createdAtISO: "2026-03-01T00:00:00.000Z",
+						updatedAtISO: "2026-03-01T00:00:00.000Z",
+						workspaceRoot,
+						bardoRoot,
+						ruleset: "shadowdark",
+						importedRulebooks: ["rules/sources/rulebook/original.md"],
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await writeFile(
+				path.join(bardoRoot, "_settings/settings.md"),
+				"existing settings",
+				"utf8",
+			);
+			await writeFile(
+				path.join(bardoRoot, "state/current.md"),
+				"existing state",
+				"utf8",
+			);
+			await writeFile(
+				path.join(bardoRoot, "events/history.md"),
+				"existing history",
+				"utf8",
+			);
+
+			await ensureWorkspaceCoreFiles({
+				bardoRoot,
+				workspaceRoot,
+				ruleset: null,
+				nowIso: "2026-03-03T00:00:00.000Z",
+				importedRulebooks: [],
+			});
+
+			const manifest = JSON.parse(
+				await readFile(path.join(bardoRoot, "manifest.json"), "utf8"),
+			) as {
+				createdAtISO: string;
+				updatedAtISO: string;
+				importedRulebooks: string[];
+			};
+
+			expect(manifest.createdAtISO).toBe("2026-03-01T00:00:00.000Z");
+			expect(manifest.updatedAtISO).toBe("2026-03-03T00:00:00.000Z");
+			expect(manifest.importedRulebooks).toEqual([
+				"rules/sources/rulebook/original.md",
+			]);
+			await expect(
+				readFile(path.join(bardoRoot, "_settings/settings.md"), "utf8"),
+			).resolves.toBe("existing settings");
+			await expect(
+				readFile(path.join(bardoRoot, "state/current.md"), "utf8"),
+			).resolves.toBe("existing state");
+			await expect(
+				readFile(path.join(bardoRoot, "events/history.md"), "utf8"),
+			).resolves.toBe("existing history");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
 });

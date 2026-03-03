@@ -198,12 +198,18 @@ export async function refreshSnippet({
 			"/api/connect/snippets",
 			origin ?? window.location.origin,
 		);
-		url.searchParams.set("client", connectionClient);
-		url.searchParams.set("mode", connectionMode);
-		url.searchParams.set("apiKey", secret);
 		const response = await fetchWithTimeout(
 			url,
-			{ cache: "no-store" },
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					client: connectionClient,
+					mode: connectionMode,
+					apiKey: secret,
+				}),
+				cache: "no-store",
+			},
 			fetchOptions,
 		);
 		const payload = (await response.json()) as { snippet?: string };

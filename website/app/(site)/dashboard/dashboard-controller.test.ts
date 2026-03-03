@@ -4,6 +4,7 @@ import {
 	createKey,
 	generateCliLoginCommand,
 	loadDashboardData,
+	refreshSnippet,
 } from "./dashboard-controller";
 import {
 	createDashboardState,
@@ -230,6 +231,49 @@ describe("dashboard-controller", () => {
 				mutationError: "Key limit reached",
 			},
 			{ type: "cli_login_loading", cliLoginLoading: false },
+		]);
+	});
+
+	test("refreshSnippet sends the secret in the request body instead of the URL", async () => {
+		const actions: unknown[] = [];
+		const fetchImpl = mock(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				const url = new URL(String(input));
+				expect(url.pathname).toBe("/api/connect/snippets");
+				expect(url.searchParams.get("client")).toBeNull();
+				expect(url.searchParams.get("mode")).toBeNull();
+				expect(url.searchParams.get("apiKey")).toBeNull();
+				expect(init?.method).toBe("POST");
+				expect(init?.headers).toEqual({ "content-type": "application/json" });
+				expect(init?.body).toBe(
+					JSON.stringify({
+						client: "claude",
+						mode: "local",
+						apiKey: "secret-value",
+					}),
+				);
+
+				return new Response(JSON.stringify({ snippet: "snippet-value" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				});
+			},
+		);
+
+		await refreshSnippet({
+			dispatch: (action) => actions.push(action),
+			connectionClient: "claude",
+			connectionMode: "local",
+			secret: "secret-value",
+			origin: "https://app.bardo.ai",
+			fetchImpl,
+			timeoutMs: 50,
+		});
+
+		expect(actions).toEqual([
+			{ type: "snippet_loading", snippetLoading: true },
+			{ type: "snippet_loaded", snippet: "snippet-value" },
+			{ type: "snippet_loading", snippetLoading: false },
 		]);
 	});
 });

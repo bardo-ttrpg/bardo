@@ -126,56 +126,96 @@ async function ensureWorkspaceDirectories(bardoRoot: string): Promise<void> {
 	}
 }
 
-async function ensureWorkspaceCoreFiles(args: {
+async function ensureFile(filePath: string, content: string): Promise<void> {
+	const existing = await stat(filePath)
+		.then(() => true)
+		.catch(() => false);
+	if (existing) {
+		return;
+	}
+
+	await mkdir(path.dirname(filePath), { recursive: true });
+	await writeFile(filePath, content, "utf8");
+}
+
+async function readExistingJson(
+	filePath: string,
+): Promise<Record<string, unknown> | null> {
+	try {
+		const raw = await readFile(filePath, "utf8");
+		const parsed = JSON.parse(raw);
+		if (
+			typeof parsed === "object" &&
+			parsed !== null &&
+			!Array.isArray(parsed)
+		) {
+			return parsed as Record<string, unknown>;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+export async function ensureWorkspaceCoreFiles(args: {
 	bardoRoot: string;
 	workspaceRoot: string;
 	ruleset: string | null;
 	nowIso: string;
 	importedRulebooks: string[];
 }): Promise<void> {
+	const manifestPath = path.join(args.bardoRoot, "manifest.json");
+	const manifest = await readExistingJson(manifestPath);
 	await writeFile(
-		path.join(args.bardoRoot, "manifest.json"),
+		manifestPath,
 		JSON.stringify(
 			{
 				version: 1,
-				createdAtISO: args.nowIso,
+				createdAtISO:
+					typeof manifest?.createdAtISO === "string"
+						? manifest.createdAtISO
+						: args.nowIso,
 				updatedAtISO: args.nowIso,
 				workspaceRoot: args.workspaceRoot,
 				bardoRoot: args.bardoRoot,
-				ruleset: args.ruleset,
-				importedRulebooks: args.importedRulebooks,
+				ruleset:
+					args.ruleset ??
+					(typeof manifest?.ruleset === "string" ? manifest.ruleset : null),
+				importedRulebooks:
+					args.importedRulebooks.length > 0
+						? args.importedRulebooks
+						: Array.isArray(manifest?.importedRulebooks)
+							? manifest.importedRulebooks
+							: [],
 			},
 			null,
 			2,
 		),
 		"utf8",
 	);
-	await writeFile(
+	await ensureFile(
 		path.join(args.bardoRoot, "_settings/settings.md"),
 		renderMarkdown(
 			"Campaign Settings",
 			"Campaign setup settings and preferences.",
 			JSON.stringify({ updatedAtISO: args.nowIso }, null, 2),
 		),
-		"utf8",
 	);
-	await writeFile(
+	await ensureFile(
 		path.join(args.bardoRoot, "state/current.md"),
 		renderMarkdown(
 			"Campaign State",
 			"Current campaign state and memory snapshot.",
 			JSON.stringify({}, null, 2),
 		),
-		"utf8",
 	);
-	await writeFile(
+	await ensureFile(
 		path.join(args.bardoRoot, "events/history.md"),
 		renderMarkdown(
 			"Campaign History",
 			"Chronological campaign action history log.",
 			"",
 		),
-		"utf8",
 	);
 }
 

@@ -37,12 +37,15 @@ function resolveBaseUrl(request: Request): string {
 	return `${protocol}//${requestUrl.host}/mcp`;
 }
 
-export async function GET(request: Request) {
-	const url = new URL(request.url);
-	const client = url.searchParams.get("client");
-	const mode = url.searchParams.get("mode");
-	const apiKey = url.searchParams.get("apiKey") || "YOUR_API_KEY";
-	const serverName = url.searchParams.get("serverName") || "bardo";
+type SnippetRequest = {
+	client: string | null;
+	mode: string | null;
+	apiKey: string;
+	serverName: string;
+};
+
+function buildSnippetResponse(request: Request, params: SnippetRequest) {
+	const { client, mode, apiKey, serverName } = params;
 
 	if (!isConnectionClient(client)) {
 		return NextResponse.json(
@@ -77,5 +80,37 @@ export async function GET(request: Request) {
 		mode,
 		baseUrl,
 		snippet,
+	});
+}
+
+export async function GET(request: Request) {
+	const url = new URL(request.url);
+	return buildSnippetResponse(request, {
+		client: url.searchParams.get("client"),
+		mode: url.searchParams.get("mode"),
+		apiKey: url.searchParams.get("apiKey") || "YOUR_API_KEY",
+		serverName: url.searchParams.get("serverName") || "bardo",
+	});
+}
+
+export async function POST(request: Request) {
+	const body = (await request.json().catch(() => ({}))) as Partial<{
+		client: string;
+		mode: string;
+		apiKey: string;
+		serverName: string;
+	}>;
+
+	return buildSnippetResponse(request, {
+		client: body.client ?? null,
+		mode: body.mode ?? null,
+		apiKey:
+			typeof body.apiKey === "string" && body.apiKey.trim().length > 0
+				? body.apiKey
+				: "YOUR_API_KEY",
+		serverName:
+			typeof body.serverName === "string" && body.serverName.trim().length > 0
+				? body.serverName
+				: "bardo",
 	});
 }
