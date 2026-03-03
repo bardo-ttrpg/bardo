@@ -50,33 +50,11 @@ describe("buildConnectionSnippet", () => {
 	test("renders OpenCode local JSON with bunx adapter command", () => {
 		const snippet = render("opencode", "local");
 		expect(snippet).toContain('"type": "local"');
-		expect(snippet).toContain('"command": [');
-		expect(snippet).toContain('"bunx"');
+		expect(snippet).toContain('"command": ["bunx"');
 		expect(snippet).toContain('"--bun"');
 		expect(snippet).toContain('"bardo"');
 		expect(snippet).toContain('"--workspace-root"');
 		expect(snippet).toContain('"."');
-	});
-
-	test("renders Kiro local JSON using the stdio adapter shape", () => {
-		const snippet = render("kiro", "local");
-		expect(snippet).toContain('"mcpServers"');
-		expect(snippet).toContain('"command": "bunx"');
-		expect(snippet).toContain('"--workspace-root"');
-	});
-
-	test("renders Kilo remote JSON using mcpServers", () => {
-		const snippet = render("kilo", "remote");
-		expect(snippet).toContain('"mcpServers"');
-		expect(snippet).toContain(baseUrl);
-		expect(snippet).toContain('"Authorization": "Bearer');
-	});
-
-	test("renders Trae local JSON using mcpServers", () => {
-		const snippet = render("trae", "local");
-		expect(snippet).toContain('"mcpServers"');
-		expect(snippet).toContain('"command": "bunx"');
-		expect(snippet).toContain('"--workspace-root"');
 	});
 
 	test("renders Codex local TOML", () => {

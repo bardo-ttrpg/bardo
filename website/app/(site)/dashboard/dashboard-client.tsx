@@ -20,8 +20,6 @@ import {
 	type DashboardData,
 	type DashboardKey,
 	dashboardReducer,
-	getDashboardClientLabel,
-	getDashboardClientMetadata,
 } from "./dashboard-state";
 import { DashboardSignOutButton } from "./signout-button";
 
@@ -279,8 +277,6 @@ export function ConnectionSnippetPanel({
 	copied: boolean;
 	onCopy: () => void;
 }) {
-	const selectedClient = getDashboardClientMetadata(connectionClient);
-
 	return (
 		<div className="mt-6 border border-border p-6">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -302,7 +298,7 @@ export function ConnectionSnippetPanel({
 				>
 					{CLIENT_OPTIONS.map((client) => (
 						<option key={client} value={client}>
-							{getDashboardClientLabel(client)}
+							{client}
 						</option>
 					))}
 				</select>
@@ -332,34 +328,6 @@ export function ConnectionSnippetPanel({
 				>
 					{cliLoginLoading ? "Generating..." : "Generate CLI Login"}
 				</button>
-			</div>
-			<div className="mt-3 space-y-1 text-xs text-muted-foreground">
-				<p>
-					Support tier:{" "}
-					<strong className="font-medium">{selectedClient.tier}</strong>
-				</p>
-				<p>
-					Auto-install:{" "}
-					<strong className="font-medium">
-						{selectedClient.autoInstall ? "yes" : "no"}
-					</strong>
-				</p>
-				<p>
-					Modes:{" "}
-					<strong className="font-medium">
-						{selectedClient.supportsLocal ? "local" : ""}
-						{selectedClient.supportsLocal && selectedClient.supportsRemote
-							? " + "
-							: ""}
-						{selectedClient.supportsRemote ? "remote" : ""}
-					</strong>
-				</p>
-				<p>
-					Config path:{" "}
-					<strong className="font-medium">
-						{selectedClient.defaultConfigPath ?? "manual / client-specific"}
-					</strong>
-				</p>
 			</div>
 
 			<div className="mt-4 space-y-3">

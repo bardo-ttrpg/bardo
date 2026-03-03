@@ -1,23 +1,23 @@
-import {
-	type ConnectionClient,
-	type ConnectionMode,
-	getConnectionClientAdapter,
-	getConnectionClientDisplayName,
-	SUPPORTED_CONNECTION_CLIENTS,
-} from "../../../lib/connect-snippets";
+export type ConnectionClient =
+	| "claude"
+	| "opencode"
+	| "cursor"
+	| "codex"
+	| "vscode"
+	| "windsurf"
+	| "generic";
 
-export const CLIENT_OPTIONS: readonly ConnectionClient[] =
-	SUPPORTED_CONNECTION_CLIENTS;
+export type ConnectionMode = "remote" | "local";
 
-export type { ConnectionClient, ConnectionMode };
-
-export function getDashboardClientLabel(client: ConnectionClient): string {
-	return getConnectionClientDisplayName(client);
-}
-
-export function getDashboardClientMetadata(client: ConnectionClient) {
-	return getConnectionClientAdapter(client);
-}
+export const CLIENT_OPTIONS: readonly ConnectionClient[] = [
+	"claude",
+	"cursor",
+	"codex",
+	"vscode",
+	"opencode",
+	"windsurf",
+	"generic",
+];
 
 export type DashboardKey = {
 	id: string;
