@@ -1,128 +1,13 @@
 #!/usr/bin/env bun
 
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { runCli } from "./runtime";
 
-type CliOptions = {
-	url: string;
-	apiKey: string | null;
-	workspaceRoot: string;
-};
-
-function parseArgs(argv: string[]): CliOptions {
-	let url = Bun.env.BARDO_MCP_URL?.trim() || "http://127.0.0.1:3000/mcp";
-	let apiKey = Bun.env.BARDO_API_KEY?.trim() || null;
-	let workspaceRoot =
-		Bun.env.BARDO_WORKSPACE_ROOT?.trim() || process.cwd();
-
-	for (let i = 0; i < argv.length; i += 1) {
-		const arg = argv[i];
-		if ((arg === "--url" || arg === "-u") && typeof argv[i + 1] === "string") {
-			url = argv[i + 1]!;
-			i += 1;
-			continue;
-		}
-		if (
-			(arg === "--api-key" || arg === "-k") &&
-			typeof argv[i + 1] === "string"
-		) {
-			apiKey = argv[i + 1]!;
-			i += 1;
-			continue;
-		}
-		if (
-			(arg === "--workspace-root" || arg === "-w") &&
-			typeof argv[i + 1] === "string"
-		) {
-			workspaceRoot = argv[i + 1]!;
-			i += 1;
-			continue;
-		}
-		if (arg === "--help" || arg === "-h") {
-			printHelp();
-			process.exit(0);
-		}
-	}
-
-	return { url, apiKey, workspaceRoot };
-}
-
-function printHelp(): void {
-	process.stderr.write(`Bardo MCP local adapter
-
-Usage:
-  bunx --bun --package @bardo/mcp bardo-mcp --api-key <key> [--url <mcp-url>] [--workspace-root <abs-path>]
-
-Options:
-  --api-key, -k   API key used as Authorization: Bearer
-  --url, -u       Remote MCP endpoint (default: http://127.0.0.1:3000/mcp)
-  --workspace-root, -w
-                  Absolute workspace root to bind writes/reads to.
-                  Defaults to current working directory.
-  --help, -h      Show this message
-`);
-}
-
-async function main(): Promise<void> {
-	const options = parseArgs(process.argv.slice(2));
-	if (!options.apiKey) {
-		printHelp();
-		throw new Error("Missing API key. Pass --api-key or set BARDO_API_KEY.");
-	}
-
-	const stdioTransport = new StdioServerTransport();
-	const remoteTransport = new StreamableHTTPClientTransport(
-		new URL(options.url),
-		{
-			requestInit: {
-				headers: {
-					authorization: `Bearer ${options.apiKey}`,
-					"x-bardo-workspace-root": options.workspaceRoot,
-				},
-			},
-		},
-	);
-
-	stdioTransport.onmessage = async (message) => {
-		await remoteTransport.send(message);
-	};
-	remoteTransport.onmessage = async (message) => {
-		await stdioTransport.send(message);
-	};
-	stdioTransport.onerror = (error) => {
-		process.stderr.write(`stdio transport error: ${error.message}\n`);
-	};
-	remoteTransport.onerror = (error) => {
-		process.stderr.write(`remote transport error: ${error.message}\n`);
-	};
-
-	let closed = false;
-	const closeAll = async () => {
-		if (closed) return;
-		closed = true;
-		await Promise.allSettled([stdioTransport.close(), remoteTransport.close()]);
-	};
-
-	stdioTransport.onclose = () => {
-		void closeAll();
-	};
-	remoteTransport.onclose = () => {
-		void closeAll();
-	};
-
-	process.on("SIGINT", () => {
-		void closeAll().finally(() => process.exit(0));
+void runCli(process.argv.slice(2))
+	.then((exitCode) => {
+		process.exit(exitCode);
+	})
+	.catch((error: unknown) => {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stderr.write(`${message}\n`);
+		process.exit(1);
 	});
-	process.on("SIGTERM", () => {
-		void closeAll().finally(() => process.exit(0));
-	});
-
-	await remoteTransport.start();
-	await stdioTransport.start();
-}
-
-void main().catch((error: unknown) => {
-	const message = error instanceof Error ? error.message : String(error);
-	process.stderr.write(`${message}\n`);
-	process.exit(1);
-});

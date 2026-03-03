@@ -18,13 +18,15 @@ type BuildConnectionSnippetArgs = {
 };
 
 const LOCAL_ADAPTER_PACKAGE = "@bardo/mcp";
-const LOCAL_ADAPTER_BIN = "bardo-mcp";
+const LOCAL_ADAPTER_BIN = "bardo";
 const LOCAL_ADAPTER_COMMAND = "bunx";
 const LOCAL_ADAPTER_PREFIX_ARGS = [
 	"--bun",
 	"--package",
 	LOCAL_ADAPTER_PACKAGE,
 	LOCAL_ADAPTER_BIN,
+	"mcp",
+	"serve",
 ] as const;
 
 function quote(value: string): string {
@@ -32,7 +34,15 @@ function quote(value: string): string {
 }
 
 function buildLocalAdapterArgs(apiKey: string, baseUrl: string): string[] {
-	return [...LOCAL_ADAPTER_PREFIX_ARGS, "--api-key", apiKey, "--url", baseUrl];
+	return [
+		...LOCAL_ADAPTER_PREFIX_ARGS,
+		"--api-key",
+		apiKey,
+		"--url",
+		baseUrl,
+		"--workspace-root",
+		".",
+	];
 }
 
 function buildLocalAdapterShellCommand(
@@ -116,7 +126,7 @@ Header: Authorization: Bearer ${apiKey}`;
 	const localCommand = buildLocalAdapterShellCommand(apiKey, baseUrl);
 	switch (args.client) {
 		case "claude":
-			return `claude mcp add --scope user ${serverName} -- ${localCommand}`;
+			return `claude mcp add --scope user ${serverName} -- ${LOCAL_ADAPTER_COMMAND} --bun --package ${LOCAL_ADAPTER_PACKAGE} ${LOCAL_ADAPTER_BIN} mcp serve --api-key ${apiKey} --url ${baseUrl} --workspace-root "$PWD"`;
 		case "opencode":
 			return `{
   "mcp": {

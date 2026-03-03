@@ -99,4 +99,20 @@ describe("dashboardReducer", () => {
 		expect(next.keysLoading).toBe(false);
 		expect(next.keys).toEqual([DASHBOARD_KEY]);
 	});
+
+	test("stores the generated CLI login command and clears copy state", () => {
+		const state = {
+			...createDashboardState(),
+			copied: true,
+		};
+
+		const next = dashboardReducer(state, {
+			type: "cli_login_command_loaded",
+			cliLoginCommand:
+				'bardo login --token "cli_token" --exchange-url "https://app.bardo.ai/api/connect/cli-exchange"',
+		});
+
+		expect(next.cliLoginCommand).toContain("bardo login --token");
+		expect(next.copied).toBe(false);
+	});
 });

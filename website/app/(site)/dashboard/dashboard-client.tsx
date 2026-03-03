@@ -4,6 +4,7 @@ import { useEffect, useReducer } from "react";
 import {
 	copySecret,
 	createKey,
+	generateCliLoginCommand,
 	getDashboardViewModel,
 	loadDashboardData,
 	loadKeys,
@@ -245,16 +246,19 @@ function ApiKeysTable({
 	);
 }
 
-function ConnectionSnippetPanel({
+export function ConnectionSnippetPanel({
 	connectionClient,
 	connectionMode,
 	onClientChange,
 	onModeChange,
 	onGenerateSnippet,
+	onGenerateCliLoginCommand,
 	lastSecret,
 	lastSecretLabel,
 	snippet,
 	snippetLoading,
+	cliLoginCommand,
+	cliLoginLoading,
 	copied,
 	onCopy,
 }: {
@@ -263,10 +267,13 @@ function ConnectionSnippetPanel({
 	onClientChange: (value: ConnectionClient) => void;
 	onModeChange: (value: ConnectionMode) => void;
 	onGenerateSnippet: () => void;
+	onGenerateCliLoginCommand: () => void;
 	lastSecret: string | null;
 	lastSecretLabel: string | null;
 	snippet: string;
 	snippetLoading: boolean;
+	cliLoginCommand: string;
+	cliLoginLoading: boolean;
 	copied: boolean;
 	onCopy: () => void;
 }) {
@@ -313,37 +320,58 @@ function ConnectionSnippetPanel({
 				>
 					{snippetLoading ? "Generating..." : "Generate snippet"}
 				</button>
+				<button
+					type="button"
+					onClick={onGenerateCliLoginCommand}
+					disabled={cliLoginLoading}
+					className="border border-border px-3 py-2 text-xs uppercase disabled:opacity-60"
+				>
+					{cliLoginLoading ? "Generating..." : "Generate CLI Login"}
+				</button>
 			</div>
 
-			{lastSecret ? (
-				<div className="mt-4 space-y-3">
+			<div className="mt-4 space-y-3">
+				{lastSecret ? (
+					<>
+						<p className="text-xs text-muted-foreground">
+							{lastSecretLabel ? `${lastSecretLabel}. ` : ""}
+							This secret is shown once.
+						</p>
+						<div className="flex items-center gap-2">
+							<pre className="flex-1 overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
+								{lastSecret}
+							</pre>
+							<button
+								type="button"
+								onClick={onCopy}
+								className="shrink-0 border border-border px-2 py-1 font-mono text-xs"
+							>
+								{copied ? "Copied!" : "Copy"}
+							</button>
+						</div>
+						{snippet ? (
+							<pre className="overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
+								{snippet}
+							</pre>
+						) : null}
+					</>
+				) : (
 					<p className="text-xs text-muted-foreground">
-						{lastSecretLabel ? `${lastSecretLabel}. ` : ""}
-						This secret is shown once.
+						Create or rotate a key to generate a copy-ready snippet with that
+						key.
 					</p>
-					<div className="flex items-center gap-2">
-						<pre className="flex-1 overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
-							{lastSecret}
-						</pre>
-						<button
-							type="button"
-							onClick={onCopy}
-							className="shrink-0 border border-border px-2 py-1 font-mono text-xs"
-						>
-							{copied ? "Copied!" : "Copy"}
-						</button>
-					</div>
-					{snippet ? (
+				)}
+				{cliLoginCommand ? (
+					<div className="space-y-2">
+						<p className="text-xs text-muted-foreground">
+							CLI login command for `bardo mcp serve` onboarding:
+						</p>
 						<pre className="overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
-							{snippet}
+							{cliLoginCommand}
 						</pre>
-					) : null}
-				</div>
-			) : (
-				<p className="mt-4 text-xs text-muted-foreground">
-					Create or rotate a key to generate a copy-ready snippet with that key.
-				</p>
-			)}
+					</div>
+				) : null}
+			</div>
 		</div>
 	);
 }
@@ -416,6 +444,10 @@ export function DashboardClient() {
 		});
 	}
 
+	async function onGenerateCliLogin() {
+		await generateCliLoginCommand({ dispatch });
+	}
+
 	return (
 		<div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
 			<div className="mb-8 flex items-center justify-between">
@@ -475,10 +507,13 @@ export function DashboardClient() {
 						? void refreshCurrentSnippet(state.lastSecret)
 						: undefined
 				}
+				onGenerateCliLoginCommand={() => void onGenerateCliLogin()}
 				lastSecret={state.lastSecret}
 				lastSecretLabel={state.lastSecretLabel}
 				snippet={state.snippet}
 				snippetLoading={state.snippetLoading}
+				cliLoginCommand={state.cliLoginCommand}
+				cliLoginLoading={state.cliLoginLoading}
 				copied={state.copied}
 				onCopy={onCopySecret}
 			/>

@@ -25,9 +25,12 @@ describe("buildConnectionSnippet", () => {
 
 	test("renders Claude local command with @bardo/mcp adapter", () => {
 		const snippet = render("claude", "local");
-		expect(snippet).toContain("bunx --bun --package @bardo/mcp bardo-mcp");
+		expect(snippet).toContain(
+			"bunx --bun --package @bardo/mcp bardo mcp serve",
+		);
 		expect(snippet).toContain("--api-key");
 		expect(snippet).toContain(apiKey);
+		expect(snippet).toContain('--workspace-root "$PWD"');
 	});
 
 	test("renders Cursor remote JSON", () => {
@@ -50,7 +53,9 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('"type": "local"');
 		expect(snippet).toContain('"command": ["bunx"');
 		expect(snippet).toContain('"--bun"');
-		expect(snippet).toContain('"bardo-mcp"');
+		expect(snippet).toContain('"bardo"');
+		expect(snippet).toContain('"--workspace-root"');
+		expect(snippet).toContain('"."');
 	});
 
 	test("renders Codex local TOML", () => {
@@ -59,6 +64,7 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('command = "bunx"');
 		expect(snippet).toContain("@bardo/mcp");
 		expect(snippet).toContain('"--bun"');
-		expect(snippet).toContain('"bardo-mcp"');
+		expect(snippet).toContain('"bardo"');
+		expect(snippet).toContain('"--workspace-root"');
 	});
 });

@@ -69,6 +69,8 @@ export type DashboardState = {
 	connectionMode: ConnectionMode;
 	snippet: string;
 	snippetLoading: boolean;
+	cliLoginCommand: string;
+	cliLoginLoading: boolean;
 };
 
 export type DashboardAction =
@@ -85,7 +87,9 @@ export type DashboardAction =
 	| { type: "connection_client_changed"; connectionClient: ConnectionClient }
 	| { type: "connection_mode_changed"; connectionMode: ConnectionMode }
 	| { type: "snippet_loading"; snippetLoading: boolean }
-	| { type: "snippet_loaded"; snippet: string };
+	| { type: "snippet_loaded"; snippet: string }
+	| { type: "cli_login_loading"; cliLoginLoading: boolean }
+	| { type: "cli_login_command_loaded"; cliLoginCommand: string };
 
 export function createDashboardState(): DashboardState {
 	return {
@@ -103,6 +107,8 @@ export function createDashboardState(): DashboardState {
 		connectionMode: "local",
 		snippet: "",
 		snippetLoading: false,
+		cliLoginCommand: "",
+		cliLoginLoading: false,
 	};
 }
 
@@ -189,6 +195,18 @@ export function dashboardReducer(
 				...state,
 				snippet: action.snippet,
 				snippetLoading: false,
+			};
+		case "cli_login_loading":
+			return {
+				...state,
+				cliLoginLoading: action.cliLoginLoading,
+			};
+		case "cli_login_command_loaded":
+			return {
+				...state,
+				cliLoginCommand: action.cliLoginCommand,
+				copied: false,
+				cliLoginLoading: false,
 			};
 		default:
 			return state;

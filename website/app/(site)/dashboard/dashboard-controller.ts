@@ -71,6 +71,10 @@ type CopySecretArgs = {
 	scheduleReset?: (callback: () => void, delayMs: number) => unknown;
 };
 
+type GenerateCliLoginCommandArgs = FetchWithTimeoutArgs & {
+	dispatch: DashboardDispatch;
+};
+
 type DashboardViewModel = {
 	billing: DashboardData["billing"];
 	keyPolicy: KeyPolicy;
@@ -99,6 +103,13 @@ async function fetchWithTimeout(
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildCliLoginCommand(args: {
+	loginToken: string;
+	exchangeUrl: string;
+}): string {
+	return `bardo login --token "${args.loginToken}" --exchange-url "${args.exchangeUrl}"`;
 }
 
 function toUiError(error: unknown, fallback: string): string {
@@ -199,6 +210,62 @@ export async function refreshSnippet({
 		dispatch({ type: "snippet_loaded", snippet: payload.snippet ?? "" });
 	} finally {
 		dispatch({ type: "snippet_loading", snippetLoading: false });
+	}
+}
+
+export async function generateCliLoginCommand({
+	dispatch,
+	...fetchOptions
+}: GenerateCliLoginCommandArgs): Promise<void> {
+	dispatch({ type: "cli_login_loading", cliLoginLoading: true });
+	try {
+		const response = await fetchWithTimeout(
+			"/api/connect/cli-token",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({}),
+			},
+			{
+				...fetchOptions,
+				timeoutMs: MUTATION_REQUEST_TIMEOUT_MS,
+			},
+		);
+		const payload = (await response.json()) as {
+			loginToken?: string;
+			exchangeUrl?: string;
+			error?: string;
+		};
+		if (
+			!response.ok ||
+			typeof payload.loginToken !== "string" ||
+			typeof payload.exchangeUrl !== "string"
+		) {
+			dispatch({
+				type: "mutation_error",
+				mutationError: payload.error ?? "Failed to generate CLI login command",
+			});
+			return;
+		}
+
+		dispatch({
+			type: "mutation_error",
+			mutationError: null,
+		});
+		dispatch({
+			type: "cli_login_command_loaded",
+			cliLoginCommand: buildCliLoginCommand({
+				loginToken: payload.loginToken,
+				exchangeUrl: payload.exchangeUrl,
+			}),
+		});
+	} catch (error) {
+		dispatch({
+			type: "mutation_error",
+			mutationError: toUiError(error, "Failed to generate CLI login command"),
+		});
+	} finally {
+		dispatch({ type: "cli_login_loading", cliLoginLoading: false });
 	}
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import {
 	copySecret,
 	createKey,
+	generateCliLoginCommand,
 	loadDashboardData,
 } from "./dashboard-controller";
 import {
@@ -169,5 +170,66 @@ describe("dashboard-controller", () => {
 			label: "Created Primary",
 		});
 		expect(actions.at(-1)).toEqual({ type: "busy_changed", busyId: null });
+	});
+
+	test("generateCliLoginCommand loads a copy-ready bardo login command", async () => {
+		const actions: unknown[] = [];
+		const fetchImpl = mock(
+			async () =>
+				new Response(
+					JSON.stringify({
+						loginToken: "cli_token_123",
+						exchangeUrl: "https://app.bardo.ai/api/connect/cli-exchange",
+					}),
+					{
+						status: 200,
+						headers: { "content-type": "application/json" },
+					},
+				),
+		);
+
+		await generateCliLoginCommand({
+			dispatch: (action) => actions.push(action),
+			fetchImpl,
+			timeoutMs: 50,
+		});
+
+		expect(fetchImpl).toHaveBeenCalledTimes(1);
+		expect(actions).toEqual([
+			{ type: "cli_login_loading", cliLoginLoading: true },
+			{ type: "mutation_error", mutationError: null },
+			{
+				type: "cli_login_command_loaded",
+				cliLoginCommand:
+					'bardo login --token "cli_token_123" --exchange-url "https://app.bardo.ai/api/connect/cli-exchange"',
+			},
+			{ type: "cli_login_loading", cliLoginLoading: false },
+		]);
+	});
+
+	test("generateCliLoginCommand surfaces exchange errors", async () => {
+		const actions: unknown[] = [];
+		const fetchImpl = mock(
+			async () =>
+				new Response(JSON.stringify({ error: "Key limit reached" }), {
+					status: 403,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+
+		await generateCliLoginCommand({
+			dispatch: (action) => actions.push(action),
+			fetchImpl,
+			timeoutMs: 50,
+		});
+
+		expect(actions).toEqual([
+			{ type: "cli_login_loading", cliLoginLoading: true },
+			{
+				type: "mutation_error",
+				mutationError: "Key limit reached",
+			},
+			{ type: "cli_login_loading", cliLoginLoading: false },
+		]);
 	});
 });
