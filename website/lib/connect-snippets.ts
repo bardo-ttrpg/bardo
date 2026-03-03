@@ -6,4 +6,4 @@ export {
 	getConnectionClientDisplayName,
 	listConnectionClientAdapters,
 	SUPPORTED_CONNECTION_CLIENTS,
-} from "../../packages/bardo-mcp/src/client-adapters.ts";
+} from "@bardo/mcp/client-adapters";

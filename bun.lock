@@ -32,7 +32,8 @@
       "name": "@bardo/mcp",
       "version": "0.1.0",
       "bin": {
-        "bardo-mcp": "./src/cli.ts",
+        "bardo": "./bin/bardo.js",
+        "bardo-mcp": "./bin/bardo-mcp.js",
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.26.0",
@@ -41,6 +42,7 @@
     "website": {
       "name": "website",
       "dependencies": {
+        "@bardo/mcp": "workspace:*",
         "@clerk/nextjs": "6.38.1",
         "@sentry/nextjs": "10.40.0",
         "@tailwindcss/postcss": "^4.2.0",

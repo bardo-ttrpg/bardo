@@ -159,6 +159,12 @@ type DoctorOutput = {
 			status: number | null;
 			error: string | null;
 		};
+		controlPlane: {
+			url: string | null;
+			reachable: boolean;
+			status: number | null;
+			error: string | null;
+		};
 	};
 	account: {
 		fetched: boolean;
@@ -729,10 +735,12 @@ Compatibility:
 
 Notes:
   clients list shows the supported client matrix and whether each client can be auto-installed.
+  For the simplest setup, run bardo connect --client <client> from your project root.
   login accepts either an API key directly or a short-lived website-issued login token.
   Without arguments, login can start a browser approval flow against the website control plane.
   connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
   --status-url lets doctor fetch plan and key status details from the website control plane.
+  If you are testing from the source tree, run bun link in packages/bardo-mcp once so the bardo command is available globally.
   The workspace root defaults to the current working directory.
 `;
 }
@@ -743,63 +751,70 @@ async function handleLogin(
 	stdout: Writer,
 	stderr: Writer,
 ): Promise<number> {
-	const env = deps.env ?? process.env;
-	let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
-	let url = options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
-	let serverName: string | undefined;
-	let statusUrl =
-		options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
+	try {
+		const env = deps.env ?? process.env;
+		let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
+		let url =
+			options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
+		let serverName: string | undefined;
+		let statusUrl =
+			options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
+		const startUrl =
+			options.startUrl?.trim() ||
+			env.BARDO_LOGIN_START_URL?.trim() ||
+			"https://app.bardo.ai/api/connect/cli-session/start";
 
-	if (!apiKey && options.token?.trim()) {
-		const exchange = await exchangeLoginToken({
-			token: options.token.trim(),
-			exchangeUrl:
-				options.exchangeUrl?.trim() ||
-				env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
-				null,
-			fetchImpl: deps.fetch ?? fetch,
+		if (!apiKey && options.token?.trim()) {
+			const exchange = await exchangeLoginToken({
+				token: options.token.trim(),
+				exchangeUrl:
+					options.exchangeUrl?.trim() ||
+					env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
+					null,
+				fetchImpl: deps.fetch ?? fetch,
+			});
+			apiKey = exchange.apiKey;
+			url = exchange.mcpUrl;
+			serverName = exchange.serverName;
+			statusUrl = exchange.statusUrl ?? statusUrl;
+		}
+
+		if (!apiKey && !options.token?.trim()) {
+			const interactive = await runInteractiveLoginFlow({
+				startUrl,
+				fetchImpl: deps.fetch ?? fetch,
+				sleep:
+					deps.sleep ??
+					(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+				stdout,
+			});
+			apiKey = interactive.apiKey;
+			url = interactive.mcpUrl;
+			statusUrl = interactive.statusUrl ?? statusUrl;
+			serverName = interactive.serverName;
+		}
+
+		if (!apiKey) {
+			stderr.write(
+				"Missing API key. Pass --api-key, set BARDO_API_KEY, or use --token with --exchange-url.\n",
+			);
+			return 1;
+		}
+
+		const now = (deps.now ?? (() => new Date()))().toISOString();
+		await writeConfig(resolveConfigPath(deps), {
+			apiKey,
+			url,
+			updatedAtISO: now,
+			serverName,
+			statusUrl: statusUrl ?? undefined,
 		});
-		apiKey = exchange.apiKey;
-		url = exchange.mcpUrl;
-		serverName = exchange.serverName;
-		statusUrl = exchange.statusUrl ?? statusUrl;
-	}
-
-	if (!apiKey && !options.token?.trim()) {
-		const interactive = await runInteractiveLoginFlow({
-			startUrl:
-				options.startUrl?.trim() ||
-				env.BARDO_LOGIN_START_URL?.trim() ||
-				"https://app.bardo.ai/api/connect/cli-session/start",
-			fetchImpl: deps.fetch ?? fetch,
-			sleep:
-				deps.sleep ??
-				(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
-			stdout,
-		});
-		apiKey = interactive.apiKey;
-		url = interactive.mcpUrl;
-		statusUrl = interactive.statusUrl ?? statusUrl;
-		serverName = interactive.serverName;
-	}
-
-	if (!apiKey) {
-		stderr.write(
-			"Missing API key. Pass --api-key, set BARDO_API_KEY, or use --token with --exchange-url.\n",
-		);
+		stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
 		return 1;
 	}
-
-	const now = (deps.now ?? (() => new Date()))().toISOString();
-	await writeConfig(resolveConfigPath(deps), {
-		apiKey,
-		url,
-		updatedAtISO: now,
-		serverName,
-		statusUrl: statusUrl ?? undefined,
-	});
-	stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
-	return 0;
 }
 
 function handleClientsList(
@@ -1630,14 +1645,19 @@ async function exchangeLoginToken(args: {
 		);
 	}
 
-	const response = await args.fetchImpl(args.exchangeUrl, {
-		method: "POST",
-		headers: {
-			"content-type": "application/json",
-			accept: "application/json",
-		},
-		body: JSON.stringify({ token: args.token }),
-	});
+	let response: Response;
+	try {
+		response = await args.fetchImpl(args.exchangeUrl, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				accept: "application/json",
+			},
+			body: JSON.stringify({ token: args.token }),
+		});
+	} catch (error) {
+		throw new Error(formatControlPlaneRequestError(args.exchangeUrl, error));
+	}
 	const body = (await response.json().catch(() => ({}))) as {
 		apiKey?: string;
 		mcpUrl?: string;
@@ -1676,12 +1696,17 @@ async function runInteractiveLoginFlow(args: {
 	statusUrl?: string;
 	serverName?: string;
 }> {
-	const startResponse = await args.fetchImpl(args.startUrl, {
-		method: "POST",
-		headers: {
-			accept: "application/json",
-		},
-	});
+	let startResponse: Response;
+	try {
+		startResponse = await args.fetchImpl(args.startUrl, {
+			method: "POST",
+			headers: {
+				accept: "application/json",
+			},
+		});
+	} catch (error) {
+		throw new Error(formatControlPlaneRequestError(args.startUrl, error));
+	}
 	const startBody = (await startResponse.json().catch(() => ({}))) as Partial<{
 		sessionId: string;
 		userCode: string;
@@ -1717,12 +1742,17 @@ async function runInteractiveLoginFlow(args: {
 			: 3000;
 
 	for (;;) {
-		const pollResponse = await args.fetchImpl(startBody.pollUrl, {
-			method: "GET",
-			headers: {
-				accept: "application/json",
-			},
-		});
+		let pollResponse: Response;
+		try {
+			pollResponse = await args.fetchImpl(startBody.pollUrl, {
+				method: "GET",
+				headers: {
+					accept: "application/json",
+				},
+			});
+		} catch (error) {
+			throw new Error(formatControlPlaneRequestError(startBody.pollUrl, error));
+		}
 		const pollBody = (await pollResponse.json().catch(() => ({}))) as Partial<{
 			status: string;
 			apiKey: string;
@@ -1804,6 +1834,8 @@ async function buildDoctorReport(
 	const client = await checkClientStatus({
 		client: options.client,
 		workspaceRoot,
+		expectedServerName: config?.serverName ?? null,
+		expectedUrl: url,
 	});
 
 	return {
@@ -1821,6 +1853,10 @@ async function buildDoctorReport(
 		},
 		connectivity: {
 			health,
+			controlPlane: await checkControlPlaneReachability(
+				statusUrl || env.BARDO_LOGIN_START_URL?.trim() || null,
+				deps.fetch ?? fetch,
+			),
 		},
 		account,
 		client,
@@ -1830,6 +1866,8 @@ async function buildDoctorReport(
 async function checkClientStatus(args: {
 	client: string | null;
 	workspaceRoot: string;
+	expectedServerName: string | null;
+	expectedUrl: string | null;
 }): Promise<DoctorOutput["client"]> {
 	if (!args.client) {
 		return null;
@@ -1851,6 +1889,8 @@ async function checkClientStatus(args: {
 				client: normalized,
 				configPath,
 				configExists,
+				expectedServerName: args.expectedServerName,
+				expectedUrl: args.expectedUrl,
 			})
 		: {
 				configValid: false,
@@ -1880,6 +1920,8 @@ async function inspectClientConfig(args: {
 	client: ConnectionClient;
 	configPath: string;
 	configExists: boolean;
+	expectedServerName: string | null;
+	expectedUrl: string | null;
 }): Promise<{
 	configValid: boolean;
 	hasBardoServer: boolean;
@@ -1904,9 +1946,10 @@ async function inspectClientConfig(args: {
 	}
 
 	if (adapter.installVariant === "codex") {
-		const hasBardoServer =
-			/\[mcp_servers\.bardo\]/.test(raw) ||
-			/(command|url)\s*=\s*".*bardo/i.test(raw);
+		const hasBardoServer = hasCodexBardoServer(raw, {
+			serverName: args.expectedServerName,
+			url: args.expectedUrl,
+		});
 		return {
 			configValid: true,
 			hasBardoServer,
@@ -1916,7 +1959,10 @@ async function inspectClientConfig(args: {
 
 	try {
 		const parsed = JSON.parse(raw) as Record<string, unknown>;
-		const hasBardoServer = hasJsonBardoServer(args.client, parsed);
+		const hasBardoServer = hasJsonBardoServer(args.client, parsed, {
+			serverName: args.expectedServerName,
+			url: args.expectedUrl,
+		});
 		return {
 			configValid: true,
 			hasBardoServer,
@@ -1935,17 +1981,22 @@ async function inspectClientConfig(args: {
 function hasJsonBardoServer(
 	client: ConnectionClient,
 	payload: Record<string, unknown>,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
 ): boolean {
 	if (client === "vscode") {
 		const mcp =
 			typeof payload.mcp === "object" && payload.mcp !== null
 				? (payload.mcp as Record<string, unknown>)
 				: null;
-		const servers =
+		return hasJsonBardoServerEntry(
 			mcp && typeof mcp.servers === "object" && mcp.servers !== null
 				? (mcp.servers as Record<string, unknown>)
-				: null;
-		return Boolean(servers?.bardo);
+				: null,
+			expected,
+		);
 	}
 
 	if (client === "opencode") {
@@ -1953,14 +2004,121 @@ function hasJsonBardoServer(
 			typeof payload.mcp === "object" && payload.mcp !== null
 				? (payload.mcp as Record<string, unknown>)
 				: null;
-		return Boolean(mcp?.bardo);
+		return hasJsonBardoServerEntry(mcp, expected);
 	}
 
-	const servers =
+	return hasJsonBardoServerEntry(
 		typeof payload.mcpServers === "object" && payload.mcpServers !== null
 			? (payload.mcpServers as Record<string, unknown>)
-			: null;
-	return Boolean(servers?.bardo);
+			: null,
+		expected,
+	);
+}
+
+function hasJsonBardoServerEntry(
+	servers: Record<string, unknown> | null,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): boolean {
+	if (!servers) {
+		return false;
+	}
+
+	if (expected.serverName && expected.serverName in servers) {
+		return true;
+	}
+
+	return Object.values(servers).some((entry) =>
+		looksLikeBardoServerEntry(entry, expected.url),
+	);
+}
+
+function hasCodexBardoServer(
+	raw: string,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): boolean {
+	if (expected.serverName) {
+		const serverTable = new RegExp(
+			String.raw`^\[${escapeRegexForRegex(`mcp_servers.${expected.serverName}`)}\]$`,
+			"m",
+		);
+		if (serverTable.test(raw)) {
+			return true;
+		}
+	}
+
+	const tableBlocks =
+		raw.match(/^\[mcp_servers\.[^\]\n]+\]\n(?:.*\n)*?(?=^\[|\s*$)/gm) ?? [];
+	return tableBlocks.some((block) =>
+		looksLikeBardoServerBlock(block, expected.url),
+	);
+}
+
+function looksLikeBardoServerEntry(
+	entry: unknown,
+	expectedUrl: string | null,
+): boolean {
+	if (!entry || typeof entry !== "object") {
+		return false;
+	}
+
+	const candidate = entry as Record<string, unknown>;
+	if (typeof candidate.url === "string" && expectedUrl) {
+		return candidate.url === expectedUrl;
+	}
+
+	const tokens = collectStringTokens(entry);
+	const hasPackage = tokens.includes("@bardo/mcp");
+	const hasServeCommand =
+		tokens.includes("bardo") &&
+		tokens.includes("mcp") &&
+		tokens.includes("serve");
+
+	return hasPackage || hasServeCommand;
+}
+
+function looksLikeBardoServerBlock(
+	block: string,
+	expectedUrl: string | null,
+): boolean {
+	if (expectedUrl) {
+		const expectedUrlPattern = new RegExp(
+			`^url\\s*=\\s*${JSON.stringify(expectedUrl)}$`,
+			"m",
+		);
+		if (expectedUrlPattern.test(block)) {
+			return true;
+		}
+	}
+
+	return (
+		block.includes("@bardo/mcp") || block.includes('"bardo", "mcp", "serve"')
+	);
+}
+
+function collectStringTokens(value: unknown): string[] {
+	if (typeof value === "string") {
+		return [value];
+	}
+
+	if (Array.isArray(value)) {
+		return value.flatMap((item) => collectStringTokens(item));
+	}
+
+	if (value && typeof value === "object") {
+		return Object.values(value).flatMap((item) => collectStringTokens(item));
+	}
+
+	return [];
+}
+
+function escapeRegexForRegex(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function checkAccountStatus(args: {
@@ -2105,6 +2263,48 @@ async function checkHealth(
 	}
 }
 
+async function checkControlPlaneReachability(
+	url: string | null,
+	fetchImpl: FetchLike,
+): Promise<DoctorOutput["connectivity"]["controlPlane"]> {
+	if (!url) {
+		return {
+			url: null,
+			reachable: false,
+			status: null,
+			error: "Missing control plane URL.",
+		};
+	}
+
+	try {
+		const response = await fetchImpl(url, {
+			method: "GET",
+			headers: {
+				accept: "application/json",
+			},
+		});
+		return {
+			url,
+			reachable: true,
+			status: response.status,
+			error: null,
+		};
+	} catch (error) {
+		return {
+			url,
+			reachable: false,
+			status: null,
+			error: toErrorMessage(error),
+		};
+	}
+}
+
+function formatControlPlaneRequestError(url: string, error: unknown): string {
+	return `Could not reach the Bardo website control plane at ${url}. If you are running locally, start it with \`bun run dev:website\`. Otherwise check your BARDO_* control-plane URLs or use \`bardo login --api-key <key>\`. Root cause: ${toErrorMessage(
+		error,
+	)}`;
+}
+
 function resolveHealthUrl(mcpUrl: string): string {
 	const url = new URL(mcpUrl);
 	url.pathname = "/health";
@@ -2127,6 +2327,11 @@ function renderDoctorReport(report: DoctorOutput): string {
 			report.connectivity.health.ok
 				? `ok (${report.connectivity.health.status})`
 				: (report.connectivity.health.error ?? "failed")
+		}`,
+		`Control plane: ${
+			report.connectivity.controlPlane.reachable
+				? `reachable (${report.connectivity.controlPlane.status})`
+				: (report.connectivity.controlPlane.error ?? "not configured")
 		}`,
 		`Account status: ${
 			!report.account.fetched

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Bun's root-level test runner does not honor the website-local @/ alias here.
 import {
 	buildConnectionSnippet,
 	type ConnectionClient,

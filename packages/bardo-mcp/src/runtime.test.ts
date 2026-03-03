@@ -240,6 +240,43 @@ describe("bardo runtime", () => {
 		}
 	});
 
+	test("login surfaces an actionable error when the website control plane is unreachable", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				env: {
+					BARDO_LOGIN_START_URL:
+						"http://127.0.0.1:3001/api/connect/cli-session/start",
+				},
+				fetch: async () => {
+					throw new TypeError("fetch failed");
+				},
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stdout.read()).toBe("");
+			expect(stderr.read()).toContain(
+				"Could not reach the Bardo website control plane",
+			);
+			expect(stderr.read()).toContain(
+				"http://127.0.0.1:3001/api/connect/cli-session/start",
+			);
+			expect(stderr.read()).toContain("bun run dev:website");
+			expect(stderr.read()).toContain("bardo login --api-key");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("logout removes the saved config file", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -580,7 +617,72 @@ describe("bardo runtime", () => {
 					url: "https://app.bardo.ai/api/connect/runtime-status",
 					auth: "Bearer test-key",
 				},
+				{
+					url: "https://app.bardo.ai/api/connect/runtime-status",
+					auth: null,
+				},
 			]);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor reports control-plane reachability even before login is configured", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				env: {
+					BARDO_MCP_URL: "http://127.0.0.1:3000/mcp",
+					BARDO_RUNTIME_STATUS_URL:
+						"http://127.0.0.1:3001/api/connect/runtime-status",
+				},
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "http://127.0.0.1:3000/health") {
+						return new Response(JSON.stringify({ ok: true }), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						});
+					}
+					if (url === "http://127.0.0.1:3001/api/connect/runtime-status") {
+						return new Response(JSON.stringify({ error: "Missing API key." }), {
+							status: 401,
+							headers: { "content-type": "application/json" },
+						});
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(1);
+			const payload = JSON.parse(stdout.read()) as {
+				connectivity: {
+					controlPlane: {
+						url: string | null;
+						reachable: boolean;
+						status: number | null;
+						error: string | null;
+					};
+				};
+				account: { fetched: boolean; error: string | null };
+			};
+
+			expect(payload.connectivity.controlPlane).toEqual({
+				url: "http://127.0.0.1:3001/api/connect/runtime-status",
+				reachable: true,
+				status: 401,
+				error: null,
+			});
+			expect(payload.account.fetched).toBe(false);
+			expect(payload.account.error).toBe("Missing API key.");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -644,6 +746,70 @@ describe("bardo runtime", () => {
 				configExists: true,
 				configPath: path.join(workspaceRoot, ".kiro/settings/mcp.json"),
 			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor recognizes client configs installed with a custom server name", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await runCli(
+				["install", "--client", "kiro", "--server-name", "campaign-gm"],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				},
+			);
+
+			const exitCode = await runCli(["doctor", "--client", "kiro", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async () =>
+					new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				client: {
+					id: string;
+					configValid: boolean;
+					hasBardoServer: boolean;
+					error: string | null;
+				};
+			};
+
+			expect(payload.client).toMatchObject({
+				id: "kiro",
+				configValid: true,
+				hasBardoServer: true,
+			});
+			expect(payload.client.error).toBeNull();
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
