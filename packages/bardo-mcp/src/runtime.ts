@@ -8,42 +8,11 @@ import {
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { startLocalMcpServer } from "./local-mcp";
+import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
 const CONFIG_FILE_NAME = "config.json";
-const BARDO_ROOT_DIRNAME = "bardo";
-const CANONICAL_DIRECTORIES = [
-	"_settings",
-	"context",
-	"rules",
-	"party",
-	"entities",
-	"items",
-	"world",
-	"quests",
-	"events",
-	"projections",
-	"simulation",
-	"state",
-	"logs",
-	"secrets",
-	"manifests",
-] as const;
-const NESTED_DIRECTORIES = [
-	"rules/sources/system",
-	"rules/sources/rulebook",
-	"rules/sources/character-sheets",
-	"rules/sources/bestiary",
-	"rules/sources/expansions",
-	"rules/sources/homebrew",
-	"world/locations",
-	"world/factions",
-	"party/characters",
-	"logs/sessions",
-] as const;
 
 type Writer = {
 	write(chunk: string): void;
@@ -526,30 +495,13 @@ function resolveWorkspaceRoot(input: string | null, cwd: string): string {
 	return path.resolve(input?.trim() || cwd);
 }
 
-function useFlatWorkspaceLayout(
-	env: Record<string, string | undefined>,
-): boolean {
-	return env.BARDO_WORKSPACE_LAYOUT?.trim().toLowerCase() === "flat";
-}
-
-function resolveBardoRoot(
-	workspaceRoot: string,
-	env: Record<string, string | undefined>,
-): string {
-	if (useFlatWorkspaceLayout(env)) {
-		return workspaceRoot;
-	}
-	return path.join(workspaceRoot, BARDO_ROOT_DIRNAME);
-}
-
 async function ensureWorkspaceDirectories(
 	bardoRoot: string,
 ): Promise<string[]> {
-	const directories = [...CANONICAL_DIRECTORIES, ...NESTED_DIRECTORIES];
 	const created: string[] = [];
 
 	await mkdir(bardoRoot, { recursive: true });
-	for (const relative of directories) {
+	for (const relative of WORKSPACE_DIRECTORIES) {
 		const target = path.join(bardoRoot, relative);
 		try {
 			await access(target);
@@ -880,60 +832,6 @@ function renderDoctorReport(report: DoctorOutput): string {
 		}`,
 	];
 	return `${lines.join("\n")}\n`;
-}
-
-export async function bridgeRemoteMcp(
-	options: ResolvedServeOptions,
-): Promise<void> {
-	const stdioTransport = new StdioServerTransport();
-	const remoteTransport = new StreamableHTTPClientTransport(
-		new URL(options.url),
-		{
-			requestInit: {
-				headers: {
-					authorization: `Bearer ${options.apiKey}`,
-					"x-bardo-workspace-root": options.workspaceRoot,
-				},
-			},
-		},
-	);
-
-	stdioTransport.onmessage = async (message) => {
-		await remoteTransport.send(message);
-	};
-	remoteTransport.onmessage = async (message) => {
-		await stdioTransport.send(message);
-	};
-	stdioTransport.onerror = (error) => {
-		process.stderr.write(`stdio transport error: ${error.message}\n`);
-	};
-	remoteTransport.onerror = (error) => {
-		process.stderr.write(`remote transport error: ${error.message}\n`);
-	};
-
-	let closed = false;
-	const closeAll = async () => {
-		if (closed) return;
-		closed = true;
-		await Promise.allSettled([stdioTransport.close(), remoteTransport.close()]);
-	};
-
-	stdioTransport.onclose = () => {
-		void closeAll();
-	};
-	remoteTransport.onclose = () => {
-		void closeAll();
-	};
-
-	process.on("SIGINT", () => {
-		void closeAll().finally(() => process.exit(0));
-	});
-	process.on("SIGTERM", () => {
-		void closeAll().finally(() => process.exit(0));
-	});
-
-	await remoteTransport.start();
-	await stdioTransport.start();
 }
 
 function toErrorMessage(error: unknown): string {

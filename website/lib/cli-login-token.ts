@@ -28,7 +28,14 @@ function fromBase64Url(value: string): Uint8Array {
 	const padded = value.replaceAll("-", "+").replaceAll("_", "/");
 	const padding =
 		padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
-	return new Uint8Array(Buffer.from(`${padded}${padding}`, "base64"));
+	return Uint8Array.from(Buffer.from(`${padded}${padding}`, "base64"));
+}
+
+function toCryptoBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+	const arrayBuffer = new ArrayBuffer(bytes.byteLength);
+	const clone = new Uint8Array(arrayBuffer);
+	clone.set(bytes);
+	return clone;
 }
 
 async function deriveEncryptionKey(secret: string): Promise<CryptoKey> {
@@ -77,10 +84,12 @@ export function createCliLoginTokenCodec(secret: string) {
 			}
 
 			const key = await deriveEncryptionKey(normalizedSecret);
+			const iv = toCryptoBytes(fromBase64Url(ivPart));
+			const payload = toCryptoBytes(fromBase64Url(payloadPart));
 			const plaintext = await crypto.subtle.decrypt(
-				{ name: "AES-GCM", iv: fromBase64Url(ivPart) },
+				{ name: "AES-GCM", iv },
 				key,
-				fromBase64Url(payloadPart),
+				payload,
 			);
 			const parsed = JSON.parse(
 				new TextDecoder().decode(plaintext),

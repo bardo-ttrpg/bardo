@@ -5,6 +5,9 @@ import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
 
 export const runtime = "nodejs";
 
+const DEFAULT_CLI_LOGIN_SCOPES = ["mcp"] as const;
+const ALLOWED_CLI_LOGIN_SCOPES = new Set<string>(DEFAULT_CLI_LOGIN_SCOPES);
+
 type CreateApiKeyResult = {
 	secret: string;
 	name: string;
@@ -68,13 +71,14 @@ function resolveExchangeUrl(request: Request): string {
 
 function parseScopes(value: unknown): string[] {
 	if (!Array.isArray(value)) {
-		return ["mcp"];
+		return [...DEFAULT_CLI_LOGIN_SCOPES];
 	}
-	const scopes = value
+
+	const scopes = [...new Set(value)]
 		.filter((entry): entry is string => typeof entry === "string")
 		.map((entry) => entry.trim())
-		.filter((entry) => entry.length > 0);
-	return scopes.length > 0 ? scopes : ["mcp"];
+		.filter((entry) => ALLOWED_CLI_LOGIN_SCOPES.has(entry));
+	return scopes.length > 0 ? scopes : [...DEFAULT_CLI_LOGIN_SCOPES];
 }
 
 function parseBody(request: Request): Promise<CliTokenRequest> {
@@ -98,6 +102,12 @@ const defaultDeps: CliTokenDeps = {
 			scopes,
 			claims: { workspacePath: `./customers/${userId}` },
 		});
+		if (
+			typeof apiKey.secret !== "string" ||
+			apiKey.secret.trim().length === 0
+		) {
+			throw new Error("Clerk did not return an API key secret.");
+		}
 		return {
 			secret: apiKey.secret,
 			name: apiKey.name,
@@ -138,6 +148,9 @@ export function createCliTokenPostHandler(
 			const name = body.name?.trim() || defaultKeyName(now);
 			const scopes = parseScopes(body.scopes);
 			const key = await deps.createApiKey({ userId, name, scopes });
+			if (typeof key.secret !== "string" || key.secret.trim().length === 0) {
+				throw new Error("CLI login API key secret is missing.");
+			}
 			const mcpUrl = deps.resolveMcpUrl(request);
 			const issuedAtISO = now.toISOString();
 			const expiresAtISO = new Date(now.getTime() + deps.ttlMs).toISOString();

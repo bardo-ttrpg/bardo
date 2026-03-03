@@ -17,6 +17,7 @@ import {
 	ListToolsRequestSchema,
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
 	write(chunk: string): void;
@@ -87,50 +88,6 @@ type RemoteConnectionCoordinatorOptions = {
 	closeRemoteClient: (client: Client | null) => Promise<void>;
 };
 
-const BARDO_ROOT_DIRNAME = "bardo";
-const CANONICAL_DIRECTORIES = [
-	"_settings",
-	"context",
-	"rules",
-	"party",
-	"entities",
-	"items",
-	"world",
-	"quests",
-	"events",
-	"projections",
-	"simulation",
-	"state",
-	"logs",
-	"secrets",
-	"manifests",
-] as const;
-const NESTED_DIRECTORIES = [
-	"rules/sources/system",
-	"rules/sources/rulebook",
-	"rules/sources/character-sheets",
-	"rules/sources/bestiary",
-	"rules/sources/expansions",
-	"rules/sources/homebrew",
-	"world/locations",
-	"world/factions",
-	"party/characters",
-	"logs/sessions",
-] as const;
-
-function useFlatWorkspaceLayout(
-	env: Record<string, string | undefined> = process.env,
-): boolean {
-	return env.BARDO_WORKSPACE_LAYOUT?.trim().toLowerCase() === "flat";
-}
-
-function resolveBardoRoot(workspaceRoot: string): string {
-	if (useFlatWorkspaceLayout()) {
-		return workspaceRoot;
-	}
-	return path.join(workspaceRoot, BARDO_ROOT_DIRNAME);
-}
-
 function resolveScopedPath(rootPath: string, relativePath: string): string {
 	const normalized = relativePath.replaceAll("\\", "/").trim();
 	if (!normalized || normalized.startsWith("/")) {
@@ -164,7 +121,7 @@ function renderMarkdown(
 
 async function ensureWorkspaceDirectories(bardoRoot: string): Promise<void> {
 	await mkdir(bardoRoot, { recursive: true });
-	for (const relative of [...CANONICAL_DIRECTORIES, ...NESTED_DIRECTORIES]) {
+	for (const relative of WORKSPACE_DIRECTORIES) {
 		await mkdir(path.join(bardoRoot, relative), { recursive: true });
 	}
 }
