@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../../lib/connect-telemetry";
 
 export const runtime = "nodejs";
 
@@ -12,6 +16,7 @@ type CliSessionStartDeps = {
 		intervalMs: number;
 	}>;
 	resolveVerificationUrl: (request: Request, sessionId: string) => string;
+	telemetry: ConnectTelemetry;
 };
 
 function defaultVerificationUrl(request: Request, sessionId: string): string {
@@ -25,6 +30,7 @@ function defaultVerificationUrl(request: Request, sessionId: string): string {
 const defaultDeps: CliSessionStartDeps = {
 	createPendingSession: async () => getDefaultCliDeviceSessionService().start(),
 	resolveVerificationUrl: defaultVerificationUrl,
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createCliSessionStartPostHandler(
@@ -35,6 +41,7 @@ export function createCliSessionStartPostHandler(
 	return async function POST(request: Request) {
 		try {
 			const session = await deps.createPendingSession();
+			deps.telemetry.increment("cli_session_started");
 			const verificationUrl = deps.resolveVerificationUrl(
 				request,
 				session.sessionId,
@@ -52,6 +59,7 @@ export function createCliSessionStartPostHandler(
 				expiresAtISO: session.expiresAtISO,
 			});
 		} catch (error) {
+			deps.telemetry.increment("cli_session_start_failed");
 			return NextResponse.json(
 				{
 					error: error instanceof Error ? error.message : String(error),

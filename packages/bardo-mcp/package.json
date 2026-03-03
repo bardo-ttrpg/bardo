@@ -12,14 +12,16 @@
 	},
 	"files": [
 		"bin",
-		"src"
+		"src",
+		"dist"
 	],
 	"publishConfig": {
 		"access": "public"
 	},
 	"scripts": {
 		"start": "bun run src/cli.ts",
-		"test": "bun test"
+		"test": "bun test",
+		"build:release": "bun run ./scripts/build-release-binaries.ts"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.26.0"

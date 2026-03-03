@@ -6,6 +6,11 @@ import {
 	type GoldenScenarioId,
 	runGoldenScenarioSuite,
 } from "../evals/golden-scenarios";
+import {
+	annotateWithMinPlan,
+	hasRequiredPlan,
+	makePlanDeniedToolResult,
+} from "../tool-plan";
 import { makeToolResult } from "../tool-result";
 
 const goldenScenarioIdSchema = z.enum(GOLDEN_SCENARIO_IDS);
@@ -37,7 +42,7 @@ const evalRunGoldenScenariosOutputSchema = z.object({
 
 export function registerEvalRunGoldenScenariosTool(
 	server: McpServer,
-	_auth: AuthContext,
+	auth: AuthContext,
 ): void {
 	server.registerTool(
 		"eval_run_golden_scenarios",
@@ -47,15 +52,18 @@ export function registerEvalRunGoldenScenariosTool(
 				"Run deterministic golden scenario evals in isolated temporary workspaces and return a pass/fail summary.",
 			inputSchema: evalRunGoldenScenariosInputSchema,
 			outputSchema: evalRunGoldenScenariosOutputSchema,
-			annotations: {
+			annotations: annotateWithMinPlan("solo", {
 				title: "Run Golden Scenario Evals",
 				readOnlyHint: true,
 				destructiveHint: false,
 				idempotentHint: true,
 				openWorldHint: false,
-			},
+			}),
 		},
 		async ({ scenarioIds }) => {
+			if (!hasRequiredPlan(auth.plan ?? null, "solo")) {
+				return makePlanDeniedToolResult("solo");
+			}
 			const suite = await runGoldenScenarioSuite({
 				scenarioIds: scenarioIds as GoldenScenarioId[] | undefined,
 			});

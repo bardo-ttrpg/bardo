@@ -502,7 +502,7 @@ Usage:
   bardo login [--start-url <https-url>]
   bardo logout
   bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
-  bardo install --client <codex|cursor|windsurf|vscode> [--mode <local|remote>] [--config-path <path>] [--dry-run]
+  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode> [--mode <local|remote>] [--config-path <path>] [--dry-run]
   bardo export --output <path> [--workspace-root <path>]
   bardo pack-debug --output <path> [--workspace-root <path>]
   bardo doctor [--workspace-root <path>] [--json]
@@ -1103,20 +1103,24 @@ function resolveStoredCredentials(
 
 function normalizeInstallClient(
 	value: string | null,
-): "codex" | "cursor" | "windsurf" | "vscode" {
+): "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode" {
 	switch (value?.trim().toLowerCase()) {
+		case "claude":
+		case "opencode":
 		case "codex":
 		case "cursor":
 		case "windsurf":
 		case "vscode":
 			return value.trim().toLowerCase() as
+				| "claude"
+				| "opencode"
 				| "codex"
 				| "cursor"
 				| "windsurf"
 				| "vscode";
 		default:
 			throw new Error(
-				"Unsupported client. Use codex, cursor, windsurf, or vscode.",
+				"Unsupported client. Use claude, opencode, codex, cursor, windsurf, or vscode.",
 			);
 	}
 }
@@ -1130,7 +1134,7 @@ function normalizeInstallMode(value: string | null): "local" | "remote" {
 }
 
 function resolveInstallConfigPath(args: {
-	client: "codex" | "cursor" | "windsurf" | "vscode";
+	client: "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode";
 	workspaceRoot: string;
 	configPath: string | null;
 }): string {
@@ -1139,6 +1143,10 @@ function resolveInstallConfigPath(args: {
 	}
 
 	switch (args.client) {
+		case "claude":
+			return path.join(args.workspaceRoot, ".mcp.json");
+		case "opencode":
+			return path.join(args.workspaceRoot, "opencode.json");
 		case "codex":
 			return path.join(args.workspaceRoot, ".codex/config.toml");
 		case "cursor":
@@ -1151,7 +1159,7 @@ function resolveInstallConfigPath(args: {
 }
 
 async function buildClientConfigContent(args: {
-	client: "codex" | "cursor" | "windsurf" | "vscode";
+	client: "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode";
 	mode: "local" | "remote";
 	serverName: string;
 	apiKey: string;
@@ -1231,13 +1239,88 @@ function upsertTomlTable(
 function mergeClientJsonConfig(
 	existing: Record<string, unknown>,
 	args: {
-		client: "cursor" | "windsurf" | "vscode";
+		client: "claude" | "opencode" | "cursor" | "windsurf" | "vscode";
 		mode: "local" | "remote";
 		serverName: string;
 		apiKey: string;
 		url: string;
 	},
 ): Record<string, unknown> {
+	if (args.client === "claude") {
+		const root = structuredClone(existing);
+		const servers =
+			typeof root.mcpServers === "object" && root.mcpServers !== null
+				? (root.mcpServers as Record<string, unknown>)
+				: {};
+		servers[args.serverName] =
+			args.mode === "remote"
+				? {
+						type: "http",
+						url: args.url,
+						headers: {
+							Authorization: `Bearer ${args.apiKey}`,
+						},
+					}
+				: {
+						command: "bunx",
+						args: [
+							"--bun",
+							"--package",
+							"@bardo/mcp",
+							"bardo",
+							"mcp",
+							"serve",
+							"--api-key",
+							args.apiKey,
+							"--url",
+							args.url,
+							"--workspace-root",
+							".",
+						],
+					};
+		root.mcpServers = servers;
+		return root;
+	}
+
+	if (args.client === "opencode") {
+		const root = structuredClone(existing);
+		const mcp =
+			typeof root.mcp === "object" && root.mcp !== null
+				? (root.mcp as Record<string, unknown>)
+				: {};
+		mcp[args.serverName] =
+			args.mode === "remote"
+				? {
+						type: "remote",
+						url: args.url,
+						headers: {
+							Authorization: `Bearer ${args.apiKey}`,
+						},
+						enabled: true,
+					}
+				: {
+						type: "local",
+						command: [
+							"bunx",
+							"--bun",
+							"--package",
+							"@bardo/mcp",
+							"bardo",
+							"mcp",
+							"serve",
+							"--api-key",
+							args.apiKey,
+							"--url",
+							args.url,
+							"--workspace-root",
+							".",
+						],
+						enabled: true,
+					};
+		root.mcp = mcp;
+		return root;
+	}
+
 	if (args.client === "vscode") {
 		const root = structuredClone(existing);
 		const mcp =

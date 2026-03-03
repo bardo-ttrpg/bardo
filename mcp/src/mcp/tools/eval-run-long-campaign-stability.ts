@@ -3,6 +3,11 @@ import * as z from "zod/v4";
 import { recordLongRunCampaignEvalMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import { runLongRunCampaignStabilityEval } from "../evals/long-run-campaign-stability";
+import {
+	annotateWithMinPlan,
+	hasRequiredPlan,
+	makePlanDeniedToolResult,
+} from "../tool-plan";
 import { makeToolResult } from "../tool-result";
 
 const evalRunLongCampaignStabilityInputSchema = z.object({
@@ -83,7 +88,7 @@ const evalRunLongCampaignStabilityOutputSchema = z.object({
 
 export function registerEvalRunLongCampaignStabilityTool(
 	server: McpServer,
-	_auth: AuthContext,
+	auth: AuthContext,
 ): void {
 	server.registerTool(
 		"eval_run_long_campaign_stability",
@@ -93,15 +98,18 @@ export function registerEvalRunLongCampaignStabilityTool(
 				"Runs a strict 25-40 turn stability simulation with retry injection and validates replay consistency + projection integrity.",
 			inputSchema: evalRunLongCampaignStabilityInputSchema,
 			outputSchema: evalRunLongCampaignStabilityOutputSchema,
-			annotations: {
+			annotations: annotateWithMinPlan("solo_plus", {
 				title: "Run Long Campaign Stability Eval",
 				readOnlyHint: true,
 				destructiveHint: false,
 				idempotentHint: true,
 				openWorldHint: false,
-			},
+			}),
 		},
 		async ({ turnCount, retryInjection }) => {
+			if (!hasRequiredPlan(auth.plan ?? null, "solo_plus")) {
+				return makePlanDeniedToolResult("solo_plus");
+			}
 			const startedAt = performance.now();
 			const result = await runLongRunCampaignStabilityEval({
 				turnCount,

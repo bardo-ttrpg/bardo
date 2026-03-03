@@ -2,6 +2,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { resolveRouteUserId } from "../../../../lib/clerk-route-auth";
 import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../lib/connect-telemetry";
 
 export const runtime = "nodejs";
 
@@ -40,6 +44,7 @@ type CliTokenDeps = {
 	statusUrl: string | null;
 	ttlMs: number;
 	now: () => Date;
+	telemetry: ConnectTelemetry;
 };
 
 function resolveMcpUrl(request: Request): string {
@@ -136,6 +141,7 @@ const defaultDeps: CliTokenDeps = {
 	statusUrl: null,
 	ttlMs: Number(process.env.BARDO_CLI_LOGIN_TTL_MS ?? 300_000),
 	now: () => new Date(),
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createCliTokenPostHandler(
@@ -175,6 +181,7 @@ export function createCliTokenPostHandler(
 				issuedAtISO,
 				expiresAtISO,
 			});
+			deps.telemetry.increment("cli_token_issued");
 
 			return NextResponse.json({
 				loginToken,
@@ -186,6 +193,7 @@ export function createCliTokenPostHandler(
 				keyName: key.name,
 			});
 		} catch (error) {
+			deps.telemetry.increment("cli_token_failed");
 			const message = error instanceof Error ? error.message : String(error);
 			return NextResponse.json({ error: message }, { status: 500 });
 		}

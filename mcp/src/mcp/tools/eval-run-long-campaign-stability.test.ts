@@ -29,36 +29,40 @@ function createAuth(campaignBasePath: string): AuthContext {
 	return {
 		apiKey: null,
 		campaignBasePath,
+		plan: "solo_plus",
 	};
 }
 
-function captureEvalHandler(args: {
-	auth: AuthContext;
-}): EvalRunLongCampaignStabilityHandler {
+function captureEvalHandler(args: { auth: AuthContext }): {
+	handler: EvalRunLongCampaignStabilityHandler;
+	spec: Record<string, unknown>;
+} {
 	let handler: EvalRunLongCampaignStabilityHandler | null = null;
+	let spec: Record<string, unknown> | null = null;
 	const server = {
 		registerTool: (
 			name: string,
-			_spec: unknown,
+			nextSpec: unknown,
 			callback: EvalRunLongCampaignStabilityHandler,
 		): void => {
 			if (name === "eval_run_long_campaign_stability") {
 				handler = callback;
+				spec = nextSpec as Record<string, unknown>;
 			}
 		},
 	} as unknown as McpServer;
 
 	registerEvalRunLongCampaignStabilityTool(server, args.auth);
-	if (!handler) {
+	if (!handler || !spec) {
 		throw new Error("Failed to register eval_run_long_campaign_stability.");
 	}
-	return handler;
+	return { handler, spec };
 }
 
 describe("eval_run_long_campaign_stability tool", () => {
 	test("runs long-run stability eval and returns summary", async () => {
 		resetTelemetryForTests();
-		const handler = captureEvalHandler({
+		const { handler, spec } = captureEvalHandler({
 			auth: createAuth("/tmp/bardo-long-run-tool"),
 		});
 		const result = await handler({
@@ -66,6 +70,9 @@ describe("eval_run_long_campaign_stability tool", () => {
 			retryInjection: true,
 		});
 
+		expect(spec.annotations).toMatchObject({
+			"x-bardo-min-plan": "solo_plus",
+		});
 		expect(result.isError).toBe(false);
 		expect(result.structuredContent.success).toBe(true);
 		expect(result.structuredContent.turnCount).toBe(25);
@@ -81,5 +88,26 @@ describe("eval_run_long_campaign_stability tool", () => {
 		expect(metrics).toContain(
 			'bardo_eval_long_run_replay_drift_total{dimension="none"} 1',
 		);
+	});
+
+	test("rejects solo auth contexts before running long-run stability evals", async () => {
+		const { handler } = captureEvalHandler({
+			auth: {
+				apiKey: null,
+				campaignBasePath: "/tmp/bardo-long-run-tool",
+				plan: "solo",
+			},
+		});
+
+		const result = await handler({
+			turnCount: 25,
+			retryInjection: true,
+		});
+
+		expect(result.isError).toBe(true);
+		expect(result.structuredContent).toMatchObject({
+			success: false,
+			message: expect.stringContaining("solo_plus"),
+		});
 	});
 });

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createConnectTelemetry } from "../../../../../lib/connect-telemetry";
 import { createCliSessionStartPostHandler } from "./route";
 
 describe("POST /api/connect/cli-session/start", () => {
@@ -50,5 +51,39 @@ describe("POST /api/connect/cli-session/start", () => {
 
 		expect(response.status).toBe(500);
 		expect(body.error).toContain("Upstash unavailable");
+	});
+
+	test("records start success and failure outcomes in connect telemetry", async () => {
+		const telemetry = createConnectTelemetry();
+		const okHandler = createCliSessionStartPostHandler({
+			telemetry,
+			createPendingSession: async () => ({
+				sessionId: "cli_session_123",
+				pollSecret: "poll_secret_123",
+				userCode: "ABCD-1234",
+				expiresAtISO: "2099-03-03T00:10:00.000Z",
+				intervalMs: 3000,
+			}),
+		});
+		const failingHandler = createCliSessionStartPostHandler({
+			telemetry,
+			createPendingSession: async () => {
+				throw new Error("storage offline");
+			},
+		});
+
+		await okHandler(
+			new Request("https://app.bardo.ai/api/connect/cli-session/start", {
+				method: "POST",
+			}),
+		);
+		await failingHandler(
+			new Request("https://app.bardo.ai/api/connect/cli-session/start", {
+				method: "POST",
+			}),
+		);
+
+		expect(telemetry.snapshot().cli_session_started).toBe(1);
+		expect(telemetry.snapshot().cli_session_start_failed).toBe(1);
 	});
 });

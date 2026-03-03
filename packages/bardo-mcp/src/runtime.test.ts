@@ -716,6 +716,144 @@ describe("bardo runtime", () => {
 		}
 	});
 
+	test("install writes a merge-safe Claude project config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, ".mcp.json"),
+				JSON.stringify(
+					{
+						mcpServers: {
+							existing: {
+								command: "uvx",
+								args: ["existing-tool"],
+							},
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "claude"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			const config = JSON.parse(
+				await readFile(path.join(workspaceRoot, ".mcp.json"), "utf8"),
+			) as {
+				mcpServers: Record<string, { command: string; args: string[] }>;
+			};
+			expect(config.mcpServers.existing.command).toBe("uvx");
+			expect(config.mcpServers.bardo.command).toBe("bunx");
+			expect(config.mcpServers.bardo.args).toContain("--workspace-root");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("install writes an OpenCode project config for remote mode", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, "opencode.json"),
+				JSON.stringify(
+					{
+						theme: "opencode",
+						mcp: {
+							existing: {
+								type: "local",
+								command: ["uvx", "existing-tool"],
+								enabled: true,
+							},
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				["install", "--client", "opencode", "--mode", "remote"],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			const config = JSON.parse(
+				await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			) as {
+				theme: string;
+				mcp: Record<
+					string,
+					{
+						type: string;
+						url?: string;
+						headers?: Record<string, string>;
+						command?: string[];
+						enabled?: boolean;
+					}
+				>;
+			};
+			expect(config.theme).toBe("opencode");
+			expect(config.mcp.existing.command).toEqual(["uvx", "existing-tool"]);
+			expect(config.mcp.bardo).toEqual({
+				type: "remote",
+				url: "https://mcp.bardo.ai/mcp",
+				headers: {
+					Authorization: "Bearer bardo_live_saved",
+				},
+				enabled: true,
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("export copies the bardo workspace into the target directory", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");

@@ -2,6 +2,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { mcpPeriodLimitForPlan } from "../../../../lib/api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "../../../../lib/clerk-live-billing";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../lib/connect-telemetry";
 import type { PlanTier } from "../../../../lib/user-billing";
 
 export const runtime = "nodejs";
@@ -28,6 +32,7 @@ type RuntimeStatusDeps = {
 		subject: string,
 	) => Promise<{ plan: PlanTier | null; billingUnavailable: boolean }>;
 	mcpPeriodLimitResolver: (plan: PlanTier) => number;
+	telemetry: ConnectTelemetry;
 };
 
 function readApiKey(request: Request): string | null {
@@ -110,6 +115,7 @@ const defaultDeps: RuntimeStatusDeps = {
 			: { plan: live.plan, billingUnavailable: false };
 	},
 	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createRuntimeStatusGetHandler(
@@ -126,37 +132,50 @@ export function createRuntimeStatusGetHandler(
 			);
 		}
 
-		const clerk = await deps.createClerkClient();
-		let verifiedKey: VerifiedKeyRecord;
 		try {
-			verifiedKey = await clerk.apiKeys.verify(apiKey);
+			const clerk = await deps.createClerkClient();
+			const verifiedKey: VerifiedKeyRecord = await clerk.apiKeys.verify(apiKey);
+			const subjectId = extractSubjectFromVerifiedKey(
+				verifiedKey as Record<string, unknown>,
+			);
+			const { plan, billingUnavailable } = subjectId
+				? await deps.resolvePlanForSubject(clerk, subjectId)
+				: { plan: null, billingUnavailable: false };
+			deps.telemetry.increment("runtime_status_success");
+
+			return NextResponse.json({
+				valid: true,
+				subjectId,
+				keyId: typeof verifiedKey.id === "string" ? verifiedKey.id : null,
+				scopes: extractScopes(verifiedKey),
+				workspacePath: extractWorkspacePath(
+					verifiedKey as Record<string, unknown>,
+				),
+				plan,
+				mcpPeriodLimit:
+					plan && !billingUnavailable
+						? deps.mcpPeriodLimitResolver(plan)
+						: null,
+				billingUnavailable,
+			});
 		} catch (error) {
+			const status = extractErrorStatus(error);
+			if (status === 401 || status === 403) {
+				deps.telemetry.increment("runtime_status_invalid");
+				return NextResponse.json(
+					{ error: "Invalid API key." },
+					{ status: status ?? 401 },
+				);
+			}
+			deps.telemetry.increment("runtime_status_failed");
 			return NextResponse.json(
-				{ error: "Invalid API key." },
-				{ status: extractErrorStatus(error) ?? 401 },
+				{
+					error:
+						error instanceof Error ? error.message : "Runtime status failed.",
+				},
+				{ status: 500 },
 			);
 		}
-
-		const subjectId = extractSubjectFromVerifiedKey(
-			verifiedKey as Record<string, unknown>,
-		);
-		const { plan, billingUnavailable } = subjectId
-			? await deps.resolvePlanForSubject(clerk, subjectId)
-			: { plan: null, billingUnavailable: false };
-
-		return NextResponse.json({
-			valid: true,
-			subjectId,
-			keyId: typeof verifiedKey.id === "string" ? verifiedKey.id : null,
-			scopes: extractScopes(verifiedKey),
-			workspacePath: extractWorkspacePath(
-				verifiedKey as Record<string, unknown>,
-			),
-			plan,
-			mcpPeriodLimit:
-				plan && !billingUnavailable ? deps.mcpPeriodLimitResolver(plan) : null,
-			billingUnavailable,
-		});
 	};
 }
 

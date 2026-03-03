@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../../lib/connect-telemetry";
 
 export const runtime = "nodejs";
 
@@ -12,10 +16,12 @@ type CliSessionPollDeps = {
 		| { status: "approved"; payload: Record<string, unknown> }
 		| { status: "expired" | "consumed" | "invalid" }
 	>;
+	telemetry: ConnectTelemetry;
 };
 
 const defaultDeps: CliSessionPollDeps = {
 	pollSession: async (args) => getDefaultCliDeviceSessionService().poll(args),
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createCliSessionPollGetHandler(
@@ -37,34 +43,40 @@ export function createCliSessionPollGetHandler(
 		try {
 			const result = await deps.pollSession({ sessionId, pollSecret });
 			if (result.status === "approved") {
+				deps.telemetry.increment("cli_session_poll_approved");
 				return NextResponse.json({
 					status: "approved",
 					...result.payload,
 				});
 			}
 			if (result.status === "pending") {
+				deps.telemetry.increment("cli_session_poll_pending");
 				return NextResponse.json({
 					status: "pending",
 					intervalMs: result.intervalMs,
 				});
 			}
 			if (result.status === "invalid") {
+				deps.telemetry.increment("cli_session_poll_rejected");
 				return NextResponse.json(
 					{ error: "Invalid poll secret." },
 					{ status: 401 },
 				);
 			}
 			if (result.status === "consumed") {
+				deps.telemetry.increment("cli_session_poll_rejected");
 				return NextResponse.json(
 					{ error: "CLI session has already been consumed." },
 					{ status: 409 },
 				);
 			}
+			deps.telemetry.increment("cli_session_poll_rejected");
 			return NextResponse.json(
 				{ error: "CLI session expired or was not found." },
 				{ status: 410 },
 			);
 		} catch (error) {
+			deps.telemetry.increment("cli_session_poll_failed");
 			return NextResponse.json(
 				{
 					error: error instanceof Error ? error.message : String(error),

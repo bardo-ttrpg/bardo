@@ -2,6 +2,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { resolveRouteUserId } from "../../../../../lib/clerk-route-auth";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../../lib/connect-telemetry";
 
 export const runtime = "nodejs";
 
@@ -33,6 +37,7 @@ type CliSessionApproveDeps = {
 	resolveMcpUrl: (request: Request) => string;
 	resolveStatusUrl: (request: Request) => string;
 	now: () => Date;
+	telemetry: ConnectTelemetry;
 };
 
 function resolveMcpUrl(request: Request): string {
@@ -80,6 +85,7 @@ const defaultDeps: CliSessionApproveDeps = {
 	resolveMcpUrl,
 	resolveStatusUrl,
 	now: () => new Date(),
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createCliSessionApprovePostHandler(
@@ -126,6 +132,7 @@ export function createCliSessionApprovePostHandler(
 				},
 			});
 			if (!approved.ok) {
+				deps.telemetry.increment("cli_session_approve_rejected");
 				const status =
 					approved.reason === "consumed"
 						? 409
@@ -138,8 +145,10 @@ export function createCliSessionApprovePostHandler(
 				);
 			}
 
+			deps.telemetry.increment("cli_session_approved");
 			return NextResponse.json({ ok: true });
 		} catch (error) {
+			deps.telemetry.increment("cli_session_approve_failed");
 			return NextResponse.json(
 				{
 					error: error instanceof Error ? error.message : String(error),

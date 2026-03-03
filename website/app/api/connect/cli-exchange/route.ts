@@ -7,6 +7,10 @@ import {
 	type CliLoginExchangePayload,
 	createCliLoginTokenCodec,
 } from "../../../../lib/cli-login-token";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../lib/connect-telemetry";
 
 export const runtime = "nodejs";
 
@@ -18,6 +22,7 @@ type CliExchangeDeps = {
 		token: string;
 		expiresAtISO: string;
 	}) => Promise<{ ok: boolean; reason?: "expired" | "already_used" }>;
+	telemetry: ConnectTelemetry;
 };
 
 function parseBody(request: Request): Promise<{ token?: string }> {
@@ -45,6 +50,7 @@ const defaultDeps: CliExchangeDeps = {
 		return createCliLoginTokenCodec(secret).decrypt(token);
 	},
 	consumeToken: async (args) => getDefaultCliLoginTokenStore().consume(args),
+	telemetry: getDefaultConnectTelemetry(),
 };
 
 export function createCliExchangePostHandler(
@@ -69,6 +75,7 @@ export function createCliExchangePostHandler(
 				expiresAtISO: payload.expiresAtISO,
 			});
 			if (!consumeResult.ok) {
+				deps.telemetry.increment("cli_exchange_rejected");
 				const status = consumeResult.reason === "already_used" ? 409 : 401;
 				const message =
 					consumeResult.reason === "already_used"
@@ -76,8 +83,14 @@ export function createCliExchangePostHandler(
 						: "This CLI login token has expired.";
 				return NextResponse.json({ error: message }, { status });
 			}
+			deps.telemetry.increment("cli_exchange_success");
 			return NextResponse.json(payload);
 		} catch (error) {
+			deps.telemetry.increment(
+				error instanceof CliLoginReplayStoreError
+					? "cli_exchange_failed"
+					: "cli_exchange_rejected",
+			);
 			const message = error instanceof Error ? error.message : String(error);
 			const status = error instanceof CliLoginReplayStoreError ? 500 : 401;
 			return NextResponse.json({ error: message }, { status });
