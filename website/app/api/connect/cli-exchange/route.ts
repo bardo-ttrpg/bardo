@@ -27,6 +27,15 @@ function parseBody(request: Request): Promise<{ token?: string }> {
 		.catch(() => ({}));
 }
 
+let defaultCliLoginTokenStore: ReturnType<
+	typeof createCliLoginTokenStore
+> | null = null;
+
+function getDefaultCliLoginTokenStore() {
+	defaultCliLoginTokenStore ??= createCliLoginTokenStore();
+	return defaultCliLoginTokenStore;
+}
+
 const defaultDeps: CliExchangeDeps = {
 	decodeToken: async (token) => {
 		const secret = process.env.BARDO_CLI_LOGIN_SECRET?.trim();
@@ -35,7 +44,7 @@ const defaultDeps: CliExchangeDeps = {
 		}
 		return createCliLoginTokenCodec(secret).decrypt(token);
 	},
-	consumeToken: createCliLoginTokenStore().consume,
+	consumeToken: async (args) => getDefaultCliLoginTokenStore().consume(args),
 };
 
 export function createCliExchangePostHandler(
