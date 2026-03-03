@@ -390,6 +390,100 @@ describe("bardo runtime", () => {
 		}
 	});
 
+	test("clients list prints supported client metadata as json", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			const exitCode = await runCli(["clients", "list", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as Array<{
+				id: string;
+				label: string;
+				tier: string;
+				autoInstall: boolean;
+				defaultConfigPath: string | null;
+				supportsLocal: boolean;
+				supportsRemote: boolean;
+			}>;
+
+			expect(payload.some((client) => client.id === "kiro")).toBe(true);
+			expect(payload.some((client) => client.id === "kilo")).toBe(true);
+			expect(payload.some((client) => client.id === "generic")).toBe(true);
+			expect(payload.find((client) => client.id === "vscode")).toMatchObject({
+				label: "VS Code / GitHub Copilot",
+				tier: "tier1",
+				autoInstall: true,
+				defaultConfigPath: ".vscode/settings.json",
+				supportsLocal: true,
+				supportsRemote: true,
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor can auto-detect the client from an existing workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await runCli(["install", "--client", "kiro"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			const exitCode = await runCli(["doctor", "--client", "auto", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async () =>
+					new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				client: { id: string; label: string };
+			};
+			expect(payload.client).toMatchObject({
+				id: "kiro",
+				label: "Kiro",
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("doctor fetches account status when a runtime status URL is configured", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -487,6 +581,120 @@ describe("bardo runtime", () => {
 					auth: "Bearer test-key",
 				},
 			]);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor reports client config status for a selected client", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await runCli(["install", "--client", "kiro"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			const exitCode = await runCli(["doctor", "--client", "kiro", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async () =>
+					new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				client: {
+					id: string;
+					label: string;
+					configPath: string | null;
+					configExists: boolean;
+					autoInstall: boolean;
+				};
+			};
+
+			expect(payload.client).toMatchObject({
+				id: "kiro",
+				label: "Kiro",
+				autoInstall: true,
+				configExists: true,
+				configPath: path.join(workspaceRoot, ".kiro/settings/mcp.json"),
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor reports malformed client config as invalid", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(workspaceRoot, ".kiro/settings"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(workspaceRoot, ".kiro/settings/mcp.json"),
+				"{invalid-json",
+				"utf8",
+			);
+
+			const exitCode = await runCli(["doctor", "--client", "kiro", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async () =>
+					new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			});
+
+			expect(exitCode).toBe(1);
+			const payload = JSON.parse(stdout.read()) as {
+				client: {
+					id: string;
+					configExists: boolean;
+					configValid: boolean;
+					hasBardoServer: boolean;
+					error: string | null;
+				};
+			};
+
+			expect(payload.client).toMatchObject({
+				id: "kiro",
+				configExists: true,
+				configValid: false,
+				hasBardoServer: false,
+			});
+			expect(payload.client.error).toContain("Invalid");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -716,6 +924,332 @@ describe("bardo runtime", () => {
 		}
 	});
 
+	test("install writes a Kiro workspace config using saved credentials", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "kiro"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			await expect(
+				readFile(path.join(workspaceRoot, ".kiro/settings/mcp.json"), "utf8"),
+			).resolves.toContain('"mcpServers"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".kiro/settings/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("install writes a Trae workspace config using saved credentials", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "trae"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			await expect(
+				readFile(path.join(workspaceRoot, ".trae/mcp.json"), "utf8"),
+			).resolves.toContain('"mcpServers"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".trae/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("install can auto-detect the client from an existing workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await mkdir(path.join(workspaceRoot, ".kiro/settings"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(workspaceRoot, ".kiro/settings/mcp.json"),
+				JSON.stringify({ mcpServers: {} }, null, 2),
+				"utf8",
+			);
+
+			const stdout = createWriter();
+			const exitCode = await runCli(["install", "--client", "auto"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stdout.read()).toContain(".kiro/settings/mcp.json");
+			await expect(
+				readFile(path.join(workspaceRoot, ".kiro/settings/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("install auto-detect fails when multiple supported client configs already exist", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "https://mcp.bardo.ai/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await mkdir(path.join(workspaceRoot, ".kiro/settings"), {
+				recursive: true,
+			});
+			await mkdir(path.join(workspaceRoot, ".cursor"), { recursive: true });
+			await writeFile(
+				path.join(workspaceRoot, ".kiro/settings/mcp.json"),
+				JSON.stringify({ mcpServers: {} }, null, 2),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, ".cursor/mcp.json"),
+				JSON.stringify({ mcpServers: {} }, null, 2),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "auto"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr,
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderr.read()).toContain("Multiple client configs detected");
+			expect(stderr.read()).toContain("kiro");
+			expect(stderr.read()).toContain("cursor");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect logs in, bootstraps the workspace, and installs a Kilo config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"kilo",
+					"--api-key",
+					"bardo_live_connect",
+					"--url",
+					"https://mcp.bardo.ai/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Saved Bardo credentials");
+			expect(stdout.read()).toContain("Initialized Bardo workspace");
+			expect(stdout.read()).toContain("Connected Bardo to Kilo Code");
+
+			await expect(
+				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+			).resolves.toContain('"ruleset": "shadowdark"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".kilocode/mcp.json"), "utf8"),
+			).resolves.toContain('"mcpServers"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".kilocode/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect can auto-detect the client from an existing workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(workspaceRoot, ".kiro/settings"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(workspaceRoot, ".kiro/settings/mcp.json"),
+				JSON.stringify({ mcpServers: {} }, null, 2),
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"auto",
+					"--api-key",
+					"bardo_live_connect",
+					"--url",
+					"https://mcp.bardo.ai/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Connected Bardo to Kiro");
+			await expect(
+				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+			).resolves.toContain('"ruleset": "shadowdark"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".kiro/settings/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect dry-run previews install output without persisting login or bootstrapping", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"codex",
+					"--mode",
+					"local",
+					"--dry-run",
+					"--api-key",
+					"bardo_live_preview",
+					"--url",
+					"https://mcp.bardo.ai/mcp",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("[mcp_servers.bardo]");
+			expect(stdout.read()).not.toContain("Connected Bardo");
+			await expect(
+				readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+			await expect(
+				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+			).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("install writes a merge-safe Claude project config", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -843,6 +1377,7 @@ describe("bardo runtime", () => {
 			expect(config.mcp.bardo).toEqual({
 				type: "remote",
 				url: "https://mcp.bardo.ai/mcp",
+				oauth: false,
 				headers: {
 					Authorization: "Bearer bardo_live_saved",
 				},

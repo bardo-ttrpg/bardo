@@ -4,7 +4,7 @@ import {
 	type ConnectionClient,
 	type ConnectionMode,
 	SUPPORTED_CONNECTION_CLIENTS,
-} from "@/lib/connect-snippets";
+} from "../../../../lib/connect-snippets";
 
 function isConnectionMode(value: string | null): value is ConnectionMode {
 	return value === "remote" || value === "local";
