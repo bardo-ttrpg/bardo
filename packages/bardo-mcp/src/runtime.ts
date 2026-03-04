@@ -1,15 +1,23 @@
-import {
-	access,
-	copyFile,
-	cp,
-	mkdir,
-	readFile,
-	rm,
-	writeFile,
-} from "node:fs/promises";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { startLocalMcpServer } from "./local-mcp";
+import {
+	type AutoInstallConnectionClient,
+	buildInstallConfigContent,
+	type ConnectionClient,
+	type ConnectionMode,
+	getConnectionClientAdapter,
+	getConnectionClientDisplayName,
+	isAutoInstallConnectionClient,
+	isConnectionClient,
+	listConnectionClientAdapters,
+	listTomlTableBlocks,
+} from "./client-adapters";
+import { writeTextAtomic } from "./file-utils";
+import {
+	maybeImportRulebook as importWorkspaceRulebook,
+	startLocalMcpServer,
+} from "./local-mcp";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
@@ -57,6 +65,23 @@ type InstallCommandOptions = WorkspaceCommandOptions & {
 	dryRun: boolean;
 };
 
+type ConnectCommandOptions = WorkspaceCommandOptions & {
+	client: string | null;
+	mode: string | null;
+	configPath: string | null;
+	serverName: string | null;
+	dryRun: boolean;
+	apiKey: string | null;
+	url: string | null;
+	token: string | null;
+	exchangeUrl: string | null;
+	statusUrl: string | null;
+	startUrl: string | null;
+	rulebookPath: string | null;
+	ruleset: string | null;
+	skipInit: boolean;
+};
+
 type ExportCommandOptions = WorkspaceCommandOptions & {
 	outputPath: string | null;
 };
@@ -66,6 +91,11 @@ type PackDebugCommandOptions = WorkspaceCommandOptions & {
 };
 
 type DoctorCommandOptions = WorkspaceCommandOptions & {
+	client: string | null;
+	json: boolean;
+};
+
+type ClientsListCommandOptions = {
 	json: boolean;
 };
 
@@ -76,10 +106,12 @@ export type ServeCommandOptions = WorkspaceCommandOptions & {
 
 type ParsedCliCommand =
 	| { command: "help" }
+	| { command: "clients-list"; options: ClientsListCommandOptions }
 	| { command: "login"; options: LoginCommandOptions }
 	| { command: "logout" }
 	| { command: "init"; options: InitCommandOptions }
 	| { command: "install"; options: InstallCommandOptions }
+	| { command: "connect"; options: ConnectCommandOptions }
 	| { command: "export"; options: ExportCommandOptions }
 	| { command: "pack-debug"; options: PackDebugCommandOptions }
 	| { command: "doctor"; options: DoctorCommandOptions }
@@ -104,6 +136,12 @@ type ResolvedServeOptions = {
 	plan: PlanTier | null;
 };
 
+type BardoServerDetection = {
+	hasBardoServer: boolean;
+	urlMatches: boolean | null;
+	actualUrl: string | null;
+};
+
 type DoctorOutput = {
 	auth: {
 		configured: boolean;
@@ -124,6 +162,12 @@ type DoctorOutput = {
 			status: number | null;
 			error: string | null;
 		};
+		controlPlane: {
+			url: string | null;
+			reachable: boolean;
+			status: number | null;
+			error: string | null;
+		};
 	};
 	account: {
 		fetched: boolean;
@@ -138,6 +182,21 @@ type DoctorOutput = {
 		billingUnavailable: boolean;
 		error: string | null;
 	};
+	client: {
+		id: ConnectionClient;
+		label: string;
+		tier: string;
+		autoInstall: boolean;
+		supportsLocal: boolean;
+		supportsRemote: boolean;
+		defaultConfigPath: string | null;
+		configPath: string | null;
+		configExists: boolean;
+		configValid: boolean;
+		hasBardoServer: boolean;
+		error: string | null;
+		warning: string | null;
+	} | null;
 };
 
 export function parseCliArgs(argv: string[]): ParsedCliCommand {
@@ -179,6 +238,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 		};
 	}
 
+	if (first === "connect") {
+		return {
+			command: "connect",
+			options: parseConnectOptions(argv.slice(1)),
+		};
+	}
+
 	if (first === "export") {
 		return {
 			command: "export",
@@ -198,6 +264,18 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 			command: "doctor",
 			options: parseDoctorOptions(argv.slice(1)),
 		};
+	}
+
+	if (first === "clients") {
+		const subcommand = argv[1];
+		if (!subcommand || subcommand === "list") {
+			return {
+				command: "clients-list",
+				options: parseClientsListOptions(
+					subcommand === "list" ? argv.slice(2) : argv.slice(1),
+				),
+			};
+		}
 	}
 
 	if (first === "mcp" && argv[1] === "serve") {
@@ -317,6 +395,7 @@ function parseInitOptions(argv: string[]): InitCommandOptions {
 
 function parseDoctorOptions(argv: string[]): DoctorCommandOptions {
 	let workspaceRoot: string | null = null;
+	let client: string | null = null;
 	let json = false;
 
 	for (let index = 0; index < argv.length; index += 1) {
@@ -327,12 +406,30 @@ function parseDoctorOptions(argv: string[]): DoctorCommandOptions {
 			continue;
 		}
 
+		if (argv[index] === "--client" && typeof argv[index + 1] === "string") {
+			client = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+
 		if (argv[index] === "--json") {
 			json = true;
 		}
 	}
 
-	return { workspaceRoot, json };
+	return { workspaceRoot, client, json };
+}
+
+function parseClientsListOptions(argv: string[]): ClientsListCommandOptions {
+	let json = false;
+
+	for (const arg of argv) {
+		if (arg === "--json") {
+			json = true;
+		}
+	}
+
+	return { json };
 }
 
 function parseInstallOptions(argv: string[]): InstallCommandOptions {
@@ -378,6 +475,129 @@ function parseInstallOptions(argv: string[]): InstallCommandOptions {
 	}
 
 	return { workspaceRoot, client, mode, configPath, serverName, dryRun };
+}
+
+function parseConnectOptions(argv: string[]): ConnectCommandOptions {
+	let workspaceRoot: string | null = null;
+	let client: string | null = null;
+	let mode: string | null = null;
+	let configPath: string | null = null;
+	let serverName: string | null = null;
+	let dryRun = false;
+	let apiKey: string | null = null;
+	let url: string | null = null;
+	let token: string | null = null;
+	let exchangeUrl: string | null = null;
+	let statusUrl: string | null = null;
+	let startUrl: string | null = null;
+	let rulebookPath: string | null = null;
+	let ruleset: string | null = null;
+	let skipInit = false;
+
+	for (let index = 0; index < argv.length; index += 1) {
+		const workspace = parseWorkspaceRootOption(argv, index);
+		if (workspace.workspaceRoot) {
+			workspaceRoot = workspace.workspaceRoot;
+			index = workspace.nextIndex;
+			continue;
+		}
+
+		const arg = argv[index];
+		if (arg === "--client" && typeof argv[index + 1] === "string") {
+			client = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--mode" && typeof argv[index + 1] === "string") {
+			mode = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--config-path" && typeof argv[index + 1] === "string") {
+			configPath = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--server-name" && typeof argv[index + 1] === "string") {
+			serverName = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (
+			(arg === "--api-key" || arg === "-k") &&
+			typeof argv[index + 1] === "string"
+		) {
+			apiKey = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (
+			(arg === "--url" || arg === "-u") &&
+			typeof argv[index + 1] === "string"
+		) {
+			url = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--token" && typeof argv[index + 1] === "string") {
+			token = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--exchange-url" && typeof argv[index + 1] === "string") {
+			exchangeUrl = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--status-url" && typeof argv[index + 1] === "string") {
+			statusUrl = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--start-url" && typeof argv[index + 1] === "string") {
+			startUrl = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (
+			(arg === "--rulebook" || arg === "-r") &&
+			typeof argv[index + 1] === "string"
+		) {
+			rulebookPath = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--ruleset" && typeof argv[index + 1] === "string") {
+			ruleset = argv[index + 1] ?? null;
+			index += 1;
+			continue;
+		}
+		if (arg === "--dry-run") {
+			dryRun = true;
+			continue;
+		}
+		if (arg === "--skip-init") {
+			skipInit = true;
+		}
+	}
+
+	return {
+		workspaceRoot,
+		client,
+		mode,
+		configPath,
+		serverName,
+		dryRun,
+		apiKey,
+		url,
+		token,
+		exchangeUrl,
+		statusUrl,
+		startUrl,
+		rulebookPath,
+		ruleset,
+		skipInit,
+	};
 }
 
 function parseExportOptions(argv: string[]): ExportCommandOptions {
@@ -474,6 +694,8 @@ export async function runCli(
 		case "help":
 			stdout.write(renderHelp());
 			return 0;
+		case "clients-list":
+			return handleClientsList(parsed.options, stdout);
 		case "login":
 			return handleLogin(parsed.options, deps, stdout, stderr);
 		case "logout":
@@ -482,6 +704,8 @@ export async function runCli(
 			return handleInit(parsed.options, deps, stdout, stderr);
 		case "install":
 			return handleInstall(parsed.options, deps, stdout, stderr);
+		case "connect":
+			return handleConnect(parsed.options, deps, stdout, stderr);
 		case "export":
 			return handleExport(parsed.options, deps, stdout, stderr);
 		case "pack-debug":
@@ -497,24 +721,30 @@ function renderHelp(): string {
 	return `Bardo runtime
 
 Usage:
+  bardo clients list [--json]
   bardo login --api-key <key> [--url <mcp-url>]
   bardo login --token <login-token> --exchange-url <https-url> [--status-url <https-url>]
   bardo login [--start-url <https-url>]
   bardo logout
   bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
-  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode> [--mode <local|remote>] [--config-path <path>] [--dry-run]
+  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local|remote>] [--config-path <path>] [--dry-run]
+  bardo connect --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local|remote>] [--ruleset <slug>] [--rulebook <path>]
   bardo export --output <path> [--workspace-root <path>]
   bardo pack-debug --output <path> [--workspace-root <path>]
-  bardo doctor [--workspace-root <path>] [--json]
+  bardo doctor [--workspace-root <path>] [--client <client|auto>] [--json]
   bardo mcp serve [--api-key <key>] [--url <mcp-url>] [--workspace-root <path>]
 
 Compatibility:
   bardo-mcp --api-key <key> [--url <mcp-url>] [--workspace-root <path>]
 
 Notes:
+  clients list shows the supported client matrix and whether each client can be auto-installed.
+  For the simplest setup, run bardo connect --client <client> from your project root.
   login accepts either an API key directly or a short-lived website-issued login token.
   Without arguments, login can start a browser approval flow against the website control plane.
+  connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
   --status-url lets doctor fetch plan and key status details from the website control plane.
+  If you are testing from the source tree, run bun link in packages/bardo-mcp once so the bardo command is available globally.
   The workspace root defaults to the current working directory.
 `;
 }
@@ -525,62 +755,105 @@ async function handleLogin(
 	stdout: Writer,
 	stderr: Writer,
 ): Promise<number> {
-	const env = deps.env ?? process.env;
-	let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
-	let url = options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
-	let serverName: string | undefined;
-	let statusUrl =
-		options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
+	try {
+		const env = deps.env ?? process.env;
+		let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
+		let url =
+			options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
+		let serverName: string | undefined;
+		let statusUrl =
+			options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
+		const startUrl =
+			options.startUrl?.trim() ||
+			env.BARDO_LOGIN_START_URL?.trim() ||
+			"https://app.bardo.ai/api/connect/cli-session/start";
 
-	if (!apiKey && options.token?.trim()) {
-		const exchange = await exchangeLoginToken({
-			token: options.token.trim(),
-			exchangeUrl:
-				options.exchangeUrl?.trim() ||
-				env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
-				null,
-			fetchImpl: deps.fetch ?? fetch,
+		if (!apiKey && options.token?.trim()) {
+			const exchange = await exchangeLoginToken({
+				token: options.token.trim(),
+				exchangeUrl:
+					options.exchangeUrl?.trim() ||
+					env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
+					null,
+				fetchImpl: deps.fetch ?? fetch,
+			});
+			apiKey = exchange.apiKey;
+			url = exchange.mcpUrl;
+			serverName = exchange.serverName;
+			statusUrl = exchange.statusUrl ?? statusUrl;
+		}
+
+		if (!apiKey && !options.token?.trim()) {
+			const interactive = await runInteractiveLoginFlow({
+				startUrl,
+				fetchImpl: deps.fetch ?? fetch,
+				sleep:
+					deps.sleep ??
+					(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+				stdout,
+			});
+			apiKey = interactive.apiKey;
+			url = interactive.mcpUrl;
+			statusUrl = interactive.statusUrl ?? statusUrl;
+			serverName = interactive.serverName;
+		}
+
+		if (!apiKey) {
+			stderr.write(
+				"Missing API key. Pass --api-key, set BARDO_API_KEY, or use --token with --exchange-url.\n",
+			);
+			return 1;
+		}
+
+		const now = (deps.now ?? (() => new Date()))().toISOString();
+		await writeConfig(resolveConfigPath(deps), {
+			apiKey,
+			url,
+			updatedAtISO: now,
+			serverName,
+			statusUrl: statusUrl ?? undefined,
 		});
-		apiKey = exchange.apiKey;
-		url = exchange.mcpUrl;
-		serverName = exchange.serverName;
-		statusUrl = exchange.statusUrl ?? statusUrl;
-	}
-
-	if (!apiKey && !options.token?.trim()) {
-		const interactive = await runInteractiveLoginFlow({
-			startUrl:
-				options.startUrl?.trim() ||
-				env.BARDO_LOGIN_START_URL?.trim() ||
-				"https://app.bardo.ai/api/connect/cli-session/start",
-			fetchImpl: deps.fetch ?? fetch,
-			sleep:
-				deps.sleep ??
-				(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
-			stdout,
-		});
-		apiKey = interactive.apiKey;
-		url = interactive.mcpUrl;
-		statusUrl = interactive.statusUrl ?? statusUrl;
-		serverName = interactive.serverName;
-	}
-
-	if (!apiKey) {
-		stderr.write(
-			"Missing API key. Pass --api-key, set BARDO_API_KEY, or use --token with --exchange-url.\n",
-		);
+		stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
 		return 1;
 	}
+}
 
-	const now = (deps.now ?? (() => new Date()))().toISOString();
-	await writeConfig(resolveConfigPath(deps), {
-		apiKey,
-		url,
-		updatedAtISO: now,
-		serverName,
-		statusUrl: statusUrl ?? undefined,
-	});
-	stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
+function handleClientsList(
+	options: ClientsListCommandOptions,
+	stdout: Writer,
+): number {
+	const clients = listConnectionClientAdapters().map((client) => ({
+		id: client.id,
+		label: client.label,
+		tier: client.tier,
+		autoInstall: client.autoInstall,
+		supportsLocal: client.supportsLocal,
+		supportsRemote: client.supportsRemote,
+		defaultConfigPath: client.defaultConfigPath,
+	}));
+
+	if (options.json) {
+		stdout.write(`${JSON.stringify(clients, null, 2)}\n`);
+		return 0;
+	}
+
+	const lines = ["Bardo supported clients", ""];
+	for (const client of clients) {
+		lines.push(
+			`${client.label} (${client.id})`,
+			`  tier: ${client.tier}`,
+			`  auto-install: ${client.autoInstall ? "yes" : "no"}`,
+			`  local: ${client.supportsLocal ? "yes" : "no"}`,
+			`  remote: ${client.supportsRemote ? "yes" : "no"}`,
+			`  config path: ${client.defaultConfigPath ?? "manual / client-specific"}`,
+			"",
+		);
+	}
+
+	stdout.write(`${lines.join("\n")}\n`);
 	return 0;
 }
 
@@ -607,7 +880,8 @@ async function handleInit(
 		);
 		const bardoRoot = resolveBardoRoot(workspaceRoot, env);
 		const createdDirectories = await ensureWorkspaceDirectories(bardoRoot);
-		const importedRulebooks = await maybeImportRulebook({
+		const importedRulebooks = await importWorkspaceRulebook({
+			workspaceRoot,
 			bardoRoot,
 			rulebookPath: options.rulebookPath,
 		});
@@ -642,7 +916,7 @@ async function handleInstall(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		);
-		const client = normalizeInstallClient(options.client);
+		const client = await resolveInstallClient(options.client, workspaceRoot);
 		const mode = normalizeInstallMode(options.mode);
 		const credentials = resolveStoredCredentials(config, env);
 		if (!credentials.apiKey || !credentials.url) {
@@ -656,13 +930,14 @@ async function handleInstall(
 			workspaceRoot,
 			configPath: options.configPath,
 		});
-		const nextContent = await buildClientConfigContent({
+		const existingContent = await readFile(configPath, "utf8").catch(() => "");
+		const nextContent = buildInstallConfigContent({
 			client,
 			mode,
 			serverName,
 			apiKey: credentials.apiKey,
 			url: credentials.url,
-			configPath,
+			existingContent,
 		});
 
 		if (options.dryRun) {
@@ -670,9 +945,145 @@ async function handleInstall(
 			return 0;
 		}
 
-		await mkdir(path.dirname(configPath), { recursive: true });
-		await writeFile(configPath, nextContent, "utf8");
+		await writeTextAtomic(configPath, nextContent);
 		stdout.write(`Installed Bardo MCP config at ${configPath}\n`);
+		return 0;
+	} catch (error) {
+		stderr.write(`${toErrorMessage(error)}\n`);
+		return 1;
+	}
+}
+
+async function handleConnect(
+	options: ConnectCommandOptions,
+	deps: CliRuntimeDeps,
+	stdout: Writer,
+	stderr: Writer,
+): Promise<number> {
+	try {
+		const env = deps.env ?? process.env;
+		const workspaceRoot = resolveWorkspaceRoot(
+			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
+			deps.cwd ?? process.cwd(),
+		);
+		const client = await resolveInstallClient(options.client, workspaceRoot);
+		const config = await readConfig(resolveConfigPath(deps));
+		const credentials = resolveConnectCredentials(options, config, env);
+		if (options.dryRun) {
+			if (!credentials.apiKey || !credentials.url) {
+				throw new Error(
+					"Missing credentials for dry-run. Pass --api-key with --url or run `bardo login` first.",
+				);
+			}
+
+			const serverName =
+				options.serverName?.trim() || config?.serverName || "bardo";
+			const configPath = resolveInstallConfigPath({
+				client,
+				workspaceRoot,
+				configPath: options.configPath,
+			});
+			const existingContent = await readFile(configPath, "utf8").catch(
+				() => "",
+			);
+			const nextContent = buildInstallConfigContent({
+				client,
+				mode: normalizeInstallMode(options.mode),
+				serverName,
+				apiKey: credentials.apiKey,
+				url: credentials.url,
+				existingContent,
+			});
+			stdout.write(`${nextContent}\n`);
+			return 0;
+		}
+
+		const hasLoginInputs = [options.token, options.apiKey].some(
+			(value) => typeof value === "string" && value.trim().length > 0,
+		);
+		const hasMetadataOverrides = [
+			options.url,
+			options.statusUrl,
+			options.serverName,
+		].some((value) => typeof value === "string" && value.trim().length > 0);
+
+		if (hasLoginInputs || !credentials.apiKey || !credentials.url) {
+			const loginExitCode = await handleLogin(
+				{
+					apiKey: options.apiKey,
+					url: options.url,
+					token: options.token,
+					exchangeUrl: options.exchangeUrl,
+					statusUrl: options.statusUrl,
+					startUrl: options.startUrl,
+				},
+				deps,
+				stdout,
+				stderr,
+			);
+			if (loginExitCode !== 0) {
+				return loginExitCode;
+			}
+		} else if (hasMetadataOverrides) {
+			await writeConfig(resolveConfigPath(deps), {
+				apiKey: credentials.apiKey,
+				url: credentials.url,
+				statusUrl:
+					options.statusUrl?.trim() ||
+					config?.statusUrl ||
+					env.BARDO_RUNTIME_STATUS_URL?.trim() ||
+					undefined,
+				serverName: options.serverName?.trim() || config?.serverName,
+				updatedAtISO: (deps.now ?? (() => new Date()))().toISOString(),
+			});
+		}
+
+		if (!options.skipInit) {
+			const bardoRoot = resolveBardoRoot(workspaceRoot, env);
+			const manifestExists = await access(path.join(bardoRoot, "manifest.json"))
+				.then(() => true)
+				.catch(() => false);
+			if (
+				!manifestExists ||
+				Boolean(options.rulebookPath?.trim()) ||
+				Boolean(options.ruleset?.trim())
+			) {
+				const initExitCode = await handleInit(
+					{
+						workspaceRoot,
+						rulebookPath: options.rulebookPath,
+						ruleset: options.ruleset,
+					},
+					deps,
+					stdout,
+					stderr,
+				);
+				if (initExitCode !== 0) {
+					return initExitCode;
+				}
+			}
+		}
+
+		const installExitCode = await handleInstall(
+			{
+				workspaceRoot,
+				client,
+				mode: options.mode,
+				configPath: options.configPath,
+				serverName: options.serverName,
+				dryRun: options.dryRun,
+			},
+			deps,
+			stdout,
+			stderr,
+		);
+		if (installExitCode !== 0) {
+			return installExitCode;
+		}
+
+		stdout.write(
+			`Connected Bardo to ${getConnectionClientDisplayName(client)} for ${workspaceRoot}\n`,
+		);
 		return 0;
 	} catch (error) {
 		stderr.write(`${toErrorMessage(error)}\n`);
@@ -756,12 +1167,7 @@ async function handlePackDebug(
 		};
 
 		const resolvedOutputPath = path.resolve(outputPath);
-		await mkdir(path.dirname(resolvedOutputPath), { recursive: true });
-		await writeFile(
-			resolvedOutputPath,
-			JSON.stringify(payload, null, 2),
-			"utf8",
-		);
+		await writeTextAtomic(resolvedOutputPath, JSON.stringify(payload, null, 2));
 		stdout.write(`Wrote Bardo debug bundle to ${resolvedOutputPath}\n`);
 		return 0;
 	} catch (error) {
@@ -784,7 +1190,17 @@ async function handleDoctor(
 			stdout.write(renderDoctorReport(report));
 		}
 
-		return report.auth.configured && report.connectivity.health.ok ? 0 : 1;
+		const clientHealthy =
+			report.client === null ||
+			!report.client.autoInstall ||
+			(report.client.configExists &&
+				report.client.configValid &&
+				report.client.hasBardoServer);
+		return report.auth.configured &&
+			report.connectivity.health.ok &&
+			clientHealthy
+			? 0
+			: 1;
 	} catch (error) {
 		stderr.write(`${toErrorMessage(error)}\n`);
 		return 1;
@@ -925,26 +1341,6 @@ async function ensureWorkspaceDirectories(
 	return created;
 }
 
-async function maybeImportRulebook(args: {
-	bardoRoot: string;
-	rulebookPath: string | null;
-}): Promise<string[]> {
-	if (!args.rulebookPath) {
-		return [];
-	}
-
-	const absoluteSource = path.resolve(args.rulebookPath);
-	const sourceName = path.basename(absoluteSource);
-	const target = path.join(
-		args.bardoRoot,
-		"rules/sources/rulebook",
-		sourceName,
-	);
-	await mkdir(path.dirname(target), { recursive: true });
-	await copyFile(absoluteSource, target);
-	return [path.relative(args.bardoRoot, target).replaceAll("\\", "/")];
-}
-
 async function ensureWorkspaceCoreFiles(args: {
 	bardoRoot: string;
 	workspaceRoot: string;
@@ -1063,8 +1459,7 @@ async function writeConfig(
 	filePath: string,
 	config: SavedConfig,
 ): Promise<void> {
-	await mkdir(path.dirname(filePath), { recursive: true });
-	await writeFile(filePath, JSON.stringify(config, null, 2), "utf8");
+	await writeTextAtomic(filePath, JSON.stringify(config, null, 2));
 }
 
 async function readConfig(filePath: string): Promise<SavedConfig | null> {
@@ -1101,31 +1496,97 @@ function resolveStoredCredentials(
 	};
 }
 
-function normalizeInstallClient(
-	value: string | null,
-): "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode" {
-	switch (value?.trim().toLowerCase()) {
-		case "claude":
-		case "opencode":
-		case "codex":
-		case "cursor":
-		case "windsurf":
-		case "vscode":
-			return value.trim().toLowerCase() as
-				| "claude"
-				| "opencode"
-				| "codex"
-				| "cursor"
-				| "windsurf"
-				| "vscode";
-		default:
-			throw new Error(
-				"Unsupported client. Use claude, opencode, codex, cursor, windsurf, or vscode.",
-			);
-	}
+function resolveConnectCredentials(
+	options: ConnectCommandOptions,
+	config: SavedConfig | null,
+	env: Record<string, string | undefined>,
+) {
+	return {
+		apiKey:
+			options.apiKey?.trim() ||
+			env.BARDO_API_KEY?.trim() ||
+			config?.apiKey ||
+			null,
+		url:
+			options.url?.trim() || env.BARDO_MCP_URL?.trim() || config?.url || null,
+	};
 }
 
-function normalizeInstallMode(value: string | null): "local" | "remote" {
+function normalizeInstallClient(
+	value: string | null,
+): AutoInstallConnectionClient {
+	const normalized = value?.trim().toLowerCase() ?? null;
+	if (isAutoInstallConnectionClient(normalized)) {
+		return normalized;
+	}
+	throw new Error(
+		"Unsupported client. Use claude, opencode, codex, cursor, windsurf, vscode, kiro, kilo, or trae.",
+	);
+}
+
+async function resolveInstallClient(
+	value: string | null,
+	workspaceRoot: string,
+): Promise<AutoInstallConnectionClient> {
+	const normalized = value?.trim().toLowerCase() ?? null;
+	if (normalized === "auto") {
+		return detectWorkspaceClient(workspaceRoot);
+	}
+	return normalizeInstallClient(value);
+}
+
+async function resolveDoctorClient(
+	value: string | null,
+	workspaceRoot: string,
+): Promise<ConnectionClient> {
+	const normalized = value?.trim().toLowerCase() ?? null;
+	if (normalized === "auto") {
+		return detectWorkspaceClient(workspaceRoot);
+	}
+	if (isConnectionClient(normalized)) {
+		return normalized;
+	}
+	throw new Error(
+		"Unsupported client. Use claude, opencode, codex, cursor, windsurf, vscode, kiro, kilo, trae, generic, or auto.",
+	);
+}
+
+async function detectWorkspaceClient(
+	workspaceRoot: string,
+): Promise<AutoInstallConnectionClient> {
+	const detected: AutoInstallConnectionClient[] = [];
+
+	for (const client of listConnectionClientAdapters()) {
+		if (!client.autoInstall || !client.defaultConfigPath) {
+			continue;
+		}
+		const configPath = path.join(workspaceRoot, client.defaultConfigPath);
+		const exists = await access(configPath)
+			.then(() => true)
+			.catch(() => false);
+		if (exists) {
+			detected.push(client.id as AutoInstallConnectionClient);
+		}
+	}
+
+	if (detected.length === 1) {
+		return detected[0];
+	}
+
+	if (detected.length > 1) {
+		throw new Error(
+			`Multiple client configs detected: ${detected.join(
+				", ",
+			)}. Pass --client explicitly.`,
+		);
+	}
+
+	throw new Error(
+		"No supported client config detected in this workspace. Pass --client explicitly.",
+	);
+}
+
+function normalizeInstallMode(value: string | null): ConnectionMode {
 	const normalized = value?.trim().toLowerCase() || "local";
 	if (normalized === "local" || normalized === "remote") {
 		return normalized;
@@ -1134,267 +1595,18 @@ function normalizeInstallMode(value: string | null): "local" | "remote" {
 }
 
 function resolveInstallConfigPath(args: {
-	client: "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode";
+	client: AutoInstallConnectionClient;
 	workspaceRoot: string;
 	configPath: string | null;
 }): string {
 	if (args.configPath?.trim()) {
 		return path.resolve(args.workspaceRoot, args.configPath.trim());
 	}
-
-	switch (args.client) {
-		case "claude":
-			return path.join(args.workspaceRoot, ".mcp.json");
-		case "opencode":
-			return path.join(args.workspaceRoot, "opencode.json");
-		case "codex":
-			return path.join(args.workspaceRoot, ".codex/config.toml");
-		case "cursor":
-			return path.join(args.workspaceRoot, ".cursor/mcp.json");
-		case "windsurf":
-			return path.join(args.workspaceRoot, ".windsurf/mcp.json");
-		case "vscode":
-			return path.join(args.workspaceRoot, ".vscode/settings.json");
+	const adapter = getConnectionClientAdapter(args.client);
+	if (!adapter.defaultConfigPath) {
+		throw new Error(`Client ${adapter.label} does not support auto-install.`);
 	}
-}
-
-async function buildClientConfigContent(args: {
-	client: "claude" | "opencode" | "codex" | "cursor" | "windsurf" | "vscode";
-	mode: "local" | "remote";
-	serverName: string;
-	apiKey: string;
-	url: string;
-	configPath: string;
-}): Promise<string> {
-	if (args.client === "codex") {
-		const block = buildCodexServerBlock(args);
-		const existing = await readFile(args.configPath, "utf8").catch(() => "");
-		return upsertTomlTable(existing, `mcp_servers.${args.serverName}`, block);
-	}
-
-	const existing = await readFile(args.configPath, "utf8")
-		.then((raw) => JSON.parse(raw) as Record<string, unknown>)
-		.catch(() => ({}));
-	const next = mergeClientJsonConfig(existing, args);
-	return `${JSON.stringify(next, null, 2)}\n`;
-}
-
-function buildCodexServerBlock(args: {
-	mode: "local" | "remote";
-	serverName: string;
-	apiKey: string;
-	url: string;
-}) {
-	if (args.mode === "remote") {
-		return [
-			`[mcp_servers.${args.serverName}]`,
-			`url = ${JSON.stringify(args.url)}`,
-			`http_headers = { "Authorization" = ${JSON.stringify(
-				`Bearer ${args.apiKey}`,
-			)} }`,
-			"",
-		].join("\n");
-	}
-
-	return [
-		`[mcp_servers.${args.serverName}]`,
-		`command = "bunx"`,
-		`args = ${JSON.stringify([
-			"--bun",
-			"--package",
-			"@bardo/mcp",
-			"bardo",
-			"mcp",
-			"serve",
-			"--api-key",
-			args.apiKey,
-			"--url",
-			args.url,
-			"--workspace-root",
-			".",
-		])}`,
-		"",
-	].join("\n");
-}
-
-function upsertTomlTable(
-	existing: string,
-	tableName: string,
-	replacementBlock: string,
-): string {
-	const escapedTable = tableName.replaceAll(".", "\\.");
-	const pattern = new RegExp(
-		String.raw`^\[${escapedTable}\]\n(?:.*\n)*?(?=^\[|\s*$)`,
-		"m",
-	);
-	if (pattern.test(existing)) {
-		return existing.replace(pattern, replacementBlock);
-	}
-	const trimmed = existing.trimEnd();
-	return trimmed.length > 0
-		? `${trimmed}\n\n${replacementBlock}`
-		: replacementBlock;
-}
-
-function mergeClientJsonConfig(
-	existing: Record<string, unknown>,
-	args: {
-		client: "claude" | "opencode" | "cursor" | "windsurf" | "vscode";
-		mode: "local" | "remote";
-		serverName: string;
-		apiKey: string;
-		url: string;
-	},
-): Record<string, unknown> {
-	if (args.client === "claude") {
-		const root = structuredClone(existing);
-		const servers =
-			typeof root.mcpServers === "object" && root.mcpServers !== null
-				? (root.mcpServers as Record<string, unknown>)
-				: {};
-		servers[args.serverName] =
-			args.mode === "remote"
-				? {
-						type: "http",
-						url: args.url,
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-						},
-					}
-				: {
-						command: "bunx",
-						args: [
-							"--bun",
-							"--package",
-							"@bardo/mcp",
-							"bardo",
-							"mcp",
-							"serve",
-							"--api-key",
-							args.apiKey,
-							"--url",
-							args.url,
-							"--workspace-root",
-							".",
-						],
-					};
-		root.mcpServers = servers;
-		return root;
-	}
-
-	if (args.client === "opencode") {
-		const root = structuredClone(existing);
-		const mcp =
-			typeof root.mcp === "object" && root.mcp !== null
-				? (root.mcp as Record<string, unknown>)
-				: {};
-		mcp[args.serverName] =
-			args.mode === "remote"
-				? {
-						type: "remote",
-						url: args.url,
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-						},
-						enabled: true,
-					}
-				: {
-						type: "local",
-						command: [
-							"bunx",
-							"--bun",
-							"--package",
-							"@bardo/mcp",
-							"bardo",
-							"mcp",
-							"serve",
-							"--api-key",
-							args.apiKey,
-							"--url",
-							args.url,
-							"--workspace-root",
-							".",
-						],
-						enabled: true,
-					};
-		root.mcp = mcp;
-		return root;
-	}
-
-	if (args.client === "vscode") {
-		const root = structuredClone(existing);
-		const mcp =
-			typeof root.mcp === "object" && root.mcp !== null
-				? (root.mcp as Record<string, unknown>)
-				: {};
-		const servers =
-			typeof mcp.servers === "object" && mcp.servers !== null
-				? (mcp.servers as Record<string, unknown>)
-				: {};
-		servers[args.serverName] =
-			args.mode === "remote"
-				? {
-						type: "http",
-						url: args.url,
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-						},
-					}
-				: {
-						type: "stdio",
-						command: "bunx",
-						args: [
-							"--bun",
-							"--package",
-							"@bardo/mcp",
-							"bardo",
-							"mcp",
-							"serve",
-							"--api-key",
-							args.apiKey,
-							"--url",
-							args.url,
-							"--workspace-root",
-							".",
-						],
-					};
-		mcp.servers = servers;
-		root.mcp = mcp;
-		return root;
-	}
-
-	const root = structuredClone(existing);
-	const servers =
-		typeof root.mcpServers === "object" && root.mcpServers !== null
-			? (root.mcpServers as Record<string, unknown>)
-			: {};
-	servers[args.serverName] =
-		args.mode === "remote"
-			? {
-					url: args.url,
-					headers: {
-						Authorization: `Bearer ${args.apiKey}`,
-					},
-				}
-			: {
-					command: "bunx",
-					args: [
-						"--bun",
-						"--package",
-						"@bardo/mcp",
-						"bardo",
-						"mcp",
-						"serve",
-						"--api-key",
-						args.apiKey,
-						"--url",
-						args.url,
-						"--workspace-root",
-						".",
-					],
-				};
-	root.mcpServers = servers;
-	return root;
+	return path.join(args.workspaceRoot, adapter.defaultConfigPath);
 }
 
 function redactApiKey(apiKey: string | null): string | null {
@@ -1423,14 +1635,19 @@ async function exchangeLoginToken(args: {
 		);
 	}
 
-	const response = await args.fetchImpl(args.exchangeUrl, {
-		method: "POST",
-		headers: {
-			"content-type": "application/json",
-			accept: "application/json",
-		},
-		body: JSON.stringify({ token: args.token }),
-	});
+	let response: Response;
+	try {
+		response = await args.fetchImpl(args.exchangeUrl, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				accept: "application/json",
+			},
+			body: JSON.stringify({ token: args.token }),
+		});
+	} catch (error) {
+		throw new Error(formatControlPlaneRequestError(args.exchangeUrl, error));
+	}
 	const body = (await response.json().catch(() => ({}))) as {
 		apiKey?: string;
 		mcpUrl?: string;
@@ -1469,12 +1686,17 @@ async function runInteractiveLoginFlow(args: {
 	statusUrl?: string;
 	serverName?: string;
 }> {
-	const startResponse = await args.fetchImpl(args.startUrl, {
-		method: "POST",
-		headers: {
-			accept: "application/json",
-		},
-	});
+	let startResponse: Response;
+	try {
+		startResponse = await args.fetchImpl(args.startUrl, {
+			method: "POST",
+			headers: {
+				accept: "application/json",
+			},
+		});
+	} catch (error) {
+		throw new Error(formatControlPlaneRequestError(args.startUrl, error));
+	}
 	const startBody = (await startResponse.json().catch(() => ({}))) as Partial<{
 		sessionId: string;
 		userCode: string;
@@ -1510,12 +1732,17 @@ async function runInteractiveLoginFlow(args: {
 			: 3000;
 
 	for (;;) {
-		const pollResponse = await args.fetchImpl(startBody.pollUrl, {
-			method: "GET",
-			headers: {
-				accept: "application/json",
-			},
-		});
+		let pollResponse: Response;
+		try {
+			pollResponse = await args.fetchImpl(startBody.pollUrl, {
+				method: "GET",
+				headers: {
+					accept: "application/json",
+				},
+			});
+		} catch (error) {
+			throw new Error(formatControlPlaneRequestError(startBody.pollUrl, error));
+		}
 		const pollBody = (await pollResponse.json().catch(() => ({}))) as Partial<{
 			status: string;
 			apiKey: string;
@@ -1594,6 +1821,12 @@ async function buildDoctorReport(
 		apiKey,
 		fetchImpl: deps.fetch ?? fetch,
 	});
+	const client = await checkClientStatus({
+		client: options.client,
+		workspaceRoot,
+		expectedServerName: config?.serverName ?? null,
+		expectedUrl: url,
+	});
 
 	return {
 		auth: {
@@ -1610,9 +1843,383 @@ async function buildDoctorReport(
 		},
 		connectivity: {
 			health,
+			controlPlane: await checkControlPlaneReachability(
+				statusUrl || env.BARDO_LOGIN_START_URL?.trim() || null,
+				deps.fetch ?? fetch,
+			),
 		},
 		account,
+		client,
 	};
+}
+
+async function checkClientStatus(args: {
+	client: string | null;
+	workspaceRoot: string;
+	expectedServerName: string | null;
+	expectedUrl: string | null;
+}): Promise<DoctorOutput["client"]> {
+	if (!args.client) {
+		return null;
+	}
+
+	const normalized = await resolveDoctorClient(args.client, args.workspaceRoot);
+
+	const adapter = getConnectionClientAdapter(normalized);
+	const configPath = adapter.defaultConfigPath
+		? path.join(args.workspaceRoot, adapter.defaultConfigPath)
+		: null;
+	const configExists = configPath
+		? await access(configPath)
+				.then(() => true)
+				.catch(() => false)
+		: false;
+	const inspection = configPath
+		? await inspectClientConfig({
+				client: normalized,
+				configPath,
+				configExists,
+				expectedServerName: args.expectedServerName,
+				expectedUrl: args.expectedUrl,
+			})
+		: {
+				configValid: false,
+				hasBardoServer: false,
+				error: adapter.autoInstall
+					? "Client config path is not available."
+					: null,
+				warning: null,
+			};
+
+	return {
+		id: adapter.id,
+		label: adapter.label,
+		tier: adapter.tier,
+		autoInstall: adapter.autoInstall,
+		supportsLocal: adapter.supportsLocal,
+		supportsRemote: adapter.supportsRemote,
+		defaultConfigPath: adapter.defaultConfigPath,
+		configPath,
+		configExists,
+		configValid: inspection.configValid,
+		hasBardoServer: inspection.hasBardoServer,
+		error: inspection.error,
+		warning: inspection.warning,
+	};
+}
+
+async function inspectClientConfig(args: {
+	client: ConnectionClient;
+	configPath: string;
+	configExists: boolean;
+	expectedServerName: string | null;
+	expectedUrl: string | null;
+}): Promise<{
+	configValid: boolean;
+	hasBardoServer: boolean;
+	error: string | null;
+	warning: string | null;
+}> {
+	if (!args.configExists) {
+		return {
+			configValid: false,
+			hasBardoServer: false,
+			error: "Client config file was not found.",
+			warning: null,
+		};
+	}
+
+	const adapter = getConnectionClientAdapter(args.client);
+	const raw = await readFile(args.configPath, "utf8").catch(() => null);
+	if (raw === null) {
+		return {
+			configValid: false,
+			hasBardoServer: false,
+			error: "Client config file could not be read.",
+			warning: null,
+		};
+	}
+
+	if (adapter.installVariant === "codex") {
+		const detection = detectCodexBardoServer(raw, {
+			serverName: args.expectedServerName,
+			url: args.expectedUrl,
+		});
+		return {
+			configValid: true,
+			hasBardoServer: detection.hasBardoServer,
+			error: detection.hasBardoServer
+				? null
+				: "Bardo server entry was not found.",
+			warning: buildBardoServerWarning(detection, args.expectedUrl),
+		};
+	}
+
+	try {
+		const parsed = JSON.parse(raw) as Record<string, unknown>;
+		const detection = detectJsonBardoServer(args.client, parsed, {
+			serverName: args.expectedServerName,
+			url: args.expectedUrl,
+		});
+		return {
+			configValid: true,
+			hasBardoServer: detection.hasBardoServer,
+			error: detection.hasBardoServer
+				? null
+				: "Bardo server entry was not found.",
+			warning: buildBardoServerWarning(detection, args.expectedUrl),
+		};
+	} catch {
+		return {
+			configValid: false,
+			hasBardoServer: false,
+			error:
+				"Invalid client config file. Fix the JSON before using this client.",
+			warning: null,
+		};
+	}
+}
+
+function buildBardoServerWarning(
+	detection: BardoServerDetection,
+	expectedUrl: string | null,
+): string | null {
+	if (
+		detection.hasBardoServer &&
+		expectedUrl &&
+		detection.actualUrl &&
+		detection.urlMatches === false
+	) {
+		return `Configured Bardo server URL ${detection.actualUrl} does not match the saved MCP URL ${expectedUrl}. Re-run install or connect to update the client config.`;
+	}
+
+	return null;
+}
+
+function detectJsonBardoServer(
+	client: ConnectionClient,
+	payload: Record<string, unknown>,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): BardoServerDetection {
+	if (client === "vscode") {
+		const mcp =
+			typeof payload.mcp === "object" && payload.mcp !== null
+				? (payload.mcp as Record<string, unknown>)
+				: null;
+		return detectJsonBardoServerEntry(
+			mcp && typeof mcp.servers === "object" && mcp.servers !== null
+				? (mcp.servers as Record<string, unknown>)
+				: null,
+			expected,
+		);
+	}
+
+	if (client === "opencode") {
+		const mcp =
+			typeof payload.mcp === "object" && payload.mcp !== null
+				? (payload.mcp as Record<string, unknown>)
+				: null;
+		return detectJsonBardoServerEntry(mcp, expected);
+	}
+
+	return detectJsonBardoServerEntry(
+		typeof payload.mcpServers === "object" && payload.mcpServers !== null
+			? (payload.mcpServers as Record<string, unknown>)
+			: null,
+		expected,
+	);
+}
+
+function detectJsonBardoServerEntry(
+	servers: Record<string, unknown> | null,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): BardoServerDetection {
+	if (!servers) {
+		return {
+			hasBardoServer: false,
+			urlMatches: null,
+			actualUrl: null,
+		};
+	}
+
+	for (const [serverName, entry] of Object.entries(servers)) {
+		const detection = detectBardoServerEntry(entry, {
+			serverName,
+			expectedServerName: expected.serverName,
+			expectedUrl: expected.url,
+		});
+		if (detection.hasBardoServer) {
+			return detection;
+		}
+	}
+
+	return {
+		hasBardoServer: false,
+		urlMatches: null,
+		actualUrl: null,
+	};
+}
+
+function detectCodexBardoServer(
+	raw: string,
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): BardoServerDetection {
+	for (const table of listTomlTableBlocks(raw)) {
+		if (!table.tableName.startsWith("mcp_servers.")) {
+			continue;
+		}
+		const detection = detectBardoServerBlock(table, expected);
+		if (detection.hasBardoServer) {
+			return detection;
+		}
+	}
+
+	return {
+		hasBardoServer: false,
+		urlMatches: null,
+		actualUrl: null,
+	};
+}
+
+function detectBardoServerEntry(
+	entry: unknown,
+	args: {
+		serverName: string;
+		expectedServerName: string | null;
+		expectedUrl: string | null;
+	},
+): BardoServerDetection {
+	if (!entry || typeof entry !== "object") {
+		return {
+			hasBardoServer: false,
+			urlMatches: null,
+			actualUrl: null,
+		};
+	}
+
+	const candidate = entry as Record<string, unknown>;
+	const actualUrl = typeof candidate.url === "string" ? candidate.url : null;
+	const urlMatches =
+		args.expectedUrl && actualUrl ? actualUrl === args.expectedUrl : null;
+	const matchesExpectedName =
+		args.expectedServerName !== null &&
+		args.serverName === args.expectedServerName;
+	const matchesDefaultName = args.serverName === "bardo";
+
+	const tokens = collectStringTokens(entry);
+	const hasPackage = tokens.includes("@bardo/mcp");
+	const hasServeCommand =
+		tokens.includes("bardo") &&
+		tokens.includes("mcp") &&
+		tokens.includes("serve");
+
+	return {
+		hasBardoServer:
+			matchesExpectedName ||
+			matchesDefaultName ||
+			urlMatches === true ||
+			hasPackage ||
+			hasServeCommand,
+		urlMatches,
+		actualUrl,
+	};
+}
+
+function detectBardoServerBlock(
+	table: {
+		tableName: string;
+		block: string;
+	},
+	expected: {
+		serverName: string | null;
+		url: string | null;
+	},
+): BardoServerDetection {
+	const parsedServerName = parseCodexServerName(table.tableName);
+	const actualUrl = extractTomlStringValue(table.block, "url");
+	const urlMatches =
+		expected.url && actualUrl ? actualUrl === expected.url : null;
+	const matchesExpectedName =
+		expected.serverName !== null && parsedServerName === expected.serverName;
+	const matchesDefaultName = parsedServerName === "bardo";
+	const hasServeCommand =
+		table.block.includes("@bardo/mcp") ||
+		table.block.includes('"bardo","mcp","serve"');
+
+	return {
+		hasBardoServer:
+			matchesExpectedName ||
+			matchesDefaultName ||
+			urlMatches === true ||
+			hasServeCommand,
+		urlMatches,
+		actualUrl,
+	};
+}
+
+function parseCodexServerName(tableName: string): string | null {
+	if (!tableName.startsWith("mcp_servers.")) {
+		return null;
+	}
+
+	const suffix = tableName.slice("mcp_servers.".length).trim();
+	if (suffix.startsWith('"')) {
+		try {
+			const parsed = JSON.parse(suffix) as unknown;
+			return typeof parsed === "string" ? parsed : null;
+		} catch {
+			return null;
+		}
+	}
+
+	return suffix.length > 0 ? suffix : null;
+}
+
+function extractTomlStringValue(block: string, key: string): string | null {
+	const prefix = `${key} =`;
+	for (const line of block.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed.startsWith(prefix)) {
+			continue;
+		}
+		const rawValue = trimmed.slice(prefix.length).trim();
+		if (!rawValue.startsWith('"')) {
+			return null;
+		}
+		try {
+			const parsed = JSON.parse(rawValue) as unknown;
+			return typeof parsed === "string" ? parsed : null;
+		} catch {
+			return null;
+		}
+	}
+
+	return null;
+}
+
+function collectStringTokens(value: unknown): string[] {
+	if (typeof value === "string") {
+		return [value];
+	}
+
+	if (Array.isArray(value)) {
+		return value.flatMap((item) => collectStringTokens(item));
+	}
+
+	if (value && typeof value === "object") {
+		return Object.values(value).flatMap((item) => collectStringTokens(item));
+	}
+
+	return [];
 }
 
 async function checkAccountStatus(args: {
@@ -1731,8 +2338,19 @@ async function checkHealth(
 		};
 	}
 
+	let healthUrl: string;
 	try {
-		const healthUrl = resolveHealthUrl(mcpUrl);
+		healthUrl = resolveHealthUrl(mcpUrl);
+	} catch {
+		return {
+			url: null,
+			ok: false,
+			status: null,
+			error: `MCP URL is not a valid URL: ${mcpUrl}`,
+		};
+	}
+
+	try {
 		const response = await fetchImpl(healthUrl, {
 			method: "GET",
 			headers: {
@@ -1749,12 +2367,54 @@ async function checkHealth(
 		};
 	} catch (error) {
 		return {
-			url: resolveHealthUrl(mcpUrl),
+			url: healthUrl,
 			ok: false,
 			status: null,
 			error: toErrorMessage(error),
 		};
 	}
+}
+
+async function checkControlPlaneReachability(
+	url: string | null,
+	fetchImpl: FetchLike,
+): Promise<DoctorOutput["connectivity"]["controlPlane"]> {
+	if (!url) {
+		return {
+			url: null,
+			reachable: false,
+			status: null,
+			error: "Missing control plane URL.",
+		};
+	}
+
+	try {
+		const response = await fetchImpl(url, {
+			method: "GET",
+			headers: {
+				accept: "application/json",
+			},
+		});
+		return {
+			url,
+			reachable: true,
+			status: response.status,
+			error: null,
+		};
+	} catch (error) {
+		return {
+			url,
+			reachable: false,
+			status: null,
+			error: toErrorMessage(error),
+		};
+	}
+}
+
+function formatControlPlaneRequestError(url: string, error: unknown): string {
+	return `Could not reach the Bardo website control plane at ${url}. If you are running locally, start it with \`bun run dev:website\`. Otherwise check your BARDO_* control-plane URLs or use \`bardo login --api-key <key>\`. Root cause: ${toErrorMessage(
+		error,
+	)}`;
 }
 
 function resolveHealthUrl(mcpUrl: string): string {
@@ -1780,6 +2440,11 @@ function renderDoctorReport(report: DoctorOutput): string {
 				? `ok (${report.connectivity.health.status})`
 				: (report.connectivity.health.error ?? "failed")
 		}`,
+		`Control plane: ${
+			report.connectivity.controlPlane.reachable
+				? `reachable (${report.connectivity.controlPlane.status})`
+				: (report.connectivity.controlPlane.error ?? "not configured")
+		}`,
 		`Account status: ${
 			!report.account.fetched
 				? "not checked"
@@ -1792,6 +2457,23 @@ function renderDoctorReport(report: DoctorOutput): string {
 					: (report.account.error ?? "failed")
 		}`,
 	];
+	if (report.client) {
+		lines.push(
+			`Client: ${report.client.label} (${report.client.id})`,
+			`Client tier: ${report.client.tier}`,
+			`Client auto-install: ${report.client.autoInstall ? "yes" : "no"}`,
+			`Client config path: ${report.client.configPath ?? "manual / client-specific"}`,
+			`Client config detected: ${report.client.configExists ? "yes" : "no"}`,
+			`Client config valid: ${report.client.configValid ? "yes" : "no"}`,
+			`Bardo entry detected: ${report.client.hasBardoServer ? "yes" : "no"}`,
+		);
+		if (report.client.error) {
+			lines.push(`Client note: ${report.client.error}`);
+		}
+		if (report.client.warning) {
+			lines.push(`Client warning: ${report.client.warning}`);
+		}
+	}
 	return `${lines.join("\n")}\n`;
 }
 
@@ -1803,6 +2485,5 @@ async function writeJsonFile(
 	filePath: string,
 	payload: Record<string, unknown>,
 ): Promise<void> {
-	await mkdir(path.dirname(filePath), { recursive: true });
-	await writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
+	await writeTextAtomic(filePath, JSON.stringify(payload, null, 2));
 }

@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
 import {
 	buildConnectionSnippet,
 	type ConnectionClient,
 	type ConnectionMode,
 	SUPPORTED_CONNECTION_CLIENTS,
-} from "@/lib/connect-snippets";
+} from "@bardo/mcp/client-adapters";
+import { NextResponse } from "next/server";
 
 function isConnectionMode(value: string | null): value is ConnectionMode {
 	return value === "remote" || value === "local";
@@ -85,10 +85,19 @@ function buildSnippetResponse(request: Request, params: SnippetRequest) {
 
 export async function GET(request: Request) {
 	const url = new URL(request.url);
+	if (url.searchParams.has("apiKey")) {
+		return NextResponse.json(
+			{
+				error:
+					"Do not pass apiKey in query params. Use POST /api/connect/snippets for secrets.",
+			},
+			{ status: 400 },
+		);
+	}
 	return buildSnippetResponse(request, {
 		client: url.searchParams.get("client"),
 		mode: url.searchParams.get("mode"),
-		apiKey: url.searchParams.get("apiKey") || "YOUR_API_KEY",
+		apiKey: "YOUR_API_KEY",
 		serverName: url.searchParams.get("serverName") || "bardo",
 	});
 }

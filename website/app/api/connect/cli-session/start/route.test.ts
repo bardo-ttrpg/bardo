@@ -3,8 +3,32 @@ import { createConnectTelemetry } from "../../../../../lib/connect-telemetry";
 import { createCliSessionStartPostHandler } from "./route";
 
 describe("POST /api/connect/cli-session/start", () => {
+	test("returns 429 when the session-start budget is exhausted", async () => {
+		const handler = createCliSessionStartPostHandler({
+			createPendingSession: async () => {
+				throw new Error("should not create a session");
+			},
+			consumeStartBudget: async () => ({
+				allowed: false,
+				retryAfterSeconds: 60,
+			}),
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/cli-session/start", {
+				method: "POST",
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("retry-after")).toBe("60");
+		expect(body.error).toContain("Too many");
+	});
+
 	test("starts a pending CLI session and returns approval metadata", async () => {
 		const handler = createCliSessionStartPostHandler({
+			consumeStartBudget: async () => ({ allowed: true }),
 			createPendingSession: async () => ({
 				sessionId: "cli_session_123",
 				pollSecret: "poll_secret_123",
@@ -37,6 +61,7 @@ describe("POST /api/connect/cli-session/start", () => {
 
 	test("returns a structured 500 when session storage is unavailable", async () => {
 		const handler = createCliSessionStartPostHandler({
+			consumeStartBudget: async () => ({ allowed: true }),
 			createPendingSession: async () => {
 				throw new Error("Upstash unavailable");
 			},
@@ -57,6 +82,7 @@ describe("POST /api/connect/cli-session/start", () => {
 		const telemetry = createConnectTelemetry();
 		const okHandler = createCliSessionStartPostHandler({
 			telemetry,
+			consumeStartBudget: async () => ({ allowed: true }),
 			createPendingSession: async () => ({
 				sessionId: "cli_session_123",
 				pollSecret: "poll_secret_123",
@@ -67,6 +93,7 @@ describe("POST /api/connect/cli-session/start", () => {
 		});
 		const failingHandler = createCliSessionStartPostHandler({
 			telemetry,
+			consumeStartBudget: async () => ({ allowed: true }),
 			createPendingSession: async () => {
 				throw new Error("storage offline");
 			},

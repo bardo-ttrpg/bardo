@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+	mkdir,
+	mkdtemp,
+	readFile,
+	rm,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,7 +116,42 @@ describe("local MCP workspace roots", () => {
 					bardoRoot,
 					rulebookPath: externalRulebook,
 				}),
-			).rejects.toThrow("relative path");
+			).rejects.toThrow("workspace root");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+			await rm(externalRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects rulebook imports through workspace symlinks that escape the root", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const externalRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-external-"),
+		);
+		const bardoRoot = path.join(workspaceRoot, "bardo");
+		await mkdir(path.join(workspaceRoot, "rules"), { recursive: true });
+		await mkdir(bardoRoot, { recursive: true });
+		const externalRulebook = path.join(externalRoot, "secrets.md");
+		const linkedRulebook = path.join(workspaceRoot, "rules", "linked.md");
+		await writeFile(externalRulebook, "# escaped by symlink", "utf8");
+		await symlink(externalRulebook, linkedRulebook);
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.maybeImportRulebook).toBe("function");
+			await expect(
+				(
+					mod.maybeImportRulebook as (args: {
+						workspaceRoot: string;
+						bardoRoot: string;
+						rulebookPath: string;
+					}) => Promise<string[]>
+				)({
+					workspaceRoot,
+					bardoRoot,
+					rulebookPath: "rules/linked.md",
+				}),
+			).rejects.toThrow("workspace root");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 			await rm(externalRoot, { recursive: true, force: true });

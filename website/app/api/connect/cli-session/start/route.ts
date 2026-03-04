@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
+import { getDefaultCliSessionStartRateLimiter } from "../../../../../lib/cli-session-start-rate-limit";
 import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
@@ -8,6 +9,9 @@ import {
 export const runtime = "nodejs";
 
 type CliSessionStartDeps = {
+	consumeStartBudget: (
+		request: Request,
+	) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
 	createPendingSession: () => Promise<{
 		sessionId: string;
 		pollSecret: string;
@@ -28,6 +32,8 @@ function defaultVerificationUrl(request: Request, sessionId: string): string {
 }
 
 const defaultDeps: CliSessionStartDeps = {
+	consumeStartBudget: async (request) =>
+		getDefaultCliSessionStartRateLimiter().consume(request),
 	createPendingSession: async () => getDefaultCliDeviceSessionService().start(),
 	resolveVerificationUrl: defaultVerificationUrl,
 	telemetry: getDefaultConnectTelemetry(),
@@ -40,6 +46,26 @@ export function createCliSessionStartPostHandler(
 
 	return async function POST(request: Request) {
 		try {
+			const budget = await deps.consumeStartBudget(request);
+			if (!budget.allowed) {
+				deps.telemetry.increment("cli_session_start_failed");
+				return NextResponse.json(
+					{
+						error:
+							"Too many CLI session start requests. Wait before trying again.",
+					},
+					{
+						status: 429,
+						headers:
+							typeof budget.retryAfterSeconds === "number"
+								? {
+										"retry-after": String(budget.retryAfterSeconds),
+									}
+								: undefined,
+					},
+				);
+			}
+
 			const session = await deps.createPendingSession();
 			deps.telemetry.increment("cli_session_started");
 			const verificationUrl = deps.resolveVerificationUrl(

@@ -1,23 +1,23 @@
-export type ConnectionClient =
-	| "claude"
-	| "opencode"
-	| "cursor"
-	| "codex"
-	| "vscode"
-	| "windsurf"
-	| "generic";
+import {
+	type ConnectionClient,
+	type ConnectionMode,
+	getConnectionClientAdapter,
+	getConnectionClientDisplayName,
+	SUPPORTED_CONNECTION_CLIENTS,
+} from "../../../lib/connect-snippets";
 
-export type ConnectionMode = "remote" | "local";
+export const CLIENT_OPTIONS: readonly ConnectionClient[] =
+	SUPPORTED_CONNECTION_CLIENTS;
 
-export const CLIENT_OPTIONS: readonly ConnectionClient[] = [
-	"claude",
-	"cursor",
-	"codex",
-	"vscode",
-	"opencode",
-	"windsurf",
-	"generic",
-];
+export type { ConnectionClient, ConnectionMode };
+
+export function getDashboardClientLabel(client: ConnectionClient): string {
+	return getConnectionClientDisplayName(client);
+}
+
+export function getDashboardClientMetadata(client: ConnectionClient) {
+	return getConnectionClientAdapter(client);
+}
 
 export type DashboardKey = {
 	id: string;
@@ -40,8 +40,6 @@ type BillingState = {
 	periodStart: number;
 	mcpCallsTotal: number;
 	mcpCallsThisPeriod: number;
-	apiKeyCallsTotal: number;
-	apiKeyCallsThisPeriod: number;
 };
 
 export type DashboardData = {

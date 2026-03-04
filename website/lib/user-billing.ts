@@ -45,8 +45,6 @@ type BillingFields = {
 	periodStart: number | undefined;
 	mcpCallsTotal: number | undefined;
 	mcpCallsThisPeriod: number | undefined;
-	apiKeyCallsTotal: number | undefined;
-	apiKeyCallsThisPeriod: number | undefined;
 };
 
 type ResolvedBillingFields = {
@@ -56,8 +54,6 @@ type ResolvedBillingFields = {
 	periodStart: number;
 	mcpCallsTotal: number;
 	mcpCallsThisPeriod: number;
-	apiKeyCallsTotal: number;
-	apiKeyCallsThisPeriod: number;
 };
 
 export function resolveBillingState(
@@ -73,7 +69,5 @@ export function resolveBillingState(
 		periodStart: fields.periodStart ?? now,
 		mcpCallsTotal: fields.mcpCallsTotal ?? 0,
 		mcpCallsThisPeriod: fields.mcpCallsThisPeriod ?? 0,
-		apiKeyCallsTotal: fields.apiKeyCallsTotal ?? 0,
-		apiKeyCallsThisPeriod: fields.apiKeyCallsThisPeriod ?? 0,
 	};
 }

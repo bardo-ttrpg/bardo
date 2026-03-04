@@ -1,7 +1,11 @@
+import { randomUUID } from "node:crypto";
 import {
+	access,
 	mkdir,
 	readdir,
 	readFile,
+	realpath,
+	rename,
 	rm,
 	stat,
 	writeFile,
@@ -97,23 +101,171 @@ type RemoteConnectionCoordinatorOptions = {
 	closeRemoteClient: (client: Client | null) => Promise<void>;
 };
 
-function resolveScopedPath(rootPath: string, relativePath: string): string {
-	const normalized = relativePath.replaceAll("\\", "/").trim();
-	if (!normalized || normalized.startsWith("/")) {
-		throw new Error("Path must be a non-empty relative path.");
-	}
+const DEFAULT_TEXT_FILE_LIMIT_BYTES = 10 * 1024 * 1024;
 
-	const absolute = path.resolve(rootPath, normalized);
-	const relative = path.relative(rootPath, absolute);
-	if (
+function parsePositiveInteger(
+	value: string | undefined,
+	fallback: number,
+): number {
+	if (!value) return fallback;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return fallback;
+	}
+	return Math.floor(parsed);
+}
+
+function isPathInsideRoot(rootPath: string, candidatePath: string): boolean {
+	const relative = path.relative(rootPath, candidatePath);
+	return !(
 		relative === ".." ||
 		relative.startsWith(`..${path.sep}`) ||
 		path.isAbsolute(relative)
-	) {
+	);
+}
+
+async function resolveExistingPath(pathname: string): Promise<string | null> {
+	let current = pathname;
+	for (;;) {
+		const exists = await access(current)
+			.then(() => true)
+			.catch(() => false);
+		if (exists) {
+			return current;
+		}
+		const parent = path.dirname(current);
+		if (parent === current) {
+			return null;
+		}
+		current = parent;
+	}
+}
+
+async function resolveScopedPath(
+	rootPath: string,
+	relativePath: string,
+): Promise<string> {
+	const normalized = relativePath.replaceAll("\\", "/").trim();
+	if (!normalized) {
+		throw new Error("Path must be a non-empty workspace path.");
+	}
+
+	const absolute = path.isAbsolute(normalized)
+		? path.resolve(normalized)
+		: path.resolve(rootPath, normalized);
+	if (!isPathInsideRoot(rootPath, absolute)) {
+		throw new Error("Path escapes the workspace root.");
+	}
+
+	const realRoot = await realpath(rootPath);
+	const existingPath = await resolveExistingPath(absolute);
+	if (!existingPath) {
+		throw new Error("Path escapes the workspace root.");
+	}
+	const realExistingPath = await realpath(existingPath);
+	if (!isPathInsideRoot(realRoot, realExistingPath)) {
 		throw new Error("Path escapes the workspace root.");
 	}
 
 	return absolute;
+}
+
+function resolveTextFileLimitBytes(
+	env: Record<string, string | undefined>,
+): number {
+	return parsePositiveInteger(
+		env.BARDO_WORKSPACE_TEXT_FILE_LIMIT_BYTES,
+		DEFAULT_TEXT_FILE_LIMIT_BYTES,
+	);
+}
+
+async function ensureReadableTextFileSize(
+	filePath: string,
+	limitBytes: number,
+): Promise<void> {
+	const details = await stat(filePath);
+	if (!details.isFile()) {
+		throw new Error("Path must reference a regular file.");
+	}
+	if (details.size > limitBytes) {
+		throw new Error(
+			`File is too large to read as text (${details.size} bytes > ${limitBytes} bytes).`,
+		);
+	}
+}
+
+async function movePathToWorkspaceTrash(args: {
+	workspaceRoot: string;
+	targetPath: string;
+	recursive: boolean;
+}): Promise<
+	| { deleted: false; trashed: false; targetPath: string; trashPath: null }
+	| { deleted: true; trashed: true; targetPath: string; trashPath: string }
+> {
+	const details = await stat(args.targetPath).catch((error: unknown) => {
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			error.code === "ENOENT"
+		) {
+			return null;
+		}
+		throw error;
+	});
+	if (!details) {
+		return {
+			targetPath: args.targetPath,
+			deleted: false,
+			trashed: false,
+			trashPath: null,
+		};
+	}
+
+	const workspaceRoot = path.resolve(args.workspaceRoot);
+	const bardoRoot = resolveBardoRoot(workspaceRoot);
+	const trashRoot = path.join(bardoRoot, "_trash");
+	const protectedRoots = [workspaceRoot, bardoRoot, trashRoot];
+	if (
+		protectedRoots.some((protectedPath) => args.targetPath === protectedPath)
+	) {
+		throw new Error(
+			"Refusing to delete the workspace root or Bardo system root.",
+		);
+	}
+	if (details.isDirectory() && !args.recursive) {
+		throw new Error(
+			"Refusing to delete a directory without recursive=true. Use workspace trash intentionally.",
+		);
+	}
+	if (isPathInsideRoot(trashRoot, args.targetPath)) {
+		await rm(args.targetPath, {
+			force: true,
+			recursive: args.recursive,
+		});
+		return {
+			targetPath: args.targetPath,
+			deleted: true,
+			trashed: false,
+			trashPath: null,
+		};
+	}
+
+	const relativeTarget = path.relative(workspaceRoot, args.targetPath);
+	const trashPath = path.join(
+		trashRoot,
+		new Date().toISOString().replaceAll(":", "-"),
+		randomUUID(),
+		relativeTarget,
+	);
+	await mkdir(path.dirname(trashPath), { recursive: true });
+	await rename(args.targetPath, trashPath);
+	return {
+		targetPath: args.targetPath,
+		deleted: true,
+		trashed: true,
+		trashPath,
+	};
 }
 
 function renderMarkdown(
@@ -237,7 +389,7 @@ export async function maybeImportRulebook(args: {
 		return [];
 	}
 
-	const absoluteSource = resolveScopedPath(
+	const absoluteSource = await resolveScopedPath(
 		args.workspaceRoot,
 		args.rulebookPath,
 	);
@@ -458,30 +610,38 @@ export function createWorkspaceRootManager(args: WorkspaceRootManagerInput) {
 	let source = args.defaultSource;
 	let roots: RootEntry[] = [];
 	let didAttemptRefresh = false;
+	let refreshPromise: Promise<WorkspaceContext> | null = null;
 
 	async function refreshFromClientRoots(): Promise<WorkspaceContext> {
 		didAttemptRefresh = true;
-		try {
-			const result = await args.listRoots();
-			roots = Array.isArray(result.roots) ? result.roots : [];
-			const resolvedRoot = resolveWorkspaceRootFromRoots(roots);
-			if (resolvedRoot) {
-				currentRoot = path.resolve(resolvedRoot);
-				source = "roots";
+		refreshPromise ??= (async () => {
+			try {
+				const result = await args.listRoots();
+				roots = Array.isArray(result.roots) ? result.roots : [];
+				const resolvedRoot = resolveWorkspaceRootFromRoots(roots);
+				if (resolvedRoot) {
+					currentRoot = path.resolve(resolvedRoot);
+					source = "roots";
+				}
+			} catch {
+				// Keep the existing workspace root when roots are unavailable.
 			}
-		} catch {
-			// Keep the existing workspace root when roots are unavailable.
-		}
-
-		return {
-			workspaceRoot: currentRoot,
-			source,
-			roots: [...roots],
-		};
+			return {
+				workspaceRoot: currentRoot,
+				source,
+				roots: [...roots],
+			};
+		})().finally(() => {
+			refreshPromise = null;
+		});
+		return refreshPromise;
 	}
 
 	return {
 		async getWorkspaceContext(): Promise<WorkspaceContext> {
+			if (refreshPromise) {
+				return refreshPromise;
+			}
 			if (!didAttemptRefresh) {
 				return refreshFromClientRoots();
 			}
@@ -497,6 +657,7 @@ export function createWorkspaceRootManager(args: WorkspaceRootManagerInput) {
 
 function localToolDefinitions(
 	manager: ReturnType<typeof createWorkspaceRootManager>,
+	textFileLimitBytes: number,
 ): LocalToolDefinition[] {
 	return [
 		{
@@ -600,7 +761,7 @@ function localToolDefinitions(
 				const context = await manager.getWorkspaceContext();
 				const basePath =
 					typeof args.path === "string" && args.path.trim()
-						? resolveScopedPath(context.workspaceRoot, args.path)
+						? await resolveScopedPath(context.workspaceRoot, args.path)
 						: context.workspaceRoot;
 				const maxEntries =
 					typeof args.maxEntries === "number" && args.maxEntries > 0
@@ -637,10 +798,11 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
-				const filePath = resolveScopedPath(
+				const filePath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
 				);
+				await ensureReadableTextFileSize(filePath, textFileLimitBytes);
 				const content = await readFile(filePath, "utf8");
 				return { filePath, content };
 			},
@@ -666,15 +828,22 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
-				const filePath = resolveScopedPath(
+				const filePath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
 				);
+				const content = String(args.content ?? "");
+				const bytesWritten = Buffer.byteLength(content, "utf8");
+				if (bytesWritten > textFileLimitBytes) {
+					throw new Error(
+						`Content is too large to write as text (${bytesWritten} bytes > ${textFileLimitBytes} bytes).`,
+					);
+				}
 				await mkdir(path.dirname(filePath), { recursive: true });
-				await writeFile(filePath, String(args.content ?? ""), "utf8");
+				await writeFile(filePath, content, "utf8");
 				return {
 					filePath,
-					bytesWritten: Buffer.byteLength(String(args.content ?? ""), "utf8"),
+					bytesWritten,
 				};
 			},
 		},
@@ -682,7 +851,7 @@ function localToolDefinitions(
 			name: "bardo_workspace_delete_path",
 			title: "Delete Workspace Path",
 			description:
-				"Delete a file or directory under the active workspace root.",
+				"Move a file or directory under the active workspace root into the Bardo trash.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -700,15 +869,15 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
-				const targetPath = resolveScopedPath(
+				const targetPath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
 				);
-				await rm(targetPath, {
-					force: true,
+				return movePathToWorkspaceTrash({
+					workspaceRoot: context.workspaceRoot,
+					targetPath,
 					recursive: args.recursive === true,
 				});
-				return { targetPath, deleted: true };
 			},
 		},
 	];
@@ -761,6 +930,9 @@ export async function startLocalMcpServer(
 	options: LocalMcpServerOptions,
 ): Promise<void> {
 	const stderr = options.stderr ?? process.stderr;
+	const textFileLimitBytes = resolveTextFileLimitBytes(
+		options.env ?? process.env,
+	);
 	const toolAccess = createRemoteToolAccessController({
 		plan: options.plan ?? null,
 		env: options.env ?? process.env,
@@ -786,7 +958,7 @@ export async function startLocalMcpServer(
 		defaultSource: "cwd",
 		listRoots: async () => server.listRoots(),
 	});
-	const localTools = localToolDefinitions(manager);
+	const localTools = localToolDefinitions(manager, textFileLimitBytes);
 	const localToolMap = new Map(localTools.map((tool) => [tool.name, tool]));
 	const remoteConnection = createRemoteConnectionCoordinator({
 		apiKey: options.apiKey,

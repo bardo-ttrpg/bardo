@@ -20,8 +20,6 @@ const DASHBOARD_DATA: DashboardData = {
 		periodStart: 1,
 		mcpCallsTotal: 20,
 		mcpCallsThisPeriod: 10,
-		apiKeyCallsTotal: 0,
-		apiKeyCallsThisPeriod: 0,
 	},
 	keyPolicy: {
 		maxAllowed: 3,

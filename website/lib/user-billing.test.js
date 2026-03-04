@@ -28,8 +28,6 @@ test("resolveBillingState falls back to free-tier defaults for legacy users", ()
 			periodStart: undefined,
 			mcpCallsTotal: undefined,
 			mcpCallsThisPeriod: undefined,
-			apiKeyCallsTotal: undefined,
-			apiKeyCallsThisPeriod: undefined,
 		},
 		now,
 	);
@@ -41,7 +39,5 @@ test("resolveBillingState falls back to free-tier defaults for legacy users", ()
 		periodStart: now,
 		mcpCallsTotal: 0,
 		mcpCallsThisPeriod: 0,
-		apiKeyCallsTotal: 0,
-		apiKeyCallsThisPeriod: 0,
 	});
 });

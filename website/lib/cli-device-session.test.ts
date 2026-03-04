@@ -112,4 +112,25 @@ describe("cli device session service", () => {
 
 		await expect(service.start()).rejects.toThrow("bardo-staging");
 	});
+
+	test("does not rely on Math.random when generating the user approval code", async () => {
+		const originalRandom = Math.random;
+		Math.random = () => {
+			throw new Error("Math.random should not be used for device codes");
+		};
+
+		try {
+			const service = createCliDeviceSessionService({
+				now: () => new Date("2026-03-03T00:00:00.000Z"),
+				env: {
+					NODE_ENV: "development",
+				},
+			});
+
+			const started = await service.start();
+			expect(started.userCode).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+		} finally {
+			Math.random = originalRandom;
+		}
+	});
 });

@@ -28,6 +28,17 @@ afterEach(() => {
 });
 
 describe("GET /api/connect/snippets base URL resolution", () => {
+	test("rejects API keys in GET query params and requires POST for secrets", async () => {
+		const request = makeRequest(
+			"http://localhost:3001/api/connect/snippets?client=vscode&mode=remote&apiKey=secret-value",
+		);
+		const response = await GET(request);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain("POST");
+	});
+
 	test("uses BARDO_MCP_BASE_URL when set", async () => {
 		process.env.BARDO_MCP_BASE_URL = "http://127.0.0.1:3000";
 		const request = makeRequest(

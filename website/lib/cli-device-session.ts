@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import type { CliLoginExchangePayload } from "./cli-login-token";
 
 type DeviceSessionStatus = "pending" | "approved" | "consumed";
@@ -55,10 +55,12 @@ function randomPollSecret(): string {
 }
 
 function randomUserCode(): string {
-	return `${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random()
-		.toString(36)
-		.slice(2, 6)
-		.toUpperCase()}`;
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	const createSegment = () =>
+		Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join(
+			"",
+		);
+	return `${createSegment()}-${createSegment()}`;
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
