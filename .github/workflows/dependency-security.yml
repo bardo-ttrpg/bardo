@@ -11,7 +11,6 @@ on:
 permissions:
   actions: read
   contents: read
-  security-events: write
 
 jobs:
   scan-pr:
@@ -19,6 +18,7 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.1
     with:
       fail-on-vuln: true
+      upload-sarif: false
       scan-args: |
         --recursive
         ./
@@ -28,6 +28,7 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.1
     with:
       fail-on-vuln: true
+      upload-sarif: false
       scan-args: |
         --recursive
         ./
