@@ -218,6 +218,10 @@ These are the repo files to trust when configuring environments:
    - website Sentry build integration and Next.js config
 9. [website/scripts/validate-deploy-env.ts](/home/armando/projects/bardo/website/scripts/validate-deploy-env.ts)
    - blocks Vercel production builds that still use Clerk test keys
+10. [mcp/src/domain/config/validate-runtime-config.ts](/home/armando/projects/bardo/mcp/src/domain/config/validate-runtime-config.ts)
+   - validates MCP runtime policy combinations before startup and in CI
+11. [website/lib/next-config-policy.ts](/home/armando/projects/bardo/website/lib/next-config-policy.ts)
+   - resolves allowed dev origins and Sentry build-silence behavior from env
 6. [website/instrumentation-client.ts](/home/armando/projects/bardo/website/instrumentation-client.ts)
    - browser Sentry startup
 7. [website/sentry.server.config.ts](/home/armando/projects/bardo/website/sentry.server.config.ts)
@@ -287,6 +291,12 @@ bun run check
 cd website && bun test
 cd ../mcp && bun run check
 ```
+
+Notes:
+
+1. `cd ../mcp && bun run check` now includes `bun run validate:env`
+2. local CLI config is versioned and currently persists `version: 1`
+3. versionless local CLI config is migrated on read
 
 Recommended before production work on the MCP:
 
@@ -398,6 +408,12 @@ Important:
 1. `NEXT_PUBLIC_APP_URL=https://<staging-website-domain>`
 2. `BARDO_MCP_BASE_URL=https://<staging-mcp-domain>`
 3. `BARDO_AUTH_INTROSPECTION_TOKEN=<staging-shared-secret>`
+
+Current route behavior to remember:
+
+1. `GET /api/connect/snippets` is public but secret-free
+2. real API keys must only be sent to `POST /api/connect/snippets`
+3. `GET /api/keys` is paginated with `limit` and `offset`
 
 #### Sentry
 
@@ -675,6 +691,7 @@ Do these tests in order.
 6. revoke API key works
 7. rotate API key works
 8. connection snippet shows the staging MCP URL
+9. key list pagination returns page metadata
 
 ### 13.2 MCP checks
 
@@ -842,6 +859,7 @@ Run these after production deploys finish.
 4. sign in
 5. open `/dashboard`
 6. create API key
+7. confirm `GET /api/keys?limit=20&offset=0` returns page metadata
 
 ### 17.2 MCP
 
@@ -850,6 +868,7 @@ Run these after production deploys finish.
 3. initialize an MCP session
 4. confirm the response includes `mcp-session-id`
 5. call `tools/list`
+6. run `bun run --cwd mcp validate:env` against the production env model
 
 ### 17.3 End-to-end
 
@@ -879,6 +898,7 @@ These are the recommended cost decisions right now.
 5. `stateful` MCP transport
 6. Sentry enabled with lower trace sampling in production
 7. Clerk as the auth source of truth
+8. dependency security workflow green before promotion
 
 ### Delay until needed
 

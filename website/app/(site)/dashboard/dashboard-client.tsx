@@ -139,15 +139,18 @@ function CreateApiKeyCard({
 	);
 }
 
-function ApiKeysTable({
+export function ApiKeysTable({
 	keysLoading,
 	keys,
+	keysHasMore,
 	busyId,
 	onRotateKey,
 	onRevokeKey,
+	onLoadMore,
 }: {
 	keysLoading: boolean;
 	keys: DashboardKey[];
+	keysHasMore: boolean;
 	busyId: string | null;
 	onRotateKey: (
 		keyId: string,
@@ -155,6 +158,7 @@ function ApiKeysTable({
 		keyWorkspacePath: string | null,
 	) => void;
 	onRevokeKey: (keyId: string, keyName: string) => void;
+	onLoadMore: () => void;
 }) {
 	return (
 		<div className="mt-6 border border-border">
@@ -244,6 +248,17 @@ function ApiKeysTable({
 					</tbody>
 				</table>
 			</div>
+			{!keysLoading && keysHasMore ? (
+				<div className="border-t border-border px-6 py-4">
+					<button
+						type="button"
+						onClick={onLoadMore}
+						className="border border-border px-3 py-2 font-mono text-[11px] uppercase tracking-widest"
+					>
+						Load more keys
+					</button>
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -434,6 +449,17 @@ export function DashboardClient() {
 		await loadKeys({ dispatch });
 	}
 
+	async function loadMoreKeys() {
+		if (state.keysLoading || state.keysNextOffset === null) {
+			return;
+		}
+		await loadKeys({
+			dispatch,
+			offset: state.keysNextOffset,
+			append: true,
+		});
+	}
+
 	async function onCreateKey() {
 		await createKey({
 			state,
@@ -512,11 +538,13 @@ export function DashboardClient() {
 			<ApiKeysTable
 				keysLoading={state.keysLoading}
 				keys={state.keys}
+				keysHasMore={state.keysHasMore}
 				busyId={state.busyId}
 				onRotateKey={(keyId, keyName, keyWorkspacePath) =>
 					void onRotateKey(keyId, keyName, keyWorkspacePath)
 				}
 				onRevokeKey={(keyId, keyName) => void onRevokeKey(keyId, keyName)}
+				onLoadMore={() => void loadMoreKeys()}
 			/>
 
 			<ConnectionSnippetPanel

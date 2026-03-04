@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { CliDeviceSessionStoreError } from "../../../../../lib/cli-device-session";
 import { createCliSessionPollGetHandler } from "./route";
 
 describe("GET /api/connect/cli-session/poll", () => {
@@ -71,5 +72,24 @@ describe("GET /api/connect/cli-session/poll", () => {
 
 		expect(response.status).toBe(500);
 		expect(body.error).toContain("poll storage unavailable");
+	});
+
+	test("returns 503 with a stable backend code when polling storage is unavailable", async () => {
+		const handler = createCliSessionPollGetHandler({
+			pollSession: async () => {
+				throw new CliDeviceSessionStoreError("poll storage unavailable");
+			},
+		});
+
+		const response = await handler(
+			new Request(
+				"https://app.bardo.ai/api/connect/cli-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
+			),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(503);
+		expect(body.code).toBe("upstash_unavailable");
+		expect(body.retryable).toBe(true);
 	});
 });

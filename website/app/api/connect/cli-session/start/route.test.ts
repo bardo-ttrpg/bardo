@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { CliSessionStartRateLimitError } from "../../../../../lib/cli-session-start-rate-limit";
 import { createConnectTelemetry } from "../../../../../lib/connect-telemetry";
 import { createCliSessionStartPostHandler } from "./route";
 
@@ -76,6 +77,27 @@ describe("POST /api/connect/cli-session/start", () => {
 
 		expect(response.status).toBe(500);
 		expect(body.error).toContain("Upstash unavailable");
+	});
+
+	test("returns 503 with a stable backend code when the start limiter backend is unavailable", async () => {
+		const handler = createCliSessionStartPostHandler({
+			consumeStartBudget: async () => {
+				throw new CliSessionStartRateLimitError(
+					"CLI session start limiter is unavailable.",
+				);
+			},
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/cli-session/start", {
+				method: "POST",
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(503);
+		expect(body.code).toBe("upstash_unavailable");
+		expect(body.retryable).toBe(true);
 	});
 
 	test("records start success and failure outcomes in connect telemetry", async () => {

@@ -8,16 +8,20 @@ import {
 	type ConnectionMode,
 	getConnectionClientAdapter,
 	getConnectionClientDisplayName,
-	isAutoInstallConnectionClient,
-	isConnectionClient,
 	listConnectionClientAdapters,
 	listTomlTableBlocks,
 } from "./client-adapters";
+import {
+	resolveAutoInstallClientSelection,
+	resolveDoctorClientSelection,
+} from "./client-resolution";
 import { writeTextAtomic } from "./file-utils";
 import {
 	maybeImportRulebook as importWorkspaceRulebook,
 	startLocalMcpServer,
 } from "./local-mcp";
+import { normalizePlan, type PlanTier } from "./plan-utils";
+import { migrateSavedConfig, type SavedConfig } from "./saved-config";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
@@ -28,16 +32,6 @@ type Writer = {
 };
 
 type FetchLike = typeof fetch;
-
-type SavedConfig = {
-	apiKey: string;
-	url: string;
-	updatedAtISO: string;
-	serverName?: string;
-	statusUrl?: string;
-};
-
-type PlanTier = "free" | "solo" | "solo_plus";
 
 type LoginCommandOptions = {
 	apiKey: string | null;
@@ -807,6 +801,7 @@ async function handleLogin(
 
 		const now = (deps.now ?? (() => new Date()))().toISOString();
 		await writeConfig(resolveConfigPath(deps), {
+			version: 1,
 			apiKey,
 			url,
 			updatedAtISO: now,
@@ -916,7 +911,11 @@ async function handleInstall(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		);
-		const client = await resolveInstallClient(options.client, workspaceRoot);
+		const selection = await resolveAutoInstallClientSelection({
+			client: options.client,
+			workspaceRoot,
+		});
+		const client = selection.client;
 		const mode = normalizeInstallMode(options.mode);
 		const credentials = resolveStoredCredentials(config, env);
 		if (!credentials.apiKey || !credentials.url) {
@@ -966,7 +965,11 @@ async function handleConnect(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		);
-		const client = await resolveInstallClient(options.client, workspaceRoot);
+		const selection = await resolveAutoInstallClientSelection({
+			client: options.client,
+			workspaceRoot,
+		});
+		const client = selection.client;
 		const config = await readConfig(resolveConfigPath(deps));
 		const credentials = resolveConnectCredentials(options, config, env);
 		if (options.dryRun) {
@@ -1026,6 +1029,7 @@ async function handleConnect(
 			}
 		} else if (hasMetadataOverrides) {
 			await writeConfig(resolveConfigPath(deps), {
+				version: 1,
 				apiKey: credentials.apiKey,
 				url: credentials.url,
 				statusUrl:
@@ -1268,21 +1272,6 @@ function resolveWorkspaceRoot(input: string | null, cwd: string): string {
 	return path.resolve(input?.trim() || cwd);
 }
 
-function normalizePlan(value: unknown): PlanTier | null {
-	switch (typeof value === "string" ? value.trim().toLowerCase() : "") {
-		case "free":
-			return "free";
-		case "solo":
-			return "solo";
-		case "solo_plus":
-		case "solo-plus":
-		case "soloplus":
-			return "solo_plus";
-		default:
-			return null;
-	}
-}
-
 async function resolveServePlan(args: {
 	apiKey: string;
 	statusUrl: string | null;
@@ -1465,22 +1454,7 @@ async function writeConfig(
 async function readConfig(filePath: string): Promise<SavedConfig | null> {
 	try {
 		const raw = await readFile(filePath, "utf8");
-		const parsed = JSON.parse(raw) as Partial<SavedConfig>;
-		if (typeof parsed.apiKey !== "string" || typeof parsed.url !== "string") {
-			return null;
-		}
-		return {
-			apiKey: parsed.apiKey,
-			url: parsed.url,
-			serverName:
-				typeof parsed.serverName === "string" ? parsed.serverName : undefined,
-			statusUrl:
-				typeof parsed.statusUrl === "string" ? parsed.statusUrl : undefined,
-			updatedAtISO:
-				typeof parsed.updatedAtISO === "string"
-					? parsed.updatedAtISO
-					: new Date(0).toISOString(),
-		};
+		return migrateSavedConfig(JSON.parse(raw));
 	} catch {
 		return null;
 	}
@@ -1510,80 +1484,6 @@ function resolveConnectCredentials(
 		url:
 			options.url?.trim() || env.BARDO_MCP_URL?.trim() || config?.url || null,
 	};
-}
-
-function normalizeInstallClient(
-	value: string | null,
-): AutoInstallConnectionClient {
-	const normalized = value?.trim().toLowerCase() ?? null;
-	if (isAutoInstallConnectionClient(normalized)) {
-		return normalized;
-	}
-	throw new Error(
-		"Unsupported client. Use claude, opencode, codex, cursor, windsurf, vscode, kiro, kilo, or trae.",
-	);
-}
-
-async function resolveInstallClient(
-	value: string | null,
-	workspaceRoot: string,
-): Promise<AutoInstallConnectionClient> {
-	const normalized = value?.trim().toLowerCase() ?? null;
-	if (normalized === "auto") {
-		return detectWorkspaceClient(workspaceRoot);
-	}
-	return normalizeInstallClient(value);
-}
-
-async function resolveDoctorClient(
-	value: string | null,
-	workspaceRoot: string,
-): Promise<ConnectionClient> {
-	const normalized = value?.trim().toLowerCase() ?? null;
-	if (normalized === "auto") {
-		return detectWorkspaceClient(workspaceRoot);
-	}
-	if (isConnectionClient(normalized)) {
-		return normalized;
-	}
-	throw new Error(
-		"Unsupported client. Use claude, opencode, codex, cursor, windsurf, vscode, kiro, kilo, trae, generic, or auto.",
-	);
-}
-
-async function detectWorkspaceClient(
-	workspaceRoot: string,
-): Promise<AutoInstallConnectionClient> {
-	const detected: AutoInstallConnectionClient[] = [];
-
-	for (const client of listConnectionClientAdapters()) {
-		if (!client.autoInstall || !client.defaultConfigPath) {
-			continue;
-		}
-		const configPath = path.join(workspaceRoot, client.defaultConfigPath);
-		const exists = await access(configPath)
-			.then(() => true)
-			.catch(() => false);
-		if (exists) {
-			detected.push(client.id as AutoInstallConnectionClient);
-		}
-	}
-
-	if (detected.length === 1) {
-		return detected[0];
-	}
-
-	if (detected.length > 1) {
-		throw new Error(
-			`Multiple client configs detected: ${detected.join(
-				", ",
-			)}. Pass --client explicitly.`,
-		);
-	}
-
-	throw new Error(
-		"No supported client config detected in this workspace. Pass --client explicitly.",
-	);
 }
 
 function normalizeInstallMode(value: string | null): ConnectionMode {
@@ -1863,12 +1763,14 @@ async function checkClientStatus(args: {
 		return null;
 	}
 
-	const normalized = await resolveDoctorClient(args.client, args.workspaceRoot);
+	const selection = await resolveDoctorClientSelection({
+		client: args.client,
+		workspaceRoot: args.workspaceRoot,
+	});
+	const normalized = selection.client;
 
 	const adapter = getConnectionClientAdapter(normalized);
-	const configPath = adapter.defaultConfigPath
-		? path.join(args.workspaceRoot, adapter.defaultConfigPath)
-		: null;
+	const configPath = selection.configPath;
 	const configExists = configPath
 		? await access(configPath)
 				.then(() => true)

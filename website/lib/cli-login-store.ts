@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { BackendAvailabilityError } from "./backend-availability";
 
 type ConsumeArgs = {
 	token: string;
@@ -158,9 +159,12 @@ async function consumeWithUpstash(args: {
 	}
 }
 
-export class CliLoginReplayStoreError extends Error {
+export class CliLoginReplayStoreError extends BackendAvailabilityError {
 	constructor(message: string) {
-		super(message);
+		super({
+			message,
+			code: "upstash_unavailable",
+		});
 		this.name = "CliLoginReplayStoreError";
 	}
 }

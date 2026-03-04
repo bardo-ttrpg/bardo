@@ -4,6 +4,7 @@ import {
 	createKey,
 	generateCliLoginCommand,
 	loadDashboardData,
+	loadKeys,
 	refreshSnippet,
 } from "./dashboard-controller";
 import {
@@ -169,6 +170,52 @@ describe("dashboard-controller", () => {
 			label: "Created Primary",
 		});
 		expect(actions.at(-1)).toEqual({ type: "busy_changed", busyId: null });
+	});
+
+	test("loadKeys stores page metadata and supports incremental loading", async () => {
+		const actions: unknown[] = [];
+		const fetchImpl = mock(async (input: RequestInfo | URL) => {
+			const url = new URL(String(input), "https://app.bardo.ai");
+			expect(url.pathname).toBe("/api/keys");
+			expect(url.searchParams.get("limit")).toBe("20");
+			expect(url.searchParams.get("offset")).toBe("20");
+
+			return new Response(
+				JSON.stringify({
+					keys: [DASHBOARD_KEY],
+					page: {
+						limit: 20,
+						offset: 20,
+						totalCount: 21,
+						hasMore: true,
+						nextOffset: 40,
+					},
+				}),
+				{
+					status: 200,
+					headers: { "content-type": "application/json" },
+				},
+			);
+		});
+
+		await loadKeys({
+			dispatch: (action) => actions.push(action),
+			fetchImpl,
+			timeoutMs: 50,
+			offset: 20,
+			append: true,
+		});
+
+		expect(actions).toEqual([
+			{ type: "keys_loading", keysLoading: true },
+			{
+				type: "keys_loaded",
+				keys: [DASHBOARD_KEY],
+				hasMore: true,
+				nextOffset: 40,
+				append: true,
+			},
+		]);
 	});
 
 	test("generateCliLoginCommand loads a copy-ready bardo login command", async () => {

@@ -2,6 +2,7 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
+import SiteNavLink from "@/components/site-nav-link";
 import ThemeToggle from "@/components/theme-toggle";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 
@@ -34,44 +35,31 @@ const navLinkClass =
 	"font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground";
 
 function NavLink({ href, label }: { href: string; label: string }) {
+	return <SiteNavLink href={href} label={label} className={navLinkClass} />;
+}
+
+function AuthCtaLinks() {
 	return (
-		<Link href={href} prefetch={false} className={navLinkClass}>
-			{label}
-		</Link>
+		<>
+			<SiteNavLink href="/sign-in" label="Log in" className={navLinkClass} />
+			<SiteNavLink
+				href="/sign-up"
+				label="Sign up ↗"
+				className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
+			/>
+		</>
 	);
 }
 
 function AuthControls() {
 	if (!IS_CLERK_CONFIGURED) {
-		return (
-			<>
-				<Link href="/sign-in" prefetch={false} className={navLinkClass}>
-					Log in
-				</Link>
-				<Link
-					href="/sign-up"
-					prefetch={false}
-					className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-				>
-					Sign up ↗
-				</Link>
-			</>
-		);
+		return <AuthCtaLinks />;
 	}
 
 	return (
 		<>
 			<SignedOut>
-				<Link href="/sign-in" prefetch={false} className={navLinkClass}>
-					Log in
-				</Link>
-				<Link
-					href="/sign-up"
-					prefetch={false}
-					className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-				>
-					Sign up ↗
-				</Link>
+				<AuthCtaLinks />
 			</SignedOut>
 			<SignedIn>
 				<UserButton afterSignOutUrl="/" />
@@ -97,12 +85,11 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 		<div className="min-h-screen text-foreground">
 			<header className="sticky top-0 z-50 border-b border-border bg-background">
 				<div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6">
-					<Link
+					<SiteNavLink
 						href="/"
+						label="Bardo"
 						className="font-mono text-sm font-bold uppercase tracking-[0.2em] text-foreground"
-					>
-						Bardo
-					</Link>
+					/>
 
 					<nav
 						aria-label="Primary"
@@ -218,7 +205,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 		</div>
 	);
 
-	const themedBody = (
+	return (
 		<ThemeProvider
 			attribute="class"
 			defaultTheme="dark"
@@ -228,10 +215,4 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 			{body}
 		</ThemeProvider>
 	);
-
-	if (!IS_CLERK_CONFIGURED) {
-		return themedBody;
-	}
-
-	return themedBody;
 }

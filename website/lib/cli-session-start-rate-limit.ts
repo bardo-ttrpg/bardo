@@ -1,3 +1,5 @@
+import { BackendAvailabilityError } from "./backend-availability";
+
 type ConsumeResult = {
 	allowed: boolean;
 	retryAfterSeconds?: number;
@@ -19,6 +21,16 @@ type WindowCounter = {
 	windowStartMs: number;
 	used: number;
 };
+
+export class CliSessionStartRateLimitError extends BackendAvailabilityError {
+	constructor(message: string) {
+		super({
+			message,
+			code: "upstash_unavailable",
+		});
+		this.name = "CliSessionStartRateLimitError";
+	}
+}
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 	if (!value) return fallback;
@@ -198,14 +210,9 @@ export function createCliSessionStartRateLimiter(
 		}
 
 		if (!allowMemoryFallback) {
-			return {
-				allowed: false,
-				retryAfterSeconds: retryAfterSeconds(
-					currentMs,
-					windowStartMs,
-					windowMs,
-				),
-			};
+			throw new CliSessionStartRateLimitError(
+				"CLI session start limiter is unavailable.",
+			);
 		}
 
 		const existing = counters.get(clientId);

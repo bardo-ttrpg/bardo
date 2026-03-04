@@ -47,6 +47,16 @@ type SnippetRequest = {
 function buildSnippetResponse(request: Request, params: SnippetRequest) {
 	const { client, mode, apiKey, serverName } = params;
 
+	if (!client || !mode) {
+		return NextResponse.json(
+			{
+				error: "Missing client or mode.",
+				supportedClients: SUPPORTED_CONNECTION_CLIENTS,
+			},
+			{ status: 400 },
+		);
+	}
+
 	if (!isConnectionClient(client)) {
 		return NextResponse.json(
 			{

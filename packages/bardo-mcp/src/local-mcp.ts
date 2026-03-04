@@ -21,6 +21,7 @@ import {
 	ListToolsRequestSchema,
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { normalizePlan, type PlanTier } from "./plan-utils";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
@@ -78,8 +79,6 @@ type RemoteToolDefinition = {
 	outputSchema?: JsonSchema;
 	annotations?: Record<string, unknown>;
 };
-
-type PlanTier = "free" | "solo" | "solo_plus";
 
 type RemoteConnectionResult = {
 	client: Client | null;
@@ -486,21 +485,6 @@ export function createRemoteConnectionCoordinator(
 			return connectingPromise;
 		},
 	};
-}
-
-function normalizePlan(value: unknown): PlanTier | null {
-	switch (typeof value === "string" ? value.trim().toLowerCase() : "") {
-		case "free":
-			return "free";
-		case "solo":
-			return "solo";
-		case "solo_plus":
-		case "solo-plus":
-		case "soloplus":
-			return "solo_plus";
-		default:
-			return null;
-	}
 }
 
 function planRank(plan: PlanTier): number {

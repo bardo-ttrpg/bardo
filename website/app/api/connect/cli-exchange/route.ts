@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+	backendAvailabilityPayload,
+	isBackendAvailabilityError,
+} from "../../../../lib/backend-availability";
+import {
 	CliLoginReplayStoreError,
 	createCliLoginTokenStore,
 } from "../../../../lib/cli-login-store";
@@ -91,6 +95,11 @@ export function createCliExchangePostHandler(
 					? "cli_exchange_failed"
 					: "cli_exchange_rejected",
 			);
+			if (isBackendAvailabilityError(error)) {
+				return NextResponse.json(backendAvailabilityPayload(error), {
+					status: 503,
+				});
+			}
 			const message = error instanceof Error ? error.message : String(error);
 			const status = error instanceof CliLoginReplayStoreError ? 500 : 401;
 			return NextResponse.json({ error: message }, { status });

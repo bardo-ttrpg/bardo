@@ -91,7 +91,7 @@ describe("POST /api/connect/cli-exchange", () => {
 		expect(body.error).toContain("already been used");
 	});
 
-	test("returns 500 when the replay store is misconfigured", async () => {
+	test("returns 503 with a stable backend code when the replay store is unavailable", async () => {
 		const handler = createCliExchangePostHandler({
 			decodeToken: async () => ({
 				apiKey: "bardo_live_token",
@@ -115,7 +115,9 @@ describe("POST /api/connect/cli-exchange", () => {
 		);
 		const body = await response.json();
 
-		expect(response.status).toBe(500);
+		expect(response.status).toBe(503);
+		expect(body.code).toBe("upstash_unavailable");
+		expect(body.retryable).toBe(true);
 		expect(body.error).toContain("replay store unavailable");
 	});
 });

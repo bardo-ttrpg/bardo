@@ -46,95 +46,111 @@ async function withTimeout<T>(
 	}
 }
 
-export async function POST(request: Request) {
-	const authState = await resolveRouteUserId("/api/keys/revoke");
-	if (authState.response) {
-		return authState.response;
-	}
+type KeysRevokePostHandlerDeps = {
+	resolveAuthState?: typeof resolveRouteUserId;
+	createClerkClient?: typeof clerkClient;
+	timeoutMs?: number;
+};
 
-	const { userId } = authState;
-	if (!userId) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+export function createKeysRevokePostHandler(
+	deps: KeysRevokePostHandlerDeps = {},
+) {
+	const resolveAuthState = deps.resolveAuthState ?? resolveRouteUserId;
+	const createClerkClient = deps.createClerkClient ?? clerkClient;
+	const timeoutMs = deps.timeoutMs ?? clerkTimeoutMs;
 
-	let body: RevokeRequest = {};
-	try {
-		body = (await request.json()) as RevokeRequest;
-	} catch {
-		body = {};
-	}
+	return async function POST(request: Request) {
+		const authState = await resolveAuthState("/api/keys/revoke");
+		if (authState.response) {
+			return authState.response;
+		}
 
-	const clerkKeyId = body.id?.trim();
-	if (!clerkKeyId) {
-		return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
-	}
+		const { userId } = authState;
+		if (!userId) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-	const clerk = await clerkClient();
+		let body: RevokeRequest = {};
+		try {
+			body = (await request.json()) as RevokeRequest;
+		} catch {
+			body = {};
+		}
 
-	let clerkKey: Awaited<ReturnType<(typeof clerk)["apiKeys"]["get"]>>;
-	try {
-		clerkKey = await withTimeout(
-			clerk.apiKeys.get(clerkKeyId),
-			clerkTimeoutMs,
-			"clerk.apiKeys.get",
-		);
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		if (message.includes("timed out")) {
-			Sentry.logger.warn("website.api_keys.lookup_timed_out", {
+		const clerkKeyId = body.id?.trim();
+		if (!clerkKeyId) {
+			return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
+		}
+
+		const clerk = await createClerkClient();
+
+		let clerkKey: Awaited<ReturnType<(typeof clerk)["apiKeys"]["get"]>>;
+		try {
+			clerkKey = await withTimeout(
+				clerk.apiKeys.get(clerkKeyId),
+				timeoutMs,
+				"clerk.apiKeys.get",
+			);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			if (message.includes("timed out")) {
+				Sentry.logger.warn("website.api_keys.lookup_timed_out", {
+					"bardo.service": "website",
+					"bardo.route": "/api/keys/revoke",
+					"bardo.operation": "clerk.apiKeys.get",
+				});
+				return NextResponse.json(
+					{ error: "Key lookup timed out. Please retry." },
+					{ status: 504 },
+				);
+			}
+			Sentry.captureException(err);
+			Sentry.logger.error("website.api_keys.lookup_failed", {
 				"bardo.service": "website",
 				"bardo.route": "/api/keys/revoke",
 				"bardo.operation": "clerk.apiKeys.get",
 			});
-			return NextResponse.json(
-				{ error: "Key lookup timed out. Please retry." },
-				{ status: 504 },
-			);
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
-		Sentry.captureException(err);
-		Sentry.logger.error("website.api_keys.lookup_failed", {
-			"bardo.service": "website",
-			"bardo.route": "/api/keys/revoke",
-			"bardo.operation": "clerk.apiKeys.get",
-		});
-		return NextResponse.json({ error: "Not found" }, { status: 404 });
-	}
 
-	if (clerkKey.subject !== userId) {
-		return NextResponse.json({ error: "Not found" }, { status: 404 });
-	}
+		if (clerkKey.subject !== userId) {
+			return NextResponse.json({ error: "Not found" }, { status: 404 });
+		}
 
-	try {
-		await withTimeout(
-			clerk.apiKeys.delete(clerkKeyId),
-			clerkTimeoutMs,
-			"clerk.apiKeys.delete",
-		);
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		console.error("[api/keys/revoke] clerk.apiKeys.delete failed:", message);
-		if (message.includes("timed out")) {
-			Sentry.logger.warn("website.api_keys.delete_timed_out", {
+		try {
+			await withTimeout(
+				clerk.apiKeys.delete(clerkKeyId),
+				timeoutMs,
+				"clerk.apiKeys.delete",
+			);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			console.error("[api/keys/revoke] clerk.apiKeys.delete failed:", message);
+			if (message.includes("timed out")) {
+				Sentry.logger.warn("website.api_keys.delete_timed_out", {
+					"bardo.service": "website",
+					"bardo.route": "/api/keys/revoke",
+					"bardo.operation": "clerk.apiKeys.delete",
+				});
+				return NextResponse.json(
+					{ error: "Key deletion timed out. Please retry." },
+					{ status: 504 },
+				);
+			}
+			Sentry.captureException(err);
+			Sentry.logger.error("website.api_keys.delete_failed", {
 				"bardo.service": "website",
 				"bardo.route": "/api/keys/revoke",
 				"bardo.operation": "clerk.apiKeys.delete",
 			});
 			return NextResponse.json(
-				{ error: "Key deletion timed out. Please retry." },
-				{ status: 504 },
+				{ error: "Failed to delete key" },
+				{ status: 500 },
 			);
 		}
-		Sentry.captureException(err);
-		Sentry.logger.error("website.api_keys.delete_failed", {
-			"bardo.service": "website",
-			"bardo.route": "/api/keys/revoke",
-			"bardo.operation": "clerk.apiKeys.delete",
-		});
-		return NextResponse.json(
-			{ error: "Failed to delete key" },
-			{ status: 500 },
-		);
-	}
 
-	return NextResponse.json({ revoked: true, deleted: true });
+		return NextResponse.json({ revoked: true, deleted: true });
+	};
 }
+
+export const POST = createKeysRevokePostHandler();

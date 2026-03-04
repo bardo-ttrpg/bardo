@@ -58,12 +58,63 @@ describe("bardo runtime", () => {
 			const saved = JSON.parse(
 				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
 			) as {
+				version: number;
 				apiKey: string;
 				url: string;
 			};
 
+			expect(saved.version).toBe(1);
 			expect(saved.apiKey).toBe("test-key");
 			expect(saved.url).toBe("https://example.com/mcp");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor reads legacy versionless configs through the v1 migration path", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const configPath = path.join(homeDir, ".config/bardo/config.json");
+			await mkdir(path.dirname(configPath), { recursive: true });
+			await writeFile(
+				configPath,
+				JSON.stringify({
+					apiKey: "legacy-key",
+					url: "https://example.com/mcp",
+					updatedAtISO: "2026-03-04T00:00:00.000Z",
+				}),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				fetch: async (input) => {
+					if (String(input) === "https://example.com/health") {
+						return new Response("ok", { status: 200 });
+					}
+					if (String(input) === "https://example.com/mcp") {
+						throw new Error("Unexpected MCP fetch");
+					}
+					return new Response("ok", { status: 200 });
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			const output = JSON.parse(stdout.read()) as {
+				auth: { configured: boolean; source: string; url: string | null };
+			};
+			expect(output.auth.configured).toBe(true);
+			expect(output.auth.source).toBe("config");
+			expect(output.auth.url).toBe("https://example.com/mcp");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

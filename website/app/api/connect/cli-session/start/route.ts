@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+	backendAvailabilityPayload,
+	isBackendAvailabilityError,
+} from "../../../../../lib/backend-availability";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
 import { getDefaultCliSessionStartRateLimiter } from "../../../../../lib/cli-session-start-rate-limit";
 import {
@@ -86,6 +90,11 @@ export function createCliSessionStartPostHandler(
 			});
 		} catch (error) {
 			deps.telemetry.increment("cli_session_start_failed");
+			if (isBackendAvailabilityError(error)) {
+				return NextResponse.json(backendAvailabilityPayload(error), {
+					status: 503,
+				});
+			}
 			return NextResponse.json(
 				{
 					error: error instanceof Error ? error.message : String(error),

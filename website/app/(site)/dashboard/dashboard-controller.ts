@@ -29,6 +29,8 @@ type LoadDashboardDataArgs = FetchWithTimeoutArgs & {
 
 type LoadKeysArgs = FetchWithTimeoutArgs & {
 	dispatch: DashboardDispatch;
+	offset?: number;
+	append?: boolean;
 };
 
 type RefreshSnippetArgs = FetchWithTimeoutArgs & {
@@ -164,18 +166,36 @@ export async function loadDashboardData({
 
 export async function loadKeys({
 	dispatch,
+	offset = 0,
+	append = false,
 	...fetchOptions
 }: LoadKeysArgs): Promise<void> {
 	dispatch({ type: "keys_loading", keysLoading: true });
 	try {
+		const params = new URLSearchParams({
+			limit: "20",
+			offset: String(offset),
+		});
 		const response = await fetchWithTimeout(
-			"/api/keys",
+			`/api/keys?${params.toString()}`,
 			undefined,
 			fetchOptions,
 		);
 		if (response.ok) {
-			const payload = (await response.json()) as { keys: DashboardKey[] };
-			dispatch({ type: "keys_loaded", keys: payload.keys ?? [] });
+			const payload = (await response.json()) as {
+				keys?: DashboardKey[];
+				page?: {
+					hasMore?: boolean;
+					nextOffset?: number | null;
+				};
+			};
+			dispatch({
+				type: "keys_loaded",
+				keys: payload.keys ?? [],
+				hasMore: payload.page?.hasMore ?? false,
+				nextOffset: payload.page?.nextOffset ?? null,
+				append,
+			});
 			return;
 		}
 	} catch {

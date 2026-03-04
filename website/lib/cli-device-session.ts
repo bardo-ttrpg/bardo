@@ -1,4 +1,5 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
+import { BackendAvailabilityError } from "./backend-availability";
 import type { CliLoginExchangePayload } from "./cli-login-token";
 
 type DeviceSessionStatus = "pending" | "approved" | "consumed";
@@ -277,9 +278,12 @@ async function upstashDeleteKey(args: {
 	});
 }
 
-export class CliDeviceSessionStoreError extends Error {
+export class CliDeviceSessionStoreError extends BackendAvailabilityError {
 	constructor(message: string) {
-		super(message);
+		super({
+			message,
+			code: "upstash_unavailable",
+		});
 		this.name = "CliDeviceSessionStoreError";
 	}
 }

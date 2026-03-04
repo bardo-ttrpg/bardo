@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ConnectionSnippetPanel } from "./dashboard-client";
+import { ApiKeysTable, ConnectionSnippetPanel } from "./dashboard-client";
 
 describe("ConnectionSnippetPanel", () => {
 	test("renders the CLI login command even when no API secret is visible", () => {
@@ -78,5 +78,70 @@ describe("ConnectionSnippetPanel", () => {
 		expect(markup).toContain(">no<");
 		expect(markup).toContain("Config path:");
 		expect(markup).toContain("manual / client-specific");
+	});
+});
+
+describe("ApiKeysTable", () => {
+	test("renders a load more button when more key pages are available", () => {
+		const markup = renderToStaticMarkup(
+			<ApiKeysTable
+				keysLoading={false}
+				keys={[
+					{
+						id: "key_1",
+						name: "Primary",
+						status: "active",
+						scopes: ["mcp"],
+						createdAt: 1,
+						workspacePath: "./customers/user_1",
+						callsTotal: 20,
+						callsThisPeriod: 10,
+						lastUsedAt: null,
+						lastUsedProviderId: null,
+						lastUsedModelId: null,
+					},
+				]}
+				keysHasMore={true}
+				busyId={null}
+				onRotateKey={() => undefined}
+				onRevokeKey={() => undefined}
+				onLoadMore={() => undefined}
+			/>,
+		);
+
+		expect(markup).toContain("Load more keys");
+	});
+
+	test("escapes hostile key names instead of rendering raw HTML", () => {
+		const markup = renderToStaticMarkup(
+			<ApiKeysTable
+				keysLoading={false}
+				keys={[
+					{
+						id: "key_1",
+						name: '<script>alert("xss")</script>',
+						status: "active",
+						scopes: ["mcp"],
+						createdAt: 1,
+						workspacePath: "./customers/user_1",
+						callsTotal: 20,
+						callsThisPeriod: 10,
+						lastUsedAt: null,
+						lastUsedProviderId: null,
+						lastUsedModelId: null,
+					},
+				]}
+				keysHasMore={false}
+				busyId={null}
+				onRotateKey={() => undefined}
+				onRevokeKey={() => undefined}
+				onLoadMore={() => undefined}
+			/>,
+		);
+
+		expect(markup).toContain(
+			"&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;",
+		);
+		expect(markup).not.toContain('<script>alert("xss")</script>');
 	});
 });

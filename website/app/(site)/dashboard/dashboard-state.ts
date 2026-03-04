@@ -57,6 +57,8 @@ export type DashboardState = {
 	billingLoading: boolean;
 	keys: DashboardKey[];
 	keysLoading: boolean;
+	keysHasMore: boolean;
+	keysNextOffset: number | null;
 	name: string;
 	busyId: string | null;
 	lastSecret: string | null;
@@ -75,7 +77,13 @@ export type DashboardAction =
 	| { type: "dashboard_loading"; billingLoading: boolean }
 	| { type: "dashboard_loaded"; dashboardData: DashboardData | null }
 	| { type: "keys_loading"; keysLoading: boolean }
-	| { type: "keys_loaded"; keys: DashboardKey[] }
+	| {
+			type: "keys_loaded";
+			keys: DashboardKey[];
+			hasMore: boolean;
+			nextOffset: number | null;
+			append: boolean;
+	  }
 	| { type: "name_changed"; name: string }
 	| { type: "busy_changed"; busyId: string | null }
 	| { type: "mutation_error"; mutationError: string | null }
@@ -95,6 +103,8 @@ export function createDashboardState(): DashboardState {
 		billingLoading: true,
 		keys: [],
 		keysLoading: true,
+		keysHasMore: false,
+		keysNextOffset: null,
 		name: "Default key",
 		busyId: null,
 		lastSecret: null,
@@ -134,8 +144,10 @@ export function dashboardReducer(
 		case "keys_loaded":
 			return {
 				...state,
-				keys: action.keys,
+				keys: action.append ? [...state.keys, ...action.keys] : action.keys,
 				keysLoading: false,
+				keysHasMore: action.hasMore,
+				keysNextOffset: action.nextOffset,
 			};
 		case "name_changed":
 			return {

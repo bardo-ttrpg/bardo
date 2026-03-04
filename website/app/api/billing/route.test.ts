@@ -37,4 +37,32 @@ describe("GET /api/billing", () => {
 		expect(body.billing.apiKeyCallsTotal).toBeUndefined();
 		expect(body.billing.apiKeyCallsThisPeriod).toBeUndefined();
 	});
+
+	test("returns 503 when Clerk billing is unavailable", async () => {
+		const handler = createBillingGetHandler({
+			resolveAuthState: async () => ({ userId: "user_123" }),
+			createClerkClient: async () => ({}) as never,
+			fetchLiveBilling: async () => ({
+				billingUnavailable: true,
+				plan: "free" as const,
+				periodStart: 1,
+				subscriptionStatus: "canceled" as const,
+				subscriptionId: null,
+				billingInterval: null,
+				currentPeriodEnd: null,
+				cancelAtPeriodEnd: false,
+			}),
+			readUserUsage: async () => ({
+				total: 0,
+				thisPeriod: 0,
+				backend: "none" as const,
+			}),
+		});
+
+		const response = await handler();
+		const body = await response.json();
+
+		expect(response.status).toBe(503);
+		expect(body.error).toContain("Billing service unavailable");
+	});
 });

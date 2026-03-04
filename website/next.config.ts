@@ -1,18 +1,15 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import {
+	resolveAllowedDevOrigins,
+	resolveSentryBuildSilence,
+} from "./lib/next-config-policy";
 import { resolveSentryRelease } from "./lib/sentry-server-config";
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
 	transpilePackages: ["@bardo/mcp"],
-	allowedDevOrigins: [
-		"127.0.0.1",
-		"localhost",
-		"::1",
-		"[::1]",
-		"*.ngrok-free.app",
-		"*.ngrok.io",
-	],
+	allowedDevOrigins: resolveAllowedDevOrigins(process.env),
 	images: {
 		formats: ["image/avif", "image/webp"],
 		remotePatterns: [
@@ -27,7 +24,7 @@ const nextConfig: NextConfig = {
 const sentryRelease = resolveSentryRelease(process.env);
 
 export default withSentryConfig(nextConfig, {
-	silent: true,
+	silent: resolveSentryBuildSilence(process.env),
 	authToken: process.env.SENTRY_AUTH_TOKEN,
 	project: process.env.SENTRY_PROJECT,
 	release: sentryRelease ? { name: sentryRelease } : undefined,

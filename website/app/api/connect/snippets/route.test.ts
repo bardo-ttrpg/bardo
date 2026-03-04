@@ -28,6 +28,16 @@ afterEach(() => {
 });
 
 describe("GET /api/connect/snippets base URL resolution", () => {
+	test("rejects requests that omit client or mode", async () => {
+		const response = await GET(
+			makeRequest("http://localhost:3001/api/connect/snippets"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain("Missing client or mode");
+	});
+
 	test("rejects API keys in GET query params and requires POST for secrets", async () => {
 		const request = makeRequest(
 			"http://localhost:3001/api/connect/snippets?client=vscode&mode=remote&apiKey=secret-value",
@@ -88,5 +98,43 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 		expect(body.client).toBe("claude");
 		expect(body.mode).toBe("local");
 		expect(body.snippet).toContain("secret-value");
+	});
+
+	test("POST rejects requests that omit client or mode", async () => {
+		const response = await POST(
+			new Request("https://app.bardo.ai/api/connect/snippets", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({}),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain("Missing client or mode");
+	});
+
+	test("rejects invalid clients", async () => {
+		const response = await GET(
+			makeRequest(
+				"http://localhost:3001/api/connect/snippets?client=not-a-client&mode=remote",
+			),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain("Invalid client");
+	});
+
+	test("rejects invalid modes", async () => {
+		const response = await GET(
+			makeRequest(
+				"http://localhost:3001/api/connect/snippets?client=vscode&mode=sideways",
+			),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain("Invalid mode");
 	});
 });

@@ -1,5 +1,9 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import {
+	backendAvailabilityPayload,
+	isBackendAvailabilityError,
+} from "../../../../../lib/backend-availability";
 import { resolveRouteUserId } from "../../../../../lib/clerk-route-auth";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
 import {
@@ -149,6 +153,11 @@ export function createCliSessionApprovePostHandler(
 			return NextResponse.json({ ok: true });
 		} catch (error) {
 			deps.telemetry.increment("cli_session_approve_failed");
+			if (isBackendAvailabilityError(error)) {
+				return NextResponse.json(backendAvailabilityPayload(error), {
+					status: 503,
+				});
+			}
 			return NextResponse.json(
 				{
 					error: error instanceof Error ? error.message : String(error),

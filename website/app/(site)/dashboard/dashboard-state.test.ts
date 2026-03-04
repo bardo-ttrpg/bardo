@@ -92,10 +92,49 @@ describe("dashboardReducer", () => {
 		const next = dashboardReducer(loadingState, {
 			type: "keys_loaded",
 			keys: [DASHBOARD_KEY],
+			hasMore: true,
+			nextOffset: 20,
+			append: false,
 		});
 
 		expect(next.keysLoading).toBe(false);
 		expect(next.keys).toEqual([DASHBOARD_KEY]);
+		expect(next.keysHasMore).toBe(true);
+		expect(next.keysNextOffset).toBe(20);
+	});
+
+	test("appends keys when loading additional pages", () => {
+		const state = {
+			...createDashboardState(),
+			keys: [DASHBOARD_KEY],
+			keysHasMore: true,
+			keysNextOffset: 20,
+		};
+
+		const next = dashboardReducer(state, {
+			type: "keys_loaded",
+			keys: [
+				{
+					...DASHBOARD_KEY,
+					id: "key_2",
+					name: "Secondary",
+				},
+			],
+			hasMore: false,
+			nextOffset: null,
+			append: true,
+		});
+
+		expect(next.keys).toEqual([
+			DASHBOARD_KEY,
+			{
+				...DASHBOARD_KEY,
+				id: "key_2",
+				name: "Secondary",
+			},
+		]);
+		expect(next.keysHasMore).toBe(false);
+		expect(next.keysNextOffset).toBeNull();
 	});
 
 	test("stores the generated CLI login command and clears copy state", () => {
