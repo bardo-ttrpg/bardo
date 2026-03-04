@@ -424,7 +424,7 @@ Current route behavior to remember:
 5. `SENTRY_RELEASE=<git sha or release id>`
 6. `SENTRY_TRACES_SAMPLE_RATE=1`
 7. `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=1`
-8. `SENTRY_ORG=bardo`
+8. `SENTRY_ORG=bardo-1k`
 9. `SENTRY_PROJECT=bardo-website`
 10. `SENTRY_AUTH_TOKEN=<sentry auth token>`
 
@@ -777,7 +777,7 @@ Set these values in the Vercel Production environment.
 5. `SENTRY_RELEASE=<git sha or release id>`
 6. `SENTRY_TRACES_SAMPLE_RATE=0.1`
 7. `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=0.1`
-8. `SENTRY_ORG=bardo`
+8. `SENTRY_ORG=bardo-1k`
 9. `SENTRY_PROJECT=bardo-website`
 10. `SENTRY_AUTH_TOKEN=<sentry auth token>`
 
@@ -1089,7 +1089,7 @@ Check:
 
 1. `SENTRY_RELEASE`
 2. `SENTRY_AUTH_TOKEN`
-3. `SENTRY_ORG=bardo`
+3. `SENTRY_ORG=bardo-1k`
 4. `SENTRY_PROJECT`
 
 Fixed looks like:

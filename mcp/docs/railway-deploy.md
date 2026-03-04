@@ -78,7 +78,7 @@ If staging uses a protected Vercel Preview deployment, the MCP introspection URL
 
 Recommended website-side Sentry config:
 
-1. `SENTRY_ORG=bardo`
+1. `SENTRY_ORG=bardo-1k`
 1. `SENTRY_PROJECT=bardo-website`
 1. `SENTRY_DSN`
 1. `NEXT_PUBLIC_SENTRY_DSN`
