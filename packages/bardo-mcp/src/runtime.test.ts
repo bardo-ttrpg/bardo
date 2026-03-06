@@ -1391,6 +1391,63 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
+	test("mcp serve times out stale runtime status lookups before starting the local broker", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "test-key",
+						url: "https://mcp.bardo.ai/mcp",
+						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			let receivedPlan = "unexpected";
+			const exitCode = await runCli(["mcp", "serve"], {
+				cwd: workspaceRoot,
+				homeDir,
+				env: {
+					BARDO_RUNTIME_STATUS_TIMEOUT_MS: "100",
+				},
+				stderr,
+				stdout: createWriter(),
+				startBridge: async (options) => {
+					receivedPlan =
+						(options as { plan?: string | null }).plan === undefined
+							? "undefined"
+							: String((options as { plan?: string | null }).plan);
+				},
+				fetch: async (_input, init) =>
+					await new Promise<Response>((_resolve, reject) => {
+						const abort = init?.signal;
+						const onAbort = () =>
+							reject(
+								Object.assign(new Error("aborted"), { name: "AbortError" }),
+							);
+						abort?.addEventListener("abort", onAbort, { once: true });
+					}),
+			});
+
+			expect(exitCode).toBe(0);
+			expect(receivedPlan).toBe("null");
+			expect(stderr.read()).toContain("timed out");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("install writes a workspace Codex config using saved credentials", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -2068,7 +2125,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
-	test("install writes an OpenCode project config for remote mode", async () => {
+	test("install shims OpenCode remote mode to local stdio config", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 
@@ -2135,12 +2192,22 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(config.theme).toBe("opencode");
 			expect(config.mcp.existing.command).toEqual(["uvx", "existing-tool"]);
 			expect(config.mcp.bardo).toEqual({
-				type: "remote",
-				url: "https://mcp.bardo.ai/mcp",
-				oauth: false,
-				headers: {
-					Authorization: "Bearer bardo_live_saved",
-				},
+				type: "local",
+				command: [
+					"bunx",
+					"--bun",
+					"--package",
+					"@bardo/mcp",
+					"bardo",
+					"mcp",
+					"serve",
+					"--api-key",
+					"bardo_live_saved",
+					"--url",
+					"https://mcp.bardo.ai/mcp",
+					"--workspace-root",
+					".",
+				],
 				enabled: true,
 			});
 		} finally {

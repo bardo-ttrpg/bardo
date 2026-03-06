@@ -4,12 +4,33 @@ export type ProjectionId = "current_state";
 
 const PROJECTION_EVENT_DEPENDENCIES: Record<ProjectionId, readonly string[]> = {
 	current_state: [
+		"campaign_initialized",
 		"player_action_resolved",
 		"world_sync_applied",
 		"simulation_tick_applied",
 		"legacy_state_migrated",
 	],
 };
+
+export function latestRelevantEventSequenceForProjection(args: {
+	projectionId: ProjectionId;
+	events: ReadonlyArray<{ type: string; sequence: number }>;
+}): number {
+	const dependencies = new Set(
+		PROJECTION_EVENT_DEPENDENCIES[args.projectionId] ?? [],
+	);
+	let latestSequence = 0;
+	for (const event of args.events) {
+		if (
+			dependencies.has(event.type) &&
+			Number.isFinite(event.sequence) &&
+			event.sequence > latestSequence
+		) {
+			latestSequence = event.sequence;
+		}
+	}
+	return latestSequence;
+}
 
 export function projectionIdsForEventTypes(
 	eventTypes: readonly string[],
@@ -18,7 +39,7 @@ export function projectionIdsForEventTypes(
 	const matched: ProjectionId[] = [];
 	for (const [projectionId, dependencies] of Object.entries(
 		PROJECTION_EVENT_DEPENDENCIES,
-	) as Array<[ProjectionId, readonly string[]]>) {
+	) as Array<[ProjectionId, string[]]>) {
 		if (dependencies.some((dependency) => incoming.has(dependency))) {
 			matched.push(projectionId);
 		}

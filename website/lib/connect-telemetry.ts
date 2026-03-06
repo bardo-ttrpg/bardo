@@ -15,7 +15,10 @@ type ConnectCounterName =
 	| "cli_session_approve_failed"
 	| "runtime_status_success"
 	| "runtime_status_invalid"
-	| "runtime_status_failed";
+	| "runtime_status_failed"
+	| "connect_snippets_success"
+	| "connect_snippets_rejected"
+	| "connect_snippets_failed";
 
 type ConnectTelemetryOptions = {
 	logEnabled?: boolean;
@@ -48,6 +51,9 @@ const CONNECT_COUNTER_NAMES: readonly ConnectCounterName[] = [
 	"runtime_status_success",
 	"runtime_status_invalid",
 	"runtime_status_failed",
+	"connect_snippets_success",
+	"connect_snippets_rejected",
+	"connect_snippets_failed",
 ] as const;
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -89,6 +95,9 @@ function emptySnapshot(): ConnectTelemetrySnapshot {
 		runtime_status_success: 0,
 		runtime_status_invalid: 0,
 		runtime_status_failed: 0,
+		connect_snippets_success: 0,
+		connect_snippets_rejected: 0,
+		connect_snippets_failed: 0,
 	};
 }
 

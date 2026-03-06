@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	resolveAllowedDevOrigins,
+	resolveSecurityHeaders,
 	resolveSentryBuildSilence,
 } from "./next-config-policy";
 
@@ -55,5 +56,52 @@ describe("resolveSentryBuildSilence", () => {
 				BARDO_SENTRY_BUILD_SILENT: "false",
 			}),
 		).toBe(false);
+	});
+});
+
+describe("resolveSecurityHeaders", () => {
+	test("returns a strict baseline with no HSTS in non-production", () => {
+		const headers = resolveSecurityHeaders({
+			NODE_ENV: "development",
+			VERCEL_ENV: "preview",
+		});
+		const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
+
+		expect(headerMap.get("X-Frame-Options")).toBe("DENY");
+		expect(headerMap.get("X-Content-Type-Options")).toBe("nosniff");
+		expect(headerMap.get("Referrer-Policy")).toBe(
+			"strict-origin-when-cross-origin",
+		);
+		expect(headerMap.get("Strict-Transport-Security")).toBeUndefined();
+		expect(headerMap.get("Content-Security-Policy")).toContain(
+			"default-src 'self'",
+		);
+	});
+
+	test("includes HSTS and upgrade-insecure-requests in production", () => {
+		const headers = resolveSecurityHeaders({
+			VERCEL_ENV: "production",
+		});
+		const headerMap = new Map(headers.map((entry) => [entry.key, entry.value]));
+		const csp = headerMap.get("Content-Security-Policy") ?? "";
+
+		expect(headerMap.get("Strict-Transport-Security")).toBe(
+			"max-age=63072000; includeSubDomains; preload",
+		);
+		expect(csp).toContain("upgrade-insecure-requests");
+		expect(csp).not.toContain("'unsafe-eval'");
+	});
+
+	test("can disable unsafe-inline scripts in production with an explicit env flag", () => {
+		const headers = resolveSecurityHeaders({
+			VERCEL_ENV: "production",
+			BARDO_CSP_ALLOW_UNSAFE_INLINE_SCRIPTS: "false",
+		});
+		const csp =
+			headers.find((header) => header.key === "Content-Security-Policy")
+				?.value ?? "";
+
+		expect(csp).not.toContain("script-src 'self' 'unsafe-inline' https:");
+		expect(csp).toContain("script-src 'self' https:");
 	});
 });

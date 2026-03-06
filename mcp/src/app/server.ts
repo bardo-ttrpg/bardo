@@ -40,6 +40,7 @@ import { handleInitBootstrapRequest } from "./routes/init-bootstrap-orchestrator
 import { handleMcpRequest } from "./routes/mcp";
 import { handleMetricsRequest } from "./routes/metrics";
 import { handleResolveTurnRequest } from "./routes/turns-orchestrator";
+import { handleValidateAndMeterRequest } from "./routes/validate-and-meter";
 import { handleWorldTickRequest } from "./routes/world-tick-orchestrator";
 import { resolveUsageMetering } from "./usage-metering";
 
@@ -135,6 +136,12 @@ export function createHttpRequestHandler({
 		const isTurnsApiRoute = url.pathname === "/api/v1/turns/resolve";
 		const isInitBootstrapApiRoute = url.pathname === "/api/v1/init/bootstrap";
 		const isWorldTickApiRoute = url.pathname === "/api/v1/world/tick";
+		const isValidateAndMeterApiRoute =
+			url.pathname === "/api/v1/validate-and-meter";
+		const isLegacyValidateAndMeterApiRoute =
+			url.pathname === "/api/auth/introspect-key";
+		const isAnyValidateAndMeterApiRoute =
+			isValidateAndMeterApiRoute || isLegacyValidateAndMeterApiRoute;
 		const isMetricsRoute = url.pathname === "/metrics";
 		return withRequestSpan(
 			{
@@ -182,6 +189,7 @@ export function createHttpRequestHandler({
 					!isTurnsApiRoute &&
 					!isInitBootstrapApiRoute &&
 					!isWorldTickApiRoute &&
+					!isAnyValidateAndMeterApiRoute &&
 					!isMetricsRoute
 				) {
 					return finalize(withCors(new Response("Not Found", { status: 404 })));
@@ -245,6 +253,24 @@ export function createHttpRequestHandler({
 				try {
 					const auth = await authenticateRequest(request, store.asMap());
 					if (auth instanceof Response) {
+						if (isAnyValidateAndMeterApiRoute) {
+							return finalize(
+								withCors(
+									new Response(
+										JSON.stringify({
+											valid: false,
+											reason: "invalid_key",
+										}),
+										{
+											status: 401,
+											headers: {
+												"content-type": "application/json",
+											},
+										},
+									),
+								),
+							);
+						}
 						return finalize(auth);
 					}
 
@@ -254,6 +280,25 @@ export function createHttpRequestHandler({
 						rateLimitOutcome = "blocked";
 						if (securityPolicy.telemetryEnabled) {
 							recordRateLimitEventMetric("blocked");
+						}
+						if (isAnyValidateAndMeterApiRoute) {
+							return finalize(
+								withCors(
+									new Response(
+										JSON.stringify({
+											valid: false,
+											reason: "rate_limited",
+											retry_after: Math.ceil(limitResult.retryAfterMs / 1000),
+										}),
+										{
+											status: 429,
+											headers: {
+												"content-type": "application/json",
+											},
+										},
+									),
+								),
+							);
 						}
 						return finalize(
 							withCors(
@@ -284,6 +329,28 @@ export function createHttpRequestHandler({
 					rateLimitOutcome = "allowed";
 					if (securityPolicy.telemetryEnabled) {
 						recordRateLimitEventMetric("allowed");
+					}
+
+					if (isAnyValidateAndMeterApiRoute) {
+						if (request.method !== "POST") {
+							return finalize(
+								withCors(
+									new Response("Method Not Allowed", {
+										status: 405,
+										headers: {
+											allow: "POST, OPTIONS",
+										},
+									}),
+								),
+							);
+						}
+						return finalize(
+							await handleValidateAndMeterRequest({
+								request,
+								auth,
+								meteringLimiter: meteringLimiter,
+							}),
+						);
 					}
 
 					const usageMetering = await resolveUsageMetering(request, {

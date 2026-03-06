@@ -226,7 +226,7 @@ describe("state_get tool", () => {
 		}
 	});
 
-	test("blocks stale projection when strict canonical mode is enabled", async () => {
+	test("auto-recovers stale projection when strict canonical mode is enabled", async () => {
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-state-get-strict-stale-"),
 		);
@@ -264,7 +264,13 @@ describe("state_get tool", () => {
 				type: "player_action_resolved",
 				atISO: "2026-02-23T00:10:00.000Z",
 				source: "test",
-				data: {},
+				data: {
+					action: "I travel to river-market",
+					worldTimeAfterISO: "2026-02-23T00:10:00.000Z",
+					locationAfter: "river-market",
+					createdLocationIds: ["river-market"],
+					createdNpcIds: [],
+				},
 			})}\n`,
 		);
 		const previousStrict = Bun.env.BARDO_STRICT_CANONICAL_MODE;
@@ -272,10 +278,11 @@ describe("state_get tool", () => {
 		try {
 			const handler = captureStateGetHandler({ auth: createAuth(root) });
 			const result = await handler({});
-			expect(result.isError).toBe(true);
-			expect(result.structuredContent.success).toBe(false);
-			expect(result.structuredContent.stateSource).toBe(
-				"strict_stale_projection",
+			expect(result.isError).toBe(false);
+			expect(result.structuredContent.success).toBe(true);
+			expect(result.structuredContent.stateSource).toBe("projection");
+			expect(result.structuredContent.state.currentLocation).toBe(
+				"river-market",
 			);
 		} finally {
 			if (previousStrict === undefined) {

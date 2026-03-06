@@ -236,6 +236,20 @@ const setupPromptSchema = z.object({
 	validation: setupPromptValidationSchema,
 });
 
+const startingScenePacketSchema = z.object({
+	locationName: z.string(),
+	locationSlug: z.string(),
+	summary: z.string(),
+	openingQuestion: z.string(),
+	source: z.enum([
+		"user_provided",
+		"generated_from_workspace",
+		"generated_from_theme_map",
+		"existing_scene_reused",
+		"not_available",
+	]),
+});
+
 export const initOutputSchema = z.object({
 	success: z.boolean().describe("True when initialization operation completed"),
 	setupComplete: z
@@ -311,6 +325,12 @@ export const initOutputSchema = z.object({
 	startingScenePreview: z
 		.string()
 		.describe("Short preview of the active starting scene content"),
+	startingScenePacket: z
+		.union([startingScenePacketSchema, z.null()])
+		.optional()
+		.describe(
+			"Structured opening-scene packet for agents to render without re-reading files.",
+		),
 	spawnLocationSlug: z
 		.string()
 		.optional()

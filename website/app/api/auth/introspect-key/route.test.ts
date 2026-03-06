@@ -59,7 +59,10 @@ describe("POST /api/auth/introspect-key", () => {
 					},
 				},
 			}),
-			resolvePlanForSubject: async () => "free",
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
 			mcpPeriodLimitResolver: () => 100,
 		});
 
@@ -133,7 +136,10 @@ describe("POST /api/auth/introspect-key", () => {
 					},
 				},
 			}),
-			resolvePlanForSubject: async () => "free",
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
 			mcpPeriodLimitResolver: () => 100,
 		});
 
@@ -160,6 +166,74 @@ describe("POST /api/auth/introspect-key", () => {
 			budget_block_key: 0,
 			success: 2,
 		});
+	});
+
+	test("uses the high-water pre-auth budget tier before key verification", async () => {
+		let seenPreAuthPlan: string | null = null;
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 10_000,
+		});
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async (_secretHash, plan) => {
+					seenPreAuthPlan = plan ?? null;
+					return {
+						allowed: true,
+						limit: 3_000,
+						used: 1,
+						remaining: 2_999,
+						backend: "memory",
+					};
+				},
+				consumeUser: async (_subject, plan) => ({
+					allowed: true,
+					limit: plan === "solo_plus" ? 13_000 : 500,
+					used: 1,
+					remaining: 12_999,
+					backend: "memory",
+				}),
+				consumeKey: async (_keyId, plan) => ({
+					allowed: true,
+					limit: plan === "solo_plus" ? 3_000 : 500,
+					used: 1,
+					remaining: 2_999,
+					backend: "memory",
+				}),
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => ({
+						id: "key_solo_plus",
+						subject: "user_solo_plus",
+						claims: { workspacePath: "./customers/user_solo_plus" },
+						scopes: ["mcp"],
+					}),
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: "solo_plus",
+				billingUnavailable: false,
+			}),
+			mcpPeriodLimitResolver: () => 50_000,
+		});
+
+		const response = await handler(
+			buildRequest("shared-secret", "ak_test_preauth_plan"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(true);
+		expect(seenPreAuthPlan).toBe("solo_plus");
 	});
 
 	test("caches invalid verification errors and short-circuits repeat calls", async () => {
@@ -200,7 +274,10 @@ describe("POST /api/auth/introspect-key", () => {
 					},
 				},
 			}),
-			resolvePlanForSubject: async () => "free",
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
 			mcpPeriodLimitResolver: () => 100,
 		});
 
@@ -281,7 +358,10 @@ describe("POST /api/auth/introspect-key", () => {
 					},
 				},
 			}),
-			resolvePlanForSubject: async () => "free",
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
 			mcpPeriodLimitResolver: () => 100,
 		});
 
@@ -360,7 +440,10 @@ describe("POST /api/auth/introspect-key", () => {
 					},
 				},
 			}),
-			resolvePlanForSubject: async () => "free",
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
 			mcpPeriodLimitResolver: () => 100,
 		});
 
@@ -381,5 +464,79 @@ describe("POST /api/auth/introspect-key", () => {
 			budget_block_key: 1,
 			success: 0,
 		});
+	});
+
+	test("signals billing degradation and enforces free-tier limits when billing is unavailable", async () => {
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 10_000,
+		});
+		const seenPlans: string[] = [];
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async () => ({
+					allowed: true,
+					limit: 500,
+					used: 1,
+					remaining: 499,
+					backend: "memory",
+				}),
+				consumeUser: async (_subject, plan) => {
+					seenPlans.push(plan);
+					return {
+						allowed: true,
+						limit: 500,
+						used: 1,
+						remaining: 499,
+						backend: "memory",
+					};
+				},
+				consumeKey: async (_keyId, plan) => {
+					seenPlans.push(plan);
+					return {
+						allowed: true,
+						limit: 500,
+						used: 1,
+						remaining: 499,
+						backend: "memory",
+					};
+				},
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => ({
+						id: "key_billing_unavailable",
+						subject: "user_billing_unavailable",
+						claims: { workspacePath: "./customers/user_billing_unavailable" },
+						scopes: ["mcp"],
+					}),
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: null,
+				billingUnavailable: true,
+			}),
+			mcpPeriodLimitResolver: (plan) => (plan === "free" ? 100 : 25_000),
+		});
+
+		const response = await handler(
+			buildRequest("shared-secret", "ak_test_billing_unavailable"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(true);
+		expect(body.plan).toBe("free");
+		expect(body.billingUnavailable).toBe(true);
+		expect(body.mcpPeriodLimit).toBe(100);
+		expect(seenPlans).toEqual(["free", "free"]);
 	});
 });

@@ -1,12 +1,34 @@
 import * as z from "zod/v4";
 
+const worldDiscoverySchema = z.object({
+	kind: z.enum(["npc", "location", "faction", "item", "clue", "thread"]),
+	id: z.string().optional(),
+	displayName: z.string(),
+	discoveryMode: z.enum([
+		"explicitly_named",
+		"implicitly_present",
+		"role_placeholder",
+	]),
+	confidence: z.enum(["high", "medium", "low"]),
+	summary: z.string().optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+	persisted: z.boolean().optional(),
+});
+
 export const worldSyncInputSchema = z.object({
 	transcript: z
 		.string()
-		.min(1)
 		.max(40_000)
+		.min(1)
+		.optional()
 		.describe(
 			"Narrative text block or conversation snippet to sync discovered names (NPCs/locations) into workspace files.",
+		),
+	discoveries: z
+		.array(worldDiscoverySchema)
+		.optional()
+		.describe(
+			"Structured discoveries to persist. When provided, these are the primary sync source and transcript parsing becomes fallback-only.",
 		),
 	currentLocationHint: z
 		.string()
@@ -29,6 +51,7 @@ export const worldSyncOutputSchema = z.object({
 	existingLocationIds: z.array(z.string()),
 	existingNpcIds: z.array(z.string()),
 	currentLocationAfter: z.string(),
+	persistedDiscoveries: z.array(worldDiscoverySchema),
 	optionalSystems: z.object({
 		npcs: z.boolean(),
 		quests: z.boolean(),

@@ -114,6 +114,10 @@ function buildCliLoginCommand(args: {
 	return `bardo login --token "${args.loginToken}" --exchange-url "${args.exchangeUrl}"`;
 }
 
+function keyDeletePath(keyId: string): string {
+	return `/api/keys/${encodeURIComponent(keyId)}`;
+}
+
 function toUiError(error: unknown, fallback: string): string {
 	if (
 		(error instanceof DOMException && error.name === "AbortError") ||
@@ -370,11 +374,9 @@ export async function revokeKey({
 	dispatch({ type: "busy_changed", busyId: keyId });
 	try {
 		const response = await fetchWithTimeout(
-			"/api/keys/revoke",
+			keyDeletePath(keyId),
 			{
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ id: keyId }),
+				method: "DELETE",
 			},
 			{ ...fetchOptions, timeoutMs },
 		);
@@ -415,11 +417,9 @@ export async function rotateKey({
 	dispatch({ type: "busy_changed", busyId: keyId });
 	try {
 		const revokeResponse = await fetchWithTimeout(
-			"/api/keys/revoke",
+			keyDeletePath(keyId),
 			{
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ id: keyId }),
+				method: "DELETE",
 			},
 			{ ...fetchOptions, timeoutMs },
 		);

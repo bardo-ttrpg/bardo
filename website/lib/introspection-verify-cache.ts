@@ -16,6 +16,7 @@ type IntrospectionVerifiedKeySnapshot = {
 	subjectId: string | null;
 	keyId: string;
 	plan: PlanTier;
+	billingUnavailable?: boolean;
 	scopes: string[];
 	workspacePath: string | null;
 };
@@ -71,6 +72,7 @@ export function createIntrospectionVerifyCache(
 						subjectId: value.subjectId,
 						keyId: value.keyId,
 						plan: value.plan,
+						billingUnavailable: Boolean(value.billingUnavailable),
 						scopes: [...value.scopes],
 						workspacePath: value.workspacePath,
 					},

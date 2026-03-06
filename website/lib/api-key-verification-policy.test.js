@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	createDailyVerificationBudgetLimiter,
 	createSubjectPlanCache,
+	pruneDailyVerificationCaches,
 	rotateConfirmedKeyWindow,
 } from "./api-key-verification-policy";
 
@@ -122,6 +123,28 @@ describe("createDailyVerificationBudgetLimiter", () => {
 
 		expect(currentDay).toBe("2026-02-27");
 		expect([...confirmedKeys]).toEqual([]);
+	});
+
+	test("prunes stale memory counters and expired blocked cache entries", () => {
+		const usageByCounter = new Map([
+			["user:active", { day: "2026-02-27", used: 10 }],
+			["user:stale", { day: "2026-02-26", used: 20 }],
+			["key:stale", { day: "2026-02-25", used: 5 }],
+		]);
+		const blockedCache = new Map([
+			["key:expired", Date.UTC(2026, 1, 27, 0, 0, 0)],
+			["key:active", Date.UTC(2026, 1, 27, 0, 10, 0)],
+		]);
+
+		pruneDailyVerificationCaches({
+			usageByCounter,
+			blockedCache,
+			currentDay: "2026-02-27",
+			nowMs: Date.UTC(2026, 1, 27, 0, 5, 0),
+		});
+
+		expect([...usageByCounter.keys()]).toEqual(["user:active"]);
+		expect([...blockedCache.keys()]).toEqual(["key:active"]);
 	});
 });
 

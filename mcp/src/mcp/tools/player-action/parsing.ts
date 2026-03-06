@@ -57,13 +57,13 @@ export function resolveTravelTarget(
 
 export function extractTargetLocation(action: string): string | null {
 	const direct = action.match(
-		/(?:travel|go|walk|journey|head|move|ride|sail|enter)\s+(?:to|toward|into)?\s*(?:the\s+)?([a-z0-9'\-\s]{2,80})/i,
+		/(?:travel|go|walk|journey|head|move|ride|sail|enter)\s+(?:toward|into|to)?\s*(?:the\s+)?([a-z0-9'\-\s]{2,80}?)(?=\s+(?:and|then|but)\b|[.,!?]|$)/i,
 	);
 	if (direct?.[1]) {
 		return direct[1].trim();
 	}
 	const preposition = action.match(
-		/(?:to|toward|into)\s+(?:the\s+)?([a-z0-9'\-\s]{2,80})/i,
+		/\b(?:toward|into|to)\b\s+(?:the\s+)?([a-z0-9'\-\s]{2,80}?)(?=\s+(?:and|then|but)\b|[.,!?]|$)/i,
 	);
 	if (preposition?.[1]) {
 		return preposition[1].trim();
@@ -73,24 +73,36 @@ export function extractTargetLocation(action: string): string | null {
 
 export function parseIntent(action: string): Intent {
 	const text = action.toLowerCase();
-	if (
-		/(travel|go\s+to|walk\s+to|journey|head\s+to|move\s+to|ride\s+to|sail\s+to|enter)/.test(
+	const hasCombat =
+		/(fight|attack|battle|combat|ambush|strike|shoot|stab|slash)/.test(text);
+	const hasSocial =
+		/(talk|speak|ask|chat|convince|persuade|negotiate|question|interrogate|greet|introduce)/.test(
 			text,
-		)
-	) {
-		return "travel";
+		);
+	const hasExplore =
+		/(explore|search|investigate|scout|look around|inspect|examine|study)/.test(
+			text,
+		);
+	const hasRest = /(rest|sleep|camp|wait)/.test(text);
+	const hasTravel =
+		/(travel|go\s+to|walk\s+to|journey|head\s+to|move\s+to|ride\s+to|sail\s+to|\benter\b)/.test(
+			text,
+		);
+
+	if (hasCombat) {
+		return "combat";
 	}
-	if (/(explore|search|investigate|scout|look around)/.test(text)) {
-		return "explore";
-	}
-	if (/(talk|speak|ask|chat|convince|persuade|negotiate)/.test(text)) {
+	if (hasSocial) {
 		return "social";
 	}
-	if (/(rest|sleep|camp|wait)/.test(text)) {
+	if (hasExplore) {
+		return "explore";
+	}
+	if (hasRest) {
 		return "rest";
 	}
-	if (/(fight|attack|battle|combat|ambush)/.test(text)) {
-		return "combat";
+	if (hasTravel) {
+		return "travel";
 	}
 	return "general";
 }
@@ -110,6 +122,27 @@ export function defaultAdvanceMinutes(intent: Intent): number {
 		default:
 			return 15;
 	}
+}
+
+export function intentRequiresMechanics(
+	intent: Intent,
+	action: string,
+): boolean {
+	const normalized = action.toLowerCase();
+	if (intent === "combat") {
+		return true;
+	}
+	if (intent === "social") {
+		return /\b(convince|persuade|negotiate|threaten|interrogate|ask about|ask who|deceive|lie|pressure|bargain)\b/.test(
+			normalized,
+		);
+	}
+	if (intent === "explore") {
+		return /\b(search|investigate|inspect|examine|study|track|scout)\b/.test(
+			normalized,
+		);
+	}
+	return false;
 }
 
 export function normalizeIsoDate(input: string): string {

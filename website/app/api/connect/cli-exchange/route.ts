@@ -4,6 +4,10 @@ import {
 	isBackendAvailabilityError,
 } from "../../../../lib/backend-availability";
 import {
+	CLI_LOGIN_SECRET_MISSING_MESSAGE,
+	resolveCliLoginSecret,
+} from "../../../../lib/cli-login-secret";
+import {
 	CliLoginReplayStoreError,
 	createCliLoginTokenStore,
 } from "../../../../lib/cli-login-store";
@@ -47,9 +51,9 @@ function getDefaultCliLoginTokenStore() {
 
 const defaultDeps: CliExchangeDeps = {
 	decodeToken: async (token) => {
-		const secret = process.env.BARDO_CLI_LOGIN_SECRET?.trim();
+		const secret = resolveCliLoginSecret(process.env);
 		if (!secret) {
-			throw new Error("CLI login exchange is not configured.");
+			throw new Error(CLI_LOGIN_SECRET_MISSING_MESSAGE);
 		}
 		return createCliLoginTokenCodec(secret).decrypt(token);
 	},

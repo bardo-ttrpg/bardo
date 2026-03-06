@@ -9,6 +9,7 @@ import { resolveFeatureFlags } from "../config/features";
 import { readCanonicalEvents } from "../events/store";
 import { parseMarkdown } from "../markdown/markdown";
 import { regenerateCurrentStateProjection } from "./current-state";
+import { latestRelevantEventSequenceForProjection } from "./refresh";
 
 export type PreferredStateSource =
 	| "projection"
@@ -86,25 +87,28 @@ export async function loadPreferredCurrentState(args: {
 	if (projection.exists) {
 		if (strictCanonicalMode || args.refreshStaleProjection) {
 			const events = await readCanonicalEvents({ bardoRoot: args.bardoRoot });
-			const latestSequence = events.at(-1)?.sequence ?? 0;
+			const latestSequence = latestRelevantEventSequenceForProjection({
+				projectionId: "current_state",
+				events,
+			});
 			const projectionSeqMax = parsePositiveInteger(
 				projection.frontmatter.source_event_seq_max,
 			);
 			const isStale =
-				projectionSeqMax === null || latestSequence > projectionSeqMax;
+				latestSequence > 0 &&
+				(projectionSeqMax === null || latestSequence > projectionSeqMax);
 			if (isStale) {
-				if (strictCanonicalMode) {
-					throw new Error(
-						`STRICT_CANONICAL_STALE_PROJECTION: projection sequence ${String(
-							projectionSeqMax ?? -1,
-						)} is behind canonical sequence ${String(latestSequence)}.`,
-					);
-				}
 				if (args.refreshStaleProjection) {
 					await regenerateCurrentStateProjection({
 						bardoRoot: args.bardoRoot,
 					});
 					projection = await readStateFile(projectionPath);
+				} else if (strictCanonicalMode) {
+					throw new Error(
+						`STRICT_CANONICAL_STALE_PROJECTION: projection sequence ${String(
+							projectionSeqMax ?? -1,
+						)} is behind canonical sequence ${String(latestSequence)}.`,
+					);
 				}
 			}
 		}

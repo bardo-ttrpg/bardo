@@ -1,7 +1,5 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { toDisplayName } from "../../../domain/campaign/naming";
-import { safeParseState } from "../../../domain/campaign/state";
-import type { CampaignState } from "../../../domain/campaign/types";
 import {
 	parseMarkdown,
 	renderMarkdown,
@@ -63,16 +61,6 @@ export async function loadKnownLocations(
 	} catch {
 		return [];
 	}
-}
-
-export async function loadCampaignState(
-	statePath: string,
-): Promise<CampaignState> {
-	const rawStateMarkdown = await readTextIfExists(statePath);
-	const parsedStateMarkdown = rawStateMarkdown
-		? parseMarkdown(rawStateMarkdown)
-		: { frontmatter: {}, content: "" };
-	return safeParseState(parsedStateMarkdown.content);
 }
 
 export async function ensureLocationFile(args: {
@@ -149,22 +137,53 @@ export async function createUnknownNpc(args: {
 	return { id: npcId, path: npcPath };
 }
 
-export async function persistCampaignState(
-	statePath: string,
-	state: CampaignState,
-): Promise<void> {
-	await ensureParentDirectoryExists(statePath);
+export async function ensureNpcFile(args: {
+	bardoRoot: string;
+	npcId: string;
+	npcName: string;
+	currentLocation: string;
+	role?: string | null;
+	knownByPlayer?: boolean;
+}): Promise<{ created: boolean; path: string }> {
+	const npcPath = resolvePathInsideRoot(
+		args.bardoRoot,
+		`entities/${args.npcId}.md`,
+	);
+	const existing = await readTextIfExists(npcPath);
+	if (existing !== null) {
+		return { created: false, path: npcPath };
+	}
+
+	await ensureParentDirectoryExists(npcPath);
+	const knownByPlayer =
+		args.knownByPlayer ?? !args.npcName.startsWith("Unknown ");
 	await writeFile(
-		statePath,
+		npcPath,
 		renderMarkdown(
 			{
-				description: "Current campaign state and memory snapshot",
-				title: "Campaign State",
+				description: "NPC record synchronized from action-driven discovery",
+				title: args.npcName,
 			},
-			JSON.stringify(state, null, 2),
+			JSON.stringify(
+				{
+					id: args.npcId,
+					publicName: args.npcName,
+					trueName: knownByPlayer ? args.npcName : null,
+					discoveryStatus: knownByPlayer ? "known" : "unknown",
+					knownByPlayer,
+					currentLocation: args.currentLocation,
+					role: args.role ?? null,
+					notes:
+						"Auto-generated from player action. Expand identity, goals, and relationships through play.",
+				},
+				null,
+				2,
+			),
 		),
 		"utf8",
 	);
+
+	return { created: true, path: npcPath };
 }
 
 export function buildHistoryEntry(args: {
@@ -177,30 +196,4 @@ export function buildHistoryEntry(args: {
 	newLocationCount: number;
 }): string {
 	return `${args.worldTimeAfterISO} | intent=${args.intent} | action="${args.action}" | from=${args.locationBefore} | to=${args.locationAfter} | new_npcs=${args.newNpcCount} | new_locations=${args.newLocationCount}`;
-}
-
-export async function appendHistoryEntry(
-	historyPath: string,
-	historyEntry: string,
-): Promise<void> {
-	const existingHistory = await readTextIfExists(historyPath);
-	const parsedHistory = existingHistory
-		? parseMarkdown(existingHistory)
-		: { frontmatter: {}, content: "" };
-	const nextHistoryContent = parsedHistory.content.trim()
-		? `${parsedHistory.content.trimEnd()}\n${historyEntry}`
-		: historyEntry;
-
-	await ensureParentDirectoryExists(historyPath);
-	await writeFile(
-		historyPath,
-		renderMarkdown(
-			{
-				description: "Chronological campaign action history log",
-				title: "Campaign History",
-			},
-			nextHistoryContent,
-		),
-		"utf8",
-	);
 }

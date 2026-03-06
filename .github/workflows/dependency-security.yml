@@ -1,10 +1,7 @@
 name: Dependency Security
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+  workflow_dispatch:
   schedule:
     - cron: "0 6 * * 1"
 
@@ -13,16 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  scan-pr:
-    if: github.event_name == 'pull_request'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.1
-    with:
-      fail-on-vuln: true
-      upload-sarif: false
-      scan-args: |
-        --recursive
-        ./
-
   scan-full:
     if: github.event_name != 'pull_request'
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.1

@@ -77,6 +77,7 @@ export function registerStateGetTool(
 					const preferred = await loadPreferredCurrentState({
 						bardoRoot,
 						consumer: "state_get",
+						refreshStaleProjection: true,
 					});
 					const output: StateGetOutput = {
 						success: true,

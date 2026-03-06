@@ -128,6 +128,18 @@ function filterIncomingAnswersForPendingQuestion(args: {
 	if (!pendingQuestionKey) {
 		return { accepted: {}, ignoredKeys: [] };
 	}
+	const missingQuestions = args.requiredQuestions.filter(
+		(key) => !args.existingAnswers[key],
+	);
+	const hasFullBatchForMissing = missingQuestions.every((key) =>
+		Boolean(args.incomingAnswers[key]),
+	);
+	if (hasFullBatchForMissing) {
+		return {
+			accepted: mergeAnswers({}, args.incomingAnswers),
+			ignoredKeys: [],
+		};
+	}
 	const pendingValue = args.incomingAnswers[pendingQuestionKey];
 	const ignoredKeys = Object.keys(args.incomingAnswers).filter(
 		(key): key is BootstrapAnswerKey =>

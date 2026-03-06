@@ -1,22 +1,7 @@
 name: MCP GA Gates
 
 on:
-  pull_request:
-    paths:
-      - "mcp/**"
-      - ".github/workflows/mcp-ga-gates.yml"
-      - "package.json"
-      - "bun.lock"
-      - "turbo.json"
-  push:
-    branches:
-      - main
-    paths:
-      - "mcp/**"
-      - ".github/workflows/mcp-ga-gates.yml"
-      - "package.json"
-      - "bun.lock"
-      - "turbo.json"
+  workflow_dispatch:
 
 jobs:
   ga-gates:

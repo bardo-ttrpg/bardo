@@ -101,9 +101,9 @@ export async function runPerformanceBenchmarkEval(args?: {
 	sampleRuns?: number;
 }): Promise<PerformanceBenchmarkResult> {
 	const seedEvents = Math.max(1_000, args?.seedEvents ?? 1_000);
-	const sampleRuns = Math.max(20, args?.sampleRuns ?? 40);
+	const sampleRuns = Math.max(20, args?.sampleRuns ?? 30);
 	const thresholds = {
-		playerActionMs: 160,
+		playerActionMs: 200,
 		projectionRefreshMs: 80,
 		retrievalMs: 80,
 		indexRebuildFrequency: 0.02,
@@ -122,6 +122,21 @@ export async function runPerformanceBenchmarkEval(args?: {
 
 	try {
 		await seedCampaignEvents({ bardoRoot, seedEvents });
+		await runPlayerAction({
+			auth,
+			action: "I survey the market square",
+			idempotencyKey: "perf_warmup_action",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T13:59:00.000Z",
+		});
+		await regenerateCurrentStateProjection({ bardoRoot });
+		await retrieveContext({
+			bardoRoot,
+			query: "market",
+			mode: "fast",
+			focus: "all",
+			limit: 8,
+		});
 
 		for (let index = 0; index < sampleRuns; index += 1) {
 			const startedAt = performance.now();

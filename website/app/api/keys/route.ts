@@ -1,7 +1,10 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
-import { maxApiKeysForPlan } from "@/lib/api-keys";
+import {
+	ApiKeyCreationPolicyError,
+	assertApiKeyCreationAllowed,
+} from "@/lib/api-key-creation-policy";
 import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
 import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 import { createMcpUsageReader } from "@/lib/mcp-usage";
@@ -301,40 +304,32 @@ export function createKeysPostHandler(deps: KeysPostHandlerDeps = {}) {
 
 		const clerk = await createClerkClient();
 
-		const liveBilling = await fetchLiveBilling(clerk, userId);
-		if (liveBilling.billingUnavailable) {
-			return NextResponse.json(
-				{ error: "Billing service unavailable, please try again" },
-				{ status: 503 },
-			);
-		}
-		const maxAllowed = maxApiKeysForPlan(liveBilling.plan);
-
-		let activeCount: number;
 		try {
-			const probe = await clerk.apiKeys.list({ subject: userId, limit: 1 });
-			activeCount = probe.totalCount;
+			await assertApiKeyCreationAllowed({
+				clerk,
+				userId,
+				fetchLiveBilling,
+			});
 		} catch (err) {
+			if (err instanceof ApiKeyCreationPolicyError) {
+				return NextResponse.json(
+					{ error: err.message },
+					{ status: err.status },
+				);
+			}
 			Sentry.captureException(err);
-			Sentry.logger.error("website.api_keys.limit_probe_failed", {
+			Sentry.logger.error("website.api_keys.eligibility_check_failed", {
 				"bardo.service": "website",
 				"bardo.route": "/api/keys",
-				"bardo.operation": "clerk.apiKeys.list",
+				"bardo.operation": "api_key_creation_policy",
 			});
 			console.error(
-				"[api/keys] clerk.apiKeys.list failed:",
+				"[api/keys] API key creation eligibility check failed:",
 				clerkErrorMessage(err),
 			);
 			return NextResponse.json(
 				{ error: clerkErrorMessage(err) },
 				{ status: 500 },
-			);
-		}
-
-		if (activeCount >= maxAllowed) {
-			return NextResponse.json(
-				{ error: "API key limit reached for your plan" },
-				{ status: 403 },
 			);
 		}
 

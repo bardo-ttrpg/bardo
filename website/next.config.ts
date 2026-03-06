@@ -2,6 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import {
 	resolveAllowedDevOrigins,
+	resolveSecurityHeaders,
 	resolveSentryBuildSilence,
 } from "./lib/next-config-policy";
 import { resolveSentryRelease } from "./lib/sentry-server-config";
@@ -18,6 +19,14 @@ const nextConfig: NextConfig = {
 				hostname: "img.youtube.com",
 			},
 		],
+	},
+	async headers() {
+		return [
+			{
+				source: "/(.*)",
+				headers: resolveSecurityHeaders(process.env),
+			},
+		];
 	},
 };
 

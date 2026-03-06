@@ -2,6 +2,7 @@ import Link from "next/link";
 import ScrambleText from "@/components/scramble-text";
 import TextTicker from "@/components/text-ticker";
 import { tickerItems } from "./data";
+import InstallCommandCard from "./install-command-card";
 
 export default function HeroSection({
 	wordmarkClassName,
@@ -37,6 +38,7 @@ export default function HeroSection({
 							state-aware GM process for tabletop RPGs. Stop re-explaining your
 							world every session. Start building campaigns that persist.
 						</p>
+						<InstallCommandCard />
 						<div className="flex flex-wrap gap-3">
 							<Link
 								href="/pricing"

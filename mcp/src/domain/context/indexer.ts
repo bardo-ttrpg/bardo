@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { withKeyedLock } from "../../infra/concurrency/keyed-lock";
 import {
 	ensureParentDirectoryExists,
 	readTextIfExists,
@@ -232,40 +233,46 @@ export async function refreshContextIndex(bardoRoot: string): Promise<{
 	docsIndexed: number;
 	indexRebuilt: boolean;
 }> {
-	const indexPath = contextIndexPath(bardoRoot);
-	const manifestPath = contextIndexManifestPath(bardoRoot);
-	const corpusFingerprint = await computeCorpusFingerprint(bardoRoot);
-	const [manifestRaw, indexExists] = await Promise.all([
-		readTextIfExists(manifestPath),
-		hasIndexFile(indexPath),
-	]);
-	const manifest = parseManifest(manifestRaw);
-	if (
-		indexExists &&
-		manifest &&
-		manifest.corpusFingerprint === corpusFingerprint
-	) {
-		return {
-			indexPath,
-			docsIndexed: manifest.docsIndexed,
-			indexRebuilt: false,
-		};
-	}
+	return withKeyedLock(`context-index:${bardoRoot}`, async () => {
+		const indexPath = contextIndexPath(bardoRoot);
+		const manifestPath = contextIndexManifestPath(bardoRoot);
+		const corpusFingerprint = await computeCorpusFingerprint(bardoRoot);
+		const [manifestRaw, indexExists] = await Promise.all([
+			readTextIfExists(manifestPath),
+			hasIndexFile(indexPath),
+		]);
+		const manifest = parseManifest(manifestRaw);
+		if (
+			indexExists &&
+			manifest &&
+			manifest.corpusFingerprint === corpusFingerprint
+		) {
+			return {
+				indexPath,
+				docsIndexed: manifest.docsIndexed,
+				indexRebuilt: false,
+			};
+		}
 
-	const rebuilt = await rebuildContextIndex(bardoRoot);
-	const nextManifest: ContextIndexManifest = {
-		version: 1,
-		corpusFingerprint,
-		docsIndexed: rebuilt.docsIndexed,
-		updatedAtISO: new Date().toISOString(),
-	};
-	await ensureParentDirectoryExists(manifestPath);
-	await writeFile(manifestPath, JSON.stringify(nextManifest, null, 2), "utf8");
-	return {
-		indexPath: rebuilt.indexPath,
-		docsIndexed: rebuilt.docsIndexed,
-		indexRebuilt: true,
-	};
+		const rebuilt = await rebuildContextIndex(bardoRoot);
+		const nextManifest: ContextIndexManifest = {
+			version: 1,
+			corpusFingerprint,
+			docsIndexed: rebuilt.docsIndexed,
+			updatedAtISO: new Date().toISOString(),
+		};
+		await ensureParentDirectoryExists(manifestPath);
+		await writeFile(
+			manifestPath,
+			JSON.stringify(nextManifest, null, 2),
+			"utf8",
+		);
+		return {
+			indexPath: rebuilt.indexPath,
+			docsIndexed: rebuilt.docsIndexed,
+			indexRebuilt: true,
+		};
+	});
 }
 
 export function queryContextDocs(args: {
@@ -288,7 +295,10 @@ export function queryContextDocs(args: {
 	try {
 		const focusDir = args.focus === "all" ? null : args.focus;
 		const queryLower = args.query.toLowerCase();
-		const searchPattern = `%${queryLower}%`;
+		const tokens = queryLower
+			.split(/\s+/)
+			.map((token) => token.trim())
+			.filter((token) => token.length >= 2);
 
 		const stmt = db.prepare(
 			`SELECT
@@ -297,43 +307,65 @@ export function queryContextDocs(args: {
 				source_dir,
 				body,
 				body_chars,
-				(
-					(CASE WHEN lower(title) LIKE ? THEN 3 ELSE 0 END) +
-					(CASE WHEN lower(body) LIKE ? THEN 1 ELSE 0 END)
-				) AS match_score
+				updated_at_iso
 			FROM docs
-			WHERE (? IS NULL OR source_dir = ?)
-			AND (? = '' OR lower(title) LIKE ? OR lower(body) LIKE ?)
-			ORDER BY match_score DESC, updated_at_iso DESC
-			LIMIT ?`,
+			WHERE (? IS NULL OR source_dir = ?)`,
 		);
 
-		const rows = stmt.all(
-			searchPattern,
-			searchPattern,
-			focusDir,
-			focusDir,
-			queryLower,
-			searchPattern,
-			searchPattern,
-			args.limit,
-		) as Array<{
+		const rows = stmt.all(focusDir, focusDir) as Array<{
 			relative_path: string;
 			title: string;
 			source_dir: string;
 			body: string;
 			body_chars: number;
-			match_score: number;
+			updated_at_iso: string;
 		}>;
 
-		return rows.map((row) => ({
-			relativePath: row.relative_path,
-			title: row.title,
-			sourceDir: row.source_dir,
-			snippet: row.body.slice(0, args.mode === "fast" ? 180 : 360),
-			bodyChars: row.body_chars,
-			matchScore: row.match_score,
-		}));
+		return rows
+			.map((row) => {
+				const titleLower = row.title.toLowerCase();
+				const bodyLower = row.body.toLowerCase();
+				const pathLower = row.relative_path.toLowerCase();
+				let matchScore = 0;
+				if (!queryLower) {
+					matchScore = 1;
+				}
+				if (queryLower && titleLower.includes(queryLower)) {
+					matchScore += 6;
+				}
+				if (queryLower && bodyLower.includes(queryLower)) {
+					matchScore += 4;
+				}
+				for (const token of tokens) {
+					if (titleLower.includes(token)) {
+						matchScore += 3;
+					}
+					if (pathLower.includes(token)) {
+						matchScore += 2;
+					}
+					if (bodyLower.includes(token)) {
+						matchScore += 1;
+					}
+				}
+				return {
+					relativePath: row.relative_path,
+					title: row.title,
+					sourceDir: row.source_dir,
+					snippet: row.body.slice(0, args.mode === "fast" ? 180 : 360),
+					bodyChars: row.body_chars,
+					matchScore,
+					updatedAtISO: row.updated_at_iso,
+				};
+			})
+			.filter((row) => queryLower.length === 0 || row.matchScore > 0)
+			.sort((left, right) => {
+				if (right.matchScore !== left.matchScore) {
+					return right.matchScore - left.matchScore;
+				}
+				return right.updatedAtISO.localeCompare(left.updatedAtISO);
+			})
+			.slice(0, args.limit)
+			.map(({ updatedAtISO: _updatedAtISO, ...row }) => row);
 	} finally {
 		db.close();
 	}

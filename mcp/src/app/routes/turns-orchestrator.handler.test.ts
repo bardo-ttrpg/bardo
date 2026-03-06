@@ -580,4 +580,82 @@ describe("handleResolveTurnRequest", () => {
 			await rm(root, { recursive: true, force: true });
 		}
 	});
+
+	test("serializes concurrent strict-mode turn workflows against one workspace", async () => {
+		const previousStrict = Bun.env.BARDO_STRICT_CANONICAL_MODE;
+		const previousGuidedSetup = Bun.env.BARDO_GUIDED_SETUP_ENABLED;
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-turn-orch-concurrent-"),
+		);
+		Bun.env.BARDO_STRICT_CANONICAL_MODE = "true";
+		Bun.env.BARDO_GUIDED_SETUP_ENABLED = "false";
+
+		try {
+			installInProcessMcpFetch({ auth: createAuth(root) });
+
+			const warmupRequest = new Request("http://localhost:3000/turns/resolve", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					action: "I scout the square.",
+					autoTick: true,
+					includeState: false,
+				}),
+			});
+			const warmupResponse = await handleResolveTurnRequest(
+				warmupRequest,
+				createAuth(root),
+				false,
+			);
+			expect(warmupResponse.status).toBe(200);
+
+			const responses = await Promise.all(
+				Array.from({ length: 5 }, (_, index) =>
+					handleResolveTurnRequest(
+						new Request("http://localhost:3000/turns/resolve", {
+							method: "POST",
+							headers: { "content-type": "application/json" },
+							body: JSON.stringify({
+								action: `I inspect clue ${index + 1}.`,
+								autoTick: true,
+								includeState: false,
+							}),
+						}),
+						createAuth(root),
+						false,
+					),
+				),
+			);
+			const payloads = await Promise.all(
+				responses.map(async (response) => ({
+					status: response.status,
+					body: (await response.json()) as {
+						success?: boolean;
+						error?: string;
+					},
+				})),
+			);
+
+			expect(payloads.every((entry) => entry.status === 200)).toBe(true);
+			expect(
+				payloads.every(
+					(entry) =>
+						entry.body.success === true &&
+						!entry.body.error?.includes("STRICT_CANONICAL_STALE_PROJECTION"),
+				),
+			).toBe(true);
+		} finally {
+			if (previousStrict === undefined) {
+				delete Bun.env.BARDO_STRICT_CANONICAL_MODE;
+			} else {
+				Bun.env.BARDO_STRICT_CANONICAL_MODE = previousStrict;
+			}
+			if (previousGuidedSetup === undefined) {
+				delete Bun.env.BARDO_GUIDED_SETUP_ENABLED;
+			} else {
+				Bun.env.BARDO_GUIDED_SETUP_ENABLED = previousGuidedSetup;
+			}
+			await rm(root, { recursive: true, force: true });
+		}
+	});
 });

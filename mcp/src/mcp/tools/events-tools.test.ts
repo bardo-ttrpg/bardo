@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readCanonicalEvents } from "../../domain/events/store";
+import { parseMarkdown } from "../../domain/markdown/markdown";
 import type { AuthContext } from "../../types/contracts";
 import { registerAppendEventTool } from "./append-event";
 import { registerReplayEventsTool } from "./replay-events";
@@ -169,6 +170,54 @@ describe("event MCP tools", () => {
 			bardoRoot: path.join(root, "bardo"),
 		});
 		expect(events.length).toBe(0);
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("append_event refreshes projections when the appended event affects current state", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-append-event-projection-"),
+		);
+		const auth = createAuth(root);
+		const { appendEvent } = captureHandlers({ auth });
+
+		const appended = await appendEvent({
+			type: "world_sync_applied",
+			source: "test",
+			data: {
+				stateAfter: {
+					worldTimeISO: "2026-03-05T00:00:00.000Z",
+					currentLocation: "thornwick",
+					counters: {
+						unknownNpc: 0,
+						unknownLocation: 0,
+					},
+					locations: {
+						thornwick: {
+							name: "Thornwick",
+							visits: 1,
+							npcIds: [],
+						},
+					},
+					lastAction: "world_sync",
+				},
+			},
+			idempotencyKey: "append_event_projection_key_12345",
+		});
+
+		expect(appended.isError).toBe(false);
+		expect(appended.structuredContent.success).toBe(true);
+
+		const projectionRaw = await readFile(
+			path.join(root, "bardo/projections/current-state.md"),
+			"utf8",
+		);
+		const projectionState = JSON.parse(
+			parseMarkdown(projectionRaw).content,
+		) as {
+			currentLocation: string;
+		};
+		expect(projectionState.currentLocation).toBe("thornwick");
 
 		await rm(root, { recursive: true, force: true });
 	});

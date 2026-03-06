@@ -20,7 +20,7 @@ describe("client adapters", () => {
 		);
 	});
 
-	test("replaces codex server blocks even when the server name includes regex characters", () => {
+	test("remote codex installs are shimmed to local stdio blocks", () => {
 		const serverName = "gm+[shadow](solo)";
 		const output = buildInstallConfigContent({
 			client: "codex",
@@ -35,8 +35,8 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain(`[mcp_servers."${serverName}"]`);
-		expect(output).toContain('url = "https://mcp.bardo.ai/mcp"');
-		expect(output).toContain('"Bearer bardo_live_example"');
+		expect(output).toContain('command = "bunx"');
+		expect(output).toContain("--workspace-root");
 		expect(output.match(/\[mcp_servers\./g)?.length).toBe(1);
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
@@ -57,8 +57,8 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain("[mcp_servers.bardo]");
-		expect(output).toContain('url = "https://mcp.bardo.ai/mcp"');
-		expect(output).toContain('"Bearer bardo_live_example"');
+		expect(output).toContain('command = "bunx"');
+		expect(output).toContain("--workspace-root");
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
 	});
@@ -77,13 +77,13 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain("[mcp_servers.bardo]");
-		expect(output).toContain('url = "https://mcp.bardo.ai/mcp"');
+		expect(output).toContain('command = "bunx"');
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
 		expect(output.match(/\[mcp_servers\.bardo\]/g)?.length).toBe(1);
 	});
 
-	test("mcpServers remote install includes type: http for Claude Code HTTP transport", () => {
+	test("mcpServers remote installs are shimmed to local stdio transport", () => {
 		const output = buildInstallConfigContent({
 			client: "claude",
 			mode: "remote",
@@ -93,8 +93,8 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			existingContent: "",
 		});
 		const config = JSON.parse(output);
-		expect(config.mcpServers.bardo.type).toBe("http");
-		expect(config.mcpServers.bardo.url).toBe("https://mcp.bardo.ai/mcp");
+		expect(config.mcpServers.bardo.command).toBe("bunx");
+		expect(Array.isArray(config.mcpServers.bardo.args)).toBe(true);
 	});
 
 	test("codex local snippet uses the same escaping as the install path", () => {
@@ -132,6 +132,6 @@ http_headers = { "Authorization" = "Bearer old-token" }
 
 		expect(output).toContain('[mcp_servers."gm]\\n[injected"]');
 		expect(output).not.toContain("[injected]");
-		expect(output).toContain('url = "https://mcp.bardo.ai/mcp"');
+		expect(output).toContain('command = "bunx"');
 	});
 });

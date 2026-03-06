@@ -738,7 +738,7 @@ Notes:
   Without arguments, login can start a browser approval flow against the website control plane.
   connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
   --status-url lets doctor fetch plan and key status details from the website control plane.
-  If you are testing from the source tree, run bun link in packages/bardo-mcp once so the bardo command is available globally.
+  If you are testing from the source tree, run commands as: bun run --cwd packages/bardo-mcp start -- <command>.
   The workspace root defaults to the current working directory.
 `;
 }
@@ -916,6 +916,11 @@ async function handleInstall(
 			workspaceRoot,
 		});
 		const client = selection.client;
+		if (options.mode?.trim().toLowerCase() === "remote") {
+			stderr.write(
+				"Remote mode is deprecated and temporarily shimmed to local stdio mode.\n",
+			);
+		}
 		const mode = normalizeInstallMode(options.mode);
 		const credentials = resolveStoredCredentials(config, env);
 		if (!credentials.apiKey || !credentials.url) {
@@ -973,6 +978,11 @@ async function handleConnect(
 		const config = await readConfig(resolveConfigPath(deps));
 		const credentials = resolveConnectCredentials(options, config, env);
 		if (options.dryRun) {
+			if (options.mode?.trim().toLowerCase() === "remote") {
+				stderr.write(
+					"Remote mode is deprecated and temporarily shimmed to local stdio mode.\n",
+				);
+			}
 			if (!credentials.apiKey || !credentials.url) {
 				throw new Error(
 					"Missing credentials for dry-run. Pass --api-key with --url or run `bardo login` first.",
@@ -1272,6 +1282,16 @@ function resolveWorkspaceRoot(input: string | null, cwd: string): string {
 	return path.resolve(input?.trim() || cwd);
 }
 
+function resolveRuntimeStatusTimeoutMs(
+	env: Record<string, string | undefined>,
+): number {
+	const raw = Number(env.BARDO_RUNTIME_STATUS_TIMEOUT_MS ?? "1500");
+	if (!Number.isFinite(raw) || raw < 100) {
+		return 1500;
+	}
+	return Math.floor(raw);
+}
+
 async function resolveServePlan(args: {
 	apiKey: string;
 	statusUrl: string | null;
@@ -1287,11 +1307,16 @@ async function resolveServePlan(args: {
 		return null;
 	}
 
+	const timeoutMs = resolveRuntimeStatusTimeoutMs(args.env);
+	const abortController = new AbortController();
+	const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
 	try {
 		const response = await args.fetchImpl(args.statusUrl, {
 			headers: {
 				authorization: `Bearer ${args.apiKey}`,
 			},
+			signal: abortController.signal,
 		});
 		if (!response.ok) {
 			args.stderr.write(
@@ -1302,12 +1327,23 @@ async function resolveServePlan(args: {
 		const payload = (await response.json()) as { plan?: unknown };
 		return normalizePlan(payload.plan);
 	} catch (error) {
+		if (
+			error instanceof Error &&
+			(error.name === "AbortError" || abortController.signal.aborted)
+		) {
+			args.stderr.write(
+				`runtime status request timed out after ${timeoutMs}ms; continuing without plan-aware filtering.\n`,
+			);
+			return null;
+		}
 		args.stderr.write(
 			`runtime status request failed; continuing without plan-aware filtering: ${toErrorMessage(
 				error,
 			)}\n`,
 		);
 		return null;
+	} finally {
+		clearTimeout(timeoutId);
 	}
 }
 
@@ -1488,8 +1524,11 @@ function resolveConnectCredentials(
 
 function normalizeInstallMode(value: string | null): ConnectionMode {
 	const normalized = value?.trim().toLowerCase() || "local";
-	if (normalized === "local" || normalized === "remote") {
-		return normalized;
+	if (normalized === "local") {
+		return "local";
+	}
+	if (normalized === "remote") {
+		return "local";
 	}
 	throw new Error("Unsupported mode. Use local or remote.");
 }

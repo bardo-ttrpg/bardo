@@ -4,7 +4,7 @@ const port = Number.parseInt(
 	process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3001",
 	10,
 );
-const defaultHost = process.env.PLAYWRIGHT_LOOPBACK_HOST ?? "127.0.0.1";
+const defaultHost = process.env.PLAYWRIGHT_LOOPBACK_HOST ?? "localhost";
 const defaultBaseUrl = defaultHost.includes(":")
 	? `http://[${defaultHost}]:${String(port)}`
 	: `http://${defaultHost}:${String(port)}`;

@@ -1,5 +1,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import { assertApiKeyCreationAllowed } from "../../../../../lib/api-key-creation-policy";
 import {
 	backendAvailabilityPayload,
 	isBackendAvailabilityError,
@@ -14,6 +16,7 @@ import {
 export const runtime = "nodejs";
 
 type CreateApiKeyResult = {
+	id: string;
 	secret: string;
 	name: string;
 };
@@ -27,6 +30,7 @@ type CliSessionApproveDeps = {
 		name: string;
 		scopes: string[];
 	}) => Promise<CreateApiKeyResult>;
+	revokeApiKey: (args: { keyId: string }) => Promise<void>;
 	approveSession: (args: {
 		sessionId: string;
 		payload: {
@@ -62,11 +66,27 @@ function resolveStatusUrl(request: Request): string {
 	return new URL("/api/connect/runtime-status", request.url).toString();
 }
 
+function statusFromError(error: unknown): number {
+	if (
+		error &&
+		typeof error === "object" &&
+		"status" in error &&
+		typeof (error as { status: unknown }).status === "number"
+	) {
+		const status = (error as { status: number }).status;
+		if (status >= 400 && status < 600) {
+			return status;
+		}
+	}
+	return 500;
+}
+
 const defaultDeps: CliSessionApproveDeps = {
 	resolveUserId: async () =>
 		resolveRouteUserId("/api/connect/cli-session/approve"),
 	createApiKey: async ({ userId, name, scopes }) => {
 		const clerk = await clerkClient();
+		await assertApiKeyCreationAllowed({ clerk, userId });
 		const apiKey = await clerk.apiKeys.create({
 			name,
 			subject: userId,
@@ -74,15 +94,22 @@ const defaultDeps: CliSessionApproveDeps = {
 			claims: { workspacePath: `./customers/${userId}` },
 		});
 		if (
+			typeof apiKey.id !== "string" ||
+			apiKey.id.trim().length === 0 ||
 			typeof apiKey.secret !== "string" ||
 			apiKey.secret.trim().length === 0
 		) {
-			throw new Error("Clerk did not return an API key secret.");
+			throw new Error("Clerk did not return a complete API key payload.");
 		}
 		return {
+			id: apiKey.id,
 			secret: apiKey.secret,
 			name: apiKey.name,
 		};
+	},
+	revokeApiKey: async ({ keyId }) => {
+		const clerk = await clerkClient();
+		await clerk.apiKeys.delete(keyId);
 	},
 	approveSession: async (args) =>
 		getDefaultCliDeviceSessionService().approve(args),
@@ -91,6 +118,20 @@ const defaultDeps: CliSessionApproveDeps = {
 	now: () => new Date(),
 	telemetry: getDefaultConnectTelemetry(),
 };
+
+async function attemptApiKeyRollback(
+	deps: Pick<CliSessionApproveDeps, "revokeApiKey">,
+	keyId: string | null,
+) {
+	if (!keyId) {
+		return;
+	}
+	try {
+		await deps.revokeApiKey({ keyId });
+	} catch (rollbackError) {
+		Sentry.captureException(rollbackError);
+	}
+}
 
 export function createCliSessionApprovePostHandler(
 	overrides: Partial<CliSessionApproveDeps> = {},
@@ -117,6 +158,7 @@ export function createCliSessionApprovePostHandler(
 			);
 		}
 
+		let createdKeyId: string | null = null;
 		try {
 			const now = deps.now();
 			const key = await deps.createApiKey({
@@ -124,6 +166,7 @@ export function createCliSessionApprovePostHandler(
 				name: `CLI Login ${now.toISOString()}`,
 				scopes: ["mcp"],
 			});
+			createdKeyId = key.id;
 			const approved = await deps.approveSession({
 				sessionId,
 				payload: {
@@ -136,6 +179,7 @@ export function createCliSessionApprovePostHandler(
 				},
 			});
 			if (!approved.ok) {
+				await attemptApiKeyRollback(deps, createdKeyId);
 				deps.telemetry.increment("cli_session_approve_rejected");
 				const status =
 					approved.reason === "consumed"
@@ -152,6 +196,7 @@ export function createCliSessionApprovePostHandler(
 			deps.telemetry.increment("cli_session_approved");
 			return NextResponse.json({ ok: true });
 		} catch (error) {
+			await attemptApiKeyRollback(deps, createdKeyId);
 			deps.telemetry.increment("cli_session_approve_failed");
 			if (isBackendAvailabilityError(error)) {
 				return NextResponse.json(backendAvailabilityPayload(error), {
@@ -162,7 +207,7 @@ export function createCliSessionApprovePostHandler(
 				{
 					error: error instanceof Error ? error.message : String(error),
 				},
-				{ status: 500 },
+				{ status: statusFromError(error) },
 			);
 		}
 	};

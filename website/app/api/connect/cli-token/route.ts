@@ -1,6 +1,12 @@
 import { clerkClient } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import { assertApiKeyCreationAllowed } from "../../../../lib/api-key-creation-policy";
 import { resolveRouteUserId } from "../../../../lib/clerk-route-auth";
+import {
+	CLI_LOGIN_SECRET_MISSING_MESSAGE,
+	resolveCliLoginSecret,
+} from "../../../../lib/cli-login-secret";
 import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
 import {
 	type ConnectTelemetry,
@@ -13,6 +19,7 @@ const DEFAULT_CLI_LOGIN_SCOPES = ["mcp"] as const;
 const ALLOWED_CLI_LOGIN_SCOPES = new Set<string>(DEFAULT_CLI_LOGIN_SCOPES);
 
 type CreateApiKeyResult = {
+	id: string;
 	secret: string;
 	name: string;
 };
@@ -31,6 +38,7 @@ type CliTokenDeps = {
 		name: string;
 		scopes: string[];
 	}) => Promise<CreateApiKeyResult>;
+	revokeApiKey: (args: { keyId: string }) => Promise<void>;
 	createToken: (payload: {
 		apiKey: string;
 		mcpUrl: string;
@@ -104,14 +112,32 @@ function parseBody(request: Request): Promise<CliTokenRequest> {
 		.catch(() => ({}));
 }
 
+export { resolveCliLoginSecret } from "../../../../lib/cli-login-secret";
+
 function defaultKeyName(now: Date): string {
 	return `CLI Login ${now.toISOString()}`;
+}
+
+function statusFromError(error: unknown): number {
+	if (
+		error &&
+		typeof error === "object" &&
+		"status" in error &&
+		typeof (error as { status: unknown }).status === "number"
+	) {
+		const status = (error as { status: number }).status;
+		if (status >= 400 && status < 600) {
+			return status;
+		}
+	}
+	return 500;
 }
 
 const defaultDeps: CliTokenDeps = {
 	resolveUserId: async () => resolveRouteUserId("/api/connect/cli-token"),
 	createApiKey: async ({ userId, name, scopes }) => {
 		const clerk = await clerkClient();
+		await assertApiKeyCreationAllowed({ clerk, userId });
 		const apiKey = await clerk.apiKeys.create({
 			name,
 			subject: userId,
@@ -119,20 +145,27 @@ const defaultDeps: CliTokenDeps = {
 			claims: { workspacePath: `./customers/${userId}` },
 		});
 		if (
+			typeof apiKey.id !== "string" ||
+			apiKey.id.trim().length === 0 ||
 			typeof apiKey.secret !== "string" ||
 			apiKey.secret.trim().length === 0
 		) {
-			throw new Error("Clerk did not return an API key secret.");
+			throw new Error("Clerk did not return a complete API key payload.");
 		}
 		return {
+			id: apiKey.id,
 			secret: apiKey.secret,
 			name: apiKey.name,
 		};
 	},
+	revokeApiKey: async ({ keyId }) => {
+		const clerk = await clerkClient();
+		await clerk.apiKeys.delete(keyId);
+	},
 	createToken: async (payload) => {
-		const secret = process.env.BARDO_CLI_LOGIN_SECRET?.trim();
+		const secret = resolveCliLoginSecret(process.env);
 		if (!secret) {
-			throw new Error("CLI login exchange is not configured.");
+			throw new Error(CLI_LOGIN_SECRET_MISSING_MESSAGE);
 		}
 		return createCliLoginTokenCodec(secret).encrypt(payload);
 	},
@@ -143,6 +176,20 @@ const defaultDeps: CliTokenDeps = {
 	now: () => new Date(),
 	telemetry: getDefaultConnectTelemetry(),
 };
+
+async function attemptApiKeyRollback(
+	deps: Pick<CliTokenDeps, "revokeApiKey">,
+	keyId: string | null,
+) {
+	if (!keyId) {
+		return;
+	}
+	try {
+		await deps.revokeApiKey({ keyId });
+	} catch (rollbackError) {
+		Sentry.captureException(rollbackError);
+	}
+}
 
 export function createCliTokenPostHandler(
 	overrides: Partial<CliTokenDeps> = {},
@@ -160,12 +207,14 @@ export function createCliTokenPostHandler(
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
+		let createdKeyId: string | null = null;
 		try {
 			const body = await parseBody(request);
 			const now = deps.now();
 			const name = body.name?.trim() || defaultKeyName(now);
 			const scopes = parseScopes(body.scopes);
 			const key = await deps.createApiKey({ userId, name, scopes });
+			createdKeyId = key.id;
 			if (typeof key.secret !== "string" || key.secret.trim().length === 0) {
 				throw new Error("CLI login API key secret is missing.");
 			}
@@ -193,9 +242,13 @@ export function createCliTokenPostHandler(
 				keyName: key.name,
 			});
 		} catch (error) {
+			await attemptApiKeyRollback(deps, createdKeyId);
 			deps.telemetry.increment("cli_token_failed");
 			const message = error instanceof Error ? error.message : String(error);
-			return NextResponse.json({ error: message }, { status: 500 });
+			return NextResponse.json(
+				{ error: message },
+				{ status: statusFromError(error) },
+			);
 		}
 	};
 }

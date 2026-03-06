@@ -36,8 +36,16 @@ async function makeRemoteServer() {
 	const remoteServer = Bun.serve({
 		port: remoteServerPort,
 		async fetch(request) {
-			if (new URL(request.url).pathname === "/health") {
+			const pathname = new URL(request.url).pathname;
+			if (pathname === "/health") {
 				return Response.json({ ok: true });
+			}
+			if (pathname === "/api/v1/validate-and-meter") {
+				return Response.json({
+					valid: true,
+					remaining_quota: 10_000,
+					plan: "free",
+				});
 			}
 
 			const server = new Server(
@@ -130,7 +138,7 @@ afterEach(async () => {
 });
 
 describe("bardo mcp serve integration", () => {
-	test("serves local workspace tools and proxies remote tools with roots-aware workspace binding", async () => {
+	test("serves only local workspace tools and keeps remote proxy path unreachable", async () => {
 		const cwdWorkspace = await createTempDir("bardo-cwd-");
 		const clientWorkspace = await createTempDir("bardo-root-");
 		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
@@ -166,6 +174,10 @@ describe("bardo mcp serve integration", () => {
 				remote.url,
 			],
 			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
 			stderr: "pipe",
 		});
 
@@ -178,7 +190,7 @@ describe("bardo mcp serve integration", () => {
 			).toBe(true);
 			expect(
 				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
-			).toBe(true);
+			).toBe(false);
 
 			const bootstrap = await client.callTool({
 				name: "bardo_workspace_bootstrap",
@@ -215,11 +227,12 @@ describe("bardo mcp serve integration", () => {
 					message: "hello",
 				},
 			});
+			expect(remoteEcho.isError).toBe(true);
 			expect(remoteEcho.structuredContent).toMatchObject({
-				message: "hello",
-				workspaceRoot: clientWorkspace,
+				success: false,
+				reason: "REMOTE_PROXY_DISABLED",
 			});
-			expect(remote.getLastWorkspaceRoot()).toBe(clientWorkspace);
+			expect(remote.getLastWorkspaceRoot()).toBeNull();
 		} finally {
 			await client.close();
 		}
@@ -277,6 +290,10 @@ describe("bardo mcp serve integration", () => {
 				remote.url,
 			],
 			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
 			stderr: "pipe",
 		});
 
@@ -354,6 +371,10 @@ describe("bardo mcp serve integration", () => {
 				remote.url,
 			],
 			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
 			stderr: "pipe",
 		});
 

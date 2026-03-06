@@ -26,6 +26,9 @@ describe("connect telemetry", () => {
 			runtime_status_success: 1,
 			runtime_status_invalid: 0,
 			runtime_status_failed: 0,
+			connect_snippets_success: 0,
+			connect_snippets_rejected: 0,
+			connect_snippets_failed: 0,
 		});
 	});
 

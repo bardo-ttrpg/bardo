@@ -315,17 +315,6 @@ function buildCodexServerBlock(args: {
 	url: string;
 }) {
 	const tableName = formatCodexTableName(args.serverName);
-	if (args.mode === "remote") {
-		return [
-			`[${tableName}]`,
-			`url = ${JSON.stringify(args.url)}`,
-			`http_headers = { "Authorization" = ${JSON.stringify(
-				`Bearer ${args.apiKey}`,
-			)} }`,
-			"",
-		].join("\n");
-	}
-
 	return [
 		`[${tableName}]`,
 		`command = "bunx"`,
@@ -380,20 +369,11 @@ function mergeJsonVariant(args: {
 			typeof mcp.servers === "object" && mcp.servers !== null
 				? (mcp.servers as Record<string, unknown>)
 				: {};
-		servers[args.serverName] =
-			args.mode === "remote"
-				? {
-						type: "http",
-						url: args.url,
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-						},
-					}
-				: {
-						type: "stdio",
-						command: LOCAL_ADAPTER_COMMAND,
-						args: localArgs,
-					};
+		servers[args.serverName] = {
+			type: "stdio",
+			command: LOCAL_ADAPTER_COMMAND,
+			args: localArgs,
+		};
 		mcp.servers = servers;
 		root.mcp = mcp;
 		return root;
@@ -405,22 +385,11 @@ function mergeJsonVariant(args: {
 			typeof root.mcp === "object" && root.mcp !== null
 				? (root.mcp as Record<string, unknown>)
 				: {};
-		mcp[args.serverName] =
-			args.mode === "remote"
-				? {
-						type: "remote",
-						url: args.url,
-						oauth: false,
-						headers: {
-							Authorization: `Bearer ${args.apiKey}`,
-						},
-						enabled: true,
-					}
-				: {
-						type: "local",
-						command: buildLocalAdapterCommandParts(args.apiKey, args.url),
-						enabled: true,
-					};
+		mcp[args.serverName] = {
+			type: "local",
+			command: buildLocalAdapterCommandParts(args.apiKey, args.url),
+			enabled: true,
+		};
 		root.mcp = mcp;
 		return root;
 	}
@@ -430,19 +399,10 @@ function mergeJsonVariant(args: {
 		typeof root.mcpServers === "object" && root.mcpServers !== null
 			? (root.mcpServers as Record<string, unknown>)
 			: {};
-	servers[args.serverName] =
-		args.mode === "remote"
-			? {
-					type: "http",
-					url: args.url,
-					headers: {
-						Authorization: `Bearer ${args.apiKey}`,
-					},
-				}
-			: {
-					command: LOCAL_ADAPTER_COMMAND,
-					args: localArgs,
-				};
+	servers[args.serverName] = {
+		command: LOCAL_ADAPTER_COMMAND,
+		args: localArgs,
+	};
 	root.mcpServers = servers;
 	return root;
 }
@@ -545,68 +505,6 @@ export function buildConnectionSnippet(args: {
 	const serverName = args.serverName?.trim() || "bardo";
 	const apiKey = args.apiKey;
 	const baseUrl = args.baseUrl;
-	const adapter = getConnectionClientAdapter(args.client);
-
-	if (args.mode === "remote") {
-		switch (args.client) {
-			case "claude":
-				return `claude mcp add --scope user --transport http ${shellQuote(serverName)} ${shellQuote(baseUrl)} \\
---header ${shellQuote(`Authorization: Bearer ${apiKey}`)}`;
-			case "codex":
-				return buildCodexServerBlock({
-					mode: "remote",
-					serverName,
-					apiKey,
-					url: baseUrl,
-				}).trim();
-			case "vscode":
-				return `${JSON.stringify(
-					mergeJsonVariant({
-						variant: "vscode",
-						existing: {},
-						mode: "remote",
-						serverName,
-						apiKey,
-						url: baseUrl,
-					}),
-					null,
-					2,
-				)}`;
-			case "opencode":
-				return `${JSON.stringify(
-					mergeJsonVariant({
-						variant: "opencode",
-						existing: {},
-						mode: "remote",
-						serverName,
-						apiKey,
-						url: baseUrl,
-					}),
-					null,
-					2,
-				)}`;
-			case "cursor":
-			case "windsurf":
-			case "kiro":
-			case "kilo":
-			case "trae":
-				return `${JSON.stringify(
-					mergeJsonVariant({
-						variant: "mcpServers",
-						existing: {},
-						mode: "remote",
-						serverName,
-						apiKey,
-						url: baseUrl,
-					}),
-					null,
-					2,
-				)}`;
-			case "generic":
-				return `MCP URL: ${baseUrl}
-Header: Authorization: Bearer ${apiKey}`;
-		}
-	}
 
 	switch (args.client) {
 		case "claude":
@@ -623,7 +521,7 @@ Header: Authorization: Bearer ${apiKey}`;
 				mergeJsonVariant({
 					variant: "vscode",
 					existing: {},
-					mode: "local",
+					mode: args.mode,
 					serverName,
 					apiKey,
 					url: baseUrl,
@@ -636,7 +534,7 @@ Header: Authorization: Bearer ${apiKey}`;
 				mergeJsonVariant({
 					variant: "opencode",
 					existing: {},
-					mode: "local",
+					mode: args.mode,
 					serverName,
 					apiKey,
 					url: baseUrl,
@@ -653,7 +551,7 @@ Header: Authorization: Bearer ${apiKey}`;
 				mergeJsonVariant({
 					variant: "mcpServers",
 					existing: {},
-					mode: "local",
+					mode: args.mode,
 					serverName,
 					apiKey,
 					url: baseUrl,
@@ -665,5 +563,5 @@ Header: Authorization: Bearer ${apiKey}`;
 			return buildLocalAdapterShellCommand(apiKey, baseUrl);
 	}
 
-	throw new Error(`Unsupported client ${adapter.label}.`);
+	throw new Error(`Unsupported client ${args.client}.`);
 }

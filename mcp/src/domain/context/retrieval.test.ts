@@ -61,4 +61,38 @@ describe("retrieveContext", () => {
 
 		await rm(root, { recursive: true, force: true });
 	});
+
+	test("does not fail when multiple callers refresh the same workspace concurrently", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-context-concurrent-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+		const worldPath = path.join(bardoRoot, "world/locations/river-market.md");
+		await mkdir(path.dirname(worldPath), { recursive: true });
+		await writeFile(
+			worldPath,
+			renderMarkdown(
+				{ title: "River Market", description: "Location file" },
+				"Rumors spread through the river market.",
+			),
+			"utf8",
+		);
+
+		const runs = await Promise.all(
+			Array.from({ length: 8 }, () =>
+				retrieveContext({
+					bardoRoot,
+					query: "river market",
+					mode: "fast",
+					focus: "all",
+					limit: 10,
+				}),
+			),
+		);
+
+		expect(runs).toHaveLength(8);
+		expect(runs.every((run) => run.results.length > 0)).toBe(true);
+
+		await rm(root, { recursive: true, force: true });
+	});
 });

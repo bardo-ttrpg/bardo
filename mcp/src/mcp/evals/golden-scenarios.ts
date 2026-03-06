@@ -6,7 +6,10 @@ import { renderMarkdown } from "../../domain/markdown/markdown";
 import { migrateLegacyStateToCanonicalEvents } from "../../domain/migrations/legacy-state";
 import { resolveBardoRoot } from "../../infra/filesystem/filesystem";
 import type { AuthContext } from "../../types/contracts";
-import { parseIntent } from "../tools/player-action/parsing";
+import {
+	intentRequiresMechanics,
+	parseIntent,
+} from "../tools/player-action/parsing";
 import { runPlayerAction } from "../tools/player-action/register";
 
 export const GOLDEN_SCENARIO_IDS = [
@@ -47,7 +50,7 @@ function assertCondition(
 
 function expectedEventTypesForAction(action: string): string[] {
 	const intent = parseIntent(action);
-	if (intent === "combat" || intent === "social") {
+	if (intentRequiresMechanics(intent, action)) {
 		return [
 			"player_action_declared",
 			"action_intent_validated",

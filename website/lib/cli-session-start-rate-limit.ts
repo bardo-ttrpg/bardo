@@ -22,6 +22,8 @@ type WindowCounter = {
 	used: number;
 };
 
+const CLEANUP_INTERVAL = 128;
+
 export class CliSessionStartRateLimitError extends BackendAvailabilityError {
 	constructor(message: string) {
 		super({
@@ -170,13 +172,32 @@ export function createCliSessionStartRateLimiter(
 	);
 	const upstash = readUpstashConfig(env);
 	const counters = new Map<string, WindowCounter>();
-	const ttlConfirmed = new Set<string>();
+	const ttlConfirmed = new Map<string, number>();
+	let callsSinceCleanup = 0;
+
+	function maybePrune(currentMs: number) {
+		callsSinceCleanup += 1;
+		if (callsSinceCleanup % CLEANUP_INTERVAL !== 0) {
+			return;
+		}
+		for (const [clientId, counter] of counters) {
+			if (counter.windowStartMs + windowMs <= currentMs) {
+				counters.delete(clientId);
+			}
+		}
+		for (const [key, expiresAt] of ttlConfirmed) {
+			if (expiresAt <= currentMs) {
+				ttlConfirmed.delete(key);
+			}
+		}
+	}
 
 	async function consume(request: Request): Promise<ConsumeResult> {
 		const clientId = resolveClientId(request);
 		const currentMs = now();
 		const windowStartMs = Math.floor(currentMs / windowMs) * windowMs;
 		const key = `bardo:connect:cli-session:start:${clientId}:${windowStartMs}`;
+		maybePrune(currentMs);
 
 		if (upstash) {
 			const used = await upstashIncrement({
@@ -185,7 +206,8 @@ export function createCliSessionStartRateLimiter(
 				key,
 			});
 			if (used !== null) {
-				if (!ttlConfirmed.has(key)) {
+				const ttlExpiresAt = ttlConfirmed.get(key) ?? 0;
+				if (ttlExpiresAt <= currentMs) {
 					const ensured = await upstashEnsureExpiry({
 						config: upstash,
 						fetchImpl,
@@ -193,7 +215,7 @@ export function createCliSessionStartRateLimiter(
 						ttlSeconds: Math.max(1, Math.ceil(windowMs / 1000)),
 					});
 					if (ensured) {
-						ttlConfirmed.add(key);
+						ttlConfirmed.set(key, windowStartMs + windowMs);
 					}
 				}
 				return used <= limit

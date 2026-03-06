@@ -15,12 +15,14 @@ describe("buildConnectionSnippet", () => {
 		});
 	}
 
-	test("renders Claude remote command with Authorization Bearer header", () => {
+	test("renders Claude remote command as a local stdio shim", () => {
 		const snippet = render("claude", "remote");
 		expect(snippet).toContain("claude mcp add");
-		expect(snippet).toContain(baseUrl);
-		expect(snippet).toContain("Authorization: Bearer");
-		expect(snippet).toContain(apiKey);
+		expect(snippet).toContain(
+			"bunx --bun --package '@bardo/mcp' 'bardo' mcp serve",
+		);
+		expect(snippet).toContain(`--api-key '${apiKey}'`);
+		expect(snippet).toContain(`--url '${baseUrl}'`);
 	});
 
 	test("renders Claude local command with @bardo/mcp adapter", () => {
@@ -32,19 +34,20 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('--workspace-root "$PWD"');
 	});
 
-	test("renders Cursor remote JSON", () => {
+	test("renders Cursor remote JSON as a local stdio shim", () => {
 		const snippet = render("cursor", "remote");
 		expect(snippet).toContain('"mcpServers"');
-		expect(snippet).toContain('"url"');
+		expect(snippet).toContain('"command": "bunx"');
+		expect(snippet).toContain('"--api-key"');
 		expect(snippet).toContain(baseUrl);
-		expect(snippet).toContain('"Authorization": "Bearer');
 	});
 
-	test("renders OpenCode remote JSON with oauth disabled", () => {
+	test("renders OpenCode remote JSON as a local stdio shim", () => {
 		const snippet = render("opencode", "remote");
-		expect(snippet).toContain('"type": "remote"');
-		expect(snippet).toContain('"oauth": false');
-		expect(snippet).toContain('"Authorization": "Bearer');
+		expect(snippet).toContain('"type": "local"');
+		expect(snippet).toContain('"command": [');
+		expect(snippet).toContain('"--api-key"');
+		expect(snippet).toContain(baseUrl);
 	});
 
 	test("renders OpenCode local JSON with bunx adapter command", () => {
@@ -65,11 +68,12 @@ describe("buildConnectionSnippet", () => {
 		expect(snippet).toContain('"--workspace-root"');
 	});
 
-	test("renders Kilo remote JSON using mcpServers", () => {
+	test("renders Kilo remote JSON as a local stdio shim", () => {
 		const snippet = render("kilo", "remote");
 		expect(snippet).toContain('"mcpServers"');
+		expect(snippet).toContain('"command": "bunx"');
 		expect(snippet).toContain(baseUrl);
-		expect(snippet).toContain('"Authorization": "Bearer');
+		expect(snippet).toContain('"--api-key"');
 	});
 
 	test("renders Trae local JSON using mcpServers", () => {

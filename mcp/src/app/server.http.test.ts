@@ -140,4 +140,274 @@ describe("createHttpRequestHandler HTTP smoke tests", () => {
 		expect(Array.isArray(body.result?.tools)).toBe(true);
 		expect(body.result?.tools?.some((tool) => tool.name === "init")).toBe(true);
 	});
+
+	test("returns timestamp_skew for validate-and-meter calls with stale timestamps", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry();
+		sessionStore.set("session_validate_1", {
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+			subjectId: "user_1",
+			keyId: "key_1",
+			plan: "free",
+			mcpPeriodLimit: 100,
+			server: {} as never,
+			transport: {} as never,
+		});
+		sessionRegistry.registerSession({
+			sessionId: "session_validate_1",
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+		});
+		const handler = createHttpRequestHandler({
+			securityPolicy: makePolicy({
+				authMode: "optional",
+			}),
+			sessionStore,
+			sessionRegistry,
+			usageLimiter: {
+				async consume() {
+					return {
+						allowed: true,
+						limit: 100,
+						usedThisPeriod: 1,
+						remaining: 99,
+						period: "2026-03",
+						backend: "memory",
+					};
+				},
+				reset() {},
+			},
+		});
+
+		const response = await handler(
+			new Request("http://localhost/api/v1/validate-and-meter", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-bardo-timestamp": "1000",
+					"mcp-session-id": "session_validate_1",
+				},
+				body: JSON.stringify({
+					tool: "bardo_workspace_status",
+					action: "invoke",
+					workspace_id: "/tmp/workspace",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(400);
+		await expect(response.json()).resolves.toMatchObject({
+			valid: false,
+			reason: "timestamp_skew",
+		});
+	});
+
+	test("accepts validate-and-meter calls with current timestamp", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry();
+		sessionStore.set("session_validate_2", {
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+			subjectId: "user_1",
+			keyId: "key_1",
+			plan: "free",
+			mcpPeriodLimit: 100,
+			server: {} as never,
+			transport: {} as never,
+		});
+		sessionRegistry.registerSession({
+			sessionId: "session_validate_2",
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+		});
+		const handler = createHttpRequestHandler({
+			securityPolicy: makePolicy({
+				authMode: "optional",
+			}),
+			sessionStore,
+			sessionRegistry,
+			usageLimiter: {
+				async consume() {
+					return {
+						allowed: true,
+						limit: 100,
+						usedThisPeriod: 1,
+						remaining: 99,
+						period: "2026-03",
+						backend: "memory",
+					};
+				},
+				reset() {},
+			},
+		});
+		const now = Date.now();
+		const response = await handler(
+			new Request("http://localhost/api/v1/validate-and-meter", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-bardo-timestamp": String(now),
+					"mcp-session-id": "session_validate_2",
+				},
+				body: JSON.stringify({
+					tool: "bardo_workspace_status",
+					action: "invoke",
+					workspace_id: "/tmp/workspace",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({
+			valid: true,
+		});
+	});
+
+	test("deduplicates repeated reconciliation entries by id before charging units", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry();
+		sessionStore.set("session_validate_4", {
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+			subjectId: "user_4",
+			keyId: "key_4",
+			plan: "free",
+			mcpPeriodLimit: 100,
+			server: {} as never,
+			transport: {} as never,
+		});
+		sessionRegistry.registerSession({
+			sessionId: "session_validate_4",
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+		});
+		let chargedUnits = 0;
+		const handler = createHttpRequestHandler({
+			securityPolicy: makePolicy({
+				authMode: "optional",
+			}),
+			sessionStore,
+			sessionRegistry,
+			usageLimiter: {
+				async consume(input) {
+					const units = input.units ?? 0;
+					chargedUnits = units;
+					return {
+						allowed: true,
+						limit: 100,
+						usedThisPeriod: units,
+						remaining: 100 - units,
+						period: "2026-03",
+						backend: "memory",
+					};
+				},
+				reset() {},
+			},
+		});
+		const now = Date.now();
+		const response = await handler(
+			new Request("http://localhost/api/v1/validate-and-meter", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-bardo-timestamp": String(now),
+					"mcp-session-id": "session_validate_4",
+				},
+				body: JSON.stringify({
+					tool: "bardo_workspace_status",
+					action: "invoke",
+					workspace_id: "/tmp/workspace",
+					reconciliation: {
+						batch_id: "batch-1",
+						entries: [
+							{
+								id: "entry-1",
+								ts: now - 1000,
+								tool: "bardo_workspace_read_text",
+								action: "invoke",
+								units: 1,
+								workspace_id: "/tmp/workspace",
+							},
+							{
+								id: "entry-1",
+								ts: now - 1000,
+								tool: "bardo_workspace_read_text",
+								action: "invoke",
+								units: 1,
+								workspace_id: "/tmp/workspace",
+							},
+						],
+					},
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(chargedUnits).toBe(2);
+		await expect(response.json()).resolves.toMatchObject({
+			valid: true,
+		});
+	});
+
+	test("accepts legacy /api/auth/introspect-key fallback requests for one-release compatibility", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry();
+		sessionStore.set("session_validate_3", {
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+			subjectId: "user_legacy",
+			keyId: "key_legacy",
+			plan: "free",
+			mcpPeriodLimit: 100,
+			server: {} as never,
+			transport: {} as never,
+		});
+		sessionRegistry.registerSession({
+			sessionId: "session_validate_3",
+			apiKey: "test-key",
+			campaignBasePath: process.cwd(),
+		});
+		const handler = createHttpRequestHandler({
+			securityPolicy: makePolicy({
+				authMode: "optional",
+			}),
+			sessionStore,
+			sessionRegistry,
+			usageLimiter: {
+				async consume() {
+					return {
+						allowed: true,
+						limit: 100,
+						usedThisPeriod: 2,
+						remaining: 98,
+						period: "2026-03",
+						backend: "memory",
+					};
+				},
+				reset() {},
+			},
+		});
+		const now = Date.now();
+		const response = await handler(
+			new Request("http://localhost/api/auth/introspect-key", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-bardo-timestamp": String(now),
+					"mcp-session-id": "session_validate_3",
+				},
+				body: JSON.stringify({
+					tool: "bardo_workspace_status",
+					action: "invoke",
+					workspace_id: "/tmp/workspace",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({
+			valid: true,
+		});
+	});
 });

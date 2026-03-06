@@ -30,6 +30,74 @@ export const playerActionInputSchema = z.object({
 	idempotencyKey: z.string().trim().min(8).max(200).optional(),
 });
 
+export const discoveryCandidateSchema = z.object({
+	kind: z.enum(["npc", "location", "faction", "item", "clue", "thread"]),
+	id: z.string(),
+	displayName: z.string(),
+	discoveryMode: z.enum([
+		"explicitly_named",
+		"implicitly_present",
+		"role_placeholder",
+	]),
+	confidence: z.enum(["high", "medium", "low"]),
+	summary: z.string(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+	persisted: z.boolean().optional(),
+});
+
+export const gmPacketSchema = z.object({
+	sceneFrame: z.object({
+		locationId: z.string(),
+		locationName: z.string(),
+		summary: z.string(),
+		activeSituation: z.string(),
+		exits: z.array(z.string()),
+		sensoryCues: z.array(z.string()),
+		unresolvedQuestions: z.array(z.string()),
+	}),
+	resolution: z.object({
+		intent: z.string(),
+		fiction: z.string(),
+		mechanicsSummary: z.string(),
+		outcome: z.enum(["success", "failure", "mixed"]),
+	}),
+	narrativeBeats: z.array(z.string()),
+	npcReactions: z.array(
+		z.object({
+			npcId: z.string(),
+			displayName: z.string(),
+			reaction: z.string(),
+			disposition: z.string(),
+		}),
+	),
+	discoveries: z.array(discoveryCandidateSchema),
+	consequences: z.object({
+		timeAdvancedMinutes: z.number().int().nonnegative(),
+		worldTimeAfterISO: z.string(),
+		locationAfter: z.string(),
+		clocksAdvanced: z.array(z.string()),
+		threadsActivated: z.array(z.string()),
+	}),
+	followUps: z.array(z.string()),
+	safetyNotes: z.array(z.string()),
+	renderingHints: z.object({
+		tone: z.string(),
+		pacing: z.string(),
+		revealLevel: z.string(),
+		rulesTransparency: z.string(),
+	}),
+});
+
+const stateDeltaSchema = z.object({
+	worldTimeBeforeISO: z.string(),
+	worldTimeAfterISO: z.string(),
+	locationBefore: z.string(),
+	locationAfter: z.string(),
+	timeAdvancedMinutes: z.number().int().nonnegative(),
+	createdNpcIds: z.array(z.string()),
+	createdLocationIds: z.array(z.string()),
+});
+
 export const playerActionOutputSchema = z.object({
 	success: z.boolean().describe("True when the action was processed"),
 	message: z.string().describe("Human-readable action summary"),
@@ -47,6 +115,18 @@ export const playerActionOutputSchema = z.object({
 	locationAfter: z.string(),
 	createdNpcIds: z.array(z.string()),
 	createdLocationIds: z.array(z.string()),
+	gmPacket: gmPacketSchema,
+	stateDelta: stateDeltaSchema,
+	discoveryCandidates: z.array(discoveryCandidateSchema),
+	canonicalEventIds: z.array(z.string()),
+	confidence: z.object({
+		narration: z.enum(["high", "medium", "low"]),
+		discoveries: z.enum(["high", "medium", "low"]),
+	}),
+	completeness: z.object({
+		gmPacket: z.boolean(),
+		contextReady: z.boolean(),
+	}),
 	mechanics: z.object({
 		ruleset: z
 			.string()

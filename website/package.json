@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "next dev -p ${PORT:-3001}",
-		"dev:e2e": "next dev --hostname ${PLAYWRIGHT_LOOPBACK_HOST:-127.0.0.1} -p ${PORT:-3001}",
+		"dev:e2e": "next dev --hostname ${PLAYWRIGHT_LOOPBACK_HOST:-localhost} -p ${PORT:-3001}",
 		"build": "bun run validate:deploy-env && next build",
 		"validate:deploy-env": "bun ./scripts/validate-deploy-env.ts",
 		"start": "next start -p ${PORT:-3001}",

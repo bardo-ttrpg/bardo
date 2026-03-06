@@ -121,4 +121,34 @@ describe("cli login token store", () => {
 			}),
 		).rejects.toThrow("bardo-staging");
 	});
+
+	test("falls back to memory replay protection when Upstash is unreachable in development", async () => {
+		const fetchImpl = mock(async () => {
+			throw new Error("fetch failed");
+		});
+		const store = createCliLoginTokenStore({
+			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
+			env: {
+				NODE_ENV: "development",
+				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "true",
+				UPSTASH_REDIS_REST_URL: "https://staging.upstash.io",
+				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
+				UPSTASH_REDIS_DATABASE_NAME: "bardo-staging",
+			},
+			fetchImpl,
+		});
+
+		const first = await store.consume({
+			token: "cli_token_fallback",
+			expiresAtISO: "2026-03-03T00:05:00.000Z",
+		});
+		const second = await store.consume({
+			token: "cli_token_fallback",
+			expiresAtISO: "2026-03-03T00:05:00.000Z",
+		});
+
+		expect(first).toEqual({ ok: true });
+		expect(second).toEqual({ ok: false, reason: "already_used" });
+		expect(fetchImpl).toHaveBeenCalledTimes(2);
+	});
 });

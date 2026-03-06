@@ -4,6 +4,12 @@ import { readTextIfExists } from "../../../infra/filesystem/filesystem";
 import type { DiceRoller, OptionalSystems } from "./types";
 import { defaultOptionalSystems } from "./types";
 
+export type PendingInitInputs = {
+	diceRoller: DiceRoller | null;
+	theme: string | null;
+	startingScene: string | null;
+};
+
 export function normalizeTheme(input: string | undefined): string | null {
 	const trimmed = input?.trim();
 	return trimmed ? trimmed : null;
@@ -51,6 +57,30 @@ export function mergeOptionalSystems(
 		quests: override.quests ?? base.quests,
 		items: override.items ?? base.items,
 		worldGeneration: override.worldGeneration ?? base.worldGeneration,
+	};
+}
+
+export function normalizePendingInitInputs(value: unknown): PendingInitInputs {
+	if (typeof value !== "object" || value === null) {
+		return {
+			diceRoller: null,
+			theme: null,
+			startingScene: null,
+		};
+	}
+
+	const record = value as Record<string, unknown>;
+	return {
+		diceRoller: normalizeSavedDiceRoller(record.diceRoller),
+		theme:
+			typeof record.theme === "string" && record.theme.trim().length > 0
+				? record.theme.trim()
+				: null,
+		startingScene:
+			typeof record.startingScene === "string" &&
+			record.startingScene.trim().length > 0
+				? record.startingScene.trim()
+				: null,
 	};
 }
 

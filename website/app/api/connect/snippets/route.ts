@@ -5,6 +5,15 @@ import {
 	SUPPORTED_CONNECTION_CLIENTS,
 } from "@bardo/mcp/client-adapters";
 import { NextResponse } from "next/server";
+import {
+	backendAvailabilityPayload,
+	isBackendAvailabilityError,
+} from "../../../../lib/backend-availability";
+import { getDefaultConnectSnippetsRateLimiter } from "../../../../lib/connect-snippets-rate-limit";
+import {
+	type ConnectTelemetry,
+	getDefaultConnectTelemetry,
+} from "../../../../lib/connect-telemetry";
 
 function isConnectionMode(value: string | null): value is ConnectionMode {
 	return value === "remote" || value === "local";
@@ -93,6 +102,91 @@ function buildSnippetResponse(request: Request, params: SnippetRequest) {
 	});
 }
 
+type SnippetsPostDeps = {
+	consumeSnippetBudget: (
+		request: Request,
+	) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
+	telemetry: ConnectTelemetry;
+};
+
+const defaultPostDeps: SnippetsPostDeps = {
+	consumeSnippetBudget: async (request) =>
+		getDefaultConnectSnippetsRateLimiter().consume(request),
+	telemetry: getDefaultConnectTelemetry(),
+};
+
+export function createSnippetsPostHandler(
+	overrides: Partial<SnippetsPostDeps> = {},
+) {
+	const deps = { ...defaultPostDeps, ...overrides };
+
+	return async function POST(request: Request) {
+		try {
+			const budget = await deps.consumeSnippetBudget(request);
+			if (!budget.allowed) {
+				deps.telemetry.increment("connect_snippets_rejected");
+				return NextResponse.json(
+					{
+						error: "Too many snippet requests. Wait before trying again.",
+					},
+					{
+						status: 429,
+						headers:
+							typeof budget.retryAfterSeconds === "number"
+								? {
+										"retry-after": String(budget.retryAfterSeconds),
+									}
+								: undefined,
+					},
+				);
+			}
+
+			const body = (await request.json().catch(() => ({}))) as Partial<{
+				client: string;
+				mode: string;
+				apiKey: string;
+				serverName: string;
+			}>;
+
+			const response = buildSnippetResponse(request, {
+				client: body.client ?? null,
+				mode: body.mode ?? null,
+				apiKey:
+					typeof body.apiKey === "string" && body.apiKey.trim().length > 0
+						? body.apiKey
+						: "YOUR_API_KEY",
+				serverName:
+					typeof body.serverName === "string" &&
+					body.serverName.trim().length > 0
+						? body.serverName
+						: "bardo",
+			});
+
+			if (response.status >= 500) {
+				deps.telemetry.increment("connect_snippets_failed");
+			} else if (response.status >= 400) {
+				deps.telemetry.increment("connect_snippets_rejected");
+			} else {
+				deps.telemetry.increment("connect_snippets_success");
+			}
+			return response;
+		} catch (error) {
+			deps.telemetry.increment("connect_snippets_failed");
+			if (isBackendAvailabilityError(error)) {
+				return NextResponse.json(backendAvailabilityPayload(error), {
+					status: 503,
+				});
+			}
+			return NextResponse.json(
+				{
+					error: error instanceof Error ? error.message : String(error),
+				},
+				{ status: 500 },
+			);
+		}
+	};
+}
+
 export async function GET(request: Request) {
 	const url = new URL(request.url);
 	if (url.searchParams.has("apiKey")) {
@@ -112,24 +206,4 @@ export async function GET(request: Request) {
 	});
 }
 
-export async function POST(request: Request) {
-	const body = (await request.json().catch(() => ({}))) as Partial<{
-		client: string;
-		mode: string;
-		apiKey: string;
-		serverName: string;
-	}>;
-
-	return buildSnippetResponse(request, {
-		client: body.client ?? null,
-		mode: body.mode ?? null,
-		apiKey:
-			typeof body.apiKey === "string" && body.apiKey.trim().length > 0
-				? body.apiKey
-				: "YOUR_API_KEY",
-		serverName:
-			typeof body.serverName === "string" && body.serverName.trim().length > 0
-				? body.serverName
-				: "bardo",
-	});
-}
+export const POST = createSnippetsPostHandler();

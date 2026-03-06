@@ -35,7 +35,7 @@ describe("regenerateCurrentStateProjection", () => {
 		expect(projection.eventCount).toBe(1);
 		const raw = await readFile(projection.projectionPath, "utf8");
 		const parsed = parseMarkdown(raw);
-		expect(parsed.frontmatter.projection_schema).toBe("v1");
+		expect(parsed.frontmatter.projection_schema).toBe("v2");
 		expect(parsed.frontmatter.source_event_seq_min).toBe("1");
 		expect(parsed.frontmatter.source_event_seq_max).toBe("1");
 		expect(parsed.frontmatter.source_event_count).toBe("1");
@@ -122,6 +122,42 @@ describe("regenerateCurrentStateProjection", () => {
 		};
 		expect(state.worldTimeISO).toBe("2026-02-23T02:00:00.000Z");
 		expect(state.lastAction).toBe("simulation_tick:turn");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("synchronizes legacy state/current.md to the regenerated projection state", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-projection-legacy-sync-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: "evt-legacy-sync-1",
+				type: "player_action_resolved",
+				atISO: "2026-02-23T02:10:00.000Z",
+				source: "player_action",
+				data: {
+					action: "I arrive in thornwick",
+					worldTimeAfterISO: "2026-02-23T02:10:00.000Z",
+					locationAfter: "thornwick",
+					createdLocationIds: ["thornwick"],
+				},
+			},
+		});
+
+		const projection = await regenerateCurrentStateProjection({ bardoRoot });
+		const projectionState = JSON.parse(
+			parseMarkdown(await readFile(projection.projectionPath, "utf8")).content,
+		);
+		const legacyStatePath = path.join(bardoRoot, "state/current.md");
+		const legacyState = JSON.parse(
+			parseMarkdown(await readFile(legacyStatePath, "utf8")).content,
+		);
+
+		expect(legacyState).toEqual(projectionState);
 
 		await rm(root, { recursive: true, force: true });
 	});

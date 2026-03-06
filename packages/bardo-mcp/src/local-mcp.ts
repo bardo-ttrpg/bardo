@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
 	access,
 	mkdir,
@@ -12,8 +12,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -22,6 +21,7 @@ import {
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { normalizePlan, type PlanTier } from "./plan-utils";
+import { createValidateAndMeterClient } from "./validate-and-meter-client";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
@@ -101,6 +101,28 @@ type RemoteConnectionCoordinatorOptions = {
 };
 
 const DEFAULT_TEXT_FILE_LIMIT_BYTES = 10 * 1024 * 1024;
+const SESSION_LOCK_FILENAME = ".session.lock";
+const TEMP_FILE_SUFFIX_PATTERN = /^(.*)\.[0-9a-fA-F-]+\.tmp$/;
+const RULEBOOK_MODIFIED_OPTIONS = [
+	"re-parse (creates new manifest)",
+	"ignore (use existing manifest)",
+	"diff-and-merge",
+] as const;
+
+function sha256(input: string): string {
+	return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+function resolveValidateAndMeterUrl(
+	mcpUrl: string,
+	env: Record<string, string | undefined>,
+): string {
+	const explicit = env.BARDO_VALIDATE_AND_METER_URL?.trim();
+	if (explicit) {
+		return explicit;
+	}
+	return new URL("/api/v1/validate-and-meter", mcpUrl).toString();
+}
 
 function parsePositiveInteger(
 	value: string | undefined,
@@ -138,6 +160,282 @@ async function resolveExistingPath(pathname: string): Promise<string | null> {
 		}
 		current = parent;
 	}
+}
+
+async function writeTextAtomic(
+	filePath: string,
+	content: string,
+): Promise<void> {
+	const tempPath = `${filePath}.${randomUUID()}.tmp`;
+	await mkdir(path.dirname(filePath), { recursive: true });
+	try {
+		await writeFile(tempPath, content, "utf8");
+		await rename(tempPath, filePath);
+	} catch (error) {
+		await rm(tempPath, { force: true });
+		throw error;
+	}
+}
+
+async function listTempFilesRecursively(rootPath: string): Promise<string[]> {
+	const pendingDirs = [rootPath];
+	const tempFiles: string[] = [];
+	while (pendingDirs.length > 0) {
+		const currentDir = pendingDirs.pop();
+		if (!currentDir) {
+			continue;
+		}
+		const entries = await readdir(currentDir, { withFileTypes: true }).catch(
+			(error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return [];
+				}
+				throw error;
+			},
+		);
+		for (const entry of entries) {
+			const fullPath = path.join(currentDir, entry.name);
+			if (entry.isDirectory()) {
+				pendingDirs.push(fullPath);
+				continue;
+			}
+			if (entry.isFile() && entry.name.endsWith(".tmp")) {
+				tempFiles.push(fullPath);
+			}
+		}
+	}
+	return tempFiles;
+}
+
+export async function recoverWorkspaceTempFiles(args: {
+	workspaceRoot: string;
+}): Promise<{
+	scanned: number;
+	recovered: number;
+	deleted: number;
+}> {
+	const bardoRoot = resolveBardoRoot(args.workspaceRoot);
+	const candidates = await listTempFilesRecursively(bardoRoot);
+	let recovered = 0;
+	let deleted = 0;
+	for (const tempPath of candidates) {
+		const match = TEMP_FILE_SUFFIX_PATTERN.exec(tempPath);
+		const targetPath = match?.[1] ?? null;
+		if (!targetPath) {
+			await rm(tempPath, { force: true });
+			deleted += 1;
+			continue;
+		}
+		const content = await readFile(tempPath, "utf8").catch((error: unknown) => {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return null;
+			}
+			throw error;
+		});
+		if (content === null) {
+			continue;
+		}
+		if (path.extname(targetPath).toLowerCase() === ".json") {
+			try {
+				JSON.parse(content);
+			} catch {
+				await rm(tempPath, { force: true });
+				deleted += 1;
+				continue;
+			}
+		}
+		const targetExists = await stat(targetPath)
+			.then(() => true)
+			.catch((error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return false;
+				}
+				throw error;
+			});
+		if (targetExists) {
+			await rm(tempPath, { force: true });
+			deleted += 1;
+			continue;
+		}
+		await mkdir(path.dirname(targetPath), { recursive: true });
+		await rename(tempPath, targetPath);
+		recovered += 1;
+	}
+	return {
+		scanned: candidates.length,
+		recovered,
+		deleted,
+	};
+}
+
+type WorkspaceLockRecord = {
+	pid: number;
+	started_at: string;
+	workspace_root: string;
+};
+
+function isLockRecord(value: unknown): value is WorkspaceLockRecord {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	const record = value as Record<string, unknown>;
+	return (
+		typeof record.pid === "number" &&
+		typeof record.started_at === "string" &&
+		typeof record.workspace_root === "string"
+	);
+}
+
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return !(
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			error.code === "ESRCH"
+		);
+	}
+}
+
+async function acquireWorkspaceLock(
+	workspaceRoot: string,
+	stderr?: Writer,
+): Promise<void> {
+	const bardoRoot = resolveBardoRoot(workspaceRoot);
+	const lockPath = path.join(bardoRoot, SESSION_LOCK_FILENAME);
+	await mkdir(bardoRoot, { recursive: true });
+	const recovery = await recoverWorkspaceTempFiles({ workspaceRoot });
+	if ((recovery.recovered > 0 || recovery.deleted > 0) && stderr) {
+		stderr.write(
+			`workspace.tmp_recovery scanned=${recovery.scanned} recovered=${recovery.recovered} deleted=${recovery.deleted}\n`,
+		);
+	}
+	const lockContent = JSON.stringify(
+		{
+			pid: process.pid,
+			started_at: new Date().toISOString(),
+			workspace_root: workspaceRoot,
+		},
+		null,
+		2,
+	);
+	for (;;) {
+		try {
+			await writeFile(lockPath, lockContent, { encoding: "utf8", flag: "wx" });
+			return;
+		} catch (error) {
+			if (
+				typeof error !== "object" ||
+				error === null ||
+				!("code" in error) ||
+				error.code !== "EEXIST"
+			) {
+				throw error;
+			}
+		}
+
+		const existingRaw = await readFile(lockPath, "utf8").catch(
+			(error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return null;
+				}
+				throw error;
+			},
+		);
+		if (!existingRaw) {
+			continue;
+		}
+
+		try {
+			const parsed = JSON.parse(existingRaw);
+			if (
+				isLockRecord(parsed) &&
+				parsed.pid !== process.pid &&
+				isProcessAlive(parsed.pid)
+			) {
+				throw new Error(
+					`WORKSPACE_LOCKED owner_pid=${parsed.pid} started_at=${parsed.started_at}`,
+				);
+			}
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message.startsWith("WORKSPACE_LOCKED")
+			) {
+				throw error;
+			}
+		}
+
+		await rm(lockPath, { force: true });
+	}
+}
+
+async function releaseWorkspaceLock(workspaceRoot: string): Promise<void> {
+	const lockPath = path.join(
+		resolveBardoRoot(workspaceRoot),
+		SESSION_LOCK_FILENAME,
+	);
+	const existingRaw = await readFile(lockPath, "utf8").catch(
+		(error: unknown) => {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return null;
+			}
+			throw error;
+		},
+	);
+	if (!existingRaw) {
+		return;
+	}
+	try {
+		const parsed = JSON.parse(existingRaw);
+		if (!isLockRecord(parsed) || parsed.pid !== process.pid) {
+			return;
+		}
+	} catch {
+		// If lockfile is malformed, avoid destructive cleanup.
+		return;
+	}
+	await rm(lockPath, { force: true });
+}
+
+export async function acquireWorkspaceLockForTests(
+	workspaceRoot: string,
+): Promise<void> {
+	await acquireWorkspaceLock(workspaceRoot);
+}
+
+export async function releaseWorkspaceLockForTests(
+	workspaceRoot: string,
+): Promise<void> {
+	await releaseWorkspaceLock(workspaceRoot);
 }
 
 async function resolveScopedPath(
@@ -294,8 +592,7 @@ async function ensureFile(filePath: string, content: string): Promise<void> {
 		return;
 	}
 
-	await mkdir(path.dirname(filePath), { recursive: true });
-	await writeFile(filePath, content, "utf8");
+	await writeTextAtomic(filePath, content);
 }
 
 async function readExistingJson(
@@ -317,6 +614,119 @@ async function readExistingJson(
 	}
 }
 
+function toStringArray(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function toRulebookHashes(value: unknown): Record<string, string> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return {};
+	}
+	const result: Record<string, string> = {};
+	for (const [key, rawValue] of Object.entries(value)) {
+		if (typeof rawValue === "string" && rawValue.length > 0) {
+			result[key] = rawValue;
+		}
+	}
+	return result;
+}
+
+async function hashImportedRulebooks(args: {
+	bardoRoot: string;
+	importedRulebooks: string[];
+}): Promise<Record<string, string>> {
+	const hashes: Record<string, string> = {};
+	for (const relativePath of args.importedRulebooks) {
+		const absolutePath = path.join(args.bardoRoot, relativePath);
+		const content = await readFile(absolutePath, "utf8").catch(
+			(error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return null;
+				}
+				throw error;
+			},
+		);
+		if (content === null) {
+			continue;
+		}
+		hashes[relativePath] = sha256(content);
+	}
+	return hashes;
+}
+
+export async function detectRulebookHashDrift(args: {
+	bardoRoot: string;
+}): Promise<{
+	detected: boolean;
+	warnings: Array<{
+		warning: "RULEBOOK_MODIFIED";
+		relativePath: string;
+		old_hash: string;
+		new_hash: string;
+		options: readonly string[];
+	}>;
+}> {
+	const manifestPath = path.join(args.bardoRoot, "manifest.json");
+	const manifest = await readExistingJson(manifestPath);
+	if (!manifest) {
+		return { detected: false, warnings: [] };
+	}
+	const importedRulebooks = toStringArray(manifest.importedRulebooks);
+	const storedHashes = toRulebookHashes(manifest.rulebookHashes);
+	const warnings: Array<{
+		warning: "RULEBOOK_MODIFIED";
+		relativePath: string;
+		old_hash: string;
+		new_hash: string;
+		options: readonly string[];
+	}> = [];
+	for (const relativePath of importedRulebooks) {
+		const oldHash = storedHashes[relativePath];
+		if (!oldHash) {
+			continue;
+		}
+		const absolutePath = path.join(args.bardoRoot, relativePath);
+		const content = await readFile(absolutePath, "utf8").catch(
+			(error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return null;
+				}
+				throw error;
+			},
+		);
+		if (content === null) {
+			continue;
+		}
+		const newHash = sha256(content);
+		if (newHash !== oldHash) {
+			warnings.push({
+				warning: "RULEBOOK_MODIFIED",
+				relativePath,
+				old_hash: oldHash,
+				new_hash: newHash,
+				options: RULEBOOK_MODIFIED_OPTIONS,
+			});
+		}
+	}
+	return {
+		detected: warnings.length > 0,
+		warnings,
+	};
+}
+
 export async function ensureWorkspaceCoreFiles(args: {
 	bardoRoot: string;
 	workspaceRoot: string;
@@ -326,7 +736,19 @@ export async function ensureWorkspaceCoreFiles(args: {
 }): Promise<void> {
 	const manifestPath = path.join(args.bardoRoot, "manifest.json");
 	const manifest = await readExistingJson(manifestPath);
-	await writeFile(
+	const importedRulebooks =
+		args.importedRulebooks.length > 0
+			? args.importedRulebooks
+			: toStringArray(manifest?.importedRulebooks);
+	const existingRulebookHashes = toRulebookHashes(manifest?.rulebookHashes);
+	const nextRulebookHashes = {
+		...existingRulebookHashes,
+		...(await hashImportedRulebooks({
+			bardoRoot: args.bardoRoot,
+			importedRulebooks,
+		})),
+	};
+	await writeTextAtomic(
 		manifestPath,
 		JSON.stringify(
 			{
@@ -341,17 +763,16 @@ export async function ensureWorkspaceCoreFiles(args: {
 				ruleset:
 					args.ruleset ??
 					(typeof manifest?.ruleset === "string" ? manifest.ruleset : null),
-				importedRulebooks:
-					args.importedRulebooks.length > 0
-						? args.importedRulebooks
-						: Array.isArray(manifest?.importedRulebooks)
-							? manifest.importedRulebooks
-							: [],
+				importedRulebooks,
+				rulebookHashes: nextRulebookHashes,
+				capabilityManifest: toStringArray(manifest?.capabilityManifest),
+				supplements: Array.isArray(manifest?.supplements)
+					? manifest.supplements
+					: [],
 			},
 			null,
 			2,
 		),
-		"utf8",
 	);
 	await ensureFile(
 		path.join(args.bardoRoot, "_settings/settings.md"),
@@ -399,8 +820,134 @@ export async function maybeImportRulebook(args: {
 		path.basename(absoluteSource),
 	);
 	await mkdir(path.dirname(target), { recursive: true });
-	await writeFile(target, sourceContents, "utf8");
+	await writeTextAtomic(target, sourceContents);
 	return [path.relative(args.bardoRoot, target).replaceAll("\\", "/")];
+}
+
+export async function addWorkspaceSupplement(args: {
+	workspaceRoot: string;
+	bardoRoot: string;
+	supplementPath: string;
+	scope: string;
+	capabilityAdditions: string[];
+	nowIso?: string;
+}): Promise<{
+	copiedTo: string;
+	addedCapabilities: string[];
+	supplementHash: string;
+}> {
+	if (args.scope !== "additive_only") {
+		throw new Error(
+			"Supplements must use scope=additive_only to avoid overriding existing capabilities.",
+		);
+	}
+
+	const absoluteSource = await resolveScopedPath(
+		args.workspaceRoot,
+		args.supplementPath,
+	);
+	const sourceContents = await readFile(absoluteSource, "utf8");
+	const supplementHash = sha256(sourceContents);
+	const target = path.join(
+		args.bardoRoot,
+		"rules/sources/expansions",
+		path.basename(absoluteSource),
+	);
+	await mkdir(path.dirname(target), { recursive: true });
+	await writeTextAtomic(target, sourceContents);
+	const relativeTarget = path
+		.relative(args.bardoRoot, target)
+		.replaceAll("\\", "/");
+
+	const nowIso = args.nowIso ?? new Date().toISOString();
+	const manifestPath = path.join(args.bardoRoot, "manifest.json");
+	const manifest = (await readExistingJson(manifestPath)) ?? {};
+	const currentCapabilities = toStringArray(manifest.capabilityManifest);
+	const requestedCapabilities = Array.from(
+		new Set(
+			args.capabilityAdditions
+				.map((value) => value.trim())
+				.filter((value) => value.length > 0),
+		),
+	);
+	const addedCapabilities = requestedCapabilities.filter(
+		(capability) => !currentCapabilities.includes(capability),
+	);
+	const supplements = Array.isArray(manifest.supplements)
+		? [...manifest.supplements]
+		: [];
+	supplements.push({
+		relativePath: relativeTarget,
+		scope: "additive_only",
+		addedAtISO: nowIso,
+		supplementHash,
+		addedCapabilities,
+	});
+
+	const importedRulebooks = toStringArray(manifest.importedRulebooks);
+	const nextRulebookHashes = {
+		...toRulebookHashes(manifest.rulebookHashes),
+		...(await hashImportedRulebooks({
+			bardoRoot: args.bardoRoot,
+			importedRulebooks,
+		})),
+	};
+
+	await writeTextAtomic(
+		manifestPath,
+		JSON.stringify(
+			{
+				version: 1,
+				createdAtISO:
+					typeof manifest.createdAtISO === "string"
+						? manifest.createdAtISO
+						: nowIso,
+				updatedAtISO: nowIso,
+				workspaceRoot:
+					typeof manifest.workspaceRoot === "string"
+						? manifest.workspaceRoot
+						: args.workspaceRoot,
+				bardoRoot:
+					typeof manifest.bardoRoot === "string"
+						? manifest.bardoRoot
+						: args.bardoRoot,
+				ruleset: typeof manifest.ruleset === "string" ? manifest.ruleset : null,
+				importedRulebooks,
+				rulebookHashes: nextRulebookHashes,
+				capabilityManifest: [...currentCapabilities, ...addedCapabilities],
+				supplements,
+			},
+			null,
+			2,
+		),
+	);
+
+	const historyPath = path.join(args.bardoRoot, "events/history.md");
+	const existingHistory = await readFile(historyPath, "utf8").catch(
+		(error: unknown) => {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return "";
+			}
+			throw error;
+		},
+	);
+	const historyEntry = `\n- ${nowIso} supplement_activation ${JSON.stringify({
+		supplement: relativeTarget,
+		scope: "additive_only",
+		addedCapabilities,
+	})}\n`;
+	await writeTextAtomic(historyPath, `${existingHistory}${historyEntry}`);
+
+	return {
+		copiedTo: relativeTarget,
+		addedCapabilities,
+		supplementHash,
+	};
 }
 
 function makeToolResult(
@@ -596,6 +1143,14 @@ export function createWorkspaceRootManager(args: WorkspaceRootManagerInput) {
 	let didAttemptRefresh = false;
 	let refreshPromise: Promise<WorkspaceContext> | null = null;
 
+	function snapshotWorkspaceContext(): WorkspaceContext {
+		return {
+			workspaceRoot: currentRoot,
+			source,
+			roots: [...roots],
+		};
+	}
+
 	async function refreshFromClientRoots(): Promise<WorkspaceContext> {
 		didAttemptRefresh = true;
 		refreshPromise ??= (async () => {
@@ -610,11 +1165,7 @@ export function createWorkspaceRootManager(args: WorkspaceRootManagerInput) {
 			} catch {
 				// Keep the existing workspace root when roots are unavailable.
 			}
-			return {
-				workspaceRoot: currentRoot,
-				source,
-				roots: [...roots],
-			};
+			return snapshotWorkspaceContext();
 		})().finally(() => {
 			refreshPromise = null;
 		});
@@ -626,22 +1177,19 @@ export function createWorkspaceRootManager(args: WorkspaceRootManagerInput) {
 			if (refreshPromise) {
 				return refreshPromise;
 			}
-			if (!didAttemptRefresh) {
-				return refreshFromClientRoots();
-			}
-			return {
-				workspaceRoot: currentRoot,
-				source,
-				roots: [...roots],
-			};
+			return snapshotWorkspaceContext();
 		},
 		refreshFromClientRoots,
+		hasAttemptedRefresh(): boolean {
+			return didAttemptRefresh;
+		},
 	};
 }
 
 function localToolDefinitions(
 	manager: ReturnType<typeof createWorkspaceRootManager>,
 	textFileLimitBytes: number,
+	ensureWorkspaceLock: (workspaceRoot: string) => Promise<void>,
 ): LocalToolDefinition[] {
 	return [
 		{
@@ -667,6 +1215,12 @@ function localToolDefinitions(
 				const initialized = await stat(manifestPath)
 					.then(() => true)
 					.catch(() => false);
+				const rulebookHashDrift = initialized
+					? await detectRulebookHashDrift({ bardoRoot })
+					: {
+							detected: false,
+							warnings: [],
+						};
 				return {
 					workspaceRoot: context.workspaceRoot,
 					bardoRoot,
@@ -674,6 +1228,7 @@ function localToolDefinitions(
 					roots: context.roots,
 					manifestPath,
 					initialized,
+					rulebookHashDrift,
 				};
 			},
 		},
@@ -698,6 +1253,7 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
+				await ensureWorkspaceLock(context.workspaceRoot);
 				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
 				await ensureWorkspaceDirectories(bardoRoot);
 				const importedRulebooks = await maybeImportRulebook({
@@ -782,6 +1338,7 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
+				await ensureWorkspaceLock(context.workspaceRoot);
 				const filePath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
@@ -812,6 +1369,7 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
+				await ensureWorkspaceLock(context.workspaceRoot);
 				const filePath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
@@ -823,11 +1381,70 @@ function localToolDefinitions(
 						`Content is too large to write as text (${bytesWritten} bytes > ${textFileLimitBytes} bytes).`,
 					);
 				}
-				await mkdir(path.dirname(filePath), { recursive: true });
-				await writeFile(filePath, content, "utf8");
+				try {
+					await writeTextAtomic(filePath, content);
+				} catch (error) {
+					if (
+						typeof error === "object" &&
+						error !== null &&
+						"code" in error &&
+						error.code === "ENOSPC"
+					) {
+						throw new Error(
+							`DISK_FULL path=${filePath} bytes_needed=${bytesWritten}`,
+						);
+					}
+					throw error;
+				}
 				return {
 					filePath,
 					bytesWritten,
+				};
+			},
+		},
+		{
+			name: "bardo_workspace_add_supplement",
+			title: "Add Rulebook Supplement",
+			description:
+				"Add a mid-campaign supplement using additive-only capability updates and log supplement activation.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					supplementPath: { type: "string" },
+					scope: { type: "string" },
+					capabilityAdditions: {
+						type: "array",
+						items: { type: "string" },
+					},
+				},
+				required: ["supplementPath"],
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await ensureWorkspaceLock(context.workspaceRoot);
+				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
+				const result = await addWorkspaceSupplement({
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot,
+					supplementPath: String(args.supplementPath ?? ""),
+					scope: typeof args.scope === "string" ? args.scope : "additive_only",
+					capabilityAdditions: Array.isArray(args.capabilityAdditions)
+						? args.capabilityAdditions.filter(
+								(value): value is string => typeof value === "string",
+							)
+						: [],
+				});
+				return {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot,
+					...result,
 				};
 			},
 		},
@@ -853,6 +1470,7 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
+				await ensureWorkspaceLock(context.workspaceRoot);
 				const targetPath = await resolveScopedPath(
 					context.workspaceRoot,
 					String(args.path ?? ""),
@@ -867,60 +1485,48 @@ function localToolDefinitions(
 	];
 }
 
-async function connectRemoteClient(options: LocalMcpServerOptions): Promise<{
-	client: Client | null;
-	tools: RemoteToolDefinition[];
-}> {
-	if (!options.apiKey) {
-		return { client: null, tools: [] };
-	}
-
-	const transport = new StreamableHTTPClientTransport(new URL(options.url), {
-		requestInit: {
-			headers: {
-				authorization: `Bearer ${options.apiKey}`,
-				"x-bardo-workspace-root": options.workspaceRoot,
-			},
-		},
-	});
-	const client = new Client(
-		{
-			name: "bardo-local-runtime",
-			version: "0.1.0",
-		},
-		{},
-	);
-	await client.connect(transport);
-	const toolsResult = await client.listTools();
-	return {
-		client,
-		tools: toolsResult.tools as RemoteToolDefinition[],
-	};
-}
-
-async function closeRemoteClient(client: Client | null): Promise<void> {
-	if (!client) {
-		return;
-	}
-
-	try {
-		await client.close();
-	} catch {
-		// Ignore transport shutdown errors during reconnects.
-	}
-}
-
 export async function startLocalMcpServer(
 	options: LocalMcpServerOptions,
 ): Promise<void> {
 	const stderr = options.stderr ?? process.stderr;
-	const textFileLimitBytes = resolveTextFileLimitBytes(
-		options.env ?? process.env,
-	);
-	const toolAccess = createRemoteToolAccessController({
-		plan: options.plan ?? null,
-		env: options.env ?? process.env,
-	});
+	const env = options.env ?? process.env;
+	const textFileLimitBytes = resolveTextFileLimitBytes(env);
+	const validateAndMeterUrl = resolveValidateAndMeterUrl(options.url, env);
+	const meterClientByWorkspace = new Map<
+		string,
+		ReturnType<typeof createValidateAndMeterClient>
+	>();
+	const lockedWorkspaces = new Set<string>();
+	const ensureWorkspaceLock = async (workspaceRoot: string) => {
+		if (lockedWorkspaces.has(workspaceRoot)) {
+			return;
+		}
+		await acquireWorkspaceLock(workspaceRoot, stderr);
+		lockedWorkspaces.add(workspaceRoot);
+	};
+	const releaseWorkspaceLocks = async () => {
+		for (const workspaceRoot of lockedWorkspaces) {
+			await releaseWorkspaceLock(workspaceRoot);
+		}
+		lockedWorkspaces.clear();
+	};
+
+	function getMeterClient(workspaceRoot: string) {
+		if (!options.apiKey) {
+			return null;
+		}
+		const existing = meterClientByWorkspace.get(workspaceRoot);
+		if (existing) {
+			return existing;
+		}
+		const client = createValidateAndMeterClient({
+			apiKey: options.apiKey,
+			workspaceId: workspaceRoot,
+			controlPlaneUrl: validateAndMeterUrl,
+		});
+		meterClientByWorkspace.set(workspaceRoot, client);
+		return client;
+	}
 
 	const server = new Server(
 		{
@@ -934,7 +1540,7 @@ export async function startLocalMcpServer(
 				},
 			},
 			instructions:
-				"Use the bardo_workspace_* tools for local filesystem and bootstrap operations. Remote game-domain tools are proxied through this local server when authentication is configured.",
+				"Use the bardo_workspace_* tools for local filesystem and bootstrap operations. This runtime intentionally does not proxy remote tools.",
 		},
 	);
 	const manager = createWorkspaceRootManager({
@@ -942,19 +1548,12 @@ export async function startLocalMcpServer(
 		defaultSource: "cwd",
 		listRoots: async () => server.listRoots(),
 	});
-	const localTools = localToolDefinitions(manager, textFileLimitBytes);
+	const localTools = localToolDefinitions(
+		manager,
+		textFileLimitBytes,
+		ensureWorkspaceLock,
+	);
 	const localToolMap = new Map(localTools.map((tool) => [tool.name, tool]));
-	const remoteConnection = createRemoteConnectionCoordinator({
-		apiKey: options.apiKey,
-		stderr,
-		getWorkspaceContext: () => manager.getWorkspaceContext(),
-		connectRemoteClient: async (workspaceRoot) =>
-			connectRemoteClient({
-				...options,
-				workspaceRoot,
-			}),
-		closeRemoteClient,
-	});
 
 	server.oninitialized = () => {
 		void manager.refreshFromClientRoots();
@@ -963,28 +1562,31 @@ export async function startLocalMcpServer(
 		RootsListChangedNotificationSchema,
 		async () => {
 			await manager.refreshFromClientRoots();
-			await remoteConnection.invalidate();
 		},
 	);
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
-		const remote = await remoteConnection.ensureRemoteConnection();
 		return {
-			tools: [
-				...localTools.map((tool) => ({
-					name: tool.name,
-					title: tool.title,
-					description: tool.description,
-					inputSchema: tool.inputSchema,
-					annotations: tool.annotations,
-				})),
-				...toolAccess.filterTools(remote.tools),
-			],
+			tools: localTools.map((tool) => ({
+				name: tool.name,
+				title: tool.title,
+				description: tool.description,
+				inputSchema: tool.inputSchema,
+				annotations: tool.annotations,
+			})),
 		};
 	});
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		const localTool = localToolMap.get(request.params.name);
 		if (localTool) {
 			try {
+				const context = await manager.getWorkspaceContext();
+				const meterClient = getMeterClient(context.workspaceRoot);
+				if (meterClient) {
+					await meterClient.validateAndMeter({
+						tool: request.params.name,
+						action: "invoke",
+					});
+				}
 				const payload = await localTool.handler(
 					(request.params.arguments as Record<string, unknown>) ?? {},
 				);
@@ -998,46 +1600,11 @@ export async function startLocalMcpServer(
 			}
 		}
 
-		const remote = await remoteConnection.ensureRemoteConnection();
-		if (!remote.client) {
-			return makeToolResult(
-				"Remote MCP is not connected. Run `bardo login` first.",
-				{ success: false },
-				true,
-			);
-		}
-
-		const remoteTool = remote.tools.find(
-			(tool) => tool.name === request.params.name,
+		return makeToolResult(
+			`Remote proxy is disabled in this runtime. Tool "${request.params.name}" is unavailable.`,
+			{ success: false, reason: "REMOTE_PROXY_DISABLED" },
+			true,
 		);
-		if (remoteTool && !toolAccess.isAllowed(remoteTool)) {
-			return makeToolResult(
-				toolAccess.blockedMessage(request.params.name, remoteTool),
-				{
-					success: false,
-					requiredPlan: requiredPlanForTool(remoteTool, {
-						plan: options.plan ?? null,
-						env: options.env ?? process.env,
-					}),
-				},
-				true,
-			);
-		}
-
-		try {
-			return await remote.client.callTool({
-				name: request.params.name,
-				arguments:
-					(request.params.arguments as Record<string, unknown>) ?? undefined,
-			});
-		} catch (error) {
-			await remoteConnection.invalidate();
-			return makeToolResult(
-				error instanceof Error ? error.message : String(error),
-				{ success: false },
-				true,
-			);
-		}
 	});
 
 	const transport = new StdioServerTransport();
@@ -1046,5 +1613,9 @@ export async function startLocalMcpServer(
 		transport.onerror = (error) => reject(error);
 	});
 	await server.connect(transport);
-	await transportClosed;
+	try {
+		await transportClosed;
+	} finally {
+		await releaseWorkspaceLocks();
+	}
 }

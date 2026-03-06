@@ -359,10 +359,10 @@ export function resolveRuntimeApiKeyValidator(args: {
 
 	return {
 		mode,
-		validateApiKey: async (apiKey) => {
-			const hosted = await hostedValidator(apiKey);
+		validateApiKey: async (apiKey, metadata) => {
+			const hosted = await hostedValidator(apiKey, metadata);
 			if (hosted) return hosted;
-			return envValidator(apiKey);
+			return envValidator(apiKey, metadata);
 		},
 	};
 }

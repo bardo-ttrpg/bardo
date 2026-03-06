@@ -1016,6 +1016,13 @@ function filterSetupAnswersForCurrentQuestion(args: {
 	if (!args.answers || !args.questionKey) {
 		return undefined;
 	}
+	const hasFullRequiredBatch = REQUIRED_SETUP_KEYS.every((key) => {
+		const value = args.answers?.[key];
+		return value !== undefined && value !== null;
+	});
+	if (hasFullRequiredBatch) {
+		return args.answers;
+	}
 	const questionKey = args.questionKey as keyof SetupAnswers;
 	const value = args.answers[questionKey];
 	if (value === undefined || value === null) {

@@ -213,4 +213,61 @@ describe("resolveRuntimeApiKeyValidator", () => {
 		expect(resolved.mode).toBe("hybrid");
 		expect(resolved.validateApiKey).not.toBeNull();
 	});
+
+	test("forwards metadata to hosted introspection in hybrid mode", async () => {
+		const previousFetch = globalThis.fetch;
+		let seenBody: Record<string, unknown> | null = null;
+		globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+			if (typeof init?.body === "string") {
+				seenBody = JSON.parse(init.body) as Record<string, unknown>;
+			}
+			return new Response(
+				JSON.stringify({
+					valid: true,
+					campaignBasePath: "./customers/alice",
+				}),
+				{ status: 200 },
+			);
+		}) as typeof fetch;
+
+		try {
+			const resolved = resolveRuntimeApiKeyValidator({
+				env: {
+					BARDO_AUTH_PROVIDER: "hybrid",
+					BARDO_AUTH_INTROSPECTION_URL: "https://example.com/introspect",
+				},
+				apiKeyMap: new Map([["fallback", "/repo/customers/fallback"]]),
+				projectRoot: "/repo",
+			});
+			const validateApiKey = resolved.validateApiKey;
+			expect(validateApiKey).not.toBeNull();
+			if (!validateApiKey) {
+				return;
+			}
+
+			const result = await validateApiKey("key", {
+				requiredScope: "api",
+				workspaceRoot: "/tmp/workspace",
+				providerId: "openai",
+				modelId: "gpt-5",
+			});
+
+			expect(result).toEqual({
+				apiKey: "key",
+				campaignBasePath: "/repo/customers/alice",
+				subjectId: null,
+				keyId: null,
+				plan: null,
+				mcpPeriodLimit: null,
+			});
+			expect(seenBody).toMatchObject({
+				requiredScope: "api",
+				workspaceRoot: "/tmp/workspace",
+				providerId: "openai",
+				modelId: "gpt-5",
+			});
+		} finally {
+			globalThis.fetch = previousFetch;
+		}
+	});
 });

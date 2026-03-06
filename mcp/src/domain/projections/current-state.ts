@@ -11,6 +11,7 @@ import { renderMarkdown } from "../markdown/markdown";
 
 export const CURRENT_STATE_PROJECTION_ID = "current_state";
 const CURRENT_STATE_PROJECTION_PATH = "projections/current-state.md";
+const LEGACY_CURRENT_STATE_PATH = "state/current.md";
 
 function asNonEmptyString(value: unknown): string | null {
 	if (typeof value !== "string") {
@@ -43,6 +44,10 @@ function ensureLocationRecord(state: CampaignState, locationId: string): void {
 			name: toDisplayName(locationId),
 			visits: 0,
 			npcIds: [],
+			tags: [],
+			exits: [],
+			activeClues: [],
+			occupantIds: [],
 		};
 	}
 }
@@ -99,8 +104,19 @@ export function deriveCurrentStateFromEvents(
 	let state = safeParseState("");
 	const orderedEvents = [...events].sort((a, b) => a.sequence - b.sequence);
 	for (const event of orderedEvents) {
+		if (event.type === "campaign_initialized") {
+			const snapshot = readStateSnapshot(event.data);
+			if (snapshot) {
+				state = snapshot;
+			}
+		}
 		if (event.type === "player_action_resolved") {
-			applyPlayerActionResolvedEvent(state, event);
+			const snapshot = readStateSnapshot(event.data);
+			if (snapshot) {
+				state = snapshot;
+			} else {
+				applyPlayerActionResolvedEvent(state, event);
+			}
 		}
 		if (event.type === "world_sync_applied") {
 			const snapshot = readStateSnapshot(event.data);
@@ -138,6 +154,10 @@ export async function regenerateCurrentStateProjection(args: {
 		args.bardoRoot,
 		CURRENT_STATE_PROJECTION_PATH,
 	);
+	const legacyStatePath = resolvePathInsideRoot(
+		args.bardoRoot,
+		LEGACY_CURRENT_STATE_PATH,
+	);
 	const rawContent = JSON.stringify(state, null, 2);
 	const minSequence = events.length > 0 ? (events[0]?.sequence ?? null) : null;
 	const maxSequence =
@@ -150,11 +170,21 @@ export async function regenerateCurrentStateProjection(args: {
 				title: "Current State Projection",
 				description:
 					"Derived campaign state projection generated from canonical event log",
-				projection_schema: "v1",
+				projection_schema: "v2",
 				generated_at_iso: generatedAtISO,
 				source_event_seq_min: minSequence ? String(minSequence) : "0",
 				source_event_seq_max: maxSequence ? String(maxSequence) : "0",
 				source_event_count: String(events.length),
+			},
+			rawContent,
+		),
+	);
+	await writeTextAtomic(
+		legacyStatePath,
+		renderMarkdown(
+			{
+				title: "Campaign State",
+				description: "Current campaign state and memory snapshot",
 			},
 			rawContent,
 		),

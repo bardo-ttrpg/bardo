@@ -14,6 +14,8 @@ import {
 	loadTableContract,
 	summarizeRuntimePolicyViolations,
 } from "../../domain/policy/runtime-guards";
+import { regenerateProjectionsForEventTypes } from "../../domain/projections/refresh";
+import { withKeyedLock } from "../../infra/concurrency/keyed-lock";
 import {
 	resolveBardoRoot,
 	resolvePathInsideRoot,
@@ -138,89 +140,100 @@ export function registerAppendEventTool(
 				"events/canonical.ndjson",
 			);
 			try {
-				if (!dryRun && !idempotencyKey) {
-					throw new Error("`idempotencyKey` is required when dryRun is false.");
-				}
-				if (!dryRun && idempotencyKey) {
-					const replay = await getIdempotentResult({
-						bardoRoot,
-						key: idempotencyKey,
-						scope: "append_event",
-					});
-					if (replay) {
-						return makeToolResult({
-							...(replay as AppendEventOutput),
-							idempotentReplay: true,
+				return await withKeyedLock(
+					`workspace-mutation:${bardoRoot}`,
+					async () => {
+						if (!dryRun && !idempotencyKey) {
+							throw new Error(
+								"`idempotencyKey` is required when dryRun is false.",
+							);
+						}
+						if (!dryRun && idempotencyKey) {
+							const replay = await getIdempotentResult({
+								bardoRoot,
+								key: idempotencyKey,
+								scope: "append_event",
+							});
+							if (replay) {
+								return makeToolResult({
+									...(replay as AppendEventOutput),
+									idempotentReplay: true,
+								});
+							}
+						}
+						const tableContract = await loadTableContract({ bardoRoot });
+						const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
+						const runtimeViolations = evaluateRuntimePolicy({
+							action: policyTextForAppendEvent({ type, source, data }),
+							tableContract,
+							authorityPolicy,
 						});
-					}
-				}
-				const tableContract = await loadTableContract({ bardoRoot });
-				const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
-				const runtimeViolations = evaluateRuntimePolicy({
-					action: policyTextForAppendEvent({ type, source, data }),
-					tableContract,
-					authorityPolicy,
-				});
-				if (runtimeViolations.length > 0) {
-					throw new Error(
-						`Runtime policy blocked append_event: ${summarizeRuntimePolicyViolations(runtimeViolations)}`,
-					);
-				}
+						if (runtimeViolations.length > 0) {
+							throw new Error(
+								`Runtime policy blocked append_event: ${summarizeRuntimePolicyViolations(runtimeViolations)}`,
+							);
+						}
 
-				const eventId = id?.trim() || `evt-${crypto.randomUUID()}`;
-				const normalizedTimestamp = parseEventTimestamp(atISO);
-				const existingEvents = await readCanonicalEvents({ bardoRoot });
-				const nextSequence = existingEvents.length + 1;
+						const eventId = id?.trim() || `evt-${crypto.randomUUID()}`;
+						const normalizedTimestamp = parseEventTimestamp(atISO);
+						const existingEvents = await readCanonicalEvents({ bardoRoot });
+						const nextSequence = existingEvents.length + 1;
 
-				if (dryRun) {
-					const output: AppendEventOutput = {
-						success: true,
-						message: "Event append dry-run succeeded.",
-						rootPath: bardoRoot,
-						eventLogPath,
-						dryRun: true,
-						idempotentReplay: false,
-						event: {
-							id: eventId,
-							sequence: nextSequence,
-							type,
-							atISO: normalizedTimestamp,
-							source,
-							data,
-						},
-					};
-					return makeToolResult(output);
-				}
+						if (dryRun) {
+							const output: AppendEventOutput = {
+								success: true,
+								message: "Event append dry-run succeeded.",
+								rootPath: bardoRoot,
+								eventLogPath,
+								dryRun: true,
+								idempotentReplay: false,
+								event: {
+									id: eventId,
+									sequence: nextSequence,
+									type,
+									atISO: normalizedTimestamp,
+									source,
+									data,
+								},
+							};
+							return makeToolResult(output);
+						}
 
-				const appended = await appendCanonicalEvent({
-					bardoRoot,
-					event: {
-						id: eventId,
-						type,
-						atISO: normalizedTimestamp,
-						source,
-						data,
+						const appended = await appendCanonicalEvent({
+							bardoRoot,
+							event: {
+								id: eventId,
+								type,
+								atISO: normalizedTimestamp,
+								source,
+								data,
+							},
+						});
+						await regenerateProjectionsForEventTypes({
+							bardoRoot,
+							eventTypes: [type],
+						});
+						const output: AppendEventOutput = {
+							success: true,
+							message: "Event appended successfully.",
+							rootPath: bardoRoot,
+							eventLogPath,
+							dryRun: false,
+							idempotentReplay: false,
+							event: appended,
+						};
+						if (idempotencyKey) {
+							await setIdempotentResult({
+								bardoRoot,
+								key: idempotencyKey,
+								scope: "append_event",
+								result: output,
+								nowIso: new Date().toISOString(),
+							});
+						}
+						return makeToolResult(output);
 					},
-				});
-				const output: AppendEventOutput = {
-					success: true,
-					message: "Event appended successfully.",
-					rootPath: bardoRoot,
-					eventLogPath,
-					dryRun: false,
-					idempotentReplay: false,
-					event: appended,
-				};
-				if (idempotencyKey) {
-					await setIdempotentResult({
-						bardoRoot,
-						key: idempotencyKey,
-						scope: "append_event",
-						result: output,
-						nowIso: new Date().toISOString(),
-					});
-				}
-				return makeToolResult(output);
+				);
 			} catch (error) {
 				const output: AppendEventOutput = {
 					success: false,

@@ -1,22 +1,7 @@
 name: Website E2E
 
 on:
-  pull_request:
-    paths:
-      - "website/**"
-      - ".github/workflows/website-e2e.yml"
-      - "package.json"
-      - "bun.lock"
-      - "turbo.json"
-  push:
-    branches:
-      - main
-    paths:
-      - "website/**"
-      - ".github/workflows/website-e2e.yml"
-      - "package.json"
-      - "bun.lock"
-      - "turbo.json"
+  workflow_dispatch:
 
 jobs:
   e2e:

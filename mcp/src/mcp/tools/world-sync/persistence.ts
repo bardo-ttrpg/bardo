@@ -1,6 +1,4 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { safeParseState } from "../../../domain/campaign/state";
-import type { CampaignState } from "../../../domain/campaign/types";
 import {
 	parseMarkdown,
 	renderMarkdown,
@@ -35,16 +33,6 @@ export async function ensureWorldSyncDirectories(
 	await mkdir(paths.entitiesDir, { recursive: true });
 	await mkdir(paths.locationsDir, { recursive: true });
 	await mkdir(paths.stateDir, { recursive: true });
-}
-
-export async function loadCampaignState(
-	statePath: string,
-): Promise<CampaignState> {
-	const rawStateMarkdown = await readTextIfExists(statePath);
-	const parsedStateMarkdown = rawStateMarkdown
-		? parseMarkdown(rawStateMarkdown)
-		: { frontmatter: {}, content: "" };
-	return safeParseState(parsedStateMarkdown.content);
 }
 
 export async function ensureSyncedLocationFile(args: {
@@ -99,6 +87,36 @@ export async function ensureSyncedNpcFile(args: {
 	);
 	const existing = await readTextIfExists(npcPath);
 	if (existing !== null) {
+		const existingData = JSON.parse(parseMarkdown(existing).content) as {
+			publicName?: string;
+			trueName?: string;
+			currentLocation?: string;
+		};
+		await writeFile(
+			npcPath,
+			renderMarkdown(
+				{
+					description: "NPC record synchronized from narrative discovery",
+					title: args.npcName,
+				},
+				JSON.stringify(
+					{
+						...existingData,
+						id: args.npcId,
+						publicName: args.npcName,
+						trueName: args.npcName,
+						discoveryStatus: "known",
+						knownByPlayer: true,
+						currentLocation: args.currentLocation,
+						notes:
+							"Name discovered in narrative; expand role, goals, and relationships.",
+					},
+					null,
+					2,
+				),
+			),
+			"utf8",
+		);
 		return { created: false, path: npcPath };
 	}
 
@@ -129,56 +147,4 @@ export async function ensureSyncedNpcFile(args: {
 	);
 
 	return { created: true, path: npcPath };
-}
-
-export async function persistCampaignState(
-	statePath: string,
-	state: CampaignState,
-): Promise<void> {
-	await ensureParentDirectoryExists(statePath);
-	await writeFile(
-		statePath,
-		renderMarkdown(
-			{
-				description: "Current campaign state and memory snapshot",
-				title: "Campaign State",
-			},
-			JSON.stringify(state, null, 2),
-		),
-		"utf8",
-	);
-}
-
-export function buildWorldSyncHistoryEntry(args: {
-	nowIso: string;
-	createdLocationCount: number;
-	createdNpcCount: number;
-}): string {
-	return `${args.nowIso} | intent=sync | action="world_sync" | locations_created=${args.createdLocationCount} | npcs_created=${args.createdNpcCount}`;
-}
-
-export async function appendHistoryEntry(
-	historyPath: string,
-	historyEntry: string,
-): Promise<void> {
-	const existingHistory = await readTextIfExists(historyPath);
-	const parsedHistory = existingHistory
-		? parseMarkdown(existingHistory)
-		: { frontmatter: {}, content: "" };
-	const nextHistoryContent = parsedHistory.content.trim()
-		? `${parsedHistory.content.trimEnd()}\n${historyEntry}`
-		: historyEntry;
-
-	await ensureParentDirectoryExists(historyPath);
-	await writeFile(
-		historyPath,
-		renderMarkdown(
-			{
-				description: "Chronological campaign action history log",
-				title: "Campaign History",
-			},
-			nextHistoryContent,
-		),
-		"utf8",
-	);
 }

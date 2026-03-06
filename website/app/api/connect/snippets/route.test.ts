@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { GET, POST } from "./route";
+import { createConnectTelemetry } from "../../../../lib/connect-telemetry";
+import { createSnippetsPostHandler, GET, POST } from "./route";
 
 const ORIGINAL_NEXT_PUBLIC_MCP_BASE_URL = process.env.NEXT_PUBLIC_MCP_BASE_URL;
 const ORIGINAL_BARDO_MCP_BASE_URL = process.env.BARDO_MCP_BASE_URL;
@@ -136,5 +137,73 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 
 		expect(response.status).toBe(400);
 		expect(body.error).toContain("Invalid mode");
+	});
+
+	test("POST returns 429 when snippet budget is exhausted", async () => {
+		const telemetry = createConnectTelemetry();
+		const handler = createSnippetsPostHandler({
+			consumeSnippetBudget: async () => ({
+				allowed: false,
+				retryAfterSeconds: 42,
+			}),
+			telemetry,
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/snippets", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					client: "claude",
+					mode: "remote",
+				}),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("retry-after")).toBe("42");
+		expect(body.error).toContain("Too many");
+		expect(telemetry.snapshot().connect_snippets_rejected).toBe(1);
+	});
+
+	test("POST telemetry tracks success and failure outcomes", async () => {
+		const telemetry = createConnectTelemetry();
+		const success = createSnippetsPostHandler({
+			consumeSnippetBudget: async () => ({ allowed: true }),
+			telemetry,
+		});
+		const failed = createSnippetsPostHandler({
+			consumeSnippetBudget: async () => {
+				throw new Error("limiter backend unavailable");
+			},
+			telemetry,
+		});
+
+		const okResponse = await success(
+			new Request("https://app.bardo.ai/api/connect/snippets", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					client: "claude",
+					mode: "remote",
+				}),
+			}),
+		);
+		const errorResponse = await failed(
+			new Request("https://app.bardo.ai/api/connect/snippets", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					client: "claude",
+					mode: "remote",
+				}),
+			}),
+		);
+
+		expect(okResponse.status).toBe(200);
+		expect(errorResponse.status).toBe(500);
+		expect(telemetry.snapshot().connect_snippets_success).toBe(1);
+		expect(telemetry.snapshot().connect_snippets_failed).toBe(1);
 	});
 });

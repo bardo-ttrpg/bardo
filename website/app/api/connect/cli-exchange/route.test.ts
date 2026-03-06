@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CliLoginReplayStoreError } from "../../../../lib/cli-login-store";
+import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
 import { createCliExchangePostHandler } from "./route";
 
 describe("POST /api/connect/cli-exchange", () => {
@@ -119,5 +120,101 @@ describe("POST /api/connect/cli-exchange", () => {
 		expect(body.code).toBe("upstash_unavailable");
 		expect(body.retryable).toBe(true);
 		expect(body.error).toContain("replay store unavailable");
+	});
+
+	test("accepts fallback secret from BARDO_AUTH_INTROSPECTION_TOKEN", async () => {
+		const previousCliSecret = process.env.BARDO_CLI_LOGIN_SECRET;
+		const previousIntrospectionSecret =
+			process.env.BARDO_AUTH_INTROSPECTION_TOKEN;
+
+		try {
+			delete process.env.BARDO_CLI_LOGIN_SECRET;
+			process.env.BARDO_AUTH_INTROSPECTION_TOKEN =
+				"fallback-secret-with-length";
+
+			const token = await createCliLoginTokenCodec(
+				"fallback-secret-with-length",
+			).encrypt({
+				apiKey: "bardo_live_token",
+				mcpUrl: "https://mcp.bardo.ai/mcp",
+				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+				serverName: "bardo",
+				issuedAtISO: "2099-03-03T00:00:00.000Z",
+				expiresAtISO: "2099-03-03T00:10:00.000Z",
+			});
+
+			const handler = createCliExchangePostHandler({
+				consumeToken: async () =>
+					({
+						ok: true,
+					}) as const,
+			});
+
+			const response = await handler(
+				new Request("http://localhost:3001/api/connect/cli-exchange", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ token }),
+				}),
+			);
+
+			expect(response.status).toBe(200);
+		} finally {
+			if (typeof previousCliSecret === "string") {
+				process.env.BARDO_CLI_LOGIN_SECRET = previousCliSecret;
+			} else {
+				delete process.env.BARDO_CLI_LOGIN_SECRET;
+			}
+
+			if (typeof previousIntrospectionSecret === "string") {
+				process.env.BARDO_AUTH_INTROSPECTION_TOKEN =
+					previousIntrospectionSecret;
+			} else {
+				delete process.env.BARDO_AUTH_INTROSPECTION_TOKEN;
+			}
+		}
+	});
+
+	test("returns a clear configuration error when no CLI login secret is set", async () => {
+		const previousCliSecret = process.env.BARDO_CLI_LOGIN_SECRET;
+		const previousIntrospectionSecret =
+			process.env.BARDO_AUTH_INTROSPECTION_TOKEN;
+
+		try {
+			delete process.env.BARDO_CLI_LOGIN_SECRET;
+			delete process.env.BARDO_AUTH_INTROSPECTION_TOKEN;
+
+			const handler = createCliExchangePostHandler({
+				consumeToken: async () =>
+					({
+						ok: true,
+					}) as const,
+			});
+
+			const response = await handler(
+				new Request("http://localhost:3001/api/connect/cli-exchange", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ token: "invalid" }),
+				}),
+			);
+			const body = await response.json();
+
+			expect(response.status).toBe(401);
+			expect(body.error).toContain("Set BARDO_CLI_LOGIN_SECRET");
+		} finally {
+			if (typeof previousCliSecret === "string") {
+				process.env.BARDO_CLI_LOGIN_SECRET = previousCliSecret;
+			} else {
+				delete process.env.BARDO_CLI_LOGIN_SECRET;
+			}
+
+			if (typeof previousIntrospectionSecret === "string") {
+				process.env.BARDO_AUTH_INTROSPECTION_TOKEN =
+					previousIntrospectionSecret;
+			} else {
+				delete process.env.BARDO_AUTH_INTROSPECTION_TOKEN;
+			}
+		}
 	});
 });

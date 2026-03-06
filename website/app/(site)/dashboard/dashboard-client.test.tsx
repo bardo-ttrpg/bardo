@@ -7,9 +7,7 @@ describe("ConnectionSnippetPanel", () => {
 		const markup = renderToStaticMarkup(
 			<ConnectionSnippetPanel
 				connectionClient="codex"
-				connectionMode="local"
 				onClientChange={() => undefined}
-				onModeChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
 				lastSecret={null}
@@ -31,9 +29,7 @@ describe("ConnectionSnippetPanel", () => {
 		const markup = renderToStaticMarkup(
 			<ConnectionSnippetPanel
 				connectionClient="vscode"
-				connectionMode="local"
 				onClientChange={() => undefined}
-				onModeChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
 				lastSecret="bardo_live_example"
@@ -52,13 +48,11 @@ describe("ConnectionSnippetPanel", () => {
 		expect(markup).toContain("Kiro");
 	});
 
-	test("renders support details for the selected client", () => {
+	test("renders quick connect details for the selected client", () => {
 		const markup = renderToStaticMarkup(
 			<ConnectionSnippetPanel
 				connectionClient="generic"
-				connectionMode="remote"
 				onClientChange={() => undefined}
-				onModeChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
 				lastSecret="bardo_live_example"
@@ -72,12 +66,14 @@ describe("ConnectionSnippetPanel", () => {
 			/>,
 		);
 
-		expect(markup).toContain("Support tier:");
-		expect(markup).toContain(">generic<");
-		expect(markup).toContain("Auto-install:");
-		expect(markup).toContain(">no<");
-		expect(markup).toContain("Config path:");
-		expect(markup).toContain("manual / client-specific");
+		expect(markup).toContain("App:");
+		expect(markup).toContain("Generic MCP Client");
+		expect(markup).toContain("Mode:");
+		expect(markup).toContain(">local<");
+		expect(markup).toContain("Config file:");
+		expect(markup).toContain("app-specific");
+		expect(markup).toContain("Generate CLI Login");
+		expect(markup).toContain("bardo connect --client generic --mode local");
 	});
 });
 

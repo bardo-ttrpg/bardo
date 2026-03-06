@@ -65,7 +65,15 @@ type VerificationLimiter = {
 };
 
 type SubjectPlanCache = {
-	resolve(subject: string, lookup: () => Promise<PlanTier>): Promise<PlanTier>;
+	resolve(
+		subject: string,
+		lookup: () => Promise<SubjectPlanResolution>,
+	): Promise<SubjectPlanResolution>;
+};
+
+type SubjectPlanResolution = {
+	plan: PlanTier | null;
+	billingUnavailable: boolean;
 };
 
 type IntrospectionDeps = {
@@ -80,7 +88,7 @@ type IntrospectionDeps = {
 	resolvePlanForSubject: (
 		clerk: ClerkLikeClient,
 		subject: string,
-	) => Promise<PlanTier>;
+	) => Promise<SubjectPlanResolution>;
 	mcpPeriodLimitResolver: (plan: PlanTier) => number;
 	tracing: IntrospectionTracing;
 };
@@ -156,7 +164,7 @@ async function hashApiKeySecret(secret: string): Promise<string> {
 }
 
 const verificationLimiter = createDailyVerificationBudgetLimiter();
-const subjectPlanCache = createSubjectPlanCache({
+const subjectPlanCache = createSubjectPlanCache<SubjectPlanResolution>({
 	ttlMs: parsePositiveInteger(
 		process.env.BARDO_INTROSPECTION_PLAN_CACHE_TTL_MS,
 		300_000,
@@ -197,7 +205,9 @@ const defaultDeps: IntrospectionDeps = {
 			clerk as never,
 			subject,
 		);
-		return live.billingUnavailable ? "free" : live.plan;
+		return live.billingUnavailable
+			? { plan: null, billingUnavailable: true }
+			: { plan: live.plan, billingUnavailable: false };
 	},
 	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
 	tracing: introspectionTracing,
@@ -350,6 +360,9 @@ export function createIntrospectPostHandler(
 							subjectId: cachedVerification.value.subjectId,
 							keyId: cachedVerification.value.keyId,
 							plan: cachedVerification.value.plan,
+							billingUnavailable: Boolean(
+								cachedVerification.value.billingUnavailable,
+							),
 							mcpPeriodLimit: deps.mcpPeriodLimitResolver(
 								cachedVerification.value.plan,
 							),
@@ -370,7 +383,7 @@ export function createIntrospectPostHandler(
 				const preliminaryKeyUsage =
 					await deps.verificationLimiter.consumePreAuthKey(
 						await hashApiKeySecret(apiKeySecret),
-						"free",
+						"solo_plus",
 					);
 				if (!preliminaryKeyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");
@@ -451,12 +464,18 @@ export function createIntrospectPostHandler(
 						)
 					: [];
 				let plan: PlanTier = "free";
+				let billingUnavailable = false;
 				if (subject) {
-					plan = await deps.tracing.withPlanLookupSpan(() =>
-						deps.subjectPlanCache.resolve(subject, async () => {
-							return await deps.resolvePlanForSubject(clerk, subject);
-						}),
+					const cachedPlanResolution = await deps.tracing.withPlanLookupSpan(
+						() =>
+							deps.subjectPlanCache.resolve(
+								subject,
+								async () => await deps.resolvePlanForSubject(clerk, subject),
+							),
 					);
+					const resolvedPlan = cachedPlanResolution;
+					billingUnavailable = resolvedPlan.billingUnavailable;
+					plan = resolvedPlan.plan ?? "free";
 				}
 
 				const userUsage = subject
@@ -545,6 +564,7 @@ export function createIntrospectPostHandler(
 					subjectId: subject,
 					keyId,
 					plan,
+					billingUnavailable,
 					scopes,
 					workspacePath,
 				});
@@ -586,6 +606,7 @@ export function createIntrospectPostHandler(
 						subjectId: subject,
 						keyId,
 						plan,
+						billingUnavailable,
 						mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
 						verification: {
 							user: userUsage,

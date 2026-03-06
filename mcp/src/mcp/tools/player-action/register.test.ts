@@ -63,7 +63,7 @@ describe("runPlayerAction", () => {
 		const legacyHistory = await readTextIfExists(
 			path.join(bardoRoot, "state/history.md"),
 		);
-		expect(legacyState).toBeNull();
+		expect(legacyState).toBeString();
 		expect(legacyHistory).toBeNull();
 		const events = await readCanonicalEvents({ bardoRoot });
 		expect(events.length).toBe(3);
@@ -78,6 +78,9 @@ describe("runPlayerAction", () => {
 			parseMarkdown(projectionRaw).content,
 		) as { currentLocation: string };
 		expect(projectionState.currentLocation).toBe(first.locationAfter);
+		expect(JSON.parse(parseMarkdown(legacyState ?? "").content)).toEqual(
+			projectionState,
+		);
 
 		await rm(root, { recursive: true, force: true });
 	});
@@ -150,6 +153,157 @@ describe("runPlayerAction", () => {
 		expect(events[2]?.type).toBe("dice_rolled");
 		expect(events[3]?.type).toBe("mechanics_resolved");
 		expect(events[4]?.type).toBe("player_action_resolved");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("returns a GM packet with semantic discoveries for tavern social actions", async () => {
+		const root = await makeTempRoot("bardo-player-action-gm-packet-");
+		const auth = authFor(root);
+
+		const result = await runPlayerAction({
+			auth,
+			action: "I enter the tavern and ask the barkeep their name.",
+			idempotencyKey: "player_action_gm_packet_key_12345",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T03:30:00.000Z",
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.intent).toBe("social");
+		expect(result.locationAfter).toStartWith("loc_tavern_");
+		expect(result.locationAfter).not.toBe(
+			"tavern-and-ask-the-barkeep-their-name",
+		);
+		expect(result.createdNpcIds[0]).toStartWith("npc_barkeep_");
+		expect(result.gmPacket.sceneFrame.summary.length).toBeGreaterThan(0);
+		expect(result.gmPacket.narrativeBeats.length).toBeGreaterThanOrEqual(3);
+		expect(
+			result.gmPacket.narrativeBeats.some((beat) =>
+				beat.toLowerCase().includes("barkeep"),
+			),
+		).toBe(true);
+		expect(result.discoveryCandidates.length).toBeGreaterThanOrEqual(2);
+		expect(
+			result.discoveryCandidates.some(
+				(candidate) =>
+					candidate.kind === "npc" &&
+					candidate.discoveryMode === "role_placeholder" &&
+					candidate.id.startsWith("npc_barkeep_"),
+			),
+		).toBe(true);
+		expect(
+			result.discoveryCandidates.some(
+				(candidate) =>
+					candidate.kind === "location" &&
+					candidate.id.startsWith("loc_tavern_"),
+			),
+		).toBe(true);
+		expect(result.canonicalEventIds).toHaveLength(3);
+		expect(result.stateDelta.locationAfter).toBe(result.locationAfter);
+		expect(result.confidence.narration).toBe("high");
+		expect(result.completeness.gmPacket).toBe(true);
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("reuses the same tavern scene and persists semantic files across repeated tavern actions", async () => {
+		const root = await makeTempRoot("bardo-player-action-tavern-reuse-");
+		const auth = authFor(root);
+		const bardoRoot = resolveBardoRoot(root);
+
+		const first = await runPlayerAction({
+			auth,
+			action: "I enter the Warm Hearth tavern and ask the barkeep their name.",
+			idempotencyKey: "player_action_tavern_reuse_first",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T03:30:00.000Z",
+		});
+		const second = await runPlayerAction({
+			auth,
+			action: "I buy the barkeep a drink and ask who disappeared first.",
+			idempotencyKey: "player_action_tavern_reuse_second",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T03:50:00.000Z",
+		});
+
+		expect(first.success).toBe(true);
+		expect(second.success).toBe(true);
+		expect(first.locationAfter).toStartWith("loc_tavern_");
+		expect(second.locationAfter).toBe(first.locationAfter);
+		expect(second.locationAfter).not.toContain("loctavern");
+		expect(second.createdLocationIds).toEqual([]);
+		expect(second.createdNpcIds).toEqual([]);
+
+		const barkeepId = first.createdNpcIds[0];
+		expect(barkeepId).toStartWith("npc_barkeep_");
+		expect(barkeepId).not.toContain("loctavern");
+		const barkeepFile = await readTextIfExists(
+			path.join(bardoRoot, `entities/${barkeepId}.md`),
+		);
+		expect(barkeepFile).toBeString();
+		const locationFile = await readTextIfExists(
+			path.join(bardoRoot, `world/locations/${first.locationAfter}.md`),
+		);
+		expect(locationFile).toBeString();
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("does not let tavern venue inference override an explicit travel destination", async () => {
+		const root = await makeTempRoot("bardo-player-action-travel-target-");
+		const auth = authFor(root);
+		const bardoRoot = resolveBardoRoot(root);
+
+		await runPlayerAction({
+			auth,
+			action: "I enter the Warm Hearth tavern and ask the barkeep their name.",
+			idempotencyKey: "player_action_travel_target_seed",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T04:00:00.000Z",
+		});
+		const result = await runPlayerAction({
+			auth,
+			action:
+				"I leave the tavern and head toward the last known location of the disappearance.",
+			idempotencyKey: "player_action_travel_target_move",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T05:00:00.000Z",
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.intent).toBe("travel");
+		expect(result.locationAfter).toBe("disappearance-site-starting-area");
+		expect(result.locationAfter).not.toContain("tavern");
+		expect(result.locationAfter).not.toContain("ward-");
+		expect(result.gmPacket.sceneFrame.sensoryCues).not.toContain(
+			"ale and smoke",
+		);
+		expect(result.gmPacket.consequences.threadsActivated).toContain(
+			"starting-area-disappearances",
+		);
+		expect(result.createdLocationIds).toContain(
+			"disappearance-site-starting-area",
+		);
+		expect(result.createdNpcIds).toEqual([]);
+
+		const projectionRaw = await readFile(
+			path.join(bardoRoot, "projections/current-state.md"),
+			"utf8",
+		);
+		const projectionState = JSON.parse(
+			parseMarkdown(projectionRaw).content,
+		) as {
+			threads: Record<string, { title: string }>;
+			locations: Record<string, { activeClues: string[] }>;
+		};
+		expect(projectionState.threads["starting-area-disappearances"]?.title).toBe(
+			"Starting Area disappearances",
+		);
+		expect(
+			projectionState.locations["disappearance-site-starting-area"]
+				?.activeClues,
+		).toContain("A disappearance trail leads away from this site.");
 
 		await rm(root, { recursive: true, force: true });
 	});

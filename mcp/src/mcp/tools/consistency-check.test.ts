@@ -162,6 +162,67 @@ describe("consistency_check tool", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
+	test("does not warn about legacy drift after projection regeneration synchronizes compatibility state", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-consistency-legacy-sync-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: "evt-consistency-sync-1",
+				type: "player_action_resolved",
+				atISO: "2026-02-23T00:20:00.000Z",
+				source: "player_action",
+				data: {
+					action: "I arrive in thornwick",
+					worldTimeAfterISO: "2026-02-23T00:20:00.000Z",
+					locationAfter: "thornwick",
+					createdLocationIds: ["thornwick"],
+				},
+			},
+		});
+		await Bun.write(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{
+					title: "Campaign State",
+					description: "Legacy state snapshot",
+				},
+				JSON.stringify(
+					{
+						currentLocation: "stale-village",
+						worldTimeISO: "2026-02-23T00:00:00.000Z",
+						counters: { unknownNpc: 0, unknownLocation: 0 },
+						locations: {
+							"stale-village": {
+								name: "Stale Village",
+								visits: 1,
+								npcIds: [],
+							},
+						},
+						lastAction: "stale_write",
+					},
+					null,
+					2,
+				),
+			),
+		);
+		await regenerateCurrentStateProjection({ bardoRoot });
+		const handler = captureHandler({ auth: createAuth(root) });
+
+		const result = await handler({ includeWarnings: true });
+		expect(result.isError).toBe(false);
+		expect(result.structuredContent.success).toBe(true);
+		expect(
+			result.structuredContent.issues.some(
+				(issue) => issue.code === "LEGACY_STATE_EVENT_DRIFT",
+			),
+		).toBe(false);
+
+		await rm(root, { recursive: true, force: true });
+	});
+
 	test("fails in strict canonical mode when projection is missing and legacy fallback would be used", async () => {
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-consistency-strict-legacy-"),

@@ -27,6 +27,7 @@ describe("createIntrospectionVerifyCache", () => {
 				plan: "solo",
 				scopes: ["mcp"],
 				workspacePath: "./customers/user_123",
+				billingUnavailable: false,
 			},
 		});
 

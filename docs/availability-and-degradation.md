@@ -26,7 +26,7 @@ Clerk is required for:
 
 - website dashboard authentication
 - API key creation and revoke
-- billing snapshots
+- billing data
 - runtime status validation
 
 Current behavior:
@@ -89,6 +89,7 @@ If validation fails, the MCP should not start.
 - `GET` never accepts secrets
 - missing `client` or `mode` returns `400`
 - real API keys must go through `POST`
+- `POST` is rate-limited and can return `429` with `retry-after`
 
 ### `/api/keys`
 

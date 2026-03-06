@@ -7,6 +7,17 @@ import {
 import { resolveFeatureFlags } from "../../../domain/config/features";
 import { appendCanonicalEvent } from "../../../domain/events/store";
 import {
+	buildGmPacket,
+	type DiscoveryCandidate,
+	inferSemanticSceneFromAction,
+	mergeStructuredDiscoveries,
+	resolveSceneAnchorName,
+	resolveSceneAnchorSlug,
+	type StateDelta,
+	syncStateForDiscoveries,
+	upsertThread,
+} from "../../../domain/gm/runtime";
+import {
 	getIdempotentResult,
 	setIdempotentResult,
 } from "../../../domain/idempotency/store";
@@ -22,6 +33,7 @@ import {
 import { regenerateCurrentStateProjection } from "../../../domain/projections/current-state";
 import { loadPreferredCurrentState } from "../../../domain/projections/preferred-state";
 import { regenerateProjectionsForEventTypes } from "../../../domain/projections/refresh";
+import { withKeyedLock } from "../../../infra/concurrency/keyed-lock";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import { recordSetupLegacyFieldEmitMetric } from "../../../telemetry";
 import type { AuthContext } from "../../../types/contracts";
@@ -34,6 +46,7 @@ import type { SetupAnswers } from "../init/setup-schemas";
 import {
 	defaultAdvanceMinutes,
 	extractTargetLocation,
+	intentRequiresMechanics,
 	normalizeIsoDate,
 	parseIntent,
 	resolveTravelTarget,
@@ -42,6 +55,7 @@ import {
 	buildHistoryEntry,
 	createUnknownNpc,
 	ensureLocationFile,
+	ensureNpcFile,
 	ensurePlayerActionDirectories,
 	loadKnownLocations,
 	resolvePlayerActionPaths,
@@ -151,6 +165,56 @@ function defaultMechanicsSummary(required: boolean): PlayerActionMechanics {
 	};
 }
 
+function defaultStateDelta(): StateDelta {
+	return {
+		worldTimeBeforeISO: "",
+		worldTimeAfterISO: "",
+		locationBefore: "",
+		locationAfter: "",
+		timeAdvancedMinutes: 0,
+		createdNpcIds: [],
+		createdLocationIds: [],
+	};
+}
+
+function defaultGmPacket(): PlayerActionOutput["gmPacket"] {
+	return {
+		sceneFrame: {
+			locationId: "",
+			locationName: "",
+			summary: "",
+			activeSituation: "",
+			exits: [],
+			sensoryCues: [],
+			unresolvedQuestions: [],
+		},
+		resolution: {
+			intent: "general",
+			fiction: "",
+			mechanicsSummary: "",
+			outcome: "mixed",
+		},
+		narrativeBeats: [],
+		npcReactions: [],
+		discoveries: [],
+		consequences: {
+			timeAdvancedMinutes: 0,
+			worldTimeAfterISO: "",
+			locationAfter: "",
+			clocksAdvanced: [],
+			threadsActivated: [],
+		},
+		followUps: [],
+		safetyNotes: [],
+		renderingHints: {
+			tone: "grounded_fantasy",
+			pacing: "scene-focused",
+			revealLevel: "incremental",
+			rulesTransparency: "fiction-first",
+		},
+	};
+}
+
 function resolveMechanicsActionType(
 	intent: PlayerActionOutput["intent"],
 	rulesetId: string,
@@ -223,6 +287,44 @@ function defaultMechanicsRulesetId(): string {
 	return configured && configured.length > 0 ? configured : "d20_v1";
 }
 
+const DISAPPEARANCE_PATTERN =
+	/\b(disappearance|disappear(?:ed|ance)?|missing person|missing people|went missing|vanished?|vanish)\b/i;
+
+function isDisappearanceInvestigationTarget(text: string | null): boolean {
+	return text ? DISAPPEARANCE_PATTERN.test(text) : false;
+}
+
+function investigationThreadId(locationId: string): string {
+	return `${resolveSceneAnchorSlug(locationId)}-disappearances`;
+}
+
+function investigationThreadTitle(locationId: string): string {
+	return `${resolveSceneAnchorName(locationId)} disappearances`;
+}
+
+function resolveSceneSensoryCues(args: {
+	locationTags: string[];
+	intent: PlayerActionOutput["intent"];
+	existing: string[];
+	locationName: string;
+	action: string;
+}): string[] {
+	if (args.locationTags.includes("tavern")) {
+		return ["warm lamplight", "murmured gossip", "ale and smoke"];
+	}
+	if (
+		args.locationTags.includes("investigation-site") ||
+		DISAPPEARANCE_PATTERN.test(args.locationName) ||
+		DISAPPEARANCE_PATTERN.test(args.action)
+	) {
+		return ["cold night air", "unnatural silence", "disturbed ground"];
+	}
+	if (args.intent === "travel") {
+		return ["night air", "distant wind", "unfamiliar quiet"];
+	}
+	return args.existing;
+}
+
 export async function runPlayerAction(args: {
 	auth: AuthContext;
 	action: string;
@@ -243,64 +345,155 @@ export async function runPlayerAction(args: {
 	const actionEventBase = canonicalPlayerActionEventBase(args.idempotencyKey);
 
 	try {
-		if (args.idempotencyKey) {
-			const replay = await getIdempotentResult({
-				bardoRoot,
-				key: args.idempotencyKey,
-				scope: PLAYER_ACTION_SCOPE,
-			});
-			if (typeof replay === "object" && replay !== null) {
-				return {
-					...(replay as PlayerActionOutput),
-					setupPrompt: (replay as PlayerActionOutput).setupPrompt ?? null,
-					idempotentReplay: true,
-				};
-			}
-		}
-
-		let setup = defaultSetupBypassState();
-		let actionToRun = args.action;
-
-		if (guidedSetupEnabled) {
-			const setupResult = await runGuidedSetupFlow({
-				campaignBasePath: args.auth.campaignBasePath,
-				nowIso,
-				bootstrapAnswers: args.bootstrapAnswers,
-				setupAnswers: args.setupAnswers,
-				expectedRevision: args.setupRevision,
-				incomingAction: args.action,
-			});
-			setup = {
-				status: setupResult.status,
-				questionKey: setupResult.questionKey,
-				question: setupResult.question,
-				progressAnswered: setupResult.progressAnswered,
-				progressTotal: setupResult.progressTotal,
-				warnings: setupResult.warnings,
-				evidenceSummary: setupResult.evidenceSummary,
-				revision: setupResult.revision,
-				conflict: setupResult.conflict,
-				integrity: setupResult.integrity,
-				actionToExecute: setupResult.actionToExecute,
-				pendingAction: setupResult.pendingAction,
-			};
-
-			if (setupResult.status !== "complete") {
-				if (setupResult.question) {
-					recordSetupLegacyFieldEmitMetric({
-						source: "player_action",
-						field: "setupQuestion",
-					});
+		return await withKeyedLock(`workspace-mutation:${bardoRoot}`, async () => {
+			if (args.idempotencyKey) {
+				const replay = await getIdempotentResult({
+					bardoRoot,
+					key: args.idempotencyKey,
+					scope: PLAYER_ACTION_SCOPE,
+				});
+				if (typeof replay === "object" && replay !== null) {
+					return {
+						...(replay as PlayerActionOutput),
+						setupPrompt: (replay as PlayerActionOutput).setupPrompt ?? null,
+						idempotentReplay: true,
+					};
 				}
-				return {
-					success: true,
-					message:
-						setupResult.status === "locked"
-							? setupResult.message
-							: "Setup is required before gameplay can proceed.",
+			}
+
+			let setup = defaultSetupBypassState();
+			let actionToRun = args.action;
+
+			if (guidedSetupEnabled) {
+				const setupResult = await runGuidedSetupFlow({
+					campaignBasePath: args.auth.campaignBasePath,
+					nowIso,
+					bootstrapAnswers: args.bootstrapAnswers,
+					setupAnswers: args.setupAnswers,
+					expectedRevision: args.setupRevision,
+					incomingAction: args.action,
+				});
+				setup = {
+					status: setupResult.status,
+					questionKey: setupResult.questionKey,
+					question: setupResult.question,
+					progressAnswered: setupResult.progressAnswered,
+					progressTotal: setupResult.progressTotal,
+					warnings: setupResult.warnings,
+					evidenceSummary: setupResult.evidenceSummary,
+					revision: setupResult.revision,
+					conflict: setupResult.conflict,
+					integrity: setupResult.integrity,
+					actionToExecute: setupResult.actionToExecute,
+					pendingAction: setupResult.pendingAction,
+				};
+
+				if (setupResult.status !== "complete") {
+					if (setupResult.question) {
+						recordSetupLegacyFieldEmitMetric({
+							source: "player_action",
+							field: "setupQuestion",
+						});
+					}
+					return {
+						success: true,
+						message:
+							setupResult.status === "locked"
+								? setupResult.message
+								: "Setup is required before gameplay can proceed.",
+						idempotentReplay: false,
+						rootPath: bardoRoot,
+						intent: "general",
+						timeAdvancedMinutes: 0,
+						worldTimeBeforeISO: "",
+						worldTimeAfterISO: "",
+						locationBefore: "",
+						locationAfter: "",
+						createdNpcIds: [],
+						createdLocationIds: [],
+						gmPacket: defaultGmPacket(),
+						stateDelta: defaultStateDelta(),
+						discoveryCandidates: [],
+						canonicalEventIds: [],
+						confidence: {
+							narration: "low",
+							discoveries: "low",
+						},
+						completeness: {
+							gmPacket: false,
+							contextReady: false,
+						},
+						mechanics: defaultMechanicsSummary(false),
+						historyEntry: "",
+						statePath: paths.statePath,
+						historyPath: paths.historyPath,
+						narrationGuardrails: [...narrationGuardrails],
+						optionalSystems: { ...defaultOptionalSystems },
+						requiresSetup: true,
+						setupPrompt: setupResult.setupPrompt,
+						setupStatus: setupResult.status,
+						setupQuestionKey: setupResult.questionKey,
+						setupQuestion: setupResult.question,
+						setupProgressAnswered: setupResult.progressAnswered,
+						setupProgressTotal: setupResult.progressTotal,
+						setupWarnings: setupResult.warnings,
+						setupEvidenceSummary: setupResult.evidenceSummary,
+						setupRevision: setupResult.revision,
+						setupConflict: setupResult.conflict,
+						setupIntegrity: setupResult.integrity,
+						pendingAction: setupResult.pendingAction,
+					};
+				}
+
+				actionToRun = setupResult.actionToExecute ?? args.action;
+			}
+
+			const optionalSystems = await loadOptionalSystems(bardoRoot);
+			const tableContract = await loadTableContract({ bardoRoot });
+			const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
+			const runtimeViolations = evaluateRuntimePolicy({
+				action: actionToRun,
+				tableContract,
+				authorityPolicy,
+			});
+			if (runtimeViolations.length > 0) {
+				const blockedMessage =
+					summarizeRuntimePolicyViolations(runtimeViolations);
+				await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-policy-${actionEventBase}`,
+						type: "runtime_policy_blocked",
+						atISO: nowIso,
+						source: "player_action",
+						data: {
+							action: actionToRun,
+							runtimeViolations,
+							tableContract: {
+								tone: tableContract.tone,
+								boundaries: tableContract.boundaries,
+								pvp: tableContract.pvp,
+								retconPolicy: tableContract.retconPolicy,
+							},
+							authorityPolicy: {
+								mode: authorityPolicy.mode,
+								factIntroduction: authorityPolicy.factIntroduction,
+								ruleAdjudication: authorityPolicy.ruleAdjudication,
+								safetyVeto: authorityPolicy.safetyVeto,
+								allowRuleBypass: authorityPolicy.allowRuleBypass,
+								allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+								allowPlayerCanonDeclarations:
+									authorityPolicy.allowPlayerCanonDeclarations,
+							},
+						},
+					},
+				});
+				const output: PlayerActionOutput = {
+					success: false,
+					message: `Action blocked by runtime policy: ${blockedMessage}`,
 					idempotentReplay: false,
 					rootPath: bardoRoot,
-					intent: "general",
+					intent: parseIntent(actionToRun),
 					timeAdvancedMinutes: 0,
 					worldTimeBeforeISO: "",
 					worldTimeAfterISO: "",
@@ -308,86 +501,558 @@ export async function runPlayerAction(args: {
 					locationAfter: "",
 					createdNpcIds: [],
 					createdLocationIds: [],
+					gmPacket: defaultGmPacket(),
+					stateDelta: defaultStateDelta(),
+					discoveryCandidates: [],
+					canonicalEventIds: [],
+					confidence: {
+						narration: "low",
+						discoveries: "low",
+					},
+					completeness: {
+						gmPacket: false,
+						contextReady: false,
+					},
 					mechanics: defaultMechanicsSummary(false),
 					historyEntry: "",
 					statePath: paths.statePath,
 					historyPath: paths.historyPath,
 					narrationGuardrails: [...narrationGuardrails],
-					optionalSystems: { ...defaultOptionalSystems },
-					requiresSetup: true,
-					setupPrompt: setupResult.setupPrompt,
-					setupStatus: setupResult.status,
-					setupQuestionKey: setupResult.questionKey,
-					setupQuestion: setupResult.question,
-					setupProgressAnswered: setupResult.progressAnswered,
-					setupProgressTotal: setupResult.progressTotal,
-					setupWarnings: setupResult.warnings,
-					setupEvidenceSummary: setupResult.evidenceSummary,
-					setupRevision: setupResult.revision,
-					setupConflict: setupResult.conflict,
-					setupIntegrity: setupResult.integrity,
-					pendingAction: setupResult.pendingAction,
+					optionalSystems,
+					requiresSetup: false,
+					setupPrompt: null,
+					setupStatus: setup.status,
+					setupQuestionKey: null,
+					setupQuestion: null,
+					setupProgressAnswered: setup.progressAnswered,
+					setupProgressTotal: setup.progressTotal,
+					setupWarnings: setup.warnings,
+					setupEvidenceSummary: setup.evidenceSummary,
+					setupRevision: setup.revision,
+					setupConflict: setup.conflict,
+					setupIntegrity: setup.integrity,
+					pendingAction: null,
 				};
+				if (args.idempotencyKey) {
+					await setIdempotentResult({
+						bardoRoot,
+						key: args.idempotencyKey,
+						scope: PLAYER_ACTION_SCOPE,
+						result: output,
+						nowIso,
+					});
+				}
+				return output;
 			}
 
-			actionToRun = setupResult.actionToExecute ?? args.action;
-		}
+			const knownLocations = await loadKnownLocations(bardoRoot);
+			await ensurePlayerActionDirectories(bardoRoot, paths);
 
-		const optionalSystems = await loadOptionalSystems(bardoRoot);
-		const tableContract = await loadTableContract({ bardoRoot });
-		const authorityPolicy = await loadAuthorityPolicy({ bardoRoot });
-		const runtimeViolations = evaluateRuntimePolicy({
-			action: actionToRun,
-			tableContract,
-			authorityPolicy,
-		});
-		if (runtimeViolations.length > 0) {
-			const blockedMessage =
-				summarizeRuntimePolicyViolations(runtimeViolations);
-			await appendCanonicalEvent({
+			let preferredState: Awaited<ReturnType<typeof loadPreferredCurrentState>>;
+			try {
+				preferredState = await loadPreferredCurrentState({
+					bardoRoot,
+					consumer: "player_action",
+					refreshStaleProjection: true,
+				});
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
+				) {
+					await regenerateCurrentStateProjection({ bardoRoot });
+					preferredState = await loadPreferredCurrentState({
+						bardoRoot,
+						consumer: "player_action",
+						refreshStaleProjection: true,
+					});
+				} else {
+					throw error;
+				}
+			}
+			const state = JSON.parse(
+				JSON.stringify(preferredState.chosen.state),
+			) as Awaited<
+				ReturnType<typeof loadPreferredCurrentState>
+			>["chosen"]["state"];
+			const intent = parseIntent(actionToRun);
+			const mechanicsRuleset = defaultMechanicsRulesetId();
+			const mechanicsActionType = intentRequiresMechanics(intent, actionToRun)
+				? resolveMechanicsActionType(intent, mechanicsRuleset)
+				: null;
+			const mechanicsAdapter = mechanicsActionType
+				? resolveRulesetAdapter(mechanicsRuleset)
+				: null;
+			const canonicalEventIds: string[] = [];
+			const declaredEvent = await appendCanonicalEvent({
 				bardoRoot,
 				event: {
-					id: `evt-player-action-policy-${actionEventBase}`,
-					type: "runtime_policy_blocked",
+					id: `evt-player-action-declared-${actionEventBase}`,
+					type: "player_action_declared",
 					atISO: nowIso,
 					source: "player_action",
 					data: {
 						action: actionToRun,
-						runtimeViolations,
-						tableContract: {
-							tone: tableContract.tone,
-							boundaries: tableContract.boundaries,
-							pvp: tableContract.pvp,
-							retconPolicy: tableContract.retconPolicy,
-						},
-						authorityPolicy: {
-							mode: authorityPolicy.mode,
-							factIntroduction: authorityPolicy.factIntroduction,
-							ruleAdjudication: authorityPolicy.ruleAdjudication,
-							safetyVeto: authorityPolicy.safetyVeto,
-							allowRuleBypass: authorityPolicy.allowRuleBypass,
-							allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
-							allowPlayerCanonDeclarations:
-								authorityPolicy.allowPlayerCanonDeclarations,
-						},
 					},
 				},
 			});
+			canonicalEventIds.push(declaredEvent.id);
+			const intentEvent = await appendCanonicalEvent({
+				bardoRoot,
+				event: {
+					id: `evt-player-action-intent-${actionEventBase}`,
+					type: "action_intent_validated",
+					atISO: nowIso,
+					source: "player_action",
+					data: {
+						action: actionToRun,
+						intent,
+					},
+				},
+			});
+			canonicalEventIds.push(intentEvent.id);
+			const locationBefore = state.currentLocation;
+			const targetLocationText = extractTargetLocation(actionToRun);
+			const disappearanceInvestigation =
+				intent === "travel" &&
+				isDisappearanceInvestigationTarget(targetLocationText);
+			let locationAfter = state.currentLocation;
+			let discoveryCandidates: DiscoveryCandidate[] = [];
+			const inferredSemanticScene = inferSemanticSceneFromAction({
+				action: actionToRun,
+				currentLocation: locationBefore,
+			});
+			const semanticScene =
+				inferredSemanticScene &&
+				(intent !== "travel" ||
+					!targetLocationText ||
+					inferredSemanticScene.locationKeywords.some((keyword) =>
+						targetLocationText.toLowerCase().includes(keyword),
+					))
+					? inferredSemanticScene
+					: null;
+
+			if (intent === "travel" && targetLocationText) {
+				const resolved = disappearanceInvestigation
+					? {
+							slug: `disappearance-site-${resolveSceneAnchorSlug(locationBefore)}`,
+							name: `Disappearance Site near ${resolveSceneAnchorName(locationBefore)}`,
+						}
+					: resolveTravelTarget(targetLocationText, knownLocations);
+				const targetSlug = resolved.slug;
+				locationAfter = targetSlug;
+				if (!state.locations[targetSlug]) {
+					state.locations[targetSlug] = {
+						name: resolved.name,
+						visits: 0,
+						npcIds: [],
+						tags: [],
+						exits: [],
+						activeClues: [],
+						occupantIds: [],
+					};
+				}
+				if (disappearanceInvestigation) {
+					const location = state.locations[targetSlug];
+					if (location) {
+						if (!location.tags.includes("investigation-site")) {
+							location.tags.push("investigation-site");
+						}
+						if (
+							!location.activeClues.includes(
+								"A disappearance trail leads away from this site.",
+							)
+						) {
+							location.activeClues.push(
+								"A disappearance trail leads away from this site.",
+							);
+						}
+					}
+					const threadId = investigationThreadId(locationBefore);
+					const threadTitle = investigationThreadTitle(locationBefore);
+					upsertThread(state, {
+						id: threadId,
+						title: threadTitle,
+						status: "active",
+						urgency: "high",
+						summary: `People have been disappearing around ${resolveSceneAnchorName(locationBefore)}, and the party is tracing the site of the latest disappearance.`,
+					});
+					discoveryCandidates = mergeStructuredDiscoveries(
+						discoveryCandidates,
+						[
+							{
+								kind: "thread",
+								id: threadId,
+								displayName: threadTitle,
+								discoveryMode: "implicitly_present",
+								confidence: "high",
+								summary:
+									"The disappearances around town are now an active investigation thread.",
+							},
+							{
+								kind: "clue",
+								id: `${targetSlug}-trail`,
+								displayName: "Disappearance trail",
+								discoveryMode: "implicitly_present",
+								confidence: "medium",
+								summary:
+									"The disappearance site still holds a physical trail worth following.",
+								metadata: {
+									locationId: targetSlug,
+								},
+							},
+						],
+					);
+				}
+
+				if (optionalSystems.worldGeneration) {
+					const ensuredLocation = await ensureLocationFile({
+						bardoRoot,
+						locationSlug: targetSlug,
+						locationName: state.locations[targetSlug].name,
+					});
+					if (ensuredLocation.created) {
+						createdLocationIds.push(targetSlug);
+					}
+				}
+			}
+			if (semanticScene) {
+				locationAfter = semanticScene.locationId;
+				const semanticSync = syncStateForDiscoveries({
+					state,
+					locationId: semanticScene.locationId,
+					locationName: semanticScene.locationName,
+					locationTag: semanticScene.locationTag,
+					placeholderNpcs: optionalSystems.npcs
+						? semanticScene.placeholderNpcs
+						: [],
+				});
+				createdLocationIds.push(...semanticSync.createdLocationIds);
+				createdNpcIds.push(...semanticSync.createdNpcIds);
+				discoveryCandidates = semanticScene.discoveries.filter(
+					(discovery) => discovery.kind !== "npc" || optionalSystems.npcs,
+				);
+				if (optionalSystems.worldGeneration) {
+					await ensureLocationFile({
+						bardoRoot,
+						locationSlug: semanticScene.locationId,
+						locationName: semanticScene.locationName,
+					});
+					if (optionalSystems.npcs) {
+						for (const npc of semanticScene.placeholderNpcs) {
+							await ensureNpcFile({
+								bardoRoot,
+								npcId: npc.id,
+								npcName: npc.displayName,
+								currentLocation: semanticScene.locationId,
+								role: npc.role,
+							});
+						}
+					}
+				}
+			}
+
+			if (!state.locations[locationAfter]) {
+				state.counters.unknownLocation += 1;
+				const generatedSlug =
+					locationAfter || `unknown-location-${state.counters.unknownLocation}`;
+				locationAfter = generatedSlug;
+				state.locations[generatedSlug] = {
+					name: toDisplayName(generatedSlug),
+					visits: 0,
+					npcIds: [],
+					tags: [],
+					exits: [],
+					activeClues: [],
+					occupantIds: [],
+				};
+				if (optionalSystems.worldGeneration) {
+					const ensuredLocation = await ensureLocationFile({
+						bardoRoot,
+						locationSlug: generatedSlug,
+						locationName: state.locations[generatedSlug].name,
+					});
+					if (ensuredLocation.created) {
+						createdLocationIds.push(generatedSlug);
+					}
+				}
+			}
+
+			state.currentLocation = locationAfter;
+			const locationRecord = state.locations[locationAfter];
+			if (!locationRecord) {
+				throw new Error("Failed to resolve location record for action.");
+			}
+			locationRecord.visits += 1;
+
+			const shouldSpawnAmbient =
+				(intent === "travel" || intent === "explore") &&
+				!locationRecord.tags.includes("investigation-site");
+			if (shouldSpawnAmbient && optionalSystems.npcs && !semanticScene) {
+				const existingAtLocation = locationRecord.npcIds.length;
+				const desiredMinimum = 2;
+				const toCreate = Math.max(0, desiredMinimum - existingAtLocation);
+				for (let i = 0; i < toCreate; i += 1) {
+					state.counters.unknownNpc += 1;
+					const npc = await createUnknownNpc({
+						bardoRoot,
+						npcIndex: state.counters.unknownNpc,
+						locationSlug: locationAfter,
+					});
+					locationRecord.npcIds.push(npc.id);
+					createdNpcIds.push(npc.id);
+				}
+			}
+
+			const worldTimeBeforeISO = normalizeIsoDate(state.worldTimeISO);
+			const advance = defaultAdvanceMinutes(intent);
+			const nextWorldTime = new Date(worldTimeBeforeISO);
+			nextWorldTime.setMinutes(nextWorldTime.getMinutes() + advance);
+			const worldTimeAfterISO = nextWorldTime.toISOString();
+			state.worldTimeISO = worldTimeAfterISO;
+			state.lastAction = actionToRun;
+			state.party.currentLocation = locationAfter;
+			state.party.statusSummary = `The party is acting in ${locationRecord.name}.`;
+			state.scene.summary = `The party is focused on ${locationRecord.name}.`;
+			state.scene.activeSituation = `Resolve the consequences of: ${actionToRun}`;
+			state.scene.sensoryCues = resolveSceneSensoryCues({
+				locationTags: locationRecord.tags ?? [],
+				intent,
+				existing: state.scene.sensoryCues,
+				locationName: locationRecord.name,
+				action: actionToRun,
+			});
+			state.scene.unresolvedQuestions =
+				discoveryCandidates.length > 0
+					? discoveryCandidates
+							.map((candidate) => candidate.summary)
+							.slice(0, 3)
+					: state.scene.unresolvedQuestions;
+			state.mechanicsContext = {
+				ruleset: mechanicsRuleset,
+				difficultyHint:
+					mechanicsActionType !== null
+						? resolveTargetDifficulty({ intent, action: actionToRun })
+						: null,
+				combatActive: intent === "combat",
+				initiativeOrder:
+					intent === "combat" ? ["pc_party", ...locationRecord.npcIds] : [],
+				advantageHints:
+					intent === "social" && semanticScene
+						? ["close conversation", "roleplay leverage available"]
+						: [],
+			};
+
+			let mechanics = {
+				...defaultMechanicsSummary(mechanicsActionType !== null),
+				ruleset: mechanicsRuleset,
+			};
+			if (mechanicsActionType && mechanicsAdapter) {
+				const targetDifficulty = resolveTargetDifficulty({
+					intent,
+					action: actionToRun,
+				});
+				const modifier = resolveModifier({ intent, action: actionToRun });
+				const advantage = resolveAdvantageFromAction(actionToRun);
+				const validation = mechanicsAdapter.validate({
+					actionType: mechanicsActionType,
+					targetDifficulty,
+					modifier,
+					actorId: "pc_party",
+					declaredIntent: actionToRun,
+					advantage,
+				});
+				if (!validation.valid) {
+					throw new Error(
+						`${mechanicsAdapter.id} mechanics validation failed: ${validation.errors.join("; ")}`,
+					);
+				}
+
+				const resolution = mechanicsAdapter.resolve({
+					actionType: mechanicsActionType,
+					targetDifficulty,
+					modifier,
+					actorId: "pc_party",
+					declaredIntent: actionToRun,
+					advantage,
+				});
+				if (resolution.resolutionMode === "unsupported") {
+					throw new Error(
+						resolution.unsupportedReason ??
+							`${mechanicsAdapter.id} does not support this mechanics request.`,
+					);
+				}
+
+				mechanics = {
+					ruleset: mechanicsAdapter.id,
+					required: true,
+					resolved: true,
+					actionType: resolution.actionType,
+					targetDifficulty: resolution.targetDifficulty,
+					modifier: resolution.modifier,
+					advantage: resolution.advantage,
+					rawRoll: resolution.rawRoll,
+					total: resolution.total,
+					outcome: resolution.outcome,
+					margin: resolution.margin,
+					resolutionMode: resolution.resolutionMode,
+					unsupportedReason: resolution.unsupportedReason,
+					trace: resolution.trace,
+					validationErrors: [],
+				};
+
+				if (resolution.rolls.length > 0) {
+					const diceEvent = await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: `evt-player-action-dice-${actionEventBase}`,
+							type: "dice_rolled",
+							atISO: worldTimeAfterISO,
+							source: "player_action",
+							data: {
+								ruleset: mechanicsAdapter.id,
+								action: actionToRun,
+								intent,
+								actionType: resolution.actionType,
+								targetDifficulty: resolution.targetDifficulty,
+								modifier: resolution.modifier,
+								advantage: resolution.advantage,
+								rolls: resolution.rolls,
+								selectedRoll: resolution.rawRoll,
+								total: resolution.total,
+								resolutionMode: resolution.resolutionMode,
+							},
+						},
+					});
+					canonicalEventIds.push(diceEvent.id);
+				}
+				const mechanicsEvent = await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-mechanics-${actionEventBase}`,
+						type: "mechanics_resolved",
+						atISO: worldTimeAfterISO,
+						source: "player_action",
+						data: {
+							ruleset: mechanicsAdapter.id,
+							action: actionToRun,
+							intent,
+							actionType: resolution.actionType,
+							targetDifficulty: resolution.targetDifficulty,
+							modifier: resolution.modifier,
+							advantage: resolution.advantage,
+							rawRoll: resolution.rawRoll,
+							total: resolution.total,
+							outcome: resolution.outcome,
+							margin: resolution.margin,
+							resolutionMode: resolution.resolutionMode,
+							trace: resolution.trace,
+						},
+					},
+				});
+				canonicalEventIds.push(mechanicsEvent.id);
+			}
+
+			const historyEntry = buildHistoryEntry({
+				worldTimeAfterISO,
+				intent,
+				action: actionToRun,
+				locationBefore,
+				locationAfter,
+				newNpcCount: createdNpcIds.length,
+				newLocationCount: createdLocationIds.length,
+			});
+			const gmPacket = buildGmPacket({
+				action: actionToRun,
+				intent,
+				locationBefore,
+				locationAfter,
+				locationAfterName: locationRecord.name,
+				worldTimeAfterISO,
+				timeAdvancedMinutes: advance,
+				mechanics: {
+					required: mechanics.required,
+					resolved: mechanics.resolved,
+					outcome: mechanics.outcome,
+					total: mechanics.total,
+					targetDifficulty: mechanics.targetDifficulty,
+				},
+				discoveries: discoveryCandidates,
+				state,
+			});
+			const resolvedEvent = await appendCanonicalEvent({
+				bardoRoot,
+				event: {
+					id: `evt-player-action-${actionEventBase}`,
+					type: "player_action_resolved",
+					atISO: worldTimeAfterISO,
+					source: "player_action",
+					data: {
+						action: actionToRun,
+						intent,
+						worldTimeBeforeISO,
+						worldTimeAfterISO,
+						locationBefore,
+						locationAfter,
+						createdNpcIds,
+						createdLocationIds,
+						mechanics,
+						discoveries: discoveryCandidates,
+						stateAfter: state,
+					},
+				},
+			});
+			canonicalEventIds.push(resolvedEvent.id);
+			await regenerateProjectionsForEventTypes({
+				bardoRoot,
+				eventTypes: ["player_action_resolved"],
+			});
+			const stateDelta: StateDelta = {
+				worldTimeBeforeISO,
+				worldTimeAfterISO,
+				locationBefore,
+				locationAfter,
+				timeAdvancedMinutes: advance,
+				createdNpcIds: [...createdNpcIds],
+				createdLocationIds: [...createdLocationIds],
+			};
+
 			const output: PlayerActionOutput = {
-				success: false,
-				message: `Action blocked by runtime policy: ${blockedMessage}`,
+				success: true,
+				message:
+					createdNpcIds.length > 0 || createdLocationIds.length > 0
+						? "Action processed. Time advanced and world context expanded automatically."
+						: "Action processed. Time advanced and state updated.",
 				idempotentReplay: false,
 				rootPath: bardoRoot,
-				intent: parseIntent(actionToRun),
-				timeAdvancedMinutes: 0,
-				worldTimeBeforeISO: "",
-				worldTimeAfterISO: "",
-				locationBefore: "",
-				locationAfter: "",
-				createdNpcIds: [],
-				createdLocationIds: [],
-				mechanics: defaultMechanicsSummary(false),
-				historyEntry: "",
+				intent,
+				timeAdvancedMinutes: advance,
+				worldTimeBeforeISO,
+				worldTimeAfterISO,
+				locationBefore,
+				locationAfter,
+				createdNpcIds,
+				createdLocationIds,
+				gmPacket,
+				stateDelta,
+				discoveryCandidates,
+				canonicalEventIds,
+				confidence: {
+					narration: gmPacket.narrativeBeats.length >= 3 ? "high" : "medium",
+					discoveries: discoveryCandidates.some(
+						(candidate) => candidate.confidence === "high",
+					)
+						? "high"
+						: discoveryCandidates.length > 0
+							? "medium"
+							: "low",
+				},
+				completeness: {
+					gmPacket: gmPacket.narrativeBeats.length >= 3,
+					contextReady: true,
+				},
+				mechanics,
+				historyEntry,
 				statePath: paths.statePath,
 				historyPath: paths.historyPath,
 				narrationGuardrails: [...narrationGuardrails],
@@ -406,6 +1071,7 @@ export async function runPlayerAction(args: {
 				setupIntegrity: setup.integrity,
 				pendingAction: null,
 			};
+
 			if (args.idempotencyKey) {
 				await setIdempotentResult({
 					bardoRoot,
@@ -415,343 +1081,9 @@ export async function runPlayerAction(args: {
 					nowIso,
 				});
 			}
+
 			return output;
-		}
-
-		const knownLocations = await loadKnownLocations(bardoRoot);
-		await ensurePlayerActionDirectories(bardoRoot, paths);
-
-		let preferredState: Awaited<ReturnType<typeof loadPreferredCurrentState>>;
-		try {
-			preferredState = await loadPreferredCurrentState({
-				bardoRoot,
-				consumer: "player_action",
-			});
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
-			) {
-				await regenerateCurrentStateProjection({ bardoRoot });
-				preferredState = await loadPreferredCurrentState({
-					bardoRoot,
-					consumer: "player_action",
-				});
-			} else {
-				throw error;
-			}
-		}
-		const state = JSON.parse(
-			JSON.stringify(preferredState.chosen.state),
-		) as Awaited<
-			ReturnType<typeof loadPreferredCurrentState>
-		>["chosen"]["state"];
-		const intent = parseIntent(actionToRun);
-		const mechanicsRuleset = defaultMechanicsRulesetId();
-		const mechanicsActionType = resolveMechanicsActionType(
-			intent,
-			mechanicsRuleset,
-		);
-		const mechanicsAdapter = mechanicsActionType
-			? resolveRulesetAdapter(mechanicsRuleset)
-			: null;
-		await appendCanonicalEvent({
-			bardoRoot,
-			event: {
-				id: `evt-player-action-declared-${actionEventBase}`,
-				type: "player_action_declared",
-				atISO: nowIso,
-				source: "player_action",
-				data: {
-					action: actionToRun,
-				},
-			},
 		});
-		await appendCanonicalEvent({
-			bardoRoot,
-			event: {
-				id: `evt-player-action-intent-${actionEventBase}`,
-				type: "action_intent_validated",
-				atISO: nowIso,
-				source: "player_action",
-				data: {
-					action: actionToRun,
-					intent,
-				},
-			},
-		});
-		const locationBefore = state.currentLocation;
-		const targetLocationText = extractTargetLocation(actionToRun);
-		let locationAfter = state.currentLocation;
-
-		if (intent === "travel" && targetLocationText) {
-			const resolved = resolveTravelTarget(targetLocationText, knownLocations);
-			const targetSlug = resolved.slug;
-			locationAfter = targetSlug;
-			if (!state.locations[targetSlug]) {
-				state.locations[targetSlug] = {
-					name: resolved.name,
-					visits: 0,
-					npcIds: [],
-				};
-			}
-
-			if (optionalSystems.worldGeneration) {
-				const ensuredLocation = await ensureLocationFile({
-					bardoRoot,
-					locationSlug: targetSlug,
-					locationName: state.locations[targetSlug].name,
-				});
-				if (ensuredLocation.created) {
-					createdLocationIds.push(targetSlug);
-				}
-			}
-		}
-
-		if (!state.locations[locationAfter]) {
-			state.counters.unknownLocation += 1;
-			const generatedSlug =
-				locationAfter || `unknown-location-${state.counters.unknownLocation}`;
-			locationAfter = generatedSlug;
-			state.locations[generatedSlug] = {
-				name: toDisplayName(generatedSlug),
-				visits: 0,
-				npcIds: [],
-			};
-			if (optionalSystems.worldGeneration) {
-				const ensuredLocation = await ensureLocationFile({
-					bardoRoot,
-					locationSlug: generatedSlug,
-					locationName: state.locations[generatedSlug].name,
-				});
-				if (ensuredLocation.created) {
-					createdLocationIds.push(generatedSlug);
-				}
-			}
-		}
-
-		state.currentLocation = locationAfter;
-		const locationRecord = state.locations[locationAfter];
-		if (!locationRecord) {
-			throw new Error("Failed to resolve location record for action.");
-		}
-		locationRecord.visits += 1;
-
-		const shouldSpawnAmbient = intent === "travel" || intent === "explore";
-		if (shouldSpawnAmbient && optionalSystems.npcs) {
-			const existingAtLocation = locationRecord.npcIds.length;
-			const desiredMinimum = 2;
-			const toCreate = Math.max(0, desiredMinimum - existingAtLocation);
-			for (let i = 0; i < toCreate; i += 1) {
-				state.counters.unknownNpc += 1;
-				const npc = await createUnknownNpc({
-					bardoRoot,
-					npcIndex: state.counters.unknownNpc,
-					locationSlug: locationAfter,
-				});
-				locationRecord.npcIds.push(npc.id);
-				createdNpcIds.push(npc.id);
-			}
-		}
-
-		const worldTimeBeforeISO = normalizeIsoDate(state.worldTimeISO);
-		const advance = defaultAdvanceMinutes(intent);
-		const nextWorldTime = new Date(worldTimeBeforeISO);
-		nextWorldTime.setMinutes(nextWorldTime.getMinutes() + advance);
-		const worldTimeAfterISO = nextWorldTime.toISOString();
-		state.worldTimeISO = worldTimeAfterISO;
-		state.lastAction = actionToRun;
-
-		let mechanics = {
-			...defaultMechanicsSummary(mechanicsActionType !== null),
-			ruleset: mechanicsRuleset,
-		};
-		if (mechanicsActionType && mechanicsAdapter) {
-			const targetDifficulty = resolveTargetDifficulty({
-				intent,
-				action: actionToRun,
-			});
-			const modifier = resolveModifier({ intent, action: actionToRun });
-			const advantage = resolveAdvantageFromAction(actionToRun);
-			const validation = mechanicsAdapter.validate({
-				actionType: mechanicsActionType,
-				targetDifficulty,
-				modifier,
-				actorId: "pc_party",
-				declaredIntent: actionToRun,
-				advantage,
-			});
-			if (!validation.valid) {
-				throw new Error(
-					`${mechanicsAdapter.id} mechanics validation failed: ${validation.errors.join("; ")}`,
-				);
-			}
-
-			const resolution = mechanicsAdapter.resolve({
-				actionType: mechanicsActionType,
-				targetDifficulty,
-				modifier,
-				actorId: "pc_party",
-				declaredIntent: actionToRun,
-				advantage,
-			});
-			if (resolution.resolutionMode === "unsupported") {
-				throw new Error(
-					resolution.unsupportedReason ??
-						`${mechanicsAdapter.id} does not support this mechanics request.`,
-				);
-			}
-
-			mechanics = {
-				ruleset: mechanicsAdapter.id,
-				required: true,
-				resolved: true,
-				actionType: resolution.actionType,
-				targetDifficulty: resolution.targetDifficulty,
-				modifier: resolution.modifier,
-				advantage: resolution.advantage,
-				rawRoll: resolution.rawRoll,
-				total: resolution.total,
-				outcome: resolution.outcome,
-				margin: resolution.margin,
-				resolutionMode: resolution.resolutionMode,
-				unsupportedReason: resolution.unsupportedReason,
-				trace: resolution.trace,
-				validationErrors: [],
-			};
-
-			if (resolution.rolls.length > 0) {
-				await appendCanonicalEvent({
-					bardoRoot,
-					event: {
-						id: `evt-player-action-dice-${actionEventBase}`,
-						type: "dice_rolled",
-						atISO: worldTimeAfterISO,
-						source: "player_action",
-						data: {
-							ruleset: mechanicsAdapter.id,
-							action: actionToRun,
-							intent,
-							actionType: resolution.actionType,
-							targetDifficulty: resolution.targetDifficulty,
-							modifier: resolution.modifier,
-							advantage: resolution.advantage,
-							rolls: resolution.rolls,
-							selectedRoll: resolution.rawRoll,
-							total: resolution.total,
-							resolutionMode: resolution.resolutionMode,
-						},
-					},
-				});
-			}
-			await appendCanonicalEvent({
-				bardoRoot,
-				event: {
-					id: `evt-player-action-mechanics-${actionEventBase}`,
-					type: "mechanics_resolved",
-					atISO: worldTimeAfterISO,
-					source: "player_action",
-					data: {
-						ruleset: mechanicsAdapter.id,
-						action: actionToRun,
-						intent,
-						actionType: resolution.actionType,
-						targetDifficulty: resolution.targetDifficulty,
-						modifier: resolution.modifier,
-						advantage: resolution.advantage,
-						rawRoll: resolution.rawRoll,
-						total: resolution.total,
-						outcome: resolution.outcome,
-						margin: resolution.margin,
-						resolutionMode: resolution.resolutionMode,
-						trace: resolution.trace,
-					},
-				},
-			});
-		}
-
-		const historyEntry = buildHistoryEntry({
-			worldTimeAfterISO,
-			intent,
-			action: actionToRun,
-			locationBefore,
-			locationAfter,
-			newNpcCount: createdNpcIds.length,
-			newLocationCount: createdLocationIds.length,
-		});
-		await appendCanonicalEvent({
-			bardoRoot,
-			event: {
-				id: `evt-player-action-${actionEventBase}`,
-				type: "player_action_resolved",
-				atISO: worldTimeAfterISO,
-				source: "player_action",
-				data: {
-					action: actionToRun,
-					intent,
-					worldTimeBeforeISO,
-					worldTimeAfterISO,
-					locationBefore,
-					locationAfter,
-					createdNpcIds,
-					createdLocationIds,
-					mechanics,
-				},
-			},
-		});
-		await regenerateProjectionsForEventTypes({
-			bardoRoot,
-			eventTypes: ["player_action_resolved"],
-		});
-
-		const output: PlayerActionOutput = {
-			success: true,
-			message:
-				createdNpcIds.length > 0 || createdLocationIds.length > 0
-					? "Action processed. Time advanced and world context expanded automatically."
-					: "Action processed. Time advanced and state updated.",
-			idempotentReplay: false,
-			rootPath: bardoRoot,
-			intent,
-			timeAdvancedMinutes: advance,
-			worldTimeBeforeISO,
-			worldTimeAfterISO,
-			locationBefore,
-			locationAfter,
-			createdNpcIds,
-			createdLocationIds,
-			mechanics,
-			historyEntry,
-			statePath: paths.statePath,
-			historyPath: paths.historyPath,
-			narrationGuardrails: [...narrationGuardrails],
-			optionalSystems,
-			requiresSetup: false,
-			setupPrompt: null,
-			setupStatus: setup.status,
-			setupQuestionKey: null,
-			setupQuestion: null,
-			setupProgressAnswered: setup.progressAnswered,
-			setupProgressTotal: setup.progressTotal,
-			setupWarnings: setup.warnings,
-			setupEvidenceSummary: setup.evidenceSummary,
-			setupRevision: setup.revision,
-			setupConflict: setup.conflict,
-			setupIntegrity: setup.integrity,
-			pendingAction: null,
-		};
-
-		if (args.idempotencyKey) {
-			await setIdempotentResult({
-				bardoRoot,
-				key: args.idempotencyKey,
-				scope: PLAYER_ACTION_SCOPE,
-				result: output,
-				nowIso,
-			});
-		}
-
-		return output;
 	} catch (error) {
 		return {
 			success: false,
@@ -769,6 +1101,18 @@ export async function runPlayerAction(args: {
 			locationAfter: "",
 			createdNpcIds: [],
 			createdLocationIds: [],
+			gmPacket: defaultGmPacket(),
+			stateDelta: defaultStateDelta(),
+			discoveryCandidates: [],
+			canonicalEventIds: [],
+			confidence: {
+				narration: "low",
+				discoveries: "low",
+			},
+			completeness: {
+				gmPacket: false,
+				contextReady: false,
+			},
 			mechanics: defaultMechanicsSummary(false),
 			historyEntry: "",
 			statePath: paths.statePath,

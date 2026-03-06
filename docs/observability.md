@@ -89,13 +89,17 @@ Current counters:
 - `runtime_status_success`
 - `runtime_status_invalid`
 - `runtime_status_failed`
+- `connect_snippets_success`
+- `connect_snippets_rejected`
+- `connect_snippets_failed`
 
 If `BARDO_CONNECT_TELEMETRY_LOG=true`, the website logs periodic snapshots.
 
 ## MCP Metrics
 
-Prometheus output is available through `/metrics` when telemetry and the route
-are enabled.
+Sentry is the primary incident and error surface for operations. The MCP
+`/metrics` endpoint is optional runtime telemetry for internal diagnostics when
+that route is enabled.
 
 Examples already covered in tests include:
 
@@ -105,6 +109,32 @@ Examples already covered in tests include:
 
 Auth can be required for `/metrics` depending on
 `BARDO_METRICS_REQUIRE_AUTH`.
+
+## Sentry Alert Baseline
+
+Keep alerting simple and Sentry-first.
+
+Website recommended alerts:
+
+- `website.api_keys.eligibility_check_failed` spikes above normal baseline.
+- `website.api_keys.lookup_timed_out` or `website.api_keys.delete_timed_out`
+  appears repeatedly in a short window.
+- `website.api_keys.create_failed` spikes above normal baseline.
+
+Connect-flow recommended alerts:
+
+- monitor API 5xx rate for:
+  - `/api/connect/cli-token`
+  - `/api/connect/cli-session/start`
+  - `/api/connect/cli-session/approve`
+  - `/api/connect/snippets`
+- investigate any sustained 5xx increase together with `bardo-website`
+  release/environment tags.
+
+MCP recommended alerts:
+
+- sustained 5xx increase on `/mcp`.
+- repeated `upstash_unavailable` or auth/introspection failures.
 
 ## Minimum Good Signals Before Promotion
 

@@ -1,4 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { refreshContextIndex } from "../../../domain/context/indexer";
+import { appendCanonicalEvent } from "../../../domain/events/store";
+import { regenerateProjectionsForEventTypes } from "../../../domain/projections/refresh";
 import { resolveBardoRoot } from "../../../infra/filesystem/filesystem";
 import { recordSetupLegacyFieldEmitMetric } from "../../../telemetry";
 import type { AuthContext } from "../../../types/contracts";
@@ -14,16 +17,19 @@ import {
 	initInputSchema,
 	initOutputSchema,
 	mergeOptionalSystems,
+	normalizePendingInitInputs,
 	normalizeSavedDiceRoller,
 	normalizeSavedOptionalSystems,
 	normalizeTheme,
 	persistInitSettings,
+	persistPendingInitInputs,
 	persistStateAndHistory,
 	readJsonMarkdown,
 	resolveInitPaths,
 	resolveStartingScene,
 	runBootstrapStep,
 	runGuidedSetupFlow,
+	type SetupAnswers,
 } from "./shared";
 
 const INIT_DEPRECATION_NOTICE =
@@ -42,6 +48,52 @@ function recordLegacySetupPromptFields(output: InitOutput): void {
 			field: "nextPrompts",
 		});
 	}
+}
+
+function buildStartingScenePacket(args: {
+	locationName: string;
+	locationSlug: string;
+	sceneContent: string;
+	source: InitOutput["startingSceneSource"];
+}): NonNullable<InitOutput["startingScenePacket"]> {
+	const summary = args.sceneContent.trim().slice(0, 280);
+	const openingQuestion =
+		args.sceneContent
+			.split(/(?<=[.!?])\s+/)
+			.map((entry) => entry.trim())
+			.find((entry) => entry.endsWith("?")) ?? "What do you do first?";
+	return {
+		locationName: args.locationName,
+		locationSlug: args.locationSlug,
+		summary,
+		openingQuestion,
+		source: args.source,
+	};
+}
+
+function mergeSetupAnswersFromHints(args: {
+	setupAnswers: SetupAnswers | undefined;
+	diceRoller: "player" | "bardo" | null;
+	theme: string | null;
+}): SetupAnswers | undefined {
+	const next: SetupAnswers = {
+		...(args.setupAnswers ?? {}),
+	};
+	let changed = false;
+
+	if (!next.diceRoller && args.diceRoller) {
+		next.diceRoller = args.diceRoller;
+		changed = true;
+	}
+	if (!next.theme && args.theme) {
+		next.theme = args.theme;
+		changed = true;
+	}
+
+	if (!args.setupAnswers && !changed) {
+		return undefined;
+	}
+	return next;
 }
 
 export function registerInitTool(server: McpServer, auth: AuthContext): void {
@@ -102,6 +154,9 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				Object.keys(settings.data).length > 0
 					? settings.data
 					: legacySettings.data;
+			const pendingInitInputs = normalizePendingInitInputs(
+				settings.data.pendingInitInputs,
+			);
 
 			const savedDiceRoller = normalizeSavedDiceRoller(
 				sourceSettingsData.diceRoller,
@@ -113,13 +168,24 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			const savedOptionalSystems = normalizeSavedOptionalSystems(
 				sourceSettingsData.optionalSystems,
 			);
+			const resolvedStartingSceneInput =
+				typeof startingScene === "string" && startingScene.trim().length > 0
+					? startingScene.trim()
+					: pendingInitInputs.startingScene;
 
-			let resolvedDiceRoller = diceRoller ?? savedDiceRoller;
-			let resolvedTheme = normalizeTheme(theme) ?? savedTheme;
+			let resolvedDiceRoller =
+				diceRoller ?? pendingInitInputs.diceRoller ?? savedDiceRoller;
+			let resolvedTheme =
+				normalizeTheme(theme) ?? pendingInitInputs.theme ?? savedTheme;
 			const resolvedOptionalSystems = mergeOptionalSystems(
 				savedOptionalSystems,
 				optionalSystems,
 			);
+			const setupAnswersForFlow = mergeSetupAnswersFromHints({
+				setupAnswers,
+				diceRoller: resolvedDiceRoller,
+				theme: resolvedTheme,
+			});
 
 			let setupStatus:
 				| "needs_input"
@@ -149,7 +215,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					campaignBasePath: auth.campaignBasePath,
 					nowIso,
 					bootstrapAnswers,
-					setupAnswers,
+					setupAnswers: setupAnswersForFlow,
 					expectedRevision: setupRevision,
 				});
 
@@ -165,6 +231,13 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					resolvedTheme ?? normalizeTheme(setup.answers.theme ?? undefined);
 
 				if (setup.status !== "complete") {
+					await persistPendingInitInputs({
+						settingsPath: paths.settingsPath,
+						nowIso,
+						diceRoller: resolvedDiceRoller,
+						theme: resolvedTheme,
+						startingScene: resolvedStartingSceneInput,
+					});
 					const output: InitOutput = {
 						success: true,
 						setupComplete: false,
@@ -188,6 +261,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 						mapGenerated: false,
 						startingSceneSource: "not_available",
 						startingScenePreview: "",
+						startingScenePacket: null,
 						workspaceSummary: summary,
 						statePath: paths.statePath,
 						historyPath: paths.historyPath,
@@ -212,6 +286,13 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			});
 
 			if (!bootstrap.complete) {
+				await persistPendingInitInputs({
+					settingsPath: paths.settingsPath,
+					nowIso,
+					diceRoller: resolvedDiceRoller,
+					theme: resolvedTheme,
+					startingScene: resolvedStartingSceneInput,
+				});
 				const output: InitOutput = {
 					success: true,
 					setupComplete: false,
@@ -236,6 +317,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					mapGenerated: false,
 					startingSceneSource: "not_available",
 					startingScenePreview: "",
+					startingScenePacket: null,
 					workspaceSummary: summary,
 					statePath: paths.statePath,
 					historyPath: paths.historyPath,
@@ -266,14 +348,84 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 			}
 
 			if (bootstrapOnly) {
+				const setupProbe = await runGuidedSetupFlow({
+					campaignBasePath: auth.campaignBasePath,
+					nowIso,
+					setupAnswers: setupAnswersForFlow,
+				});
+				setupStatus = setupProbe.status;
+				setupQuestionKey = setupProbe.questionKey;
+				setupQuestion = setupProbe.question;
+				setupPrompt = setupProbe.setupPrompt;
+				setupRevisionOutput = setupProbe.revision;
+				setupConflict = setupProbe.conflict;
+				setupIntegrity = setupProbe.integrity;
+				resolvedDiceRoller =
+					resolvedDiceRoller ?? setupProbe.answers.diceRoller;
+				resolvedTheme =
+					resolvedTheme ??
+					normalizeTheme(setupProbe.answers.theme ?? undefined);
+				if (setupProbe.status !== "complete") {
+					const output: InitOutput = {
+						success: true,
+						setupComplete: false,
+						requiresUserInput: true,
+						setupPrompt,
+						message:
+							"Bootstrap is complete, but guided setup still needs an answer before campaign state can be initialized.",
+						nextPrompts: setupQuestion ? [setupQuestion] : [],
+						rootPath: bardoRoot,
+						rootExistedBefore: directorySetup.rootExistedBefore,
+						createdDirectories: directorySetup.createdDirectories,
+						existingDirectories: directorySetup.existingDirectories,
+						directories: directorySetup.directories,
+						diceRoller: resolvedDiceRoller,
+						theme: resolvedTheme,
+						optionalSystems: resolvedOptionalSystems,
+						settingsPath: paths.settingsPath,
+						legacySettingsPath: paths.legacySettingsPath,
+						legacySettingsDetected,
+						startingScenePath: paths.scenePath,
+						mapPath: paths.mapPath,
+						mapGenerated: false,
+						startingSceneSource: "not_available",
+						startingScenePreview: "",
+						startingScenePacket: null,
+						workspaceSummary: summary,
+						statePath: paths.statePath,
+						historyPath: paths.historyPath,
+						bootstrap: {
+							complete: true,
+							alreadyInitialized: bootstrap.alreadyInitialized,
+							pendingQuestionKey: null,
+							nextPrompt: null,
+							bootstrapPath: bootstrap.bootstrapPath,
+							identityPath: bootstrap.identityPath,
+							userPath: bootstrap.userPath,
+							soulPath: bootstrap.soulPath,
+							includeValues: bootstrap.includeValues,
+							answeredCount: bootstrap.totalQuestions,
+							totalQuestions: bootstrap.totalQuestions,
+						},
+						setupStatus,
+						setupQuestionKey,
+						setupQuestion,
+						setupRevision: setupRevisionOutput,
+						setupConflict,
+						setupIntegrity,
+						deprecationNotice: INIT_DEPRECATION_NOTICE,
+					};
+					recordLegacySetupPromptFields(output);
+					return makeToolResult(output);
+				}
+
 				const output: InitOutput = {
 					success: true,
-					setupComplete: true,
+					setupComplete: false,
 					requiresUserInput: false,
-					setupPrompt: null,
-					message: bootstrap.alreadyInitialized
-						? "Bootstrap already complete."
-						: "Bootstrap complete.",
+					setupPrompt,
+					message:
+						"Bootstrap and guided setup answers are complete. Run init without bootstrapOnly to materialize the starting scene and canonical state.",
 					nextPrompts: [],
 					rootPath: bardoRoot,
 					rootExistedBefore: directorySetup.rootExistedBefore,
@@ -291,6 +443,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					mapGenerated: false,
 					startingSceneSource: "not_available",
 					startingScenePreview: "",
+					startingScenePacket: null,
 					workspaceSummary: summary,
 					statePath: paths.statePath,
 					historyPath: paths.historyPath,
@@ -330,7 +483,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				summary,
 				hint,
 				resolvedTheme,
-				startingSceneInput: startingScene,
+				startingSceneInput: resolvedStartingSceneInput ?? undefined,
 				nextPrompts,
 			});
 
@@ -354,7 +507,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					scene.startingLocationName,
 				);
 
-				await persistStateAndHistory({
+				const seededState = await persistStateAndHistory({
 					statePath: paths.statePath,
 					historyPath: paths.historyPath,
 					nowIso,
@@ -364,7 +517,29 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					resolvedTheme,
 					startingSceneSource: scene.startingSceneSource,
 				});
+				await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-campaign-initialized-${crypto.randomUUID()}`,
+						type: "campaign_initialized",
+						atISO: nowIso,
+						source: "init",
+						data: {
+							startingLocationSlug: scene.startingLocationSlug,
+							startingLocationName: scene.startingLocationName,
+							diceRoller: resolvedDiceRoller,
+							theme: resolvedTheme,
+							startingSceneSource: scene.startingSceneSource,
+							stateAfter: seededState,
+						},
+					},
+				});
+				await regenerateProjectionsForEventTypes({
+					bardoRoot,
+					eventTypes: ["campaign_initialized"],
+				});
 			}
+			await refreshContextIndex(bardoRoot);
 
 			const setupComplete =
 				bootstrap.complete &&
@@ -378,6 +553,14 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 					? "Initialization complete. Bootstrap was already initialized and campaign setup is ready."
 					: "Initialization complete. Bootstrap, workspace, preferences, and starting scene are ready."
 				: "Initialization partially complete. Additional user input is required before campaign start.";
+			const startingScenePacket = scene.startingSceneContent
+				? buildStartingScenePacket({
+						locationName: scene.startingLocationName,
+						locationSlug: scene.startingLocationSlug,
+						sceneContent: scene.startingSceneContent,
+						source: scene.startingSceneSource,
+					})
+				: null;
 
 			const output: InitOutput = {
 				success: true,
@@ -402,6 +585,7 @@ export function registerInitTool(server: McpServer, auth: AuthContext): void {
 				mapGenerated: scene.mapGenerated,
 				startingSceneSource: scene.startingSceneSource,
 				startingScenePreview: scene.startingSceneContent.slice(0, 240),
+				startingScenePacket,
 				spawnLocationSlug: scene.spawnSelection?.slug,
 				spawnLocationName: scene.spawnSelection?.name,
 				spawnOrigin: scene.spawnSelection?.origin,

@@ -16,6 +16,7 @@ describe("resolveToolPolicyConfig", () => {
 	test("uses standard profile by default outside production", () => {
 		const config = resolveToolPolicyConfig({});
 		expect(hasTool(config, "player_action")).toBe(true);
+		expect(hasTool(config, "scene_turn")).toBe(true);
 		expect(hasTool(config, "apply_domain_transition")).toBe(true);
 		expect(hasTool(config, "migrate_legacy_state")).toBe(true);
 		expect(hasTool(config, "eval_run_golden_scenarios")).toBe(true);
@@ -34,6 +35,7 @@ describe("resolveToolPolicyConfig", () => {
 			modelId: null,
 		});
 		expect(resolved.profile).toBe("gameplay");
+		expect(resolved.allowedTools.has("scene_turn")).toBe(true);
 		expect(resolved.allowedTools.has("player_action")).toBe(true);
 		expect(resolved.allowedTools.has("append_event")).toBe(false);
 		expect(resolved.allowedTools.has("migrate_legacy_state")).toBe(false);

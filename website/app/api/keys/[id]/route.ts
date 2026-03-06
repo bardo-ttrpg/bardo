@@ -1,5 +1,9 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import {
+	resolveClerkApiTimeoutMs,
+	revokeApiKeyForUser,
+} from "@/lib/api-key-revocation";
 import { resolveRouteUserId } from "@/lib/clerk-route-auth";
 
 export const runtime = "nodejs";
@@ -7,47 +11,46 @@ export const runtime = "nodejs";
 // ─── DELETE /api/keys/[id] ────────────────────────────────────────────────────
 // Revokes a Clerk API key.
 
-export async function DELETE(
-	_request: Request,
-	{ params }: { params: Promise<{ id: string }> },
+type KeyByIdDeleteHandlerDeps = {
+	resolveAuthState?: typeof resolveRouteUserId;
+	createClerkClient?: typeof clerkClient;
+	timeoutMs?: number;
+};
+
+export function createKeyByIdDeleteHandler(
+	deps: KeyByIdDeleteHandlerDeps = {},
 ) {
-	const authState = await resolveRouteUserId("/api/keys/[id]");
-	if (authState.response) {
-		return authState.response;
-	}
+	const resolveAuthState = deps.resolveAuthState ?? resolveRouteUserId;
+	const createClerkClient = deps.createClerkClient ?? clerkClient;
+	const timeoutMs = deps.timeoutMs ?? resolveClerkApiTimeoutMs();
 
-	const { userId } = authState;
-	if (!userId) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+	return async function DELETE(
+		_request: Request,
+		{ params }: { params: Promise<{ id: string }> },
+	) {
+		const authState = await resolveAuthState("/api/keys/[id]");
+		if (authState.response) {
+			return authState.response;
+		}
 
-	const { id: clerkKeyId } = await params;
-	if (!clerkKeyId) {
-		return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
-	}
+		const { userId } = authState;
+		if (!userId) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-	const clerk = await clerkClient();
+		const { id: clerkKeyId } = await params;
+		if (!clerkKeyId) {
+			return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
+		}
 
-	// Verify the key belongs to this user before revoking.
-	let clerkKey: Awaited<ReturnType<(typeof clerk)["apiKeys"]["get"]>>;
-	try {
-		clerkKey = await clerk.apiKeys.get(clerkKeyId);
-	} catch {
-		return NextResponse.json({ error: "Not found" }, { status: 404 });
-	}
-	if (clerkKey.subject !== userId) {
-		return NextResponse.json({ error: "Not found" }, { status: 404 });
-	}
-
-	try {
-		await clerk.apiKeys.delete(clerkKeyId);
-	} catch (err) {
-		console.error("[api/keys/[id]] clerk.apiKeys.delete failed:", err);
-		return NextResponse.json(
-			{ error: "Failed to delete key" },
-			{ status: 500 },
-		);
-	}
-
-	return NextResponse.json({ revoked: true, deleted: true });
+		return revokeApiKeyForUser({
+			userId,
+			clerkKeyId,
+			route: "/api/keys/[id]",
+			createClerkClient,
+			timeoutMs,
+		});
+	};
 }
+
+export const DELETE = createKeyByIdDeleteHandler();

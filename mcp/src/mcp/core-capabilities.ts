@@ -23,6 +23,23 @@ function parseProvenanceInteger(value: string | undefined): number | null {
 	return parsed;
 }
 
+function projectionProvenance(
+	projectionFrontmatter: Record<string, string | undefined>,
+) {
+	return {
+		projectionGeneratedAtISO: projectionFrontmatter.generated_at_iso ?? null,
+		sourceEventSequenceMin: parseProvenanceInteger(
+			projectionFrontmatter.source_event_seq_min,
+		),
+		sourceEventSequenceMax: parseProvenanceInteger(
+			projectionFrontmatter.source_event_seq_max,
+		),
+		sourceEventCount: parseProvenanceInteger(
+			projectionFrontmatter.source_event_count,
+		),
+	};
+}
+
 export function registerCoreResourcesAndPrompts(
 	server: McpServer,
 	auth: AuthContext,
@@ -60,6 +77,12 @@ export function registerCoreResourcesAndPrompts(
 				worldTimeISO: preferredState.chosen.state.worldTimeISO,
 				currentLocation: preferredState.chosen.state.currentLocation,
 				lastAction: preferredState.chosen.state.lastAction,
+				scene: preferredState.chosen.state.scene,
+				party: preferredState.chosen.state.party,
+				activeThreads: Object.values(
+					preferredState.chosen.state.threads,
+				).filter((thread) => thread.status !== "resolved"),
+				mechanicsContext: preferredState.chosen.state.mechanicsContext,
 				locationCount: Object.keys(preferredState.chosen.state.locations)
 					.length,
 				totalCanonicalEvents: events.length,
@@ -69,16 +92,7 @@ export function registerCoreResourcesAndPrompts(
 					projection: {
 						projectionSchema:
 							projectionFrontmatter.projection_schema ?? "unknown",
-						generatedAtISO: projectionFrontmatter.generated_at_iso ?? null,
-						sourceEventSequenceMin: parseProvenanceInteger(
-							projectionFrontmatter.source_event_seq_min,
-						),
-						sourceEventSequenceMax: parseProvenanceInteger(
-							projectionFrontmatter.source_event_seq_max,
-						),
-						sourceEventCount: parseProvenanceInteger(
-							projectionFrontmatter.source_event_count,
-						),
+						...projectionProvenance(projectionFrontmatter),
 					},
 					canonicalEvents: {
 						total: events.length,
@@ -125,12 +139,13 @@ export function registerCoreResourcesAndPrompts(
 				worldTimeISO: preferredState.chosen.state.worldTimeISO,
 				currentLocationId: preferredState.chosen.state.currentLocation,
 				currentLocation: location,
+				scene: preferredState.chosen.state.scene,
+				occupants:
+					location?.occupantIds
+						.map((npcId) => preferredState.chosen.state.npcs[npcId])
+						.filter(Boolean) ?? [],
 				provenance: {
-					projectionGeneratedAtISO:
-						projectionFrontmatter.generated_at_iso ?? null,
-					sourceEventSequenceMax: parseProvenanceInteger(
-						projectionFrontmatter.source_event_seq_max,
-					),
+					...projectionProvenance(projectionFrontmatter),
 				},
 			};
 			return {
@@ -166,7 +181,9 @@ export function registerCoreResourcesAndPrompts(
 				contractVersion: "v1",
 				stateSource: preferredState.source,
 				party: {
+					...preferredState.chosen.state.party,
 					currentLocation: preferredState.chosen.state.currentLocation,
+					currentLocationId: preferredState.chosen.state.currentLocation,
 					worldTimeISO: preferredState.chosen.state.worldTimeISO,
 					lastAction: preferredState.chosen.state.lastAction,
 					counters: preferredState.chosen.state.counters,
@@ -174,11 +191,7 @@ export function registerCoreResourcesAndPrompts(
 						.length,
 				},
 				provenance: {
-					projectionGeneratedAtISO:
-						projectionFrontmatter.generated_at_iso ?? null,
-					sourceEventSequenceMax: parseProvenanceInteger(
-						projectionFrontmatter.source_event_seq_max,
-					),
+					...projectionProvenance(projectionFrontmatter),
 				},
 			};
 			return {
@@ -213,17 +226,18 @@ export function registerCoreResourcesAndPrompts(
 			const locationId = preferredState.chosen.state.currentLocation;
 			const location =
 				preferredState.chosen.state.locations[locationId] ?? null;
+			const activeNpcs =
+				location?.npcIds
+					.map((npcId) => preferredState.chosen.state.npcs[npcId])
+					.filter(Boolean) ?? [];
 			const payload = {
 				contractVersion: "v1",
 				stateSource: preferredState.source,
 				currentLocationId: locationId,
 				npcIds: location?.npcIds ?? [],
+				npcs: activeNpcs,
 				provenance: {
-					projectionGeneratedAtISO:
-						projectionFrontmatter.generated_at_iso ?? null,
-					sourceEventSequenceMax: parseProvenanceInteger(
-						projectionFrontmatter.source_event_seq_max,
-					),
+					...projectionProvenance(projectionFrontmatter),
 				},
 			};
 			return {
@@ -231,6 +245,51 @@ export function registerCoreResourcesAndPrompts(
 					{
 						uri: "resource://npc/active-roster",
 						text: JSON.stringify(payload, null, 2),
+						mimeType: "application/json",
+					},
+				],
+			};
+		},
+	);
+
+	server.registerResource(
+		"npcs_roster",
+		"resource://npcs/roster",
+		{
+			title: "NPC Roster",
+			description:
+				"All introduced or discovered NPCs in the current campaign state.",
+			mimeType: "application/json",
+		},
+		async () => {
+			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
+			const preferredState = await loadPreferredCurrentState({
+				bardoRoot,
+				consumer: "resource_npcs_roster",
+				refreshStaleProjection: true,
+			});
+			const projectionFrontmatter = preferredState.projection.frontmatter;
+			const roster = Object.values(preferredState.chosen.state.npcs)
+				.filter((npc) => npc.introduced || npc.discovered)
+				.sort((left, right) =>
+					left.displayName.localeCompare(right.displayName),
+				);
+			return {
+				contents: [
+					{
+						uri: "resource://npcs/roster",
+						text: JSON.stringify(
+							{
+								contractVersion: "v1",
+								stateSource: preferredState.source,
+								npcs: roster,
+								provenance: {
+									...projectionProvenance(projectionFrontmatter),
+								},
+							},
+							null,
+							2,
+						),
 						mimeType: "application/json",
 					},
 				],
@@ -249,19 +308,15 @@ export function registerCoreResourcesAndPrompts(
 		},
 		async () => {
 			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
-			const events = await readCanonicalEvents({ bardoRoot });
-			const recent = events.slice(Math.max(0, events.length - 40));
-			const openThreads = recent
-				.filter((event) =>
-					["lore_revealed", "quest_updated", "mechanics_resolved"].includes(
-						event.type,
-					),
-				)
-				.map((event) => ({
-					eventId: event.id,
-					type: event.type,
-					atISO: event.atISO,
-				}));
+			const preferredState = await loadPreferredCurrentState({
+				bardoRoot,
+				consumer: "resource_threads_open",
+				refreshStaleProjection: true,
+			});
+			const projectionFrontmatter = preferredState.projection.frontmatter;
+			const openThreads = Object.values(
+				preferredState.chosen.state.threads,
+			).filter((thread) => thread.status !== "resolved");
 			return {
 				contents: [
 					{
@@ -269,7 +324,61 @@ export function registerCoreResourcesAndPrompts(
 						text: JSON.stringify(
 							{
 								contractVersion: "v1",
+								stateSource: preferredState.source,
 								openThreads,
+								provenance: {
+									...projectionProvenance(projectionFrontmatter),
+								},
+							},
+							null,
+							2,
+						),
+						mimeType: "application/json",
+					},
+				],
+			};
+		},
+	);
+
+	server.registerResource(
+		"combat_current",
+		"resource://combat/current",
+		{
+			title: "Current Combat State",
+			description:
+				"Current combat or tactical mechanics context for the active scene.",
+			mimeType: "application/json",
+		},
+		async () => {
+			const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
+			const preferredState = await loadPreferredCurrentState({
+				bardoRoot,
+				consumer: "resource_combat_current",
+				refreshStaleProjection: true,
+			});
+			const projectionFrontmatter = preferredState.projection.frontmatter;
+			return {
+				contents: [
+					{
+						uri: "resource://combat/current",
+						text: JSON.stringify(
+							{
+								contractVersion: "v1",
+								stateSource: preferredState.source,
+								combat: {
+									active:
+										preferredState.chosen.state.mechanicsContext.combatActive,
+									initiativeOrder:
+										preferredState.chosen.state.mechanicsContext
+											.initiativeOrder,
+									advantageHints:
+										preferredState.chosen.state.mechanicsContext.advantageHints,
+									difficultyHint:
+										preferredState.chosen.state.mechanicsContext.difficultyHint,
+								},
+								provenance: {
+									...projectionProvenance(projectionFrontmatter),
+								},
 							},
 							null,
 							2,
@@ -475,7 +584,7 @@ export function registerCoreResourcesAndPrompts(
 							type: "text",
 							text:
 								`Run a full scene turn for action: "${action}". ` +
-								"Read resource://scene/current, resource://party/status, and resource://events/recent-digest. Resolve mechanics before narration and append canonical events for state changes.",
+								"Read resource://scene/current, resource://party/status, resource://npcs/roster, and resource://events/recent-digest. Resolve mechanics before narration and append canonical events for state changes.",
 						},
 					},
 				],

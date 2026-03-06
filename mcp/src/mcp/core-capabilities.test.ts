@@ -79,7 +79,9 @@ describe("registerCoreResourcesAndPrompts", () => {
 			"scene_current",
 			"party_status",
 			"npc_active_roster",
+			"npcs_roster",
 			"threads_open",
+			"combat_current",
 			"rules_current_ruleset_summary",
 			"table_contract",
 			"authority_policy",
@@ -136,6 +138,22 @@ describe("registerCoreResourcesAndPrompts", () => {
 		};
 		expect(partyPayload.party.currentLocation).toBe("river-market");
 		expect(partyPayload.stateSource).toBe("projection");
+		const combatResource = await registeredResources[6]?.handler();
+		const combatPayload = JSON.parse(
+			combatResource?.contents[0]?.text ?? "{}",
+		) as {
+			combat?: {
+				active?: boolean;
+			};
+		};
+		expect(combatPayload.combat?.active).toBe(false);
+		const npcRosterResource = await registeredResources[4]?.handler();
+		const npcRosterPayload = JSON.parse(
+			npcRosterResource?.contents[0]?.text ?? "{}",
+		) as {
+			npcs?: unknown[];
+		};
+		expect(Array.isArray(npcRosterPayload.npcs)).toBe(true);
 
 		const resolveActionPrompt = await registeredPrompts
 			.find((entry) => entry.name === "resolve_player_action")
@@ -144,6 +162,14 @@ describe("registerCoreResourcesAndPrompts", () => {
 			});
 		expect(resolveActionPrompt?.messages[0]?.content.text).toContain(
 			"validate_action_against_ruleset",
+		);
+		const runSceneTurnPrompt = await registeredPrompts
+			.find((entry) => entry.name === "run_scene_turn")
+			?.handler({
+				action: "I question the barkeep.",
+			});
+		expect(runSceneTurnPrompt?.messages[0]?.content.text).toContain(
+			"resource://npcs/roster",
 		);
 		const safetyPrompt = await registeredPrompts
 			.find((entry) => entry.name === "safety_pause_and_reframe")
@@ -248,7 +274,7 @@ describe("registerCoreResourcesAndPrompts", () => {
 		}
 	});
 
-	test("fails resource read when projection is stale in strict mode", async () => {
+	test("auto-recovers stale projection when strict mode reads a resource", async () => {
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-core-capabilities-stale-strict-"),
 		);
@@ -310,13 +336,15 @@ describe("registerCoreResourcesAndPrompts", () => {
 		Bun.env.BARDO_STRICT_CANONICAL_MODE = "true";
 		try {
 			registerCoreResourcesAndPrompts(server, createAuth(root));
-			let threw = false;
-			try {
-				await resources[0]?.handler();
-			} catch {
-				threw = true;
-			}
-			expect(threw).toBe(true);
+			const result = await resources[0]?.handler();
+			const content = result?.contents?.[0];
+			expect(typeof content?.text).toBe("string");
+			const payload = JSON.parse(content?.text ?? "{}") as {
+				currentLocation?: string;
+				stateSource?: string;
+			};
+			expect(payload.currentLocation).toBe("river-market");
+			expect(payload.stateSource).toBe("projection");
 		} finally {
 			if (previousStrict === undefined) {
 				delete Bun.env.BARDO_STRICT_CANONICAL_MODE;

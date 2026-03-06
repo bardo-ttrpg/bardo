@@ -15,7 +15,6 @@ import {
 import {
 	CLIENT_OPTIONS,
 	type ConnectionClient,
-	type ConnectionMode,
 	createDashboardState,
 	type DashboardData,
 	type DashboardKey,
@@ -42,7 +41,7 @@ function BillingPlanCard({
 	return (
 		<div className="border border-border p-6 lg:col-span-1">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Billing Plan
+				Plan & Usage
 			</p>
 			{billingLoading ? (
 				<p className="text-sm text-muted-foreground">Loading…</p>
@@ -52,16 +51,15 @@ function BillingPlanCard({
 						Plan: <strong className="uppercase">{billing.plan}</strong>
 					</p>
 					<p className="text-sm">
-						Credits: {billing.creditsTotal.toLocaleString()} total
-					</p>
-					<p className="text-sm">
-						Billable MCP tool calls this period:{" "}
+						MCP calls this period:{" "}
 						<strong>{billing.mcpCallsThisPeriod.toLocaleString()}</strong> /{" "}
 						{mcpPeriodLimit.toLocaleString()}
 					</p>
 					<p className="text-sm text-muted-foreground">
-						Billable MCP tool calls total:{" "}
-						{billing.mcpCallsTotal.toLocaleString()}
+						MCP calls total: {billing.mcpCallsTotal.toLocaleString()}
+					</p>
+					<p className="text-sm text-muted-foreground">
+						Credits: {billing.creditsTotal.toLocaleString()}
 					</p>
 				</div>
 			) : (
@@ -93,7 +91,7 @@ function CreateApiKeyCard({
 	return (
 		<div className="border border-border p-6 lg:col-span-2">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Create API Key
+				API Keys
 			</p>
 			<div className="grid gap-3 sm:grid-cols-1">
 				<input
@@ -115,11 +113,7 @@ function CreateApiKeyCard({
 				Keys are shown once on create/rotate. Store them securely.
 			</p>
 			<p className="mt-1 text-xs text-muted-foreground">
-				Workspace location is managed automatically per account.
-			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Hosted staging and production workspaces live on the MCP server, not in
-				your local editor folder.
+				Use one key per app or environment for easier rotation.
 			</p>
 			<p className="mt-1 text-xs text-muted-foreground">
 				Active keys: {activeCount} / {keyPolicy.maxAllowed}
@@ -168,15 +162,13 @@ export function ApiKeysTable({
 				</p>
 			</div>
 			<div className="overflow-x-auto">
-				<table className="w-full min-w-[760px]">
+				<table className="w-full min-w-[680px]">
 					<thead>
 						<tr className="border-b border-border text-left text-xs text-muted-foreground">
 							<th className="px-6 py-3 font-medium">Name</th>
-							<th className="px-6 py-3 font-medium">Scopes</th>
 							<th className="px-6 py-3 font-medium">Status</th>
 							<th className="px-6 py-3 font-medium">MCP period</th>
 							<th className="px-6 py-3 font-medium">MCP total</th>
-							<th className="px-6 py-3 font-medium">Workspace</th>
 							<th className="px-6 py-3 font-medium">Last used</th>
 							<th className="px-6 py-3 font-medium">Actions</th>
 						</tr>
@@ -186,7 +178,7 @@ export function ApiKeysTable({
 							<tr>
 								<td
 									className="px-6 py-6 text-sm text-muted-foreground"
-									colSpan={8}
+									colSpan={6}
 								>
 									Loading keys…
 								</td>
@@ -195,7 +187,7 @@ export function ApiKeysTable({
 							<tr>
 								<td
 									className="px-6 py-6 text-sm text-muted-foreground"
-									colSpan={8}
+									colSpan={6}
 								>
 									No keys yet. Create your first API key above.
 								</td>
@@ -204,18 +196,12 @@ export function ApiKeysTable({
 							keys.map((key) => (
 								<tr key={key.id} className="border-b border-border text-sm">
 									<td className="px-6 py-3">{key.name}</td>
-									<td className="px-6 py-3 font-mono text-xs">
-										{key.scopes.join(",")}
-									</td>
 									<td className="px-6 py-3 uppercase">{key.status}</td>
 									<td className="px-6 py-3 font-mono text-xs">
 										{key.callsThisPeriod.toLocaleString()}
 									</td>
 									<td className="px-6 py-3 font-mono text-xs">
 										{key.callsTotal.toLocaleString()}
-									</td>
-									<td className="px-6 py-3 font-mono text-xs text-muted-foreground">
-										{key.workspacePath ?? "—"}
 									</td>
 									<td className="px-6 py-3 text-xs text-muted-foreground">
 										{formatDate(key.lastUsedAt)}
@@ -265,9 +251,7 @@ export function ApiKeysTable({
 
 export function ConnectionSnippetPanel({
 	connectionClient,
-	connectionMode,
 	onClientChange,
-	onModeChange,
 	onGenerateSnippet,
 	onGenerateCliLoginCommand,
 	lastSecret,
@@ -280,9 +264,7 @@ export function ConnectionSnippetPanel({
 	onCopy,
 }: {
 	connectionClient: ConnectionClient;
-	connectionMode: ConnectionMode;
 	onClientChange: (value: ConnectionClient) => void;
-	onModeChange: (value: ConnectionMode) => void;
 	onGenerateSnippet: () => void;
 	onGenerateCliLoginCommand: () => void;
 	lastSecret: string | null;
@@ -295,17 +277,17 @@ export function ConnectionSnippetPanel({
 	onCopy: () => void;
 }) {
 	const selectedClient = getDashboardClientMetadata(connectionClient);
+	const selectedClientLabel = getDashboardClientLabel(connectionClient);
+	const connectCommand = `bardo connect --client ${connectionClient} --mode local`;
 
 	return (
 		<div className="mt-6 border border-border p-6">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Connection Snippet Generator
+				Quick Connect
 			</p>
 			<p className="mb-3 text-xs text-muted-foreground">
-				Remote mode connects your client straight to the Railway MCP. Local mode
-				runs a tiny Bun adapter on your machine, but with the current hosted
-				setup the workspace still lives on the MCP server unless workspace
-				overrides are explicitly enabled.
+				Select your app, generate a one-time CLI login command, then paste the
+				connection snippet if your app needs manual config.
 			</p>
 			<div className="flex flex-wrap gap-3">
 				<select
@@ -320,16 +302,6 @@ export function ConnectionSnippetPanel({
 							{getDashboardClientLabel(client)}
 						</option>
 					))}
-				</select>
-				<select
-					value={connectionMode}
-					onChange={(event) =>
-						onModeChange(event.target.value as ConnectionMode)
-					}
-					className="border border-border bg-background px-3 py-2 text-sm"
-				>
-					<option value="remote">remote</option>
-					<option value="local">local</option>
 				</select>
 				<button
 					type="button"
@@ -348,32 +320,30 @@ export function ConnectionSnippetPanel({
 					{cliLoginLoading ? "Generating..." : "Generate CLI Login"}
 				</button>
 			</div>
-			<div className="mt-3 space-y-1 text-xs text-muted-foreground">
+			<div className="mt-4 rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
 				<p>
-					Support tier:{" "}
-					<strong className="font-medium">{selectedClient.tier}</strong>
+					App: <strong className="font-medium">{selectedClientLabel}</strong>
 				</p>
 				<p>
-					Auto-install:{" "}
-					<strong className="font-medium">
-						{selectedClient.autoInstall ? "yes" : "no"}
-					</strong>
+					Mode: <strong className="font-medium uppercase">local</strong>
 				</p>
 				<p>
-					Modes:{" "}
+					Config file:{" "}
 					<strong className="font-medium">
-						{selectedClient.supportsLocal ? "local" : ""}
-						{selectedClient.supportsLocal && selectedClient.supportsRemote
-							? " + "
-							: ""}
-						{selectedClient.supportsRemote ? "remote" : ""}
+						{selectedClient.defaultConfigPath ?? "app-specific"}
 					</strong>
 				</p>
-				<p>
-					Config path:{" "}
-					<strong className="font-medium">
-						{selectedClient.defaultConfigPath ?? "manual / client-specific"}
-					</strong>
+				<ol className="mt-2 list-decimal space-y-1 pl-4">
+					<li>Click `Generate CLI Login`.</li>
+					<li>Run that command in your terminal.</li>
+					<li>Run this connect command:</li>
+				</ol>
+				<pre className="mt-2 overflow-x-auto border border-border bg-background p-2 font-mono text-xs text-foreground">
+					{connectCommand}
+				</pre>
+				<p className="mt-2">
+					If your app needs manual config, click `Generate snippet` and paste it
+					into the config file above.
 				</p>
 			</div>
 
@@ -549,17 +519,10 @@ export function DashboardClient() {
 
 			<ConnectionSnippetPanel
 				connectionClient={state.connectionClient}
-				connectionMode={state.connectionMode}
 				onClientChange={(connectionClient) =>
 					dispatch({
 						type: "connection_client_changed",
 						connectionClient,
-					})
-				}
-				onModeChange={(connectionMode) =>
-					dispatch({
-						type: "connection_mode_changed",
-						connectionMode,
 					})
 				}
 				onGenerateSnippet={() =>

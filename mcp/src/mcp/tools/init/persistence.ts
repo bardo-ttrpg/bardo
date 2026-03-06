@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import type { CampaignState } from "../../../domain/campaign/types";
 import { resolveFeatureFlags } from "../../../domain/config/features";
 import {
 	parseMarkdown,
@@ -10,7 +11,11 @@ import {
 } from "../../../infra/filesystem/filesystem";
 import { recordLegacyCompatibilityWriteMetric } from "../../../telemetry";
 import type { InitOutput } from "./schemas";
-import { readJsonMarkdown } from "./settings";
+import {
+	normalizePendingInitInputs,
+	type PendingInitInputs,
+	readJsonMarkdown,
+} from "./settings";
 import { inferLocationSlug, toDisplayName } from "./spawn";
 import type { SpawnSelection } from "./types";
 
@@ -80,6 +85,7 @@ export async function persistInitSettings(args: {
 		optionalSystems: args.resolvedOptionalSystems,
 		startingScenePath: "world/scenes/starting-scene.md",
 		mapPath: "world/maps/primary-map.md",
+		pendingInitInputs: null,
 		lastSpawn: args.spawnSelection
 			? {
 					slug: args.spawnSelection.slug,
@@ -110,6 +116,45 @@ export async function persistInitSettings(args: {
 	);
 }
 
+export async function persistPendingInitInputs(args: {
+	settingsPath: string;
+	nowIso: string;
+	diceRoller: "player" | "bardo" | null;
+	theme: string | null;
+	startingScene: string | null;
+}): Promise<void> {
+	const existing = await readJsonMarkdown(args.settingsPath);
+	const existingPending = normalizePendingInitInputs(
+		existing.data.pendingInitInputs,
+	);
+	const nextPending: PendingInitInputs = {
+		diceRoller: args.diceRoller ?? existingPending.diceRoller,
+		theme: args.theme ?? existingPending.theme,
+		startingScene: args.startingScene ?? existingPending.startingScene,
+	};
+
+	const nextSettings = {
+		...existing.data,
+		pendingInitInputs: nextPending,
+		updatedAtISO: args.nowIso,
+	};
+
+	await ensureParentDirectoryExists(args.settingsPath);
+	await writeFile(
+		args.settingsPath,
+		renderMarkdown(
+			{
+				description:
+					existing.frontmatter.description ??
+					"Campaign setup settings and preferences (authoritative location)",
+				title: existing.frontmatter.title ?? "Campaign Settings",
+			},
+			JSON.stringify(nextSettings, null, 2),
+		),
+		"utf8",
+	);
+}
+
 export async function persistStateAndHistory(args: {
 	statePath: string;
 	historyPath: string;
@@ -119,7 +164,7 @@ export async function persistStateAndHistory(args: {
 	resolvedDiceRoller: "player" | "bardo" | null;
 	resolvedTheme: string | null;
 	startingSceneSource: InitOutput["startingSceneSource"];
-}): Promise<void> {
+}): Promise<CampaignState> {
 	const strictCanonicalMode = resolveFeatureFlags(Bun.env).strictCanonicalMode;
 	const currentState = await readJsonMarkdown(args.statePath);
 	const stateData = currentState.data;
@@ -130,14 +175,18 @@ export async function persistStateAndHistory(args: {
 			: {};
 	const locations =
 		typeof stateData.locations === "object" && stateData.locations !== null
-			? (stateData.locations as Record<string, unknown>)
-			: {};
+			? (stateData.locations as CampaignState["locations"])
+			: ({} as CampaignState["locations"]);
 
 	if (!(args.startingLocationSlug in locations)) {
 		locations[args.startingLocationSlug] = {
 			name: args.startingLocationName,
 			visits: 0,
 			npcIds: [],
+			tags: [],
+			exits: [],
+			activeClues: [],
+			occupantIds: [],
 		};
 	}
 
@@ -158,9 +207,49 @@ export async function persistStateAndHistory(args: {
 					? counters.unknownLocation
 					: 0,
 		},
+		scene: {
+			summary: `The campaign opens at ${args.startingLocationName}.`,
+			activeSituation: "Take the first meaningful action of the campaign.",
+			exits: [],
+			sensoryCues: [],
+			unresolvedQuestions: [],
+		},
+		party: {
+			currentLocation: args.startingLocationSlug,
+			statusSummary: `The party begins at ${args.startingLocationName}.`,
+			knownResources: [],
+			activeConditions: [],
+		},
+		npcs:
+			typeof stateData.npcs === "object" && stateData.npcs !== null
+				? (stateData.npcs as CampaignState["npcs"])
+				: ({} as CampaignState["npcs"]),
 		locations,
+		threads:
+			typeof stateData.threads === "object" && stateData.threads !== null
+				? (stateData.threads as CampaignState["threads"])
+				: ({} as CampaignState["threads"]),
+		factions:
+			typeof stateData.factions === "object" && stateData.factions !== null
+				? (stateData.factions as CampaignState["factions"])
+				: ({} as CampaignState["factions"]),
+		clocks:
+			typeof stateData.clocks === "object" && stateData.clocks !== null
+				? (stateData.clocks as CampaignState["clocks"])
+				: ({} as CampaignState["clocks"]),
+		mechanicsContext:
+			typeof stateData.mechanicsContext === "object" &&
+			stateData.mechanicsContext !== null
+				? (stateData.mechanicsContext as CampaignState["mechanicsContext"])
+				: {
+						ruleset: "d20_v1",
+						difficultyHint: null,
+						combatActive: false,
+						initiativeOrder: [],
+						advantageHints: [],
+					},
 		lastAction: "campaign_initialized",
-	};
+	} satisfies CampaignState;
 
 	await ensureParentDirectoryExists(args.statePath);
 	await writeFile(
@@ -213,4 +302,6 @@ export async function persistStateAndHistory(args: {
 		artifact: "state_history",
 		strictMode: strictCanonicalMode,
 	});
+
+	return nextState;
 }

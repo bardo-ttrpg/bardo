@@ -101,7 +101,10 @@ describe("simulation_tick tool", () => {
 		const legacyState = await readTextIfExists(
 			path.join(bardoRoot, "state/current.md"),
 		);
-		expect(legacyState).toBeNull();
+		expect(legacyState).toBeString();
+		expect(JSON.parse(parseMarkdown(legacyState ?? "").content)).toEqual(
+			projectionState,
+		);
 		let legacyEventFiles = 0;
 		try {
 			const files = await readdir(path.join(bardoRoot, "world/events"));

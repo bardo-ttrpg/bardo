@@ -20,8 +20,8 @@ type UsageCounter = {
 	used: number;
 };
 
-type PlanCacheEntry = {
-	plan: PlanTier;
+type PlanCacheEntry<TValue> = {
+	value: TValue;
 	expiresAt: number;
 };
 
@@ -32,6 +32,8 @@ type UpstashConfig = {
 	token: string;
 };
 
+const CLEANUP_INTERVAL = 256;
+
 export type DailyVerificationConsumeResult = {
 	allowed: boolean;
 	limit: number;
@@ -39,6 +41,24 @@ export type DailyVerificationConsumeResult = {
 	remaining: number;
 	backend: "memory" | "upstash";
 };
+
+export function pruneDailyVerificationCaches(args: {
+	usageByCounter: Map<string, UsageCounter>;
+	blockedCache: Map<string, number>;
+	currentDay: string;
+	nowMs: number;
+}): void {
+	for (const [counterId, usage] of args.usageByCounter) {
+		if (usage.day !== args.currentDay) {
+			args.usageByCounter.delete(counterId);
+		}
+	}
+	for (const [cacheKey, blockedUntil] of args.blockedCache) {
+		if (blockedUntil <= args.nowMs) {
+			args.blockedCache.delete(cacheKey);
+		}
+	}
+}
 
 export function rotateConfirmedKeyWindow(args: {
 	confirmedKeys: Set<string>;
@@ -227,6 +247,20 @@ export function createDailyVerificationBudgetLimiter(
 	const blockedCache = new Map<string, number>();
 	const ttlConfirmedKeys = new Set<string>();
 	let ttlConfirmedDay: string | null = null;
+	let consumeCount = 0;
+
+	function maybePruneCaches(currentDay: string, nowMs: number): void {
+		consumeCount += 1;
+		if (consumeCount % CLEANUP_INTERVAL !== 0) {
+			return;
+		}
+		pruneDailyVerificationCaches({
+			usageByCounter,
+			blockedCache,
+			currentDay,
+			nowMs,
+		});
+	}
 
 	async function consume(
 		scope: VerificationCounterScope,
@@ -241,6 +275,7 @@ export function createDailyVerificationBudgetLimiter(
 			activeDay: ttlConfirmedDay,
 			currentDay: day,
 		});
+		maybePruneCaches(day, nowMs);
 		const safeId = id.trim() || "unknown";
 		const blockedKey = `${scope}:${safeId}:${day}`;
 		const blockedUntil = blockedCache.get(blockedKey);
@@ -342,25 +377,27 @@ export function createDailyVerificationBudgetLimiter(
 	};
 }
 
-export function createSubjectPlanCache(options: SubjectPlanCacheOptions = {}) {
-	const bySubject = new Map<string, PlanCacheEntry>();
+export function createSubjectPlanCache<TValue = PlanTier>(
+	options: SubjectPlanCacheOptions = {},
+) {
+	const bySubject = new Map<string, PlanCacheEntry<TValue>>();
 	const now = options.nowMs ?? (() => Date.now());
 	const ttlMs = readPositiveMs(options.ttlMs, 300_000);
 
 	return {
 		async resolve(
 			subject: string,
-			lookup: () => Promise<PlanTier>,
-		): Promise<PlanTier> {
+			lookup: () => Promise<TValue>,
+		): Promise<TValue> {
 			const current = now();
 			const cached = bySubject.get(subject);
 			if (cached && cached.expiresAt > current) {
-				return cached.plan;
+				return cached.value;
 			}
 
-			const plan = await lookup();
-			bySubject.set(subject, { plan, expiresAt: current + ttlMs });
-			return plan;
+			const value = await lookup();
+			bySubject.set(subject, { value, expiresAt: current + ttlMs });
+			return value;
 		},
 		reset(): void {
 			bySubject.clear();

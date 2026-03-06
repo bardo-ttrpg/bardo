@@ -114,6 +114,23 @@ function pruneExpiredTokens(
 	}
 }
 
+function consumeWithMemory(args: {
+	usedTokens: Map<string, number>;
+	token: string;
+	expiresAt: number;
+	current: number;
+}): ConsumeResult {
+	pruneExpiredTokens(args.usedTokens, args.current);
+	const key = hashToken(args.token);
+	const existingExpiry = args.usedTokens.get(key);
+	if (typeof existingExpiry === "number" && existingExpiry > args.current) {
+		return { ok: false, reason: "already_used" };
+	}
+
+	args.usedTokens.set(key, args.expiresAt);
+	return { ok: true };
+}
+
 async function consumeWithUpstash(args: {
 	key: string;
 	config: UpstashConfig;
@@ -185,6 +202,7 @@ export function createCliLoginTokenStore(
 		async consume(args: ConsumeArgs): Promise<ConsumeResult> {
 			const expiresAt = Date.parse(args.expiresAtISO);
 			const current = now();
+			const token = args.token.trim();
 			if (!Number.isFinite(expiresAt) || expiresAt <= current) {
 				return { ok: false, reason: "expired" };
 			}
@@ -192,28 +210,39 @@ export function createCliLoginTokenStore(
 			const ttlSeconds = Math.max(1, Math.ceil((expiresAt - current) / 1000));
 			const config = readUpstashConfig(env);
 			if (config) {
-				return consumeWithUpstash({
-					key: replayKey(args.token.trim()),
-					config,
-					fetchImpl,
-					ttlSeconds,
-				});
+				try {
+					return await consumeWithUpstash({
+						key: replayKey(token),
+						config,
+						fetchImpl,
+						ttlSeconds,
+					});
+				} catch (error) {
+					if (
+						!(error instanceof CliLoginReplayStoreError) ||
+						!allowMemoryFallback
+					) {
+						throw error;
+					}
+					return consumeWithMemory({
+						usedTokens,
+						token,
+						expiresAt,
+						current,
+					});
+				}
 			}
 			if (!allowMemoryFallback) {
 				throw new CliLoginReplayStoreError(
 					"CLI login replay store is not configured with Upstash and memory fallback is disabled.",
 				);
 			}
-
-			pruneExpiredTokens(usedTokens, current);
-			const key = hashToken(args.token.trim());
-			const existingExpiry = usedTokens.get(key);
-			if (typeof existingExpiry === "number" && existingExpiry > current) {
-				return { ok: false, reason: "already_used" };
-			}
-
-			usedTokens.set(key, expiresAt);
-			return { ok: true };
+			return consumeWithMemory({
+				usedTokens,
+				token,
+				expiresAt,
+				current,
+			});
 		},
 		reset(): void {
 			usedTokens.clear();

@@ -30,6 +30,37 @@ import {
 	readMapLocationCandidates,
 } from "./workspace";
 
+function inferExplicitSceneLocation(scene: string): {
+	locationName: string;
+	locationSlug: string;
+} | null {
+	const stopwords = new Set(["The", "A", "An", "This", "That", "What"]);
+	const patterns = [
+		/\bcalled\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3}),\s+a\s+(?:frontier\s+)?(?:town|village|city|outpost|hamlet)\b/,
+		/\b([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\.\s+This\s+(?:frontier\s+)?(?:town|village|city|outpost|hamlet)\b/,
+		/\b(?:town|village|city|outpost|hamlet)\s+of\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b(?:surrounding|outside|beyond|near|around)\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b(?:streets?|roads?|walls?|gates?)\s+of\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b(?:across|in|at|inside|within)\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b(?:arrive at|begin at|stand in|inside|within)\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+		/\b([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*){0,3})\b/,
+	];
+
+	for (const pattern of patterns) {
+		const match = scene.match(pattern);
+		const raw = match?.[1]?.trim();
+		if (!raw || stopwords.has(raw)) {
+			continue;
+		}
+		return {
+			locationName: raw,
+			locationSlug: inferLocationSlug(raw),
+		};
+	}
+	return null;
+}
+
 type SceneResolution = {
 	startingSceneContent: string;
 	startingSceneSource: InitOutput["startingSceneSource"];
@@ -76,6 +107,16 @@ export async function resolveStartingScene(args: {
 		startingSceneContent = args.startingSceneInput.trim();
 		startingSceneSource = "user_provided";
 		shouldPersistScene = true;
+		const inferredLocation = inferExplicitSceneLocation(startingSceneContent);
+		if (inferredLocation) {
+			startingLocationName = inferredLocation.locationName;
+			startingLocationSlug = inferredLocation.locationSlug;
+			spawnSelection = {
+				slug: inferredLocation.locationSlug,
+				name: inferredLocation.locationName,
+				origin: "workspace",
+			};
+		}
 	} else if (existingSceneContent) {
 		startingSceneContent = existingSceneContent;
 		startingSceneSource = "existing_scene_reused";
@@ -143,17 +184,24 @@ export async function resolveStartingScene(args: {
 	}
 
 	if (shouldPersistScene) {
-		spawnSelection = chooseRandomSpawn(
-			args.resolvedTheme,
-			workspaceLocationCandidates,
-			mapCandidatesForSpawn,
-		);
-		startingLocationName = spawnSelection.name;
-		startingLocationSlug = spawnSelection.slug;
-		startingSceneContent = applySpawnToScene(
-			startingSceneContent,
-			spawnSelection,
-		);
+		if (startingSceneSource === "user_provided" && spawnSelection) {
+			startingSceneContent = applySpawnToScene(
+				startingSceneContent,
+				spawnSelection,
+			);
+		} else {
+			spawnSelection = chooseRandomSpawn(
+				args.resolvedTheme,
+				workspaceLocationCandidates,
+				mapCandidatesForSpawn,
+			);
+			startingLocationName = spawnSelection.name;
+			startingLocationSlug = spawnSelection.slug;
+			startingSceneContent = applySpawnToScene(
+				startingSceneContent,
+				spawnSelection,
+			);
+		}
 		await ensureParentDirectoryExists(args.paths.scenePath);
 		await writeFile(
 			args.paths.scenePath,

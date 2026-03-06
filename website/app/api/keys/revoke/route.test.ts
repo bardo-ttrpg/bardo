@@ -64,4 +64,31 @@ describe("POST /api/keys/revoke", () => {
 		expect(response.status).toBe(404);
 		expect(body.error).toBe("Not found");
 	});
+
+	test("returns 502 when Clerk key lookup fails for a non-timeout upstream error", async () => {
+		const handler = createKeysRevokePostHandler({
+			resolveAuthState: async () => ({ userId: "user_123" }),
+			createClerkClient: async () =>
+				({
+					apiKeys: {
+						get: async () => {
+							throw new Error("upstream lookup failure");
+						},
+						delete: async () => undefined,
+					},
+				}) as never,
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/keys/revoke", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ id: "key_123" }),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(502);
+		expect(body.error).toContain("Key lookup failed");
+	});
 });
