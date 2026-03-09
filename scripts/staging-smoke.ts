@@ -1,3 +1,8 @@
+import {
+	appendVercelProtectionBypass,
+	parseJsonOrSseJson,
+} from "./staging-smoke-lib";
+
 type CheckResult = {
 	name: string;
 	ok: boolean;
@@ -100,7 +105,7 @@ async function postJson<T>(args: {
 		},
 		args.timeoutMs,
 	);
-	const json = (await response.json()) as T;
+	const json = parseJsonOrSseJson<T>(await response.text());
 	return { response, json };
 }
 
@@ -119,13 +124,19 @@ async function main() {
 	const connectClient = readOptionalEnv("STAGING_CONNECT_CLIENT", "codex");
 	const connectMode = readOptionalEnv("STAGING_CONNECT_MODE", "remote");
 	const mcpServerName = readOptionalEnv("STAGING_MCP_SERVER_NAME", "bardo");
+	const websiteProtectionBypassSecret = readOptionalEnv(
+		"STAGING_VERCEL_PROTECTION_BYPASS_SECRET",
+		"",
+	);
+	const withWebsiteBypass = (url: string) =>
+		appendVercelProtectionBypass(url, websiteProtectionBypassSecret);
 
 	const checks: CheckResult[] = [];
 
 	checks.push(
 		await expectStatus({
 			name: "website root",
-			url: websiteUrl,
+			url: withWebsiteBypass(websiteUrl),
 			expectedStatuses: [200, 301, 302, 307, 308],
 		}),
 	);
@@ -138,7 +149,9 @@ async function main() {
 	checks.push(healthResult);
 
 	const introspection = await postJson<{ valid?: boolean }>({
-		url: new URL("/api/auth/introspect-key", websiteUrl).toString(),
+		url: withWebsiteBypass(
+			new URL("/api/auth/introspect-key", websiteUrl).toString(),
+		),
 		headers: {
 			"x-bardo-introspection-token": introspectionToken,
 		},
@@ -262,11 +275,11 @@ async function main() {
 		name: "mcp tools/list",
 		ok:
 			toolsList.response.ok &&
-			toolNames.includes("campaign_turn") &&
+			toolNames.includes("init") &&
 			toolNames.includes("context_query") &&
-			toolNames.includes("generate_session_recap") &&
-			!toolNames.includes("scene_turn") &&
-			!toolNames.includes("player_action") &&
+			toolNames.includes("scene_turn") &&
+			toolNames.includes("player_action") &&
+			!toolNames.includes("campaign_turn") &&
 			!toolNames.includes("verify_narration"),
 		details: toolNames.join(", "),
 	});
@@ -296,71 +309,58 @@ async function main() {
 		details: promptNames.join(", "),
 	});
 
-	const turnMessages = [
-		{
-			name: "campaign_turn query",
-			id: 6,
-			message: "What do we know about the current location?",
-			workflow: "context_query",
-		},
-		{
-			name: "campaign_turn recap",
-			id: 7,
-			message: "Give me a recap of what happened so far.",
-			workflow: "generate_session_recap",
-		},
-		{
-			name: "campaign_turn gameplay",
-			id: 8,
-			message: "I listen to the tavern for gossip.",
-			workflow: "scene_turn",
-		},
-	] as const;
-
-	for (const turn of turnMessages) {
-		const response = await postJson<
-			JsonRpcResponse<{
-				structuredContent?: {
-					success?: boolean;
-					status?: string;
-					workflow?: string;
-					verification?: { safeToPresent?: boolean };
+	const sceneTurn = await postJson<
+		JsonRpcResponse<{
+			structuredContent?: {
+				success?: boolean;
+				message?: string;
+				gmPacket?: {
+					narrativeBeats?: string[];
+					discoveries?: Array<{ persisted?: boolean }>;
 				};
-			}>
-		>({
-			url: mcpUrl,
-			headers: sessionHeaders,
-			body: {
-				jsonrpc: "2.0",
-				id: turn.id,
-				method: "tools/call",
-				params: {
-					name: "campaign_turn",
-					arguments: {
-						message: turn.message,
-						includeState: true,
-					},
+				consistency?: {
+					success?: boolean;
+					errorCount?: number;
+				};
+			};
+		}>
+	>({
+		url: mcpUrl,
+		headers: sessionHeaders,
+		body: {
+			jsonrpc: "2.0",
+			id: 6,
+			method: "tools/call",
+			params: {
+				name: "scene_turn",
+				arguments: {
+					action: "I listen to the tavern for gossip.",
+					idempotencyKey: "staging-smoke-scene-turn",
 				},
 			},
-		});
-		const content =
-			response.response.ok && assertJsonRpcSuccess(response.json)
-				? response.json.result.structuredContent
-				: undefined;
-		checks.push({
-			name: turn.name,
-			ok:
-				response.response.ok &&
-				content?.success === true &&
-				content.status === "complete" &&
-				content.workflow === turn.workflow &&
-				content.verification?.safeToPresent === true,
-			details: `status=${content?.status ?? "unknown"} workflow=${content?.workflow ?? "unknown"}`,
-		});
-	}
+		},
+	});
+	const sceneTurnContent =
+		sceneTurn.response.ok && assertJsonRpcSuccess(sceneTurn.json)
+			? sceneTurn.json.result.structuredContent
+			: undefined;
+	checks.push({
+		name: "scene_turn gameplay",
+		ok:
+			sceneTurn.response.ok &&
+			sceneTurnContent?.success === true &&
+			(sceneTurnContent.gmPacket?.narrativeBeats?.length ?? 0) > 0 &&
+			sceneTurnContent.consistency?.success === true &&
+			(sceneTurnContent.consistency?.errorCount ?? 1) === 0,
+		details:
+			sceneTurnContent?.message ??
+			(sceneTurn.response.ok ? "missing structured content" : "request failed"),
+	});
 
 	const runtimeStatus = await fetchWithTimeout(
-		new URL("/api/connect/runtime-status", websiteUrl),
+		withWebsiteBypass(
+			new URL("/api/connect/runtime-status", websiteUrl).toString(),
+		),
 		{
 			headers: {
 				BARDO_API_KEY: apiKey,
@@ -375,7 +375,9 @@ async function main() {
 	});
 
 	const snippets = await postJson<{ baseUrl?: string; snippet?: string }>({
-		url: new URL("/api/connect/snippets", websiteUrl).toString(),
+		url: withWebsiteBypass(
+			new URL("/api/connect/snippets", websiteUrl).toString(),
+		),
 		body: {
 			client: connectClient,
 			mode: connectMode,
@@ -403,7 +405,9 @@ async function main() {
 		  }
 		| { error?: string }
 	>({
-		url: new URL("/api/connect/cli-session/start", websiteUrl).toString(),
+		url: withWebsiteBypass(
+			new URL("/api/connect/cli-session/start", websiteUrl).toString(),
+		),
 		body: {},
 	});
 	const pollUrl =
@@ -426,7 +430,7 @@ async function main() {
 	});
 
 	if (pollUrl) {
-		const pendingPoll = await fetchWithTimeout(pollUrl, {});
+		const pendingPoll = await fetchWithTimeout(withWebsiteBypass(pollUrl), {});
 		const pendingPollJson = (await pendingPoll.json()) as {
 			status?: string;
 			intervalMs?: number;
@@ -455,7 +459,9 @@ async function main() {
 		};
 
 		const authKeys = await fetchWithTimeout(
-			new URL("/api/keys?limit=20&offset=0", websiteUrl),
+			withWebsiteBypass(
+				new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
+			),
 			{
 				headers: authHeaders,
 			},
@@ -480,7 +486,7 @@ async function main() {
 			secret?: string;
 			error?: string;
 		}>({
-			url: new URL("/api/keys", websiteUrl).toString(),
+			url: withWebsiteBypass(new URL("/api/keys", websiteUrl).toString()),
 			headers: authHeaders,
 			body: {
 				name: keyName,
@@ -501,7 +507,9 @@ async function main() {
 
 		if (createdKeyId) {
 			const deleteResponse = await fetchWithTimeout(
-				new URL(`/api/keys/${createdKeyId}`, websiteUrl),
+				withWebsiteBypass(
+					new URL(`/api/keys/${createdKeyId}`, websiteUrl).toString(),
+				),
 				{
 					method: "DELETE",
 					headers: authHeaders,
@@ -520,7 +528,9 @@ async function main() {
 
 		if (cliSessionId) {
 			const approval = await postJson<{ ok?: boolean; error?: string }>({
-				url: new URL("/api/connect/cli-session/approve", websiteUrl).toString(),
+				url: withWebsiteBypass(
+					new URL("/api/connect/cli-session/approve", websiteUrl).toString(),
+				),
 				headers: authHeaders,
 				body: {
 					sessionId: cliSessionId,
@@ -533,7 +543,10 @@ async function main() {
 			});
 
 			if (pollUrl) {
-				const approvedPoll = await fetchWithTimeout(pollUrl, {});
+				const approvedPoll = await fetchWithTimeout(
+					withWebsiteBypass(pollUrl),
+					{},
+				);
 				const approvedPollJson = (await approvedPoll.json()) as {
 					status?: string;
 					apiKey?: string;
@@ -551,7 +564,7 @@ async function main() {
 
 				if (approvedPollJson.apiKey && approvedPollJson.statusUrl) {
 					const approvedRuntimeStatus = await fetchWithTimeout(
-						approvedPollJson.statusUrl,
+						withWebsiteBypass(approvedPollJson.statusUrl),
 						{
 							headers: {
 								BARDO_API_KEY: approvedPollJson.apiKey,
@@ -578,7 +591,9 @@ async function main() {
 			exchangeUrl?: string;
 			error?: string;
 		}>({
-			url: new URL("/api/connect/cli-token", websiteUrl).toString(),
+			url: withWebsiteBypass(
+				new URL("/api/connect/cli-token", websiteUrl).toString(),
+			),
 			headers: authHeaders,
 			body: {},
 		});
@@ -597,7 +612,7 @@ async function main() {
 				statusUrl?: string;
 				error?: string;
 			}>({
-				url: cliToken.json.exchangeUrl,
+				url: withWebsiteBypass(cliToken.json.exchangeUrl),
 				body: {
 					token: cliToken.json.loginToken,
 				},
@@ -613,7 +628,7 @@ async function main() {
 
 			if (cliExchange.json.apiKey && cliExchange.json.statusUrl) {
 				const exchangedRuntimeStatus = await fetchWithTimeout(
-					cliExchange.json.statusUrl,
+					withWebsiteBypass(cliExchange.json.statusUrl),
 					{
 						headers: {
 							BARDO_API_KEY: cliExchange.json.apiKey,

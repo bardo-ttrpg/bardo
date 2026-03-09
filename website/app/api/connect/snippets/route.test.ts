@@ -146,6 +146,9 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 			consumeSnippetBudget: async () => ({
 				allowed: false,
 				retryAfterSeconds: 42,
+				limit: 60,
+				remaining: 0,
+				resetEpochSeconds: 1_800_000_042,
 			}),
 			telemetry,
 		});
@@ -164,6 +167,9 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 
 		expect(response.status).toBe(429);
 		expect(response.headers.get("retry-after")).toBe("42");
+		expect(response.headers.get("x-ratelimit-limit")).toBe("60");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000042");
 		expect(body.error).toContain("Too many");
 		expect(telemetry.snapshot().connect_snippets_rejected).toBe(1);
 	});
@@ -171,7 +177,12 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 	test("POST telemetry tracks success and failure outcomes", async () => {
 		const telemetry = createConnectTelemetry();
 		const success = createSnippetsPostHandler({
-			consumeSnippetBudget: async () => ({ allowed: true }),
+			consumeSnippetBudget: async () => ({
+				allowed: true,
+				limit: 60,
+				remaining: 59,
+				resetEpochSeconds: 1_800_000_000,
+			}),
 			telemetry,
 		});
 		const failed = createSnippetsPostHandler({
@@ -203,6 +214,9 @@ describe("GET /api/connect/snippets base URL resolution", () => {
 		);
 
 		expect(okResponse.status).toBe(200);
+		expect(okResponse.headers.get("x-ratelimit-limit")).toBe("60");
+		expect(okResponse.headers.get("x-ratelimit-remaining")).toBe("59");
+		expect(okResponse.headers.get("x-ratelimit-reset")).toBe("1800000000");
 		expect(errorResponse.status).toBe(500);
 		expect(telemetry.snapshot().connect_snippets_success).toBe(1);
 		expect(telemetry.snapshot().connect_snippets_failed).toBe(1);

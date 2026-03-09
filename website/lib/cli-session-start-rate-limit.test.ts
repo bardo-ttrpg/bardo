@@ -26,15 +26,33 @@ describe("createCliSessionStartRateLimiter", () => {
 		});
 		const request = requestFromIp("203.0.113.11");
 
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
+		expect(await limiter.consume(request)).toEqual({
+			allowed: true,
+			limit: 2,
+			remaining: 1,
+			resetEpochSeconds: 1,
+		});
+		expect(await limiter.consume(request)).toEqual({
+			allowed: true,
+			limit: 2,
+			remaining: 0,
+			resetEpochSeconds: 1,
+		});
 		expect(await limiter.consume(request)).toEqual({
 			allowed: false,
 			retryAfterSeconds: 1,
+			limit: 2,
+			remaining: 0,
+			resetEpochSeconds: 1,
 		});
 
 		nowMs = 1_150;
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
+		expect(await limiter.consume(request)).toEqual({
+			allowed: true,
+			limit: 2,
+			remaining: 1,
+			resetEpochSeconds: 2,
+		});
 	});
 
 	test("throws a backend-availability error when Upstash is unavailable and memory fallback is disabled", async () => {
@@ -109,9 +127,15 @@ describe("createCliSessionStartRateLimiter", () => {
 		});
 		const request = requestFromIp("203.0.113.41");
 
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
+		expect(await limiter.consume(request)).toEqual(
+			expect.objectContaining({ allowed: true, limit: 10, remaining: 9 }),
+		);
+		expect(await limiter.consume(request)).toEqual(
+			expect.objectContaining({ allowed: true, limit: 10, remaining: 8 }),
+		);
+		expect(await limiter.consume(request)).toEqual(
+			expect.objectContaining({ allowed: true, limit: 10, remaining: 7 }),
+		);
 		expect(expireCalls).toBe(1);
 	});
 
@@ -150,11 +174,15 @@ describe("createCliSessionStartRateLimiter", () => {
 		});
 		const request = requestFromIp("203.0.113.51");
 
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
+		expect(await limiter.consume(request)).toEqual(
+			expect.objectContaining({ allowed: true, limit: 10, remaining: 9 }),
+		);
 		expect(expireCalls).toBe(1);
 
 		nowMs = 2_100;
-		expect(await limiter.consume(request)).toEqual({ allowed: true });
+		expect(await limiter.consume(request)).toEqual(
+			expect.objectContaining({ allowed: true, limit: 10, remaining: 8 }),
+		);
 		expect(expireCalls).toBe(2);
 	});
 });

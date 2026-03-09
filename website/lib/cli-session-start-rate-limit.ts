@@ -3,6 +3,9 @@ import { BackendAvailabilityError } from "./backend-availability";
 type ConsumeResult = {
 	allowed: boolean;
 	retryAfterSeconds?: number;
+	limit?: number;
+	remaining?: number;
+	resetEpochSeconds?: number;
 };
 
 type CreateRateLimiterOptions = {
@@ -219,7 +222,12 @@ export function createCliSessionStartRateLimiter(
 					}
 				}
 				return used <= limit
-					? { allowed: true }
+					? {
+							allowed: true,
+							limit,
+							remaining: Math.max(0, limit - used),
+							resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
+						}
 					: {
 							allowed: false,
 							retryAfterSeconds: retryAfterSeconds(
@@ -227,6 +235,9 @@ export function createCliSessionStartRateLimiter(
 								windowStartMs,
 								windowMs,
 							),
+							limit,
+							remaining: 0,
+							resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
 						};
 			}
 		}
@@ -246,7 +257,12 @@ export function createCliSessionStartRateLimiter(
 		counters.set(clientId, counter);
 
 		return counter.used <= limit
-			? { allowed: true }
+			? {
+					allowed: true,
+					limit,
+					remaining: Math.max(0, limit - counter.used),
+					resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
+				}
 			: {
 					allowed: false,
 					retryAfterSeconds: retryAfterSeconds(
@@ -254,6 +270,9 @@ export function createCliSessionStartRateLimiter(
 						windowStartMs,
 						windowMs,
 					),
+					limit,
+					remaining: 0,
+					resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
 				};
 	}
 

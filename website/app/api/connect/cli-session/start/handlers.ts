@@ -9,13 +9,18 @@ import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
 } from "../../../../../lib/connect-telemetry";
+import { applyRateLimitHeaders } from "../../../../../lib/rate-limit-headers";
 
 export const runtime = "nodejs";
 
 type CliSessionStartDeps = {
-	consumeStartBudget: (
-		request: Request,
-	) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
+	consumeStartBudget: (request: Request) => Promise<{
+		allowed: boolean;
+		retryAfterSeconds?: number;
+		limit?: number;
+		remaining?: number;
+		resetEpochSeconds?: number;
+	}>;
 	createPendingSession: () => Promise<{
 		sessionId: string;
 		pollSecret: string;
@@ -53,21 +58,15 @@ export function createCliSessionStartPostHandler(
 			const budget = await deps.consumeStartBudget(request);
 			if (!budget.allowed) {
 				deps.telemetry.increment("cli_session_start_failed");
-				return NextResponse.json(
+				const response = NextResponse.json(
 					{
 						error:
 							"Too many CLI session start requests. Wait before trying again.",
 					},
-					{
-						status: 429,
-						headers:
-							typeof budget.retryAfterSeconds === "number"
-								? {
-										"retry-after": String(budget.retryAfterSeconds),
-									}
-								: undefined,
-					},
+					{ status: 429 },
 				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
 			}
 
 			const session = await deps.createPendingSession();
@@ -80,7 +79,7 @@ export function createCliSessionStartPostHandler(
 			pollUrl.searchParams.set("sessionId", session.sessionId);
 			pollUrl.searchParams.set("pollSecret", session.pollSecret);
 
-			return NextResponse.json({
+			const response = NextResponse.json({
 				sessionId: session.sessionId,
 				userCode: session.userCode,
 				verificationUrl,
@@ -88,6 +87,8 @@ export function createCliSessionStartPostHandler(
 				intervalMs: session.intervalMs,
 				expiresAtISO: session.expiresAtISO,
 			});
+			applyRateLimitHeaders(response.headers, budget);
+			return response;
 		} catch (error) {
 			deps.telemetry.increment("cli_session_start_failed");
 			if (isBackendAvailabilityError(error)) {

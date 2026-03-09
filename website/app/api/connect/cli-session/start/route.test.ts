@@ -12,6 +12,9 @@ describe("POST /api/connect/cli-session/start", () => {
 			consumeStartBudget: async () => ({
 				allowed: false,
 				retryAfterSeconds: 60,
+				limit: 10,
+				remaining: 0,
+				resetEpochSeconds: 1_800_000_060,
 			}),
 		});
 
@@ -24,12 +27,20 @@ describe("POST /api/connect/cli-session/start", () => {
 
 		expect(response.status).toBe(429);
 		expect(response.headers.get("retry-after")).toBe("60");
+		expect(response.headers.get("x-ratelimit-limit")).toBe("10");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000060");
 		expect(body.error).toContain("Too many");
 	});
 
 	test("starts a pending CLI session and returns approval metadata", async () => {
 		const handler = createCliSessionStartPostHandler({
-			consumeStartBudget: async () => ({ allowed: true }),
+			consumeStartBudget: async () => ({
+				allowed: true,
+				limit: 10,
+				remaining: 9,
+				resetEpochSeconds: 1_800_000_000,
+			}),
 			createPendingSession: async () => ({
 				sessionId: "cli_session_123",
 				pollSecret: "poll_secret_123",
@@ -49,6 +60,9 @@ describe("POST /api/connect/cli-session/start", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get("x-ratelimit-limit")).toBe("10");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("9");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000000");
 		expect(body.sessionId).toBe("cli_session_123");
 		expect(body.userCode).toBe("ABCD-1234");
 		expect(body.verificationUrl).toBe(

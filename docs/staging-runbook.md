@@ -74,6 +74,7 @@ STAGING_WEBSITE_URL=https://staging.example.com \
 STAGING_MCP_URL=https://mcp-staging.example.com/mcp \
 STAGING_API_KEY=replace_with_real_staging_key \
 STAGING_INTROSPECTION_TOKEN=replace_with_shared_secret \
+STAGING_VERCEL_PROTECTION_BYPASS_SECRET=replace_with_vercel_bypass_secret \
 STAGING_AUTH_COOKIE='__session=replace_with_staging_session_cookie' \
 bun run staging:smoke
 ```
@@ -85,7 +86,7 @@ The smoke script validates:
 1. website introspection accepts a real staging key
 1. MCP rejects missing and invalid keys
 1. MCP `initialize`, `tools/list`, and `prompts/list`
-1. `campaign_turn` query / recap / gameplay
+1. `scene_turn` gameplay flow
 1. website `/api/connect/runtime-status`
 1. website `/api/connect/snippets` points to staging MCP
 1. website `/api/connect/cli-session/start` and initial `/poll`
@@ -98,6 +99,7 @@ Notes:
 
 1. `STAGING_AUTH_COOKIE` should be a real staging browser session cookie for the seeded smoke user.
 1. If `STAGING_AUTH_COOKIE` is omitted, the script still covers unauthenticated smoke checks and explicitly skips protected dashboard/CLI checks.
+1. If `website` staging uses a protected Vercel Preview deployment, set `STAGING_VERCEL_PROTECTION_BYPASS_SECRET` so the smoke runner can reach website routes without disabling Preview protection globally.
 
 ## Manual Staging Checks
 These still require human signoff:

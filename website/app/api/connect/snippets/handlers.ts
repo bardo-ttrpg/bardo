@@ -14,6 +14,7 @@ import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
 } from "../../../../lib/connect-telemetry";
+import { applyRateLimitHeaders } from "../../../../lib/rate-limit-headers";
 
 function isConnectionMode(value: string | null): value is ConnectionMode {
 	return value === "remote" || value === "local";
@@ -103,9 +104,13 @@ function buildSnippetResponse(request: Request, params: SnippetRequest) {
 }
 
 type SnippetsPostDeps = {
-	consumeSnippetBudget: (
-		request: Request,
-	) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
+	consumeSnippetBudget: (request: Request) => Promise<{
+		allowed: boolean;
+		retryAfterSeconds?: number;
+		limit?: number;
+		remaining?: number;
+		resetEpochSeconds?: number;
+	}>;
 	telemetry: ConnectTelemetry;
 };
 
@@ -125,20 +130,14 @@ export function createSnippetsPostHandler(
 			const budget = await deps.consumeSnippetBudget(request);
 			if (!budget.allowed) {
 				deps.telemetry.increment("connect_snippets_rejected");
-				return NextResponse.json(
+				const response = NextResponse.json(
 					{
 						error: "Too many snippet requests. Wait before trying again.",
 					},
-					{
-						status: 429,
-						headers:
-							typeof budget.retryAfterSeconds === "number"
-								? {
-										"retry-after": String(budget.retryAfterSeconds),
-									}
-								: undefined,
-					},
+					{ status: 429 },
 				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
 			}
 
 			const body = (await request.json().catch(() => ({}))) as Partial<{
@@ -169,6 +168,7 @@ export function createSnippetsPostHandler(
 			} else {
 				deps.telemetry.increment("connect_snippets_success");
 			}
+			applyRateLimitHeaders(response.headers, budget);
 			return response;
 		} catch (error) {
 			deps.telemetry.increment("connect_snippets_failed");
