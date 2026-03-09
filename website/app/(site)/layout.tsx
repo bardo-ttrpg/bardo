@@ -1,10 +1,12 @@
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import SiteNavLink from "@/components/site-nav-link";
 import ThemeToggle from "@/components/theme-toggle";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
+import { resolveOptionalUserId } from "@/lib/clerk-route-auth";
+import AuthUserButton from "./auth-user-button";
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
@@ -51,36 +53,32 @@ function AuthCtaLinks() {
 	);
 }
 
-function AuthControls() {
-	if (!IS_CLERK_CONFIGURED) {
+function AuthControls({ isSignedIn }: { isSignedIn: boolean }) {
+	if (!IS_CLERK_CONFIGURED || !isSignedIn) {
 		return <AuthCtaLinks />;
 	}
 
-	return (
-		<>
-			<SignedOut>
-				<AuthCtaLinks />
-			</SignedOut>
-			<SignedIn>
-				<UserButton afterSignOutUrl="/" />
-			</SignedIn>
-		</>
-	);
+	return <AuthUserButton />;
 }
 
-function DashboardHeaderLink() {
-	if (!IS_CLERK_CONFIGURED) {
+function DashboardHeaderLink({ isSignedIn }: { isSignedIn: boolean }) {
+	if (!IS_CLERK_CONFIGURED || !isSignedIn) {
 		return null;
 	}
 
-	return (
-		<SignedIn>
-			<NavLink href="/dashboard" label="DASHBOARD" />
-		</SignedIn>
-	);
+	return <NavLink href="/dashboard" label="DASHBOARD" />;
 }
 
-export default function SiteLayout({ children }: { children: ReactNode }) {
+export default async function SiteLayout({
+	children,
+}: {
+	children: ReactNode;
+}) {
+	const userId = IS_CLERK_CONFIGURED
+		? await resolveOptionalUserId("/(site)/layout", { authFn: auth })
+		: null;
+	const isSignedIn = Boolean(userId);
+
 	const body = (
 		<div className="min-h-screen text-foreground">
 			<header className="sticky top-0 z-50 border-b border-border bg-background">
@@ -98,11 +96,11 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 						{PRIMARY_NAV_LINKS.map((link) => (
 							<NavLink key={link.href} href={link.href} label={link.label} />
 						))}
-						<DashboardHeaderLink />
+						<DashboardHeaderLink isSignedIn={isSignedIn} />
 					</nav>
 
 					<div className="flex items-center gap-3">
-						<AuthControls />
+						<AuthControls isSignedIn={isSignedIn} />
 						<ThemeToggle />
 					</div>
 				</div>
@@ -119,7 +117,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 								label={link.label}
 							/>
 						))}
-						<DashboardHeaderLink />
+						<DashboardHeaderLink isSignedIn={isSignedIn} />
 					</nav>
 				</div>
 			</header>
@@ -138,6 +136,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 									<li key={label}>
 										<Link
 											href={href}
+											prefetch={false}
 											className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 										>
 											{label}
@@ -185,6 +184,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 							</p>
 							<Link
 								href="/pricing"
+								prefetch={false}
 								className="inline-block border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 							>
 								View pricing ↗

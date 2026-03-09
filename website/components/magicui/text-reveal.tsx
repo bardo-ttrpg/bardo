@@ -5,6 +5,7 @@ import {
 	LazyMotion,
 	type MotionValue,
 	m,
+	useReducedMotion,
 	useScroll,
 	useTransform,
 } from "framer-motion";
@@ -19,6 +20,7 @@ interface TextRevealProps {
 export const TextReveal: FC<TextRevealProps> = ({ text, className }) => {
 	const targetRef = useRef<HTMLDivElement>(null);
 	const { scrollYProgress } = useScroll({ target: targetRef });
+	const prefersReducedMotion = useReducedMotion() ?? false;
 	const words = text.split(" ");
 
 	return (
@@ -33,6 +35,7 @@ export const TextReveal: FC<TextRevealProps> = ({ text, className }) => {
 								<Word
 									key={`${word}-${start.toFixed(4)}`}
 									progress={scrollYProgress}
+									prefersReducedMotion={prefersReducedMotion}
 									range={[start, end]}
 								>
 									{word}
@@ -49,11 +52,21 @@ export const TextReveal: FC<TextRevealProps> = ({ text, className }) => {
 interface WordProps {
 	children: ReactNode;
 	progress: MotionValue<number>;
+	prefersReducedMotion: boolean;
 	range: [number, number];
 }
 
-const Word: FC<WordProps> = ({ children, progress, range }) => {
-	const opacity = useTransform(progress, range, [0.15, 1]);
+const Word: FC<WordProps> = ({
+	children,
+	progress,
+	prefersReducedMotion,
+	range,
+}) => {
+	const opacity = useTransform(
+		progress,
+		range,
+		prefersReducedMotion ? [1, 1] : [0.15, 1],
+	);
 	return (
 		<span className="relative">
 			<span className="absolute opacity-15">{children}</span>

@@ -221,13 +221,27 @@ These are the repo files to trust when configuring environments:
 10. [mcp/src/domain/config/validate-runtime-config.ts](/home/armando/projects/bardo/mcp/src/domain/config/validate-runtime-config.ts)
    - validates MCP runtime policy combinations before startup and in CI
 11. [website/lib/next-config-policy.ts](/home/armando/projects/bardo/website/lib/next-config-policy.ts)
-   - resolves allowed dev origins and Sentry build-silence behavior from env
+   - resolves allowed dev origins and Sentry release-upload policy from env
 6. [website/instrumentation-client.ts](/home/armando/projects/bardo/website/instrumentation-client.ts)
    - browser Sentry startup
 7. [website/sentry.server.config.ts](/home/armando/projects/bardo/website/sentry.server.config.ts)
    - server-side website Sentry startup
 8. [mcp/src/telemetry/sentry.ts](/home/armando/projects/bardo/mcp/src/telemetry/sentry.ts)
    - MCP Sentry startup and log behavior
+
+## 7.2 Website Sentry Build Policy
+
+Website Sentry behavior is intentionally different between local development and release contexts:
+
+1. local ad-hoc builds do not upload Sentry releases or sourcemaps
+2. enforced release contexts do upload and must fail closed if the Sentry contract is broken
+3. release enforcement turns on when any of these are true:
+   - `CI=true`
+   - `VERCEL_ENV=preview`
+   - `VERCEL_ENV=production`
+   - `BARDO_ENFORCE_SENTRY_RELEASE_HEALTH=true`
+
+Local noise such as `401 Invalid token` during `next build` should be treated as a configuration bug now, not as expected behavior.
 
 ## 7.1 Optional Server-To-Server Bootstrap Path
 

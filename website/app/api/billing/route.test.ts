@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createBillingGetHandler } from "./route";
+import { createBillingGetHandler } from "./handlers";
 
 describe("GET /api/billing", () => {
 	test("returns live billing data with creditsUsed derived from real MCP usage", async () => {

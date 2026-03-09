@@ -1,9 +1,6 @@
-"use client";
-
-import { SignedIn, SignedOut } from "@clerk/nextjs";
-import { CheckoutButton as ClerkCheckoutButton } from "@clerk/nextjs/experimental";
 import Link from "next/link";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
+import CheckoutAction from "./checkout-action";
 
 type CheckoutButtonProps = {
 	clerkEnabled: boolean;
@@ -11,6 +8,7 @@ type CheckoutButtonProps = {
 	planPeriod: ClerkPlanPeriod;
 	label: string;
 	className: string;
+	isSignedIn?: boolean;
 };
 
 export default function CheckoutButton({
@@ -19,6 +17,7 @@ export default function CheckoutButton({
 	planPeriod,
 	label,
 	className,
+	isSignedIn = false,
 }: CheckoutButtonProps) {
 	const planId = clerkPlanId ?? undefined;
 	const isUnavailable = !planId;
@@ -38,28 +37,24 @@ export default function CheckoutButton({
 
 	return (
 		<div>
-			<SignedIn>
-				{isUnavailable ? (
+			{isSignedIn ? (
+				isUnavailable ? (
 					<button type="button" className={className} disabled>
 						{label}
 					</button>
 				) : (
-					<ClerkCheckoutButton
+					<CheckoutAction
 						planId={planId}
 						planPeriod={planPeriod}
-						newSubscriptionRedirectUrl="/pricing?checkout=success"
-					>
-						<button type="button" className={className}>
-							{label}
-						</button>
-					</ClerkCheckoutButton>
-				)}
-			</SignedIn>
-			<SignedOut>
-				<Link href="/sign-in" className={className}>
+						label={label}
+						className={className}
+					/>
+				)
+			) : (
+				<Link href="/sign-in" prefetch={false} className={className}>
 					{label}
 				</Link>
-			</SignedOut>
+			)}
 			{isUnavailable ? (
 				<p className="mt-2 text-xs text-red-500/80">
 					Billing is unavailable. Missing Clerk plan configuration.

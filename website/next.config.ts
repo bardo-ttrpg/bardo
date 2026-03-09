@@ -1,11 +1,17 @@
+import createBundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import {
 	resolveAllowedDevOrigins,
 	resolveSecurityHeaders,
 	resolveSentryBuildSilence,
+	resolveShouldUploadSentryArtifacts,
 } from "./lib/next-config-policy";
 import { resolveSentryRelease } from "./lib/sentry-server-config";
+
+const withBundleAnalyzer = createBundleAnalyzer({
+	enabled: process.env.ANALYZE === "true",
+});
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
@@ -17,6 +23,7 @@ const nextConfig: NextConfig = {
 			{
 				protocol: "https",
 				hostname: "img.youtube.com",
+				pathname: "/vi/**",
 			},
 		],
 	},
@@ -31,10 +38,22 @@ const nextConfig: NextConfig = {
 };
 
 const sentryRelease = resolveSentryRelease(process.env);
+const shouldUploadSentryArtifacts = resolveShouldUploadSentryArtifacts(
+	process.env,
+);
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
 	silent: resolveSentryBuildSilence(process.env),
-	authToken: process.env.SENTRY_AUTH_TOKEN,
-	project: process.env.SENTRY_PROJECT,
-	release: sentryRelease ? { name: sentryRelease } : undefined,
+	authToken: shouldUploadSentryArtifacts
+		? process.env.SENTRY_AUTH_TOKEN
+		: undefined,
+	org: shouldUploadSentryArtifacts ? process.env.SENTRY_ORG : undefined,
+	project: shouldUploadSentryArtifacts ? process.env.SENTRY_PROJECT : undefined,
+	release:
+		shouldUploadSentryArtifacts && sentryRelease
+			? { name: sentryRelease }
+			: undefined,
+	sourcemaps: {
+		disable: !shouldUploadSentryArtifacts,
+	},
 });

@@ -6,6 +6,7 @@ import {
 	m,
 	useAnimationFrame,
 	useMotionValue,
+	useReducedMotion,
 } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
 
@@ -110,6 +111,7 @@ export default function TextTicker({
 	separator = "·",
 }: TextTickerProps) {
 	const x = useMotionValue(0);
+	const prefersReducedMotion = useReducedMotion();
 	const speedRef = useRef(baseSpeed);
 	const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +128,7 @@ export default function TextTicker({
 	);
 
 	useAnimationFrame(() => {
+		if (prefersReducedMotion) return;
 		if (!wrapRef.current) return;
 		// Width of one copy of the items (1/3 of total)
 		const oneSet = wrapRef.current.scrollWidth / 3;
@@ -142,7 +145,9 @@ export default function TextTicker({
 					className="flex items-center"
 					style={{ x }}
 					onPointerEnter={() => {
-						speedRef.current = baseSpeed * hoverMultiplier;
+						if (!prefersReducedMotion) {
+							speedRef.current = baseSpeed * hoverMultiplier;
+						}
 					}}
 					onPointerLeave={() => {
 						speedRef.current = baseSpeed;

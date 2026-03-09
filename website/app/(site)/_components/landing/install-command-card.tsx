@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
 	detectInstallOs,
 	INSTALL_COMMANDS,
@@ -33,11 +33,15 @@ function detectBrowserOs(): InstallOs {
 }
 
 export default function InstallCommandCard() {
-	const [installTab, setInstallTab] = useState<InstallTab>("unix");
-
-	useEffect(() => {
-		setInstallTab(detectBrowserOs() === "windows" ? "windows" : "unix");
-	}, []);
+	const detectedInstallTab = useSyncExternalStore(
+		() => () => undefined,
+		() => (detectBrowserOs() === "windows" ? "windows" : "unix"),
+		() => "unix",
+	);
+	const [manualInstallTab, setManualInstallTab] = useState<InstallTab | null>(
+		null,
+	);
+	const installTab = manualInstallTab ?? detectedInstallTab;
 
 	const command =
 		installTab === "windows"
@@ -54,7 +58,7 @@ export default function InstallCommandCard() {
 					<button
 						key={tab.id}
 						type="button"
-						onClick={() => setInstallTab(tab.id)}
+						onClick={() => setManualInstallTab(tab.id)}
 						aria-pressed={installTab === tab.id}
 						className={`border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
 							installTab === tab.id

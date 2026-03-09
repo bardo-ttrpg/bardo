@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CliSessionStartRateLimitError } from "../../../../../lib/cli-session-start-rate-limit";
 import { createConnectTelemetry } from "../../../../../lib/connect-telemetry";
-import { createCliSessionStartPostHandler } from "./route";
+import { createCliSessionStartPostHandler } from "./handlers";
 
 describe("POST /api/connect/cli-session/start", () => {
 	test("returns 429 when the session-start budget is exhausted", async () => {

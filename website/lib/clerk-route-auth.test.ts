@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import {
 	isClerkMiddlewareDetectionError,
+	resolveOptionalUserId,
 	resolveRouteUserId,
 } from "./clerk-route-auth";
 
@@ -52,6 +53,28 @@ describe("resolveRouteUserId", () => {
 		expect(warn).toHaveBeenCalledWith("website.auth.middleware_unavailable", {
 			"bardo.service": "website",
 			"bardo.route": "/api/billing",
+			"bardo.operation": "clerk.auth",
+		});
+	});
+});
+
+describe("resolveOptionalUserId", () => {
+	test("returns null for Clerk middleware detection errors on public surfaces", async () => {
+		const warn = mock(() => {});
+
+		const result = await resolveOptionalUserId("/(site)/layout", {
+			authFn: (async () => {
+				throw new Error(
+					"Clerk: auth() was called but Clerk can't detect usage of clerkMiddleware().",
+				);
+			}) as typeof import("@clerk/nextjs/server").auth,
+			logger: { warn },
+		});
+
+		expect(result).toBeNull();
+		expect(warn).toHaveBeenCalledWith("website.auth.middleware_unavailable", {
+			"bardo.service": "website",
+			"bardo.route": "/(site)/layout",
 			"bardo.operation": "clerk.auth",
 		});
 	});

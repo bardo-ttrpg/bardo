@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createConnectTelemetry } from "../../../../lib/connect-telemetry";
-import { createSnippetsPostHandler, GET, POST } from "./route";
+import { createSnippetsPostHandler } from "./handlers";
+import { GET, POST } from "./route";
 
 const ORIGINAL_NEXT_PUBLIC_MCP_BASE_URL = process.env.NEXT_PUBLIC_MCP_BASE_URL;
 const ORIGINAL_BARDO_MCP_BASE_URL = process.env.BARDO_MCP_BASE_URL;

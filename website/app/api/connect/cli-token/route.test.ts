@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createCliTokenPostHandler, resolveCliLoginSecret } from "./route";
+import { createCliTokenPostHandler, resolveCliLoginSecret } from "./handlers";
 
 describe("POST /api/connect/cli-token", () => {
 	test("creates a short-lived login token for the authenticated user", async () => {

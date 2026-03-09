@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createKeyByIdDeleteHandler } from "./route";
+import { createKeyByIdDeleteHandler } from "./handlers";
 
 describe("DELETE /api/keys/[id]", () => {
 	test("returns 504 when Clerk key lookup times out", async () => {

@@ -24,6 +24,7 @@
 	"scripts": {
 		"start": "bun run src/cli.ts",
 		"test": "bun test",
+		"test:runtime-smoke": "bun test src/runtime.smoke.test.ts",
 		"build:release": "bun run ./scripts/build-release-binaries.ts"
 	},
 	"dependencies": {

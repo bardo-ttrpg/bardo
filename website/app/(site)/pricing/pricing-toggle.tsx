@@ -17,9 +17,11 @@ export type BillingPeriod = "monthly" | "yearly";
 export default function PricingToggle({
 	billingPeriod,
 	clerkEnabled,
+	isSignedIn,
 }: {
 	billingPeriod: BillingPeriod;
 	clerkEnabled: boolean;
+	isSignedIn: boolean;
 }) {
 	const yearly = billingPeriod === "yearly";
 	const interval = yearly ? "year" : "month";
@@ -32,6 +34,7 @@ export default function PricingToggle({
 				<div className="inline-flex items-center gap-1 border border-border bg-card/40 p-1">
 					<Link
 						href="/pricing?billing=monthly"
+						prefetch={false}
 						aria-current={!yearly ? "page" : undefined}
 						className={[
 							"min-w-24 px-4 py-2 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
@@ -44,6 +47,7 @@ export default function PricingToggle({
 					</Link>
 					<Link
 						href="/pricing?billing=yearly"
+						prefetch={false}
 						aria-current={yearly ? "page" : undefined}
 						className={[
 							"min-w-24 px-4 py-2 text-center font-mono text-[11px] uppercase tracking-widest transition-colors",
@@ -135,7 +139,11 @@ export default function PricingToggle({
 							</ul>
 
 							{tier.key === "free" ? (
-								<Link href={tier.ctaHref} className={ctaClassName}>
+								<Link
+									href={tier.ctaHref}
+									prefetch={false}
+									className={ctaClassName}
+								>
 									{tier.cta} ↗
 								</Link>
 							) : tier.checkoutPlan ? (
@@ -145,6 +153,7 @@ export default function PricingToggle({
 									planPeriod={clerkPlanPeriod}
 									label={tier.cta}
 									className={ctaClassName}
+									isSignedIn={isSignedIn}
 								/>
 							) : null}
 						</div>

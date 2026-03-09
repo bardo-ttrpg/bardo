@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createKeysRevokePostHandler } from "./route";
+import { createKeysRevokePostHandler } from "./handlers";
 
 describe("POST /api/keys/revoke", () => {
 	test("returns 504 when Clerk key lookup times out", async () => {

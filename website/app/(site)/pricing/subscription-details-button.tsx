@@ -1,13 +1,12 @@
-"use client";
-
-import { SignedIn, SignedOut } from "@clerk/nextjs";
-import { SubscriptionDetailsButton } from "@clerk/nextjs/experimental";
 import Link from "next/link";
+import SubscriptionDetailsAction from "./subscription-details-action";
 
 export default function SubscriptionDetailsCta({
 	clerkEnabled,
+	isSignedIn = false,
 }: {
 	clerkEnabled: boolean;
+	isSignedIn?: boolean;
 }) {
 	const className =
 		"inline-flex border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground";
@@ -22,18 +21,13 @@ export default function SubscriptionDetailsCta({
 
 	return (
 		<div className="mt-4 flex justify-center">
-			<SignedIn>
-				<SubscriptionDetailsButton>
-					<button type="button" className={className}>
-						Manage Subscription
-					</button>
-				</SubscriptionDetailsButton>
-			</SignedIn>
-			<SignedOut>
-				<Link href="/sign-in" className={className}>
+			{isSignedIn ? (
+				<SubscriptionDetailsAction className={className} />
+			) : (
+				<Link href="/sign-in" prefetch={false} className={className}>
 					Sign In to Manage Billing
 				</Link>
-			</SignedOut>
+			)}
 		</div>
 	);
 }

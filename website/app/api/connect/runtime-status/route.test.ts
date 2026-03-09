@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createConnectTelemetry } from "../../../../lib/connect-telemetry";
-import { createRuntimeStatusGetHandler } from "./route";
+import { createRuntimeStatusGetHandler } from "./handlers";
 
 describe("GET /api/connect/runtime-status", () => {
 	test("returns the plan, scopes, and workspace path for a valid API key", async () => {

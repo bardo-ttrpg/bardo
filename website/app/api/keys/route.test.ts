@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createKeysGetHandler, createKeysPostHandler } from "./route";
+import { createKeysGetHandler, createKeysPostHandler } from "./handlers";
 
 function makeKey(id: string) {
 	return {

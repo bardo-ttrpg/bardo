@@ -1,6 +1,12 @@
 "use client";
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from "framer-motion";
+import {
+	AnimatePresence,
+	domAnimation,
+	LazyMotion,
+	m,
+	useReducedMotion,
+} from "framer-motion";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
@@ -50,6 +56,7 @@ export default function HeroVideoDialog({
 	const [open, setOpen] = useState(false);
 	const { resolvedTheme } = useTheme();
 	const anim = variants[animationStyle];
+	const prefersReducedMotion = useReducedMotion();
 	const isDark = resolvedTheme !== "light";
 	const activeThumbnailSrc =
 		isDark && darkThumbnailSrc ? darkThumbnailSrc : thumbnailSrc;
@@ -91,15 +98,19 @@ export default function HeroVideoDialog({
 				<AnimatePresence>
 					{open && (
 						<m.div
-							initial={{ opacity: 0 }}
+							initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
 							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
+							exit={{ opacity: prefersReducedMotion ? 1 : 0 }}
 							onClick={() => setOpen(false)}
 							className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
 						>
 							<m.div
-								{...anim}
-								transition={{ type: "spring", damping: 30, stiffness: 300 }}
+								{...(prefersReducedMotion ? variants.fade : anim)}
+								transition={
+									prefersReducedMotion
+										? { duration: 0 }
+										: { type: "spring", damping: 30, stiffness: 300 }
+								}
 								className="relative mx-4 aspect-video w-full max-w-5xl"
 								onClick={(e) => e.stopPropagation()}
 							>

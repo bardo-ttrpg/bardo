@@ -25,6 +25,21 @@ export function resolveAllowedDevOrigins(
 	);
 }
 
+export function resolveShouldUploadSentryArtifacts(
+	env: Record<string, string | undefined>,
+): boolean {
+	if (parseBoolean(env.BARDO_ENFORCE_SENTRY_RELEASE_HEALTH) === true) {
+		return true;
+	}
+
+	if (parseBoolean(env.CI) === true) {
+		return true;
+	}
+
+	const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase();
+	return vercelEnv === "preview" || vercelEnv === "production";
+}
+
 export function resolveSentryBuildSilence(
 	env: Record<string, string | undefined>,
 ): boolean {
@@ -33,12 +48,7 @@ export function resolveSentryBuildSilence(
 		return explicit;
 	}
 
-	const inCi = parseBoolean(env.CI) === true;
-	const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase();
-	const isHostedBuild = vercelEnv === "preview" || vercelEnv === "production";
-	const isProductionNode = env.NODE_ENV?.trim().toLowerCase() === "production";
-
-	return !(inCi || isHostedBuild || isProductionNode);
+	return !resolveShouldUploadSentryArtifacts(env);
 }
 
 function isProductionDeployment(

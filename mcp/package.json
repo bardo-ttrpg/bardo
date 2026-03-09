@@ -8,6 +8,7 @@
 		"dev": "bun --watch index.ts",
 		"start": "bun run index.ts",
 		"validate:env": "bun run src/domain/config/validate-runtime-config.ts",
+		"validate:staging-env": "bun run ./scripts/validate-staging-env.ts",
 		"build": "tsc --noEmit",
 		"lint": "biome check .",
 		"format": "biome check --write .",

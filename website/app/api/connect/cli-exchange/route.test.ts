@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CliLoginReplayStoreError } from "../../../../lib/cli-login-store";
 import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
-import { createCliExchangePostHandler } from "./route";
+import { createCliExchangePostHandler } from "./handlers";
 
 describe("POST /api/connect/cli-exchange", () => {
 	test("returns exchange credentials from a valid login token", async () => {

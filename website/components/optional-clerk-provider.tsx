@@ -1,6 +1,7 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
+import { MotionConfig } from "framer-motion";
 import type { ReactNode } from "react";
 
 export default function OptionalClerkProvider({
@@ -11,8 +12,12 @@ export default function OptionalClerkProvider({
 	enabled: boolean;
 }) {
 	if (!enabled) {
-		return children;
+		return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 	}
 
-	return <ClerkProvider>{children}</ClerkProvider>;
+	return (
+		<ClerkProvider>
+			<MotionConfig reducedMotion="user">{children}</MotionConfig>
+		</ClerkProvider>
+	);
 }

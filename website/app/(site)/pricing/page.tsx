@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import CrosshairMarker from "@/components/crosshair-marker";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
@@ -36,6 +37,8 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 		publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 		secretKey: process.env.CLERK_SECRET_KEY,
 	});
+	const { userId } = clerkEnabled ? await auth() : { userId: null };
+	const isSignedIn = Boolean(userId);
 
 	return (
 		<div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -51,7 +54,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 					Start free, then scale with Solo or Solo Plus. Yearly plans offer up
 					to 27% savings versus monthly billing.
 				</p>
-				<SubscriptionDetailsCta clerkEnabled={clerkEnabled} />
+				<SubscriptionDetailsCta
+					clerkEnabled={clerkEnabled}
+					isSignedIn={isSignedIn}
+				/>
 			</section>
 
 			{/* ── Tier cards with URL-driven monthly/yearly toggle ── */}
@@ -59,6 +65,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 				<PricingToggle
 					billingPeriod={billingPeriod}
 					clerkEnabled={clerkEnabled}
+					isSignedIn={isSignedIn}
 				/>
 			</section>
 

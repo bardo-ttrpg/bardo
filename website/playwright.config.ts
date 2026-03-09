@@ -1,19 +1,29 @@
+import "./e2e/load-next-env";
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { authStorageStatePath } from "./e2e/clerk-env";
+import {
+	resolvePlaywrightBaseUrl,
+	resolvePlaywrightWebServerHost,
+	resolvePlaywrightWebServerPort,
+} from "./e2e/playwright-config-lib";
 
 const port = Number.parseInt(
 	process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3001",
 	10,
 );
-const defaultHost = process.env.PLAYWRIGHT_LOOPBACK_HOST ?? "localhost";
-const defaultBaseUrl = defaultHost.includes(":")
-	? `http://[${defaultHost}]:${String(port)}`
-	: `http://${defaultHost}:${String(port)}`;
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? defaultBaseUrl;
-const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${defaultHost} PORT=${String(port)} bun run dev:e2e`;
+const baseURL = resolvePlaywrightBaseUrl(process.env, port);
+const webServerHost = resolvePlaywrightWebServerHost(process.env, baseURL);
+const webServerPort = resolvePlaywrightWebServerPort(
+	process.env,
+	baseURL,
+	port,
+);
+const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${webServerHost} PORT=${String(webServerPort)} bun run dev:e2e`;
 
 export default defineConfig({
 	testDir: "./e2e",
-	testMatch: "**/*.e2e.ts",
+	testMatch: [/.*\.e2e\.ts$/, /.*\.setup\.ts$/],
 	outputDir: ".playwright/test-results",
 	timeout: 30_000,
 	forbidOnly: !!process.env.CI,
@@ -31,8 +41,23 @@ export default defineConfig({
 	},
 	projects: [
 		{
-			name: "chromium",
+			name: "setup",
+			testMatch: /setup\/.*\.setup\.ts$/,
 			use: { ...devices["Desktop Chrome"] },
+		},
+		{
+			name: "chromium",
+			testIgnore: ["**/auth/**/*.e2e.ts", "**/setup/**/*.setup.ts"],
+			use: { ...devices["Desktop Chrome"] },
+		},
+		{
+			name: "chromium-auth",
+			dependencies: ["setup"],
+			testMatch: /auth\/.*\.e2e\.ts$/,
+			use: {
+				...devices["Desktop Chrome"],
+				storageState: resolve(authStorageStatePath),
+			},
 		},
 	],
 	webServer: {

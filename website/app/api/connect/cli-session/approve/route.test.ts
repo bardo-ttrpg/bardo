@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CliDeviceSessionStoreError } from "../../../../../lib/cli-device-session";
-import { createCliSessionApprovePostHandler } from "./route";
+import { createCliSessionApprovePostHandler } from "./handlers";
 
 describe("POST /api/connect/cli-session/approve", () => {
 	test("approves a pending CLI session for the authenticated user", async () => {

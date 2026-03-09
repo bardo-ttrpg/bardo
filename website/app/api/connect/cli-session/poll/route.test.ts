@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CliDeviceSessionStoreError } from "../../../../../lib/cli-device-session";
-import { createCliSessionPollGetHandler } from "./route";
+import { createCliSessionPollGetHandler } from "./handlers";
 
 describe("GET /api/connect/cli-session/poll", () => {
 	test("returns approved credentials when the browser flow is completed", async () => {

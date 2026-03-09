@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createIntrospectionTelemetry } from "../../../../lib/introspection-telemetry";
 import { createIntrospectionVerifyCache } from "../../../../lib/introspection-verify-cache";
-import { createIntrospectPostHandler } from "./route";
+import { createIntrospectPostHandler } from "./handlers";
 
 function buildRequest(secret: string, apiKey: string): Request {
 	return new Request("http://localhost:3001/api/auth/introspect-key", {

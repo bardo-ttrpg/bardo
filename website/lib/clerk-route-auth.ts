@@ -57,3 +57,14 @@ export async function resolveRouteUserId(
 		};
 	}
 }
+
+export async function resolveOptionalUserId(
+	route: string,
+	options: {
+		authFn?: AuthFn;
+		logger?: LoggerLike;
+	} = {},
+): Promise<string | null> {
+	const result = await resolveRouteUserId(route, options);
+	return result.userId;
+}
