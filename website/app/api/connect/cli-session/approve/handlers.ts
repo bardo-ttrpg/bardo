@@ -3,6 +3,10 @@ import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { assertApiKeyCreationAllowed } from "../../../../../lib/api-key-creation-policy";
 import {
+	CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE,
+	isApiKeyLimitReachedMessage,
+} from "../../../../../lib/api-key-limit-messages";
+import {
 	backendAvailabilityPayload,
 	isBackendAvailabilityError,
 } from "../../../../../lib/backend-availability";
@@ -203,9 +207,13 @@ export function createCliSessionApprovePostHandler(
 					status: 503,
 				});
 			}
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			return NextResponse.json(
 				{
-					error: error instanceof Error ? error.message : String(error),
+					error: isApiKeyLimitReachedMessage(errorMessage)
+						? CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE
+						: errorMessage,
 				},
 				{ status: statusFromError(error) },
 			);

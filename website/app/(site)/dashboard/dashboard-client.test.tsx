@@ -10,6 +10,8 @@ describe("ConnectionSnippetPanel", () => {
 				onClientChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
+				activeCount={0}
+				maxAllowedKeys={3}
 				lastSecret={null}
 				lastSecretLabel={null}
 				snippet=""
@@ -32,6 +34,8 @@ describe("ConnectionSnippetPanel", () => {
 				onClientChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
+				activeCount={0}
+				maxAllowedKeys={3}
 				lastSecret="bardo_live_example"
 				lastSecretLabel="Example key"
 				snippet=""
@@ -55,6 +59,8 @@ describe("ConnectionSnippetPanel", () => {
 				onClientChange={() => undefined}
 				onGenerateSnippet={() => undefined}
 				onGenerateCliLoginCommand={() => undefined}
+				activeCount={0}
+				maxAllowedKeys={3}
 				lastSecret="bardo_live_example"
 				lastSecretLabel="Example key"
 				snippet=""
@@ -74,6 +80,31 @@ describe("ConnectionSnippetPanel", () => {
 		expect(markup).toContain("app-specific");
 		expect(markup).toContain("Generate CLI Login");
 		expect(markup).toContain("bardo connect --client generic --mode local");
+	});
+
+	test("surfaces when CLI login needs a free key slot", () => {
+		const markup = renderToStaticMarkup(
+			<ConnectionSnippetPanel
+				connectionClient="codex"
+				onClientChange={() => undefined}
+				onGenerateSnippet={() => undefined}
+				onGenerateCliLoginCommand={() => undefined}
+				activeCount={1}
+				maxAllowedKeys={1}
+				lastSecret={null}
+				lastSecretLabel={null}
+				snippet=""
+				snippetLoading={false}
+				cliLoginCommand=""
+				cliLoginLoading={false}
+				copied={false}
+				onCopy={() => undefined}
+			/>,
+		);
+
+		expect(markup).toContain("Free up a key slot");
+		expect(markup).toContain("Rotate or delete an existing key");
+		expect(markup).toContain("disabled");
 	});
 });
 

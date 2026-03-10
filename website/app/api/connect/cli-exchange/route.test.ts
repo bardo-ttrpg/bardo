@@ -4,12 +4,47 @@ import { createCliLoginTokenCodec } from "../../../../lib/cli-login-token";
 import { createCliExchangePostHandler } from "./handlers";
 
 describe("POST /api/connect/cli-exchange", () => {
+	test("returns 429 with rate-limit headers when exchange budget is exhausted", async () => {
+		const handler = createCliExchangePostHandler({
+			consumeBudget: async () => ({
+				allowed: false,
+				retryAfterSeconds: 45,
+				limit: 20,
+				remaining: 0,
+				resetEpochSeconds: 1_800_000_045,
+			}),
+		});
+
+		const response = await handler(
+			new Request("http://localhost:3001/api/connect/cli-exchange", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: "valid_token" }),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(429);
+		expect(body.error).toContain("Too many CLI exchange requests");
+		expect(response.headers.get("retry-after")).toBe("45");
+		expect(response.headers.get("x-ratelimit-limit")).toBe("20");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000045");
+	});
+
 	test("returns exchange credentials from a valid login token", async () => {
 		const consumeToken = async () =>
 			({
 				ok: true,
 			}) as const;
 		const handler = createCliExchangePostHandler({
+			consumeBudget: async () => ({
+				allowed: true,
+				retryAfterSeconds: 60,
+				limit: 20,
+				remaining: 19,
+				resetEpochSeconds: 1_800_000_000,
+			}),
 			decodeToken: async (token) => {
 				expect(token).toBe("valid_token");
 				return {
@@ -34,6 +69,9 @@ describe("POST /api/connect/cli-exchange", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get("x-ratelimit-limit")).toBe("20");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("19");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000000");
 		expect(body.apiKey).toBe("bardo_live_token");
 		expect(body.mcpUrl).toBe("https://mcp.bardo.ai/mcp");
 		expect(body.statusUrl).toBe(

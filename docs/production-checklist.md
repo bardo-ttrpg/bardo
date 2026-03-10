@@ -805,6 +805,32 @@ Set these values in the Vercel Production environment.
 6. `BARDO_ALLOW_CUSTOM_WORKSPACE_PATH=false`
 7. `BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE=false`
 
+### Vercel firewall and spend management
+
+Use the current non-Enterprise baseline:
+
+1. Firewall enabled
+2. AI Bots enabled with action `deny`
+3. Bot Protection enabled with action `log`
+4. custom rule challenging `/sign-in`
+5. custom rule rate-limiting `/api/keys*` if the current plan allows it
+
+Important:
+
+1. do not set global Bot Protection to `challenge` until you have re-verified CLI and server-to-server traffic
+2. on the current plan, app-level route limits still matter because not every WAF action is available
+3. review Firewall drafts before making future changes so the active config stays the source of truth
+
+Spend Management should also be enabled before the first public production launch:
+
+1. add a monthly budget in the Vercel dashboard
+2. add threshold notifications at `50%`, `75%`, and `100%`
+3. connect the threshold alerts to email or webhook destinations the team already monitors
+
+Current practical note:
+
+1. Vercel Spend Management thresholds are configured in the dashboard rather than through the public CLI workflow used by this repo
+
 ## 16. MCP Production Setup
 
 Set these values in the Railway `production` environment.

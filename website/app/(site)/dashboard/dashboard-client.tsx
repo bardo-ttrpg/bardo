@@ -254,6 +254,8 @@ export function ConnectionSnippetPanel({
 	onClientChange,
 	onGenerateSnippet,
 	onGenerateCliLoginCommand,
+	activeCount,
+	maxAllowedKeys,
 	lastSecret,
 	lastSecretLabel,
 	snippet,
@@ -267,6 +269,8 @@ export function ConnectionSnippetPanel({
 	onClientChange: (value: ConnectionClient) => void;
 	onGenerateSnippet: () => void;
 	onGenerateCliLoginCommand: () => void;
+	activeCount: number;
+	maxAllowedKeys: number;
 	lastSecret: string | null;
 	lastSecretLabel: string | null;
 	snippet: string;
@@ -279,6 +283,7 @@ export function ConnectionSnippetPanel({
 	const selectedClient = getDashboardClientMetadata(connectionClient);
 	const selectedClientLabel = getDashboardClientLabel(connectionClient);
 	const connectCommand = `bardo connect --client ${connectionClient} --mode local`;
+	const canGenerateCliLogin = activeCount < maxAllowedKeys;
 
 	return (
 		<div className="mt-6 border border-border p-6">
@@ -314,7 +319,7 @@ export function ConnectionSnippetPanel({
 				<button
 					type="button"
 					onClick={onGenerateCliLoginCommand}
-					disabled={cliLoginLoading}
+					disabled={!canGenerateCliLogin || cliLoginLoading}
 					className="border border-border px-3 py-2 text-xs uppercase disabled:opacity-60"
 				>
 					{cliLoginLoading ? "Generating..." : "Generate CLI Login"}
@@ -345,6 +350,12 @@ export function ConnectionSnippetPanel({
 					If your app needs manual config, click `Generate snippet` and paste it
 					into the config file above.
 				</p>
+				{!canGenerateCliLogin ? (
+					<p className="mt-2 text-[11px] text-muted-foreground">
+						Free up a key slot first. Rotate or delete an existing key, then
+						generate the CLI login command.
+					</p>
+				) : null}
 			</div>
 
 			<div className="mt-4 space-y-3">
@@ -473,7 +484,7 @@ export function DashboardClient() {
 	}
 
 	async function onGenerateCliLogin() {
-		await generateCliLoginCommand({ dispatch });
+		await generateCliLoginCommand({ activeCount, keyPolicy, dispatch });
 	}
 
 	return (
@@ -531,6 +542,8 @@ export function DashboardClient() {
 						: undefined
 				}
 				onGenerateCliLoginCommand={() => void onGenerateCliLogin()}
+				activeCount={activeCount}
+				maxAllowedKeys={keyPolicy.maxAllowed}
 				lastSecret={state.lastSecret}
 				lastSecretLabel={state.lastSecretLabel}
 				snippet={state.snippet}

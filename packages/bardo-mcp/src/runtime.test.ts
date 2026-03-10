@@ -61,11 +61,57 @@ describe("bardo runtime", () => {
 				version: number;
 				apiKey: string;
 				url: string;
+				statusUrl?: string;
 			};
 
 			expect(saved.version).toBe(1);
 			expect(saved.apiKey).toBe("test-key");
 			expect(saved.url).toBe("https://example.com/mcp");
+			expect(saved.statusUrl).toBe(
+				"https://app.bardo.ai/api/connect/runtime-status",
+			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login derives a runtime status URL from the configured control plane when saving an API key", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			const exitCode = await runCli(
+				[
+					"login",
+					"--api-key",
+					"test-key",
+					"--url",
+					"https://mcp-staging.example.com/mcp",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+					env: {
+						BARDO_LOGIN_START_URL:
+							"https://staging.bardo.ai/api/connect/cli-session/start",
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+
+			const saved = JSON.parse(
+				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			) as {
+				statusUrl?: string;
+			};
+
+			expect(saved.statusUrl).toBe(
+				"https://staging.bardo.ai/api/connect/runtime-status",
+			);
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

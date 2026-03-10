@@ -237,6 +237,8 @@ describe("dashboard-controller", () => {
 		);
 
 		await generateCliLoginCommand({
+			activeCount: 0,
+			keyPolicy: DASHBOARD_DATA.keyPolicy,
 			dispatch: (action) => actions.push(action),
 			fetchImpl,
 			timeoutMs: 50,
@@ -266,6 +268,8 @@ describe("dashboard-controller", () => {
 		);
 
 		await generateCliLoginCommand({
+			activeCount: 0,
+			keyPolicy: DASHBOARD_DATA.keyPolicy,
 			dispatch: (action) => actions.push(action),
 			fetchImpl,
 			timeoutMs: 50,
@@ -278,6 +282,30 @@ describe("dashboard-controller", () => {
 				mutationError: "Key limit reached",
 			},
 			{ type: "cli_login_loading", cliLoginLoading: false },
+		]);
+	});
+
+	test("generateCliLoginCommand blocks locally when no API key slot is available", async () => {
+		const actions: unknown[] = [];
+		const fetchImpl = mock(async () => {
+			throw new Error("fetch should not run");
+		});
+
+		await generateCliLoginCommand({
+			activeCount: DASHBOARD_DATA.keyPolicy.maxAllowed,
+			keyPolicy: DASHBOARD_DATA.keyPolicy,
+			dispatch: (action) => actions.push(action),
+			fetchImpl,
+			timeoutMs: 50,
+		});
+
+		expect(fetchImpl).not.toHaveBeenCalled();
+		expect(actions).toEqual([
+			{
+				type: "mutation_error",
+				mutationError:
+					"CLI login needs a free API key slot on your current plan. Rotate or delete an existing key, then retry.",
+			},
 		]);
 	});
 

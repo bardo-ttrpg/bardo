@@ -3,6 +3,7 @@ import {
 	backendAvailabilityPayload,
 	isBackendAvailabilityError,
 } from "../../../../lib/backend-availability";
+import { getDefaultCliExchangeRateLimiter } from "../../../../lib/cli-exchange-rate-limit";
 import {
 	CLI_LOGIN_SECRET_MISSING_MESSAGE,
 	resolveCliLoginSecret,
@@ -19,10 +20,18 @@ import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
 } from "../../../../lib/connect-telemetry";
+import { applyRateLimitHeaders } from "../../../../lib/rate-limit-headers";
 
 export const runtime = "nodejs";
 
 type CliExchangeDeps = {
+	consumeBudget: (request: Request) => Promise<{
+		allowed: boolean;
+		retryAfterSeconds?: number;
+		limit?: number;
+		remaining?: number;
+		resetEpochSeconds?: number;
+	}>;
 	decodeToken: (
 		token: string,
 	) => Promise<CliLoginExchangePayload> | CliLoginExchangePayload;
@@ -50,6 +59,8 @@ function getDefaultCliLoginTokenStore() {
 }
 
 const defaultDeps: CliExchangeDeps = {
+	consumeBudget: async (request) =>
+		getDefaultCliExchangeRateLimiter().consume(request),
 	decodeToken: async (token) => {
 		const secret = resolveCliLoginSecret(process.env);
 		if (!secret) {
@@ -77,6 +88,19 @@ export function createCliExchangePostHandler(
 		}
 
 		try {
+			const budget = await deps.consumeBudget(request);
+			if (!budget.allowed) {
+				deps.telemetry.increment("cli_exchange_rejected");
+				const response = NextResponse.json(
+					{
+						error: "Too many CLI exchange requests. Wait before trying again.",
+					},
+					{ status: 429 },
+				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+
 			const payload = await deps.decodeToken(token);
 			const consumeResult = await deps.consumeToken({
 				token,
@@ -92,7 +116,9 @@ export function createCliExchangePostHandler(
 				return NextResponse.json({ error: message }, { status });
 			}
 			deps.telemetry.increment("cli_exchange_success");
-			return NextResponse.json(payload);
+			const response = NextResponse.json(payload);
+			applyRateLimitHeaders(response.headers, budget);
+			return response;
 		} catch (error) {
 			deps.telemetry.increment(
 				error instanceof CliLoginReplayStoreError

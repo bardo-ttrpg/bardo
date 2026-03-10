@@ -1,5 +1,7 @@
 "use client";
 
+import { CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE } from "@/lib/api-key-limit-messages";
+
 import type {
 	ConnectionClient,
 	ConnectionMode,
@@ -74,6 +76,8 @@ type CopySecretArgs = {
 };
 
 type GenerateCliLoginCommandArgs = FetchWithTimeoutArgs & {
+	activeCount: number;
+	keyPolicy: KeyPolicy;
 	dispatch: DashboardDispatch;
 };
 
@@ -244,9 +248,19 @@ export async function refreshSnippet({
 }
 
 export async function generateCliLoginCommand({
+	activeCount,
+	keyPolicy,
 	dispatch,
 	...fetchOptions
 }: GenerateCliLoginCommandArgs): Promise<void> {
+	if (activeCount >= keyPolicy.maxAllowed) {
+		dispatch({
+			type: "mutation_error",
+			mutationError: CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE,
+		});
+		return;
+	}
+
 	dispatch({ type: "cli_login_loading", cliLoginLoading: true });
 	try {
 		const response = await fetchWithTimeout(

@@ -25,6 +25,8 @@ import { migrateSavedConfig, type SavedConfig } from "./saved-config";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
+const DEFAULT_LOGIN_START_URL =
+	"https://app.bardo.ai/api/connect/cli-session/start";
 const CONFIG_FILE_NAME = "config.json";
 
 type Writer = {
@@ -192,6 +194,40 @@ type DoctorOutput = {
 		warning: string | null;
 	} | null;
 };
+
+function deriveRuntimeStatusUrlFromControlPlaneUrl(
+	value: string | null | undefined,
+): string | null {
+	const trimmed = value?.trim();
+	if (!trimmed) {
+		return null;
+	}
+
+	try {
+		return new URL("/api/connect/runtime-status", trimmed).toString();
+	} catch {
+		return null;
+	}
+}
+
+function resolveRuntimeStatusUrl(args: {
+	explicitStatusUrl: string | null | undefined;
+	controlPlaneUrls: Array<string | null | undefined>;
+}): string | null {
+	const explicit = args.explicitStatusUrl?.trim();
+	if (explicit) {
+		return explicit;
+	}
+
+	for (const candidate of args.controlPlaneUrls) {
+		const derived = deriveRuntimeStatusUrlFromControlPlaneUrl(candidate);
+		if (derived) {
+			return derived;
+		}
+	}
+
+	return null;
+}
 
 export function parseCliArgs(argv: string[]): ParsedCliCommand {
 	if (argv.length === 0) {
@@ -755,12 +791,22 @@ async function handleLogin(
 		let url =
 			options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
 		let serverName: string | undefined;
-		let statusUrl =
-			options.statusUrl?.trim() || env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
 		const startUrl =
 			options.startUrl?.trim() ||
 			env.BARDO_LOGIN_START_URL?.trim() ||
-			"https://app.bardo.ai/api/connect/cli-session/start";
+			DEFAULT_LOGIN_START_URL;
+		let statusUrl = resolveRuntimeStatusUrl({
+			explicitStatusUrl:
+				options.statusUrl?.trim() ||
+				env.BARDO_RUNTIME_STATUS_URL?.trim() ||
+				null,
+			controlPlaneUrls: [
+				startUrl,
+				options.exchangeUrl?.trim() ||
+					env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
+					null,
+			],
+		});
 
 		if (!apiKey && options.token?.trim()) {
 			const exchange = await exchangeLoginToken({
@@ -1229,7 +1275,18 @@ async function handleServe(
 	const env = deps.env ?? process.env;
 	const config = await readConfig(resolveConfigPath(deps));
 	const statusUrl =
-		env.BARDO_RUNTIME_STATUS_URL?.trim() || config?.statusUrl?.trim() || null;
+		resolveRuntimeStatusUrl({
+			explicitStatusUrl: env.BARDO_RUNTIME_STATUS_URL?.trim() || null,
+			controlPlaneUrls: [
+				env.BARDO_LOGIN_START_URL?.trim() || null,
+				env.BARDO_LOGIN_EXCHANGE_URL?.trim() || null,
+				DEFAULT_LOGIN_START_URL,
+			],
+		}) ||
+		resolveRuntimeStatusUrl({
+			explicitStatusUrl: config?.statusUrl?.trim() || null,
+			controlPlaneUrls: [DEFAULT_LOGIN_START_URL],
+		});
 	const resolved = {
 		apiKey:
 			options.apiKey?.trim() ||
@@ -1744,10 +1801,22 @@ async function buildDoctorReport(
 	const manifest = await readExistingJson(manifestPath);
 	const envApiKey = env.BARDO_API_KEY?.trim() || null;
 	const envUrl = env.BARDO_MCP_URL?.trim() || null;
-	const envStatusUrl = env.BARDO_RUNTIME_STATUS_URL?.trim() || null;
+	const envStatusUrl = resolveRuntimeStatusUrl({
+		explicitStatusUrl: env.BARDO_RUNTIME_STATUS_URL?.trim() || null,
+		controlPlaneUrls: [
+			env.BARDO_LOGIN_START_URL?.trim() || null,
+			env.BARDO_LOGIN_EXCHANGE_URL?.trim() || null,
+			DEFAULT_LOGIN_START_URL,
+		],
+	});
 	const url = envUrl || config?.url || null;
 	const apiKey = envApiKey || config?.apiKey || null;
-	const statusUrl = envStatusUrl || config?.statusUrl || null;
+	const statusUrl =
+		envStatusUrl ||
+		resolveRuntimeStatusUrl({
+			explicitStatusUrl: config?.statusUrl || null,
+			controlPlaneUrls: [DEFAULT_LOGIN_START_URL],
+		});
 	const source: DoctorOutput["auth"]["source"] = envApiKey
 		? "env"
 		: config?.apiKey

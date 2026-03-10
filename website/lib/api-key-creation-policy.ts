@@ -1,3 +1,4 @@
+import { API_KEY_LIMIT_REACHED_MESSAGE } from "./api-key-limit-messages";
 import { maxApiKeysForPlan } from "./api-keys";
 import { fetchLiveBillingSnapshotFromClerk } from "./clerk-live-billing";
 
@@ -48,9 +49,6 @@ export async function assertApiKeyCreationAllowed(
 		limit: 1,
 	});
 	if (probe.totalCount >= maxAllowed) {
-		throw new ApiKeyCreationPolicyError(
-			403,
-			"API key limit reached for your plan",
-		);
+		throw new ApiKeyCreationPolicyError(403, API_KEY_LIMIT_REACHED_MESSAGE);
 	}
 }

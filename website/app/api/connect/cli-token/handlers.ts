@@ -2,6 +2,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { assertApiKeyCreationAllowed } from "../../../../lib/api-key-creation-policy";
+import {
+	CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE,
+	isApiKeyLimitReachedMessage,
+} from "../../../../lib/api-key-limit-messages";
 import { resolveRouteUserId } from "../../../../lib/clerk-route-auth";
 import {
 	CLI_LOGIN_SECRET_MISSING_MESSAGE,
@@ -245,8 +249,11 @@ export function createCliTokenPostHandler(
 			await attemptApiKeyRollback(deps, createdKeyId);
 			deps.telemetry.increment("cli_token_failed");
 			const message = error instanceof Error ? error.message : String(error);
+			const responseMessage = isApiKeyLimitReachedMessage(message)
+				? CLI_LOGIN_KEY_SLOT_REQUIRED_MESSAGE
+				: message;
 			return NextResponse.json(
-				{ error: message },
+				{ error: responseMessage },
 				{ status: statusFromError(error) },
 			);
 		}

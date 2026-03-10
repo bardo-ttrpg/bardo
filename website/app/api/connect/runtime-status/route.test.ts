@@ -3,8 +3,43 @@ import { createConnectTelemetry } from "../../../../lib/connect-telemetry";
 import { createRuntimeStatusGetHandler } from "./handlers";
 
 describe("GET /api/connect/runtime-status", () => {
+	test("returns 429 with rate-limit headers when runtime status budget is exhausted", async () => {
+		const handler = createRuntimeStatusGetHandler({
+			consumeBudget: async () => ({
+				allowed: false,
+				retryAfterSeconds: 30,
+				limit: 120,
+				remaining: 0,
+				resetEpochSeconds: 1_800_000_030,
+			}),
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/runtime-status", {
+				headers: {
+					authorization: "Bearer bardo_live_test",
+				},
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(429);
+		expect(body.error).toContain("Too many runtime status requests");
+		expect(response.headers.get("retry-after")).toBe("30");
+		expect(response.headers.get("x-ratelimit-limit")).toBe("120");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000030");
+	});
+
 	test("returns the plan, scopes, and workspace path for a valid API key", async () => {
 		const handler = createRuntimeStatusGetHandler({
+			consumeBudget: async () => ({
+				allowed: true,
+				retryAfterSeconds: 60,
+				limit: 120,
+				remaining: 119,
+				resetEpochSeconds: 1_800_000_000,
+			}),
 			createClerkClient: async () => ({
 				apiKeys: {
 					verify: async (secret: string) => {
@@ -43,6 +78,9 @@ describe("GET /api/connect/runtime-status", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get("x-ratelimit-limit")).toBe("120");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("119");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000000");
 		expect(body).toEqual({
 			valid: true,
 			subjectId: "user_123",

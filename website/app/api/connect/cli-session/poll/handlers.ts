@@ -4,14 +4,23 @@ import {
 	isBackendAvailabilityError,
 } from "../../../../../lib/backend-availability";
 import { getDefaultCliDeviceSessionService } from "../../../../../lib/cli-device-session";
+import { getDefaultCliSessionPollRateLimiter } from "../../../../../lib/cli-session-poll-rate-limit";
 import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
 } from "../../../../../lib/connect-telemetry";
+import { applyRateLimitHeaders } from "../../../../../lib/rate-limit-headers";
 
 export const runtime = "nodejs";
 
 type CliSessionPollDeps = {
+	consumeBudget: (request: Request) => Promise<{
+		allowed: boolean;
+		retryAfterSeconds?: number;
+		limit?: number;
+		remaining?: number;
+		resetEpochSeconds?: number;
+	}>;
 	pollSession: (args: {
 		sessionId: string;
 		pollSecret: string;
@@ -24,6 +33,8 @@ type CliSessionPollDeps = {
 };
 
 const defaultDeps: CliSessionPollDeps = {
+	consumeBudget: async (request) =>
+		getDefaultCliSessionPollRateLimiter().consume(request),
 	pollSession: async (args) => getDefaultCliDeviceSessionService().poll(args),
 	telemetry: getDefaultConnectTelemetry(),
 };
@@ -45,20 +56,38 @@ export function createCliSessionPollGetHandler(
 		}
 
 		try {
+			const budget = await deps.consumeBudget(request);
+			if (!budget.allowed) {
+				deps.telemetry.increment("cli_session_poll_rejected");
+				const response = NextResponse.json(
+					{
+						error:
+							"Too many CLI session poll requests. Wait before trying again.",
+					},
+					{ status: 429 },
+				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+
 			const result = await deps.pollSession({ sessionId, pollSecret });
 			if (result.status === "approved") {
 				deps.telemetry.increment("cli_session_poll_approved");
-				return NextResponse.json({
+				const response = NextResponse.json({
 					status: "approved",
 					...result.payload,
 				});
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
 			}
 			if (result.status === "pending") {
 				deps.telemetry.increment("cli_session_poll_pending");
-				return NextResponse.json({
+				const response = NextResponse.json({
 					status: "pending",
 					intervalMs: result.intervalMs,
 				});
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
 			}
 			if (result.status === "invalid") {
 				deps.telemetry.increment("cli_session_poll_rejected");

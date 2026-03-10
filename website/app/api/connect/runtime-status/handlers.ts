@@ -6,6 +6,8 @@ import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
 } from "../../../../lib/connect-telemetry";
+import { applyRateLimitHeaders } from "../../../../lib/rate-limit-headers";
+import { getDefaultRuntimeStatusRateLimiter } from "../../../../lib/runtime-status-rate-limit";
 import type { PlanTier } from "../../../../lib/user-billing";
 
 export const runtime = "nodejs";
@@ -26,6 +28,13 @@ type ClerkLikeClient = {
 };
 
 type RuntimeStatusDeps = {
+	consumeBudget: (request: Request) => Promise<{
+		allowed: boolean;
+		retryAfterSeconds?: number;
+		limit?: number;
+		remaining?: number;
+		resetEpochSeconds?: number;
+	}>;
 	createClerkClient: () => Promise<ClerkLikeClient>;
 	resolvePlanForSubject: (
 		clerk: ClerkLikeClient,
@@ -103,6 +112,8 @@ function extractErrorStatus(error: unknown): number | null {
 }
 
 const defaultDeps: RuntimeStatusDeps = {
+	consumeBudget: async (request) =>
+		getDefaultRuntimeStatusRateLimiter().consume(request),
 	createClerkClient: async () =>
 		(await clerkClient()) as unknown as ClerkLikeClient,
 	resolvePlanForSubject: async (clerk, subject) => {
@@ -133,6 +144,19 @@ export function createRuntimeStatusGetHandler(
 		}
 
 		try {
+			const budget = await deps.consumeBudget(request);
+			if (!budget.allowed) {
+				const response = NextResponse.json(
+					{
+						error:
+							"Too many runtime status requests. Wait before trying again.",
+					},
+					{ status: 429 },
+				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+
 			const clerk = await deps.createClerkClient();
 			const verifiedKey: VerifiedKeyRecord = await clerk.apiKeys.verify(apiKey);
 			const subjectId = extractSubjectFromVerifiedKey(
@@ -143,7 +167,7 @@ export function createRuntimeStatusGetHandler(
 				: { plan: null, billingUnavailable: false };
 			deps.telemetry.increment("runtime_status_success");
 
-			return NextResponse.json({
+			const response = NextResponse.json({
 				valid: true,
 				subjectId,
 				keyId: typeof verifiedKey.id === "string" ? verifiedKey.id : null,
@@ -158,6 +182,8 @@ export function createRuntimeStatusGetHandler(
 						: null,
 				billingUnavailable,
 			});
+			applyRateLimitHeaders(response.headers, budget);
+			return response;
 		} catch (error) {
 			const status = extractErrorStatus(error);
 			if (status === 401 || status === 403) {

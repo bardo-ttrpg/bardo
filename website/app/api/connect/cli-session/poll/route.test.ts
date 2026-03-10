@@ -3,8 +3,41 @@ import { CliDeviceSessionStoreError } from "../../../../../lib/cli-device-sessio
 import { createCliSessionPollGetHandler } from "./handlers";
 
 describe("GET /api/connect/cli-session/poll", () => {
+	test("returns 429 with rate-limit headers when poll budget is exhausted", async () => {
+		const handler = createCliSessionPollGetHandler({
+			consumeBudget: async () => ({
+				allowed: false,
+				retryAfterSeconds: 15,
+				limit: 60,
+				remaining: 0,
+				resetEpochSeconds: 1_800_000_015,
+			}),
+		});
+
+		const response = await handler(
+			new Request(
+				"https://app.bardo.ai/api/connect/cli-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
+			),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(429);
+		expect(body.error).toContain("Too many CLI session poll requests");
+		expect(response.headers.get("retry-after")).toBe("15");
+		expect(response.headers.get("x-ratelimit-limit")).toBe("60");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("0");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000015");
+	});
+
 	test("returns approved credentials when the browser flow is completed", async () => {
 		const handler = createCliSessionPollGetHandler({
+			consumeBudget: async () => ({
+				allowed: true,
+				retryAfterSeconds: 60,
+				limit: 60,
+				remaining: 59,
+				resetEpochSeconds: 1_800_000_000,
+			}),
 			pollSession: async ({ sessionId, pollSecret }) => {
 				expect(sessionId).toBe("cli_session_123");
 				expect(pollSecret).toBe("poll_secret_123");
@@ -30,6 +63,9 @@ describe("GET /api/connect/cli-session/poll", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get("x-ratelimit-limit")).toBe("60");
+		expect(response.headers.get("x-ratelimit-remaining")).toBe("59");
+		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000000");
 		expect(body.status).toBe("approved");
 		expect(body.apiKey).toBe("bardo_live_test");
 	});

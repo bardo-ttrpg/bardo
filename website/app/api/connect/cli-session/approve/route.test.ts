@@ -130,7 +130,9 @@ describe("POST /api/connect/cli-session/approve", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(403);
-		expect(body.error).toContain("API key limit reached");
+		expect(body.error).toBe(
+			"CLI login needs a free API key slot on your current plan. Rotate or delete an existing key, then retry.",
+		);
 	});
 
 	test("rolls back the generated API key when session approval is rejected", async () => {
