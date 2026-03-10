@@ -29,24 +29,35 @@ function requirePrefix(
 	}
 }
 
+function isExplicitlyEnabled(value: string | undefined) {
+	return value?.trim().toLowerCase() === "true";
+}
+
 export function validateE2EAuthEnv(
 	env: Record<string, string | undefined>,
 ): E2EAuthEnvValidationResult {
 	const errors: string[] = [];
 	const warnings: string[] = [];
+	const allowLiveKeys = isExplicitlyEnabled(env.E2E_CLERK_ALLOW_LIVE_KEYS);
 
-	requirePrefix(
-		normalize(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
-		"pk_test_",
-		"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-		errors,
-	);
-	requirePrefix(
-		normalize(env.CLERK_SECRET_KEY),
-		"sk_test_",
-		"CLERK_SECRET_KEY",
-		errors,
-	);
+	if (allowLiveKeys) {
+		warnings.push(
+			"E2E_CLERK_ALLOW_LIVE_KEYS enables Playwright auth against a live Clerk instance. Use it only for controlled production smoke runs.",
+		);
+	} else {
+		requirePrefix(
+			normalize(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
+			"pk_test_",
+			"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+			errors,
+		);
+		requirePrefix(
+			normalize(env.CLERK_SECRET_KEY),
+			"sk_test_",
+			"CLERK_SECRET_KEY",
+			errors,
+		);
+	}
 
 	const email =
 		normalize(env.E2E_CLERK_EMAIL) ?? normalize(env.E2E_CLERK_USER_IDENTIFIER);

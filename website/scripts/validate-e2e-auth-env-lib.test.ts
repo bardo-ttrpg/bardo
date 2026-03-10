@@ -62,6 +62,22 @@ describe("validateE2EAuthEnv", () => {
 		]);
 	});
 
+	test("allows live Clerk keys only when production smoke is explicitly enabled", () => {
+		const result = validateE2EAuthEnv({
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			E2E_CLERK_EMAIL: "tester@example.com",
+			E2E_CLERK_PASSWORD: "super-secret",
+			E2E_CLERK_ALLOW_LIVE_KEYS: "true",
+		});
+
+		expect(result.errors).toEqual([]);
+		expect(result.warnings).toEqual([
+			"E2E_CLERK_ALLOW_LIVE_KEYS enables Playwright auth against a live Clerk instance. Use it only for controlled production smoke runs.",
+		]);
+		expect(result.strategy).toBe("password");
+	});
+
 	test("accepts a +clerk_test email without a password", () => {
 		const result = validateE2EAuthEnv({
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",

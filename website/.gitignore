@@ -9,3 +9,4 @@ test-results/
 .bun-tmp/
 .bun-install/
 .vercel
+.env*.local

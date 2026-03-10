@@ -30,6 +30,7 @@ type RuntimeApiKeyValidator = {
 type HostedValidatorConfig = {
 	introspectionUrl: string;
 	introspectionToken: string | null;
+	protectionBypassSecret?: string | null;
 	cacheTtlMs: number;
 	invalidCacheTtlMs?: number;
 	timeoutMs?: number;
@@ -190,6 +191,12 @@ export function createHostedIntrospectionApiKeyValidator(
 				if (config.introspectionToken) {
 					headers.set("x-bardo-introspection-token", config.introspectionToken);
 				}
+				if (config.protectionBypassSecret) {
+					headers.set(
+						"x-vercel-protection-bypass",
+						config.protectionBypassSecret,
+					);
+				}
 
 				let payload: unknown = null;
 				let httpOk = false;
@@ -340,6 +347,8 @@ export function resolveRuntimeApiKeyValidator(args: {
 		{
 			introspectionUrl,
 			introspectionToken: env.BARDO_AUTH_INTROSPECTION_TOKEN?.trim() ?? null,
+			protectionBypassSecret:
+				env.BARDO_AUTH_INTROSPECTION_BYPASS_SECRET?.trim() ?? null,
 			cacheTtlMs: parsePositiveInteger(env.BARDO_AUTH_CACHE_TTL_MS, 120_000),
 			invalidCacheTtlMs: parsePositiveInteger(
 				env.BARDO_AUTH_INVALID_CACHE_TTL_MS,
