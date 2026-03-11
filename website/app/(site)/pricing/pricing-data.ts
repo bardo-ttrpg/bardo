@@ -22,8 +22,8 @@ export const pricingTiers: readonly PricingTier[] = [
 		features: [
 			"1 active campaign",
 			"100 MCP calls / month",
-			"Core MCP tools",
-			"Markdown-first storage",
+			"Canon-backed report tools",
+			"Markdown-first workspace",
 			"Community support",
 		],
 	},
@@ -38,9 +38,9 @@ export const pricingTiers: readonly PricingTier[] = [
 		features: [
 			"Unlimited campaigns",
 			"25,000 MCP calls / month",
-			"Core MCP tools",
-			"Hosted persistence",
-			"Faster sync",
+			"Full continuity workflows",
+			"Hosted account + billing",
+			"World-state reports",
 			"Clerk billing management",
 		],
 	},
@@ -55,10 +55,10 @@ export const pricingTiers: readonly PricingTier[] = [
 		features: [
 			"Unlimited campaigns",
 			"50,000 MCP calls / month",
-			"Core MCP tools",
-			"Hosted persistence",
+			"Full continuity workflows",
+			"Hosted account + billing",
 			"Priority support",
-			"Early tool access",
+			"Earlier workflow access",
 		],
 	},
 ] as const;

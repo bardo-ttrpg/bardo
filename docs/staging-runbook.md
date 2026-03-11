@@ -86,6 +86,10 @@ The smoke script validates:
 1. website introspection accepts a real staging key
 1. MCP rejects missing and invalid keys
 1. MCP `initialize`, `tools/list`, and `prompts/list`
+1. MCP `resource://reports/world-state-overview`
+1. MCP `world_state_overview` tool returns markdown grounded in workspace evidence
+1. MCP `resource://reports/last-session-diff`
+1. MCP `last_session_diff` tool returns the recent-change continuity view
 1. `scene_turn` gameplay flow
 1. website `/api/connect/runtime-status`
 1. website `/api/connect/snippets` points to staging MCP
@@ -99,16 +103,20 @@ Notes:
 
 1. `STAGING_AUTH_COOKIE` should be a real staging browser session cookie for the seeded smoke user.
 1. If `STAGING_AUTH_COOKIE` is omitted, the script still covers unauthenticated smoke checks and explicitly skips protected dashboard/CLI checks.
-1. If `website` staging uses a protected Vercel Preview deployment, set `STAGING_VERCEL_PROTECTION_BYPASS_SECRET` so the smoke runner can reach website routes without disabling Preview protection globally.
+1. If `website` staging uses a protected Vercel Preview deployment, set `STAGING_VERCEL_PROTECTION_BYPASS_SECRET` so the smoke runner can send Vercel's automation bypass headers and set the bypass cookie automatically.
 
 ## Manual Staging Checks
 These still require human signoff:
 
 1. sign in through the staging website with a real Clerk staging account
 1. confirm dashboard loads after auth
+1. confirm the dashboard credits display shows remaining credits and next reset
 1. create, rotate, and revoke a key from the dashboard
 1. generate a CLI login command from the dashboard
 1. complete one real CLI login / connect flow
+1. run `bardo init` from a clean local workspace and confirm `bardo/docs/` exists
+1. read `bardo/docs/quickstart.md` and `logs/world-state-overview.md` from the local workspace
+1. read `logs/timeline-diff.md` or `resource://reports/last-session-diff` after meaningful play
 1. create or mutate campaign data in staging
 1. restart the Railway MCP service
 1. confirm the same campaign data still exists from `/app/customers`

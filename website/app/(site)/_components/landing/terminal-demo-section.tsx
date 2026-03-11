@@ -9,13 +9,13 @@ export default function TerminalDemoSection() {
 				<div>
 					<SectionLabel>See it in action</SectionLabel>
 					<h2 className="mb-4 text-2xl font-semibold leading-snug tracking-tight text-foreground">
-						A real Bardo session — every tool call visible.
+						A real Bardo session with canon and continuity in the open.
 					</h2>
 					<p className="text-sm leading-relaxed text-muted-foreground">
-						Bardo exposes all GM operations as MCP tools. Your agent calls them
-						explicitly — no hallucinated dice rolls, no forgotten NPCs, no state
-						drift. What you see in the terminal is exactly what happened in the
-						world.
+						Bardo keeps tool calls explicit and the resulting world state
+						readable. What your agent does can be traced back to canonical
+						events, refreshed projections, and markdown reports inside the
+						workspace.
 					</p>
 				</div>
 				<div className="hidden md:flex md:flex-col md:justify-end">

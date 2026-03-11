@@ -33,12 +33,13 @@ const reportOutputSchema = z.object({
 function registerSingleReportTool(args: {
 	server: McpServer;
 	auth: AuthContext;
-	name: WorldStateReportId;
+	toolName: string;
+	reportId: WorldStateReportId;
 	title: string;
 	description: string;
 }): void {
 	args.server.registerTool(
-		args.name,
+		args.toolName,
 		{
 			title: args.title,
 			description: args.description,
@@ -57,7 +58,7 @@ function registerSingleReportTool(args: {
 			try {
 				const report = await readOrRefreshWorldStateReport({
 					bardoRoot,
-					reportId: args.name,
+					reportId: args.reportId,
 					options: {
 						sinceSequence,
 						playerView,
@@ -66,7 +67,7 @@ function registerSingleReportTool(args: {
 				return makeToolResult({
 					success: true,
 					message: "Workspace report generated successfully.",
-					reportType: args.name,
+					reportType: args.reportId,
 					rootPath: bardoRoot,
 					filePath: report.filePath,
 					rawMarkdown: report.rawMarkdown,
@@ -79,7 +80,7 @@ function registerSingleReportTool(args: {
 							error instanceof Error
 								? `Failed to generate workspace report: ${error.message}`
 								: "Failed to generate workspace report.",
-						reportType: args.name,
+						reportType: args.reportId,
 						rootPath: bardoRoot,
 						filePath: "",
 						rawMarkdown: "",
@@ -98,7 +99,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "world_state_overview",
+		toolName: "world_state_overview",
+		reportId: "world_state_overview",
 		title: "World State Overview",
 		description:
 			"Generate the primary markdown overview of canon-backed world state, active tensions, and evidence.",
@@ -106,7 +108,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "continuity_audit",
+		toolName: "continuity_audit",
+		reportId: "continuity_audit",
 		title: "Continuity Audit",
 		description:
 			"Generate a markdown continuity audit with evidence, drift findings, and contradictions.",
@@ -114,7 +117,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "timeline_diff",
+		toolName: "timeline_diff",
+		reportId: "timeline_diff",
 		title: "Timeline Diff",
 		description:
 			"Generate a markdown diff of canonical changes after an optional event sequence boundary.",
@@ -122,7 +126,17 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "faction_pressure_report",
+		toolName: "last_session_diff",
+		reportId: "timeline_diff",
+		title: "Last Session Diff",
+		description:
+			"Generate the readable markdown summary of what changed in the recent canonical window.",
+	});
+	registerSingleReportTool({
+		server,
+		auth,
+		toolName: "faction_pressure_report",
+		reportId: "faction_pressure_report",
 		title: "Faction Pressure Report",
 		description:
 			"Generate a markdown report of faction pressure, conflict, and implied tension.",
@@ -130,7 +144,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "npc_state_delta",
+		toolName: "npc_state_delta",
+		reportId: "npc_state_delta",
 		title: "NPC State Delta",
 		description:
 			"Generate a markdown snapshot of current NPC state and recent NPC evidence.",
@@ -138,7 +153,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "player_knowledge_view",
+		toolName: "player_knowledge_view",
+		reportId: "player_knowledge_view",
 		title: "Player Knowledge View",
 		description:
 			"Generate a player-safe markdown view of canon-backed knowledge and unresolved leads.",
@@ -146,7 +162,8 @@ export function registerWorldStateReportTools(
 	registerSingleReportTool({
 		server,
 		auth,
-		name: "canon_vs_inference_report",
+		toolName: "canon_vs_inference_report",
+		reportId: "canon_vs_inference_report",
 		title: "Canon Vs Inference Report",
 		description:
 			"Generate a markdown report separating canon, inference, and suggestion explicitly.",

@@ -16,6 +16,7 @@ import {
 	resolveDoctorClientSelection,
 } from "./client-resolution";
 import { writeTextAtomic } from "./file-utils";
+import { ensureWorkspaceLocalDocs } from "./local-docs";
 import {
 	maybeImportRulebook as importWorkspaceRulebook,
 	startLocalMcpServer,
@@ -1475,6 +1476,10 @@ async function ensureWorkspaceCoreFiles(args: {
 			"",
 		),
 	);
+	await ensureWorkspaceLocalDocs({
+		bardoRoot: args.bardoRoot,
+		workspaceRoot: args.workspaceRoot,
+	});
 }
 
 async function ensureFile(filePath: string, content: string): Promise<void> {

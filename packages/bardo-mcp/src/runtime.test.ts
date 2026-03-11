@@ -463,6 +463,12 @@ describe("bardo runtime", () => {
 			await expect(
 				readFile(path.join(bardoRoot, "state/current.md"), "utf8"),
 			).resolves.toContain("{}");
+			await expect(
+				readFile(path.join(bardoRoot, "docs/quickstart.md"), "utf8"),
+			).resolves.toContain("projections/current-state.md");
+			await expect(
+				readFile(path.join(bardoRoot, "docs/credits-and-billing.md"), "utf8"),
+			).resolves.toContain("1 accepted MCP tool call = 1 credit");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

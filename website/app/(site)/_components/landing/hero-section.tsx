@@ -28,30 +28,30 @@ export default function HeroSection({
 							<ScrambleText text=" MCP-Driven TTRPG Operations" from="center" />
 						</p>
 						<h1 className="max-w-sm text-2xl font-semibold leading-snug tracking-tight text-foreground sm:text-3xl">
-							Turn your AI coding agent into a professional Game Master.
+							A local-first world-state engine for tabletop campaigns.
 						</h1>
 					</div>
 
 					<div className="py-10 md:pl-10">
 						<p className="mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
-							Bardo is an MCP toolbox that gives any AI agent a structured,
-							state-aware GM process for tabletop RPGs. Stop re-explaining your
-							world every session. Start building campaigns that persist.
+							Bardo gives any MCP-capable agent a canon-aware workspace with
+							persistent state, continuity reports, and local markdown files you
+							can actually read. The AI helps, but the table still owns truth.
 						</p>
 						<InstallCommandCard />
 						<div className="flex flex-wrap gap-3">
 							<Link
-								href="/pricing"
+								href="/docs/install"
 								className="border border-foreground px-5 py-2.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 							>
-								View pricing ↗
+								Read docs ↗
 							</Link>
 							<Link
-								href="/dashboard"
+								href="/pricing"
 								prefetch={false}
 								className="border border-border px-5 py-2.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
 							>
-								Open Dashboard ↗
+								View pricing ↗
 							</Link>
 						</div>
 					</div>
@@ -66,7 +66,7 @@ export default function HeroSection({
 								7
 							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-								MCP tools
+								Continuity reports
 							</p>
 						</div>
 						<div className="border-b border-border px-6 py-8 sm:border-b-0 sm:border-r sm:px-8">
@@ -87,10 +87,10 @@ export default function HeroSection({
 						</div>
 						<div className="px-6 py-8 sm:px-8">
 							<p className="mb-1 font-mono text-3xl font-bold text-foreground tabular-nums">
-								8
+								1
 							</p>
 							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-								Agents supported
+								Credit per tool call
 							</p>
 						</div>
 					</div>

@@ -74,7 +74,8 @@ export default function InstallCommandCard() {
 				{command}
 			</pre>
 			<p className="mt-2 text-xs text-muted-foreground">
-				After install, run `bardo login` from Dashboard, then `bardo connect`.
+				After install, run `bardo login`, then `bardo connect`, then `bardo
+				init` in your campaign folder. Local docs appear in `bardo/docs/`.
 			</p>
 		</div>
 	);

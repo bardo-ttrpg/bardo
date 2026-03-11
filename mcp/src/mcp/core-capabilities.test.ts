@@ -86,6 +86,14 @@ describe("registerCoreResourcesAndPrompts", () => {
 			"table_contract",
 			"authority_policy",
 			"events_recent_digest",
+			"report_world_state_overview",
+			"report_continuity_audit",
+			"report_timeline_diff",
+			"report_last_session_diff",
+			"report_faction_pressure",
+			"report_npc_state_delta",
+			"report_player_knowledge",
+			"report_canon_vs_inference",
 		]);
 		expect(registeredPrompts.map((entry) => entry.name)).toEqual([
 			"resolve_player_action",
@@ -102,12 +110,19 @@ describe("registerCoreResourcesAndPrompts", () => {
 			"advance_world_between_sessions_v1",
 		]);
 
-		for (const resource of registeredResources) {
+		for (const resource of registeredResources.slice(0, 11)) {
 			const response = await resource.handler();
 			const payload = JSON.parse(response.contents[0]?.text ?? "{}") as {
 				contractVersion?: string;
 			};
 			expect(payload.contractVersion).toBe("v1");
+		}
+
+		for (const resource of registeredResources.slice(11)) {
+			const response = await resource.handler();
+			const payload = response.contents[0]?.text ?? "";
+			expect(payload).toContain("## Canon");
+			expect(payload).toContain("Evidence references:");
 		}
 
 		const campaignResource = await registeredResources[0]?.handler();
@@ -154,6 +169,22 @@ describe("registerCoreResourcesAndPrompts", () => {
 			npcs?: unknown[];
 		};
 		expect(Array.isArray(npcRosterPayload.npcs)).toBe(true);
+		const reportOverview = await registeredResources
+			.find((entry) => entry.name === "report_world_state_overview")
+			?.handler();
+		expect(reportOverview?.contents[0]?.uri).toBe(
+			"resource://reports/world-state-overview",
+		);
+		expect(reportOverview?.contents[0]?.text).toContain(
+			"events/canonical.ndjson",
+		);
+		const lastSessionDiff = await registeredResources
+			.find((entry) => entry.name === "report_last_session_diff")
+			?.handler();
+		expect(lastSessionDiff?.contents[0]?.uri).toBe(
+			"resource://reports/last-session-diff",
+		);
+		expect(lastSessionDiff?.contents[0]?.text).toContain("Timeline Diff");
 
 		const resolveActionPrompt = await registeredPrompts
 			.find((entry) => entry.name === "resolve_player_action")

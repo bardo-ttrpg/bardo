@@ -24,12 +24,10 @@ export const tickerItems = [
 	"Codex CLI",
 	"Gemini CLI",
 	"Any TTRPG System",
-	"D&D 5e",
-	"Pathfinder",
-	"Blades in the Dark",
-	"MOTHERSHIP",
+	"Local-first",
 	"Persistent State",
 	"Markdown-First",
+	"Continuity Reports",
 	"MCP Protocol",
 ] as const;
 
@@ -48,32 +46,32 @@ export const features: readonly LandingFeature[] = [
 	{
 		icon: Database,
 		label: "Persistent State",
-		desc: "Every action, every decision, every gold piece — written to markdown files that survive reboots, context resets, and model swaps.",
+		desc: "Canon lives in local markdown and canonical events that survive restarts, context resets, and model swaps.",
 	},
 	{
 		icon: Layers,
 		label: "System-Agnostic",
-		desc: "D&D 5e, Pathfinder, Blades in the Dark, MOTHERSHIP — Bardo has no opinion about your ruleset. You define the mechanics.",
+		desc: "Bring your own rules. Bardo tracks continuity, consequences, and world state without forcing a house system on the table.",
 	},
 	{
 		icon: CheckSquare,
-		label: "Structured Dice & Checks",
-		desc: "Attribute lookups, roll modifiers, and DC comparisons happen through MCP tools — not unstructured prompts. Every outcome is auditable.",
+		label: "Auditable Canon",
+		desc: "The important claims stay grounded in canonical events, readable files, and explicit tool calls. Suggestions stay separate from facts.",
 	},
 	{
 		icon: RefreshCw,
-		label: "World Sync",
-		desc: "NPCs remember what happened. Quests update automatically. The world file reflects your last session, always.",
+		label: "Automatic World Tracking",
+		desc: "NPCs, factions, unresolved threads, and location state refresh automatically after meaningful play without asking for a prep step.",
 	},
 	{
 		icon: PlayCircle,
 		label: "Resumable Sessions",
-		desc: "Start mid-dungeon on Tuesday with any agent on any machine. Bardo reconstructs full context from the workspace on init.",
+		desc: "Pick up a campaign from any MCP-capable client by reading the workspace, not by rebuilding memory from scratch.",
 	},
 	{
 		icon: FileText,
-		label: "Markdown-First",
-		desc: "Your campaign lives in plain text. Read it, edit it, version-control it, share it. No vendor lock-in, no proprietary format.",
+		label: "Local Docs Included",
+		desc: "Run `bardo init` and get canonical files, generated continuity reports, and local docs in `bardo/docs/` right inside the workspace.",
 	},
 ] as const;
 
@@ -85,18 +83,18 @@ export const workflow = [
 	{ n: "02", text: "Run `bardo init` in your campaign workspace folder" },
 	{
 		n: "03",
-		text: "Your agent reads world.md, state.md, and quests.md to load context",
+		text: "Your agent reads projections/current-state.md, events/canonical.ndjson, and logs/*.md to load context",
 	},
 	{
 		n: "04",
-		text: "Play sessions that auto-persist state — resume anytime, forever",
+		text: "Play sessions that auto-persist state and regenerate continuity reports automatically",
 	},
 ] as const;
 
 export const withoutBardoItems = [
 	"You re-explain your world every session",
 	"State lives in the LLM's context window — until it doesn't",
-	"Dice rolls are unstructured, unrepeatable, unauditable",
+	"Canon and suggestion get blended together",
 	"NPCs forget what happened last week",
 	"Swapping agents means starting from scratch",
 	"Long campaigns collapse under their own complexity",
@@ -105,50 +103,69 @@ export const withoutBardoItems = [
 export const withBardoItems = [
 	"World state auto-loads on every session init",
 	"State persists to markdown files — survives any reset",
-	"Every roll goes through a structured MCP tool",
-	"NPCs, quests, and factions update after every action",
+	"Canon, inference, and suggestion stay clearly separated",
+	"NPCs, factions, and threads update after every action",
 	"Any MCP-capable agent can resume your campaign",
-	"The longer you play, the richer the world gets",
+	"The workspace stays readable even as the campaign grows",
 ] as const;
 
 export const terminalTools = [
 	{
-		tool: "state-get",
-		desc: "Fetch any character or world object",
+		tool: "scene_turn",
+		desc: "Resolve a full scene step and refresh canon-backed state",
 	},
 	{
-		tool: "player-action",
-		desc: "Structured roll with modifier + DC",
+		tool: "world_state_overview",
+		desc: "Read the current continuity snapshot in markdown form",
 	},
 	{
-		tool: "world-sync",
-		desc: "Persist changes to markdown files",
+		tool: "continuity_audit",
+		desc: "Flag contradictions, stale threads, and drift signals",
 	},
 	{
-		tool: "markdown-read",
-		desc: "Load world, state, and quest files",
+		tool: "player_knowledge_view",
+		desc: "Generate the player-safe version of current knowledge",
 	},
 	{
-		tool: "markdown-upsert",
-		desc: "Write new lore and session notes",
+		tool: "last_session_diff",
+		desc: "Explain what changed since the recent canonical window",
 	},
 ] as const;
 
 export const bardoWorkspace: FileTreeRoot = {
-	name: "./the-iron-duchy/",
+	name: "./the-iron-duchy/bardo/",
 	note: "← bardo init creates this",
 	children: [
 		{
-			id: "world",
-			name: "world.md",
+			id: "manifest",
+			name: "manifest.json",
 			type: "file",
-			note: "master world document",
+			note: "workspace metadata and ruleset",
 		},
 		{
-			id: "session",
-			name: "session.md",
-			type: "file",
-			note: "current session state",
+			id: "docs",
+			name: "docs",
+			type: "folder",
+			children: [
+				{
+					id: "quickstart",
+					name: "quickstart.md",
+					type: "file",
+					note: "local getting-started guide",
+				},
+				{
+					id: "world-state-doc",
+					name: "how-to-read-your-world-state.md",
+					type: "file",
+					note: "where to read canon fast",
+				},
+				{
+					id: "credits-doc",
+					name: "credits-and-billing.md",
+					type: "file",
+					note: "flat credit model",
+				},
+			],
 		},
 		{
 			id: "rules",
@@ -164,12 +181,26 @@ export const bardoWorkspace: FileTreeRoot = {
 			],
 		},
 		{
-			id: "npcs",
-			name: "npcs",
+			id: "world",
+			name: "world",
 			type: "folder",
 			children: [
-				{ id: "npc-halvar", name: "guard-captain-halvar.md", type: "file" },
-				{ id: "npc-iara", name: "merchant-iara.md", type: "file" },
+				{
+					id: "world-factions",
+					name: "factions",
+					type: "folder",
+					children: [
+						{ id: "faction-harbor", name: "harbor-guild.md", type: "file" },
+					],
+				},
+				{
+					id: "world-locations",
+					name: "locations",
+					type: "folder",
+					children: [
+						{ id: "loc-ironhaven", name: "ironhaven.md", type: "file" },
+					],
+				},
 			],
 		},
 		{
@@ -181,40 +212,78 @@ export const bardoWorkspace: FileTreeRoot = {
 					id: "musashi",
 					name: "Musashi.md",
 					type: "file",
-					highlight: true,
 					note: "fighter 6 · STR +4",
 				},
-				{ id: "zara", name: "Zara.md", type: "file" },
 				{
-					id: "party-state",
-					name: "state.md",
+					id: "zara",
+					name: "Zara.md",
 					type: "file",
-					note: "gold, conditions, relations",
 				},
 			],
 		},
 		{
-			id: "items",
-			name: "items",
-			type: "folder",
-			children: [{ id: "inventory", name: "inventory.md", type: "file" }],
-		},
-		{
-			id: "locations",
-			name: "locations",
+			id: "projections",
+			name: "projections",
 			type: "folder",
 			children: [
-				{ id: "loc-ironhaven", name: "ironhaven.md", type: "file" },
-				{ id: "loc-mine", name: "the-old-mine.md", type: "file" },
+				{
+					id: "current-state",
+					name: "current-state.md",
+					type: "file",
+					highlight: true,
+					note: "canon-derived world snapshot",
+				},
 			],
 		},
 		{
-			id: "quests",
-			name: "quests",
+			id: "state",
+			name: "state",
 			type: "folder",
 			children: [
-				{ id: "quest-main", name: "main-quest.md", type: "file" },
-				{ id: "quest-side", name: "side-quests.md", type: "file" },
+				{
+					id: "legacy-state",
+					name: "current.md",
+					type: "file",
+					note: "legacy-compatible mirror",
+				},
+			],
+		},
+		{
+			id: "events",
+			name: "events",
+			type: "folder",
+			children: [
+				{
+					id: "canonical-events",
+					name: "canonical.ndjson",
+					type: "file",
+					note: "append-only canon log",
+				},
+			],
+		},
+		{
+			id: "logs",
+			name: "logs",
+			type: "folder",
+			children: [
+				{
+					id: "overview-log",
+					name: "world-state-overview.md",
+					type: "file",
+					note: "read this first for continuity",
+				},
+				{
+					id: "audit-log",
+					name: "continuity-audit.md",
+					type: "file",
+					note: "contradictions and drift",
+				},
+				{
+					id: "timeline-log",
+					name: "timeline-diff.md",
+					type: "file",
+					note: "what changed recently",
+				},
 			],
 		},
 	],

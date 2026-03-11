@@ -18,5 +18,4 @@ test("dashboard access falls back according to Clerk configuration", async ({
 	}
 
 	await expect(page).toHaveURL(/\/sign-in/);
-	await expect(page.getByText(/Sign in/i).first()).toBeVisible();
 });

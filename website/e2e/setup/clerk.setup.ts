@@ -19,8 +19,13 @@ setup("authenticate Clerk test user", async ({ page }) => {
 		console.warn(`warning: ${warning}`);
 	}
 
-	await page.goto("/");
-	if (strategy === "password") {
+	await page.goto("/sign-in?redirect_url=/dashboard");
+	if (email) {
+		await clerk.signIn({
+			page,
+			emailAddress: email,
+		});
+	} else if (strategy === "password") {
 		await clerk.signIn({
 			page,
 			signInParams: {

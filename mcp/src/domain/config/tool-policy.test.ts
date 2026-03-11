@@ -19,6 +19,8 @@ describe("resolveToolPolicyConfig", () => {
 		expect(hasTool(config, "scene_turn")).toBe(true);
 		expect(hasTool(config, "apply_domain_transition")).toBe(true);
 		expect(hasTool(config, "migrate_legacy_state")).toBe(true);
+		expect(hasTool(config, "world_state_overview")).toBe(true);
+		expect(hasTool(config, "last_session_diff")).toBe(true);
 		expect(hasTool(config, "eval_run_golden_scenarios")).toBe(true);
 		expect(hasTool(config, "eval_run_long_campaign_stability")).toBe(true);
 		expect(hasTool(config, "sessions_list")).toBe(true);
@@ -37,6 +39,8 @@ describe("resolveToolPolicyConfig", () => {
 		expect(resolved.profile).toBe("gameplay");
 		expect(resolved.allowedTools.has("scene_turn")).toBe(true);
 		expect(resolved.allowedTools.has("player_action")).toBe(true);
+		expect(resolved.allowedTools.has("world_state_overview")).toBe(true);
+		expect(resolved.allowedTools.has("last_session_diff")).toBe(true);
 		expect(resolved.allowedTools.has("append_event")).toBe(false);
 		expect(resolved.allowedTools.has("migrate_legacy_state")).toBe(false);
 	});
@@ -89,6 +93,8 @@ describe("resolveToolPolicyConfig", () => {
 		expect(resolved.allowedTools.has("state_set")).toBe(false);
 		expect(resolved.allowedTools.has("markdown_upsert")).toBe(false);
 		expect(resolved.allowedTools.has("player_action")).toBe(true);
+		expect(resolved.allowedTools.has("continuity_audit")).toBe(true);
+		expect(resolved.allowedTools.has("npc_state_delta")).toBe(true);
 	});
 
 	test("gameplay profile excludes admin and migration mutation tools", () => {
@@ -102,6 +108,8 @@ describe("resolveToolPolicyConfig", () => {
 		expect(resolved.allowedTools.has("player_action")).toBe(true);
 		expect(resolved.allowedTools.has("world_sync")).toBe(true);
 		expect(resolved.allowedTools.has("simulation_tick")).toBe(true);
+		expect(resolved.allowedTools.has("world_state_overview")).toBe(true);
+		expect(resolved.allowedTools.has("last_session_diff")).toBe(true);
 		expect(resolved.allowedTools.has("append_event")).toBe(false);
 		expect(resolved.allowedTools.has("apply_domain_transition")).toBe(false);
 		expect(resolved.allowedTools.has("migrate_legacy_state")).toBe(false);

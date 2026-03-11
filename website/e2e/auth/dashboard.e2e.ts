@@ -64,9 +64,10 @@ test("dashboard covers billing, key lifecycle, pagination, snippets, and CLI log
 					plan: "solo",
 					creditsTotal: 1000,
 					creditsUsed: 25,
-					periodStart: Date.now() - 86_400_000,
+					creditsRemaining: 975,
 					mcpCallsTotal: 120,
 					mcpCallsThisPeriod: 12,
+					currentPeriodEnd: Date.now() + 86_400_000,
 				},
 				keyPolicy: {
 					maxAllowed: 5,

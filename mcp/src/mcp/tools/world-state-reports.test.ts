@@ -28,6 +28,7 @@ type ReportHandler = (args: {
 type ReportToolName =
 	| "world_state_overview"
 	| "continuity_audit"
+	| "last_session_diff"
 	| "timeline_diff"
 	| "faction_pressure_report"
 	| "npc_state_delta"
@@ -86,6 +87,7 @@ describe("world-state report tools", () => {
 			"canon_vs_inference_report",
 			"continuity_audit",
 			"faction_pressure_report",
+			"last_session_diff",
 			"npc_state_delta",
 			"player_knowledge_view",
 			"timeline_diff",
@@ -99,12 +101,21 @@ describe("world-state report tools", () => {
 		);
 		expect(worldState.structuredContent.rawMarkdown).toContain("## Canon");
 		expect(worldState.structuredContent.rawMarkdown).toContain("river-market");
+		expect(worldState.structuredContent.rawMarkdown).toContain(
+			"events/canonical.ndjson",
+		);
+		expect(worldState.structuredContent.rawMarkdown).toContain(
+			"evt-report-tool-1",
+		);
 
 		const continuity = await handlers.continuity_audit({});
 		expect(continuity.isError).toBe(false);
 		expect(continuity.structuredContent.reportType).toBe("continuity_audit");
 		expect(continuity.structuredContent.rawMarkdown).toContain(
 			"Consistency check",
+		);
+		expect(continuity.structuredContent.rawMarkdown).toContain(
+			"NPCs without recent direct evidence",
 		);
 
 		const playerKnowledge = await handlers.player_knowledge_view({
@@ -123,6 +134,16 @@ describe("world-state report tools", () => {
 		expect(timelineDiff.structuredContent.reportType).toBe("timeline_diff");
 		expect(timelineDiff.structuredContent.rawMarkdown).toContain(
 			"Since sequence 1",
+		);
+		expect(timelineDiff.structuredContent.rawMarkdown).toContain(
+			"Evidence references:",
+		);
+
+		const lastSessionDiff = await handlers.last_session_diff({});
+		expect(lastSessionDiff.isError).toBe(false);
+		expect(lastSessionDiff.structuredContent.reportType).toBe("timeline_diff");
+		expect(lastSessionDiff.structuredContent.rawMarkdown).toContain(
+			"Timeline Diff",
 		);
 
 		const npcDelta = await handlers.npc_state_delta({});

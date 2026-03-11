@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	appendVercelProtectionBypass,
+	createVercelProtectionHeaders,
 	parseJsonOrSseJson,
 } from "./staging-smoke-lib";
 
@@ -34,6 +35,27 @@ describe("appendVercelProtectionBypass", () => {
 		).toBe(
 			"https://example.vercel.app/api/keys?limit=20&offset=0&x-vercel-protection-bypass=secret-123",
 		);
+	});
+});
+
+describe("createVercelProtectionHeaders", () => {
+	test("returns empty headers when no bypass secret is configured", () => {
+		expect(createVercelProtectionHeaders("")).toEqual({});
+	});
+
+	test("returns the documented automation bypass headers", () => {
+		expect(createVercelProtectionHeaders("secret-123")).toEqual({
+			"x-vercel-protection-bypass": "secret-123",
+		});
+	});
+
+	test("adds the cookie-minting header only when requested", () => {
+		expect(
+			createVercelProtectionHeaders("secret-123", { setCookie: true }),
+		).toEqual({
+			"x-vercel-protection-bypass": "secret-123",
+			"x-vercel-set-bypass-cookie": "true",
+		});
 	});
 });
 

@@ -25,15 +25,54 @@ type ReportOptions = {
 	playerView?: boolean;
 };
 
-const REPORT_PATHS: Record<WorldStateReportId, string> = {
-	world_state_overview: "logs/world-state-overview.md",
-	continuity_audit: "logs/continuity-audit.md",
-	timeline_diff: "logs/timeline-diff.md",
-	faction_pressure_report: "logs/faction-pressure.md",
-	npc_state_delta: "logs/npc-state-delta.md",
-	player_knowledge_view: "logs/player-knowledge.md",
-	canon_vs_inference_report: "logs/canon-vs-inference.md",
-};
+export const WORLD_STATE_REPORTS = {
+	world_state_overview: {
+		path: "logs/world-state-overview.md",
+		resourceUri: "resource://reports/world-state-overview",
+		title: "World State Overview",
+	},
+	continuity_audit: {
+		path: "logs/continuity-audit.md",
+		resourceUri: "resource://reports/continuity-audit",
+		title: "Continuity Audit",
+	},
+	timeline_diff: {
+		path: "logs/timeline-diff.md",
+		resourceUri: "resource://reports/timeline-diff",
+		title: "Timeline Diff",
+	},
+	faction_pressure_report: {
+		path: "logs/faction-pressure.md",
+		resourceUri: "resource://reports/faction-pressure",
+		title: "Faction Pressure",
+	},
+	npc_state_delta: {
+		path: "logs/npc-state-delta.md",
+		resourceUri: "resource://reports/npc-state-delta",
+		title: "NPC State Delta",
+	},
+	player_knowledge_view: {
+		path: "logs/player-knowledge.md",
+		resourceUri: "resource://reports/player-knowledge",
+		title: "Player Knowledge",
+	},
+	canon_vs_inference_report: {
+		path: "logs/canon-vs-inference.md",
+		resourceUri: "resource://reports/canon-vs-inference",
+		title: "Canon Vs Inference",
+	},
+} as const satisfies Record<
+	WorldStateReportId,
+	{ path: string; resourceUri: string; title: string }
+>;
+
+function reportPath(reportId: WorldStateReportId): string {
+	return WORLD_STATE_REPORTS[reportId].path;
+}
+
+function reportResourceUri(reportId: WorldStateReportId): string {
+	return WORLD_STATE_REPORTS[reportId].resourceUri;
+}
 
 function bulletList(
 	items: readonly string[],
@@ -50,6 +89,25 @@ function recentEvents(
 	limit = 5,
 ): CanonicalEvent[] {
 	return events.slice(Math.max(0, events.length - limit));
+}
+
+function evidenceFilesForReport(reportId: WorldStateReportId): string[] {
+	return [
+		"events/canonical.ndjson",
+		"projections/current-state.md",
+		"state/current.md",
+		reportPath(reportId),
+	];
+}
+
+function evidenceSummary(args: {
+	reportId: WorldStateReportId;
+	events: readonly CanonicalEvent[];
+}): string {
+	const recent = recentEvents(args.events)
+		.map((event) => `#${String(event.sequence)} ${event.id}`)
+		.join(", ");
+	return `files=${evidenceFilesForReport(args.reportId).join(", ")}; recent_event_ids=${recent || "none"}`;
 }
 
 function introducedNpcEntries(state: CampaignState): NpcState[] {
@@ -100,6 +158,10 @@ function renderWorldStateOverview(args: {
 					.map((event) => `${event.id} (${event.type})`)
 					.join(", ") || "none"
 			}`,
+			`Evidence references: ${evidenceSummary({
+				reportId: "world_state_overview",
+				events: args.events,
+			})}`,
 		]),
 		"",
 		"## Inference",
@@ -118,9 +180,27 @@ function renderWorldStateOverview(args: {
 }
 
 function renderContinuityAudit(args: {
+	state: CampaignState;
 	events: readonly CanonicalEvent[];
 	consistency: Awaited<ReturnType<typeof runConsistencyCheckForRoot>>;
 }): string {
+	const unresolvedThreads = Object.values(args.state.threads).filter(
+		(thread) => thread.status !== "resolved",
+	);
+	const staleNpcRisk = introducedNpcEntries(args.state)
+		.filter(
+			(npc) =>
+				!recentEvents(args.events).some((event) =>
+					Array.isArray(event.data.createdNpcIds)
+						? event.data.createdNpcIds.includes(npc.id)
+						: false,
+				),
+		)
+		.slice(0, 5)
+		.map((npc) => npc.displayName);
+	const highPressureFactions = activeFactionEntries(args.state)
+		.filter((faction) => faction.pressure >= 3 || faction.openConflict)
+		.map((faction) => `${faction.name} [pressure ${String(faction.pressure)}]`);
 	const findings =
 		args.consistency.issues.length > 0
 			? args.consistency.issues.map((issue) => {
@@ -138,10 +218,19 @@ function renderContinuityAudit(args: {
 			`Warnings: ${String(args.consistency.warningCount)}`,
 			"Evidence files: events/canonical.ndjson, projections/current-state.md, state/current.md",
 			`Latest canonical event: ${args.events.at(-1)?.id ?? "none"}`,
+			`Evidence references: ${evidenceSummary({
+				reportId: "continuity_audit",
+				events: args.events,
+			})}`,
 		]),
 		"",
 		"## Inference",
-		bulletList(findings),
+		bulletList([
+			...findings,
+			`Open unresolved threads: ${unresolvedThreads.length > 0 ? unresolvedThreads.map((thread) => thread.title).join(", ") : "none"}`,
+			`NPCs without recent direct evidence: ${staleNpcRisk.join(", ") || "none detected"}`,
+			`High-pressure factions to review: ${highPressureFactions.join(", ") || "none detected"}`,
+		]),
 		"",
 		"## Suggestion",
 		bulletList([
@@ -172,6 +261,10 @@ function renderTimelineDiff(args: {
 				(event) =>
 					`#${String(event.sequence)} ${event.id} (${event.type}) at ${event.atISO}`,
 			),
+			`Evidence references: ${evidenceSummary({
+				reportId: "timeline_diff",
+				events: filtered,
+			})}`,
 		]),
 		"",
 		"## Inference",
@@ -202,6 +295,10 @@ function renderFactionPressure(args: { state: CampaignState }): string {
 				(faction) =>
 					`${faction.name} [${faction.id}] pressure=${String(faction.pressure)} stance=${faction.stance}${faction.openConflict ? " open_conflict=true" : ""}`,
 			),
+			`Evidence references: ${evidenceSummary({
+				reportId: "faction_pressure_report",
+				events: [],
+			})}`,
 		),
 		"",
 		"## Inference",
@@ -247,6 +344,10 @@ function renderNpcStateDelta(args: {
 			),
 			...eventNpcIds.map((npcId) => `Event-backed NPC id: ${npcId}`),
 			`Recent NPC evidence: ${recentNpcEvents.map((event) => event.id).join(", ") || "none"}`,
+			`Evidence references: ${evidenceSummary({
+				reportId: "npc_state_delta",
+				events: recentNpcEvents,
+			})}`,
 		]),
 		"",
 		"## Inference",
@@ -288,6 +389,7 @@ function renderPlayerKnowledge(args: {
 			`Current location: ${args.state.currentLocation}`,
 			`Known NPCs: ${npcs.join(", ") || "none recorded"}`,
 			`Open threads visible to the table: ${openThreads.join(", ") || "none recorded"}`,
+			`Evidence references: files=${evidenceFilesForReport("player_knowledge_view").join(", ")}`,
 		]),
 		"",
 		"## Inference",
@@ -316,6 +418,10 @@ function renderCanonVsInference(args: {
 			`Canonical events recorded: ${String(args.events.length)}`,
 			`Current location from canon-derived state: ${args.state.currentLocation}`,
 			`Last action from canon-derived state: ${args.state.lastAction}`,
+			`Evidence references: ${evidenceSummary({
+				reportId: "canon_vs_inference_report",
+				events: args.events,
+			})}`,
 		]),
 		"",
 		"## Inference",
@@ -370,13 +476,14 @@ async function writeReport(args: {
 }> {
 	const filePath = resolvePathInsideRoot(
 		args.bardoRoot,
-		REPORT_PATHS[args.reportId],
+		reportPath(args.reportId),
 	);
 	const rawMarkdown = renderMarkdown(
 		{
-			title: args.reportId.replaceAll("_", " "),
+			title: WORLD_STATE_REPORTS[args.reportId].title,
 			description: "Derived world-state workspace report",
 			generated_at_iso: new Date().toISOString(),
+			report_uri: reportResourceUri(args.reportId),
 		},
 		renderReport(args),
 	);
@@ -399,7 +506,7 @@ export async function regenerateWorkspaceReports(args: {
 		bardoRoot: args.bardoRoot,
 		includeWarnings: true,
 	});
-	const reportIds = Object.keys(REPORT_PATHS) as WorldStateReportId[];
+	const reportIds = Object.keys(WORLD_STATE_REPORTS) as WorldStateReportId[];
 	const written: Array<{
 		reportId: WorldStateReportId;
 		filePath: string;

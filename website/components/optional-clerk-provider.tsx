@@ -16,7 +16,7 @@ export default function OptionalClerkProvider({
 	}
 
 	return (
-		<ClerkProvider>
+		<ClerkProvider afterSignOutUrl="/">
 			<MotionConfig reducedMotion="user">{children}</MotionConfig>
 		</ClerkProvider>
 	);

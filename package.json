@@ -30,7 +30,8 @@
 		"staging:readiness": "bun run check && bun run build && bun run test && bun run test:e2e && bun run test:release-gates && bun run --cwd mcp ga:readiness",
 		"staging:validate-env": "bun run --cwd website validate:staging-env && bun run --cwd mcp validate:staging-env",
 		"staging:smoke": "bun run ./scripts/staging-smoke.ts",
-		"check": "turbo run check",
+		"validate:toolchain": "bun run ./scripts/validate-toolchain-policy.ts",
+		"check": "bun run validate:toolchain && turbo run check",
 		"check:staged": "lint-staged",
 		"clean:artifacts": "bash scripts/clean-artifacts.sh",
 		"biome:check": "biome check .",
@@ -40,10 +41,10 @@
 		"prepare": "husky"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.4",
+		"@biomejs/biome": "2.4.6",
 		"husky": "^9.1.7",
-		"lint-staged": "^16.3.2",
-		"turbo": "^2.8.14",
+		"lint-staged": "^16.3.3",
+		"turbo": "^2.8.16",
 		"typescript": "5.9.3"
 	},
 	"lint-staged": {

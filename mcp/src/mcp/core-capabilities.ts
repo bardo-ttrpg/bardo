@@ -7,6 +7,11 @@ import {
 	loadTableContract,
 } from "../domain/policy/runtime-guards";
 import { loadPreferredCurrentState } from "../domain/projections/preferred-state";
+import {
+	readOrRefreshWorldStateReport,
+	WORLD_STATE_REPORTS,
+	type WorldStateReportId,
+} from "../domain/reports/workspace-reports";
 import { resolveBardoRoot } from "../infra/filesystem/filesystem";
 import type { AuthContext } from "../types/contracts";
 
@@ -38,6 +43,106 @@ function projectionProvenance(
 			projectionFrontmatter.source_event_count,
 		),
 	};
+}
+
+function registerWorldStateReportResources(
+	server: McpServer,
+	auth: AuthContext,
+): void {
+	const registerReportResource = (args: {
+		name: string;
+		uri: string;
+		title: string;
+		description: string;
+		reportId: WorldStateReportId;
+	}) => {
+		server.registerResource(
+			args.name,
+			args.uri,
+			{
+				title: args.title,
+				description: args.description,
+				mimeType: "text/markdown",
+			},
+			async () => {
+				const bardoRoot = resolveBardoRoot(auth.campaignBasePath);
+				const report = await readOrRefreshWorldStateReport({
+					bardoRoot,
+					reportId: args.reportId,
+				});
+				return {
+					contents: [
+						{
+							uri: args.uri,
+							text: report.rawMarkdown,
+							mimeType: "text/markdown",
+						},
+					],
+				};
+			},
+		);
+	};
+
+	registerReportResource({
+		name: "report_world_state_overview",
+		uri: WORLD_STATE_REPORTS.world_state_overview.resourceUri,
+		title: "World State Overview Report",
+		description:
+			"Readable markdown overview of current canon-backed world state.",
+		reportId: "world_state_overview",
+	});
+	registerReportResource({
+		name: "report_continuity_audit",
+		uri: WORLD_STATE_REPORTS.continuity_audit.resourceUri,
+		title: "Continuity Audit Report",
+		description:
+			"Readable markdown audit for contradictions, stale continuity, and drift.",
+		reportId: "continuity_audit",
+	});
+	registerReportResource({
+		name: "report_timeline_diff",
+		uri: WORLD_STATE_REPORTS.timeline_diff.resourceUri,
+		title: "Timeline Diff Report",
+		description: "Readable markdown summary of recent canonical changes.",
+		reportId: "timeline_diff",
+	});
+	registerReportResource({
+		name: "report_last_session_diff",
+		uri: "resource://reports/last-session-diff",
+		title: "Last Session Diff",
+		description:
+			"Readable markdown alias for the recent timeline diff workflow.",
+		reportId: "timeline_diff",
+	});
+	registerReportResource({
+		name: "report_faction_pressure",
+		uri: WORLD_STATE_REPORTS.faction_pressure_report.resourceUri,
+		title: "Faction Pressure Report",
+		description: "Readable markdown report for faction tension and pressure.",
+		reportId: "faction_pressure_report",
+	});
+	registerReportResource({
+		name: "report_npc_state_delta",
+		uri: WORLD_STATE_REPORTS.npc_state_delta.resourceUri,
+		title: "NPC State Delta Report",
+		description: "Readable markdown report for NPC changes and evidence.",
+		reportId: "npc_state_delta",
+	});
+	registerReportResource({
+		name: "report_player_knowledge",
+		uri: WORLD_STATE_REPORTS.player_knowledge_view.resourceUri,
+		title: "Player Knowledge Report",
+		description: "Readable player-safe markdown summary from the workspace.",
+		reportId: "player_knowledge_view",
+	});
+	registerReportResource({
+		name: "report_canon_vs_inference",
+		uri: WORLD_STATE_REPORTS.canon_vs_inference_report.resourceUri,
+		title: "Canon Vs Inference Report",
+		description:
+			"Readable markdown separation of canon, inference, and suggestion.",
+		reportId: "canon_vs_inference_report",
+	});
 }
 
 export function registerCoreResourcesAndPrompts(
@@ -520,6 +625,8 @@ export function registerCoreResourcesAndPrompts(
 			};
 		},
 	);
+
+	registerWorldStateReportResources(server, auth);
 
 	registerPromptVersionPair(
 		"resolve_player_action",

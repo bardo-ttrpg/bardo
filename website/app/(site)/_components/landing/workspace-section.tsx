@@ -17,21 +17,27 @@ export default function WorkspaceSection() {
 						<code className="border border-border px-1.5 py-0.5 font-mono text-xs text-foreground">
 							bardo init
 						</code>{" "}
-						in any folder and Bardo creates the entire workspace scaffold —
-						directories for NPCs, party members, locations, quests, items, and
-						world lore. Everything in plain markdown.
+						in any folder and Bardo creates the nested workspace scaffold:
+						canonical events, projections, logs, rules, world files, and local
+						docs under <code className="font-mono text-xs">bardo/docs/</code>.
 					</p>
 					<p className="mb-6 text-sm leading-relaxed text-muted-foreground">
-						Edit your files directly in any editor. Use Git to version your
-						campaign. Drop in any markdown you write and your agent will
-						incorporate it into the next session automatically.
+						Read your campaign truth directly from markdown. The fastest path is
+						usually{" "}
+						<code className="font-mono text-xs">
+							projections/current-state.md
+						</code>
+						, then{" "}
+						<code className="font-mono text-xs">events/canonical.ndjson</code>,
+						then the generated reports in{" "}
+						<code className="font-mono text-xs">logs/</code>.
 					</p>
 					<div className="border border-border bg-card/40 p-4">
 						<p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 							/ Init command
 						</p>
 						<code className="font-mono text-sm text-foreground">
-							bardo init --workspace ./the-iron-duchy
+							cd ./the-iron-duchy && bardo init
 						</code>
 					</div>
 				</div>
@@ -43,7 +49,7 @@ export default function WorkspaceSection() {
 					<CrosshairMarker className="-right-[5px] -bottom-[8px]" />
 					<LazyFileTree
 						root={bardoWorkspace}
-						defaultSelectedId="musashi"
+						defaultSelectedId="current-state"
 						className="h-full"
 					/>
 				</div>

@@ -14,11 +14,13 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 });
 
 const PRIMARY_NAV_LINKS = [
+	{ href: "/docs/install", label: "Docs" },
 	{ href: "/pricing", label: "Pricing" },
 	{ href: "/legal", label: "Legal" },
 ] as const;
 
 const FOOTER_PRODUCT_LINKS = [
+	{ label: "Docs", href: "/docs/install" },
 	{ label: "Pricing", href: "/pricing" },
 	{ label: "Legal", href: "/legal" },
 	{ label: "Sign up", href: "/sign-up" },

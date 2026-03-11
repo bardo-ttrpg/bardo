@@ -7,13 +7,14 @@ import SubscriptionDetailsCta from "./subscription-details-button";
 
 export const metadata: Metadata = {
 	title: "Pricing",
-	description: "Clerk Billing plans for Free, Solo, and Solo Plus.",
+	description:
+		"Simple Bardo pricing based on one accepted MCP tool call equaling one credit.",
 };
 
 const faqs = [
 	{
 		q: "What counts as a credit?",
-		a: "One MCP tool call consumes one credit. Credits reset each billing cycle based on your active plan interval.",
+		a: "One accepted MCP tool call consumes one credit. Resources, prompts, init/bootstrap, and website/dashboard browsing stay free.",
 	},
 	{
 		q: "Can I change plans anytime?",
@@ -48,11 +49,11 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 					/ Pricing
 				</p>
 				<h1 className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-					Simple pricing with Clerk Billing.
+					Simple pricing with one tool call equaling one credit.
 				</h1>
 				<p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-muted-foreground">
-					Start free, then scale with Solo or Solo Plus. Yearly plans offer up
-					to 27% savings versus monthly billing.
+					Start free, then scale monthly credits with Solo or Solo Plus. Billing
+					stays flat, predictable, and easy to explain.
 				</p>
 				<SubscriptionDetailsCta
 					clerkEnabled={clerkEnabled}

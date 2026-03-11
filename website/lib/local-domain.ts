@@ -1,5 +1,11 @@
 const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
+export function isLocalhostHostname(
+	hostname: string | null | undefined,
+): boolean {
+	return typeof hostname === "string" && LOCALHOST_HOSTNAMES.has(hostname);
+}
+
 function parseLocalHostFromAppUrl(
 	appUrl: string | null | undefined,
 ): string | null {
@@ -24,7 +30,7 @@ export function resolveCanonicalLocalhost({
 	requestHostname: string;
 	appUrl: string | null | undefined;
 }): string | null {
-	if (!LOCALHOST_HOSTNAMES.has(requestHostname)) {
+	if (!isLocalhostHostname(requestHostname)) {
 		return null;
 	}
 

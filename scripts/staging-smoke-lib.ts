@@ -12,6 +12,28 @@ export function appendVercelProtectionBypass(
 	return nextUrl.toString();
 }
 
+export function createVercelProtectionHeaders(
+	bypassSecret: string,
+	options: {
+		setCookie?: boolean;
+	} = {},
+): Record<string, string> {
+	const secret = bypassSecret.trim();
+	if (!secret) {
+		return {};
+	}
+
+	const headers: Record<string, string> = {
+		"x-vercel-protection-bypass": secret,
+	};
+
+	if (options.setCookie) {
+		headers["x-vercel-set-bypass-cookie"] = "true";
+	}
+
+	return headers;
+}
+
 export function parseJsonOrSseJson<T>(body: string): T {
 	const trimmed = body.trim();
 	if (!trimmed) {

@@ -5,8 +5,8 @@ import {
 	NextResponse,
 } from "next/server";
 import { isClerkAuthConfigured } from "./lib/clerk-config";
-import { shouldRedirectToCanonicalLocalhost } from "./lib/local-domain";
 import { shouldUseClerkOnlyProxyPathname } from "./lib/proxy-config";
+import { resolveProxyLocalhostRedirectTarget } from "./lib/proxy-localhost";
 
 const isProtectedRoute = createRouteMatcher([
 	"/dashboard(.*)",
@@ -37,22 +37,11 @@ function maybeRedirectToCanonicalLocalhost(
 	const forwardedHostHeader = request.headers.get("x-forwarded-host");
 	const hostHeader = request.headers.get("host");
 	const requestUrl = new URL(request.url);
-	const requestHostCandidates = [
-		forwardedHostHeader?.split(",")[0]?.trim() || null,
-		hostHeader?.split(",")[0]?.trim() || null,
-		requestUrl.host || null,
-		request.nextUrl.host || null,
-	];
-	const requestHost =
-		requestHostCandidates.find(
-			(value): value is string => typeof value === "string" && value.length > 0,
-		) ?? "";
-	const hostHeaderHostname = requestHost.split(":")[0]?.trim() || null;
-	const hostHeaderPort =
-		requestHost.split(":")[1]?.trim() || requestUrl.port || "";
-	const targetHost = shouldRedirectToCanonicalLocalhost({
-		requestHostname: hostHeaderHostname ?? request.nextUrl.hostname,
-		requestUrlHostname: requestUrl.hostname,
+	const targetHost = resolveProxyLocalhostRedirectTarget({
+		forwardedHostHeader,
+		hostHeader,
+		requestUrl: request.url,
+		nextUrlHost: request.nextUrl.host,
 		appUrl: process.env.NEXT_PUBLIC_APP_URL,
 	});
 	if (!targetHost) {
@@ -61,6 +50,11 @@ function maybeRedirectToCanonicalLocalhost(
 
 	const redirectUrl = new URL(request.url);
 	redirectUrl.hostname = targetHost;
+	const hostHeaderPort =
+		forwardedHostHeader?.split(",")[0]?.trim().split(":")[1]?.trim() ||
+		hostHeader?.split(",")[0]?.trim().split(":")[1]?.trim() ||
+		requestUrl.port ||
+		"";
 	if (hostHeaderPort) {
 		redirectUrl.port = hostHeaderPort;
 	}

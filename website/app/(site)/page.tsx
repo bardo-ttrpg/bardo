@@ -13,7 +13,7 @@ import WorldMapSection from "./_components/landing/world-map-section";
 export const metadata: Metadata = {
 	title: "Bardo",
 	description:
-		"Bardo converts AI agents into system-agnostic TTRPG game masters with deterministic runtime controls.",
+		"Bardo is a system-agnostic, local-first world-state engine for tabletop campaigns.",
 };
 
 export default function LandingPage() {

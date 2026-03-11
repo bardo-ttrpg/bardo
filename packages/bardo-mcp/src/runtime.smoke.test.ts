@@ -128,6 +128,9 @@ describe("bardo runtime smoke gate", () => {
 			await expect(
 				readFile(path.join(workspaceRoot, ".codex/config.toml"), "utf8"),
 			).resolves.toContain("[mcp_servers.bardo]");
+			await expect(
+				readFile(path.join(workspaceRoot, "bardo/docs/quickstart.md"), "utf8"),
+			).resolves.toContain("docs/how-to-read-your-world-state.md");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

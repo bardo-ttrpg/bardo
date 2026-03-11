@@ -481,10 +481,13 @@ Supported forms:
 
 1. HTTP header:
    - `x-vercel-protection-bypass: <secret>`
+   - for browser automation, also send `x-vercel-set-bypass-cookie: true` on the first request so the deployment bypass cookie is minted
 2. Query parameter:
    - `?x-vercel-protection-bypass=<secret>`
 
-Because the MCP currently stores a plain introspection URL, the simplest staging setup is to include the bypass secret as a query parameter in `BARDO_AUTH_INTROSPECTION_URL`.
+Because the MCP currently stores a plain introspection URL, the simplest staging setup for server-to-server introspection is still to include the bypass secret as a query parameter in `BARDO_AUTH_INTROSPECTION_URL`.
+
+For smoke scripts, Playwright, and other automated browser checks, prefer the documented header-based bypass so protected Preview routes can set the bypass cookie cleanly before auth loads.
 
 Example:
 
@@ -894,12 +897,14 @@ Run these after production deploys finish.
 ### 17.1 Website
 
 1. open `/`
+2. open `/docs/install`
 2. open `/pricing`
 3. open `/sign-in`
 4. sign in
 5. open `/dashboard`
 6. create API key
 7. confirm `GET /api/keys?limit=20&offset=0` returns page metadata
+8. confirm remaining credits and next reset render correctly in the dashboard
 
 ### 17.2 MCP
 
@@ -908,15 +913,22 @@ Run these after production deploys finish.
 3. initialize an MCP session
 4. confirm the response includes `mcp-session-id`
 5. call `tools/list`
-6. run `bun run --cwd mcp validate:env` against the production env model
+6. read `resource://reports/world-state-overview`
+7. call `world_state_overview`
+8. read `resource://reports/last-session-diff`
+9. call `last_session_diff`
+10. run `bun run --cwd mcp validate:env` against the production env model
 
 ### 17.3 End-to-end
 
 1. create a production API key in the website
 2. use that key against the production MCP
 3. confirm auth succeeds
-4. restart the MCP service
-5. confirm persisted customer data still exists
+4. run `bardo init` from a clean workspace and confirm `bardo/docs/` is created
+5. confirm `logs/world-state-overview.md` and `logs/continuity-audit.md` regenerate after meaningful play
+6. confirm `logs/timeline-diff.md` matches `last_session_diff` / `resource://reports/last-session-diff`
+7. restart the MCP service
+8. confirm persisted customer data still exists
 
 ### 17.4 Sentry
 

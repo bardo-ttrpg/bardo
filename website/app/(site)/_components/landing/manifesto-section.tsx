@@ -5,7 +5,7 @@ export default function ManifestoSection() {
 		<section className="border-y border-border [contain-intrinsic-size:1200px] [content-visibility:auto]">
 			<div className="mx-auto max-w-5xl">
 				<LazyTextReveal
-					text="Bardo gives your AI agent the memory, the tools, and the discipline to run tabletop campaigns that persist across sessions, agents, and machines — without losing a single plot thread."
+					text="Bardo keeps canon in local files you own, gives your agent continuity tools that stay auditable, and helps tabletop campaigns persist across sessions, agents, and machines without losing the plot."
 					className="h-[160vh]"
 				/>
 			</div>

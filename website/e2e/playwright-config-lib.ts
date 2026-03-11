@@ -3,7 +3,7 @@ export function resolvePlaywrightBaseUrl(
 	port: number,
 ): string {
 	const configuredLoopbackHost = env.PLAYWRIGHT_LOOPBACK_HOST;
-	const defaultHost = configuredLoopbackHost ?? "127.0.0.1";
+	const defaultHost = configuredLoopbackHost ?? "localhost";
 	const defaultBaseUrl = defaultHost.includes(":")
 		? `http://[${defaultHost}]:${String(port)}`
 		: `http://${defaultHost}:${String(port)}`;
@@ -11,11 +11,38 @@ export function resolvePlaywrightBaseUrl(
 	return env.PLAYWRIGHT_BASE_URL ?? defaultBaseUrl;
 }
 
+export function resolvePlaywrightExtraHttpHeaders(
+	env: Record<string, string | undefined>,
+): Record<string, string> {
+	const bypassSecret =
+		env.PLAYWRIGHT_VERCEL_PROTECTION_BYPASS_SECRET?.trim() ??
+		env.STAGING_VERCEL_PROTECTION_BYPASS_SECRET?.trim() ??
+		"";
+
+	if (!bypassSecret) {
+		return {};
+	}
+
+	return {
+		"x-vercel-protection-bypass": bypassSecret,
+		"x-vercel-set-bypass-cookie": "true",
+	};
+}
+
+export function resolvePlaywrightLocalAppUrl(
+	host: string,
+	port: number,
+): string {
+	return host.includes(":")
+		? `http://[${host}]:${String(port)}`
+		: `http://${host}:${String(port)}`;
+}
+
 export function resolvePlaywrightWebServerHost(
 	env: Record<string, string | undefined>,
 	_baseURL: string,
 ): string {
-	return env.PLAYWRIGHT_LOOPBACK_HOST ?? "127.0.0.1";
+	return env.PLAYWRIGHT_LOOPBACK_HOST ?? "localhost";
 }
 
 export function resolvePlaywrightWebServerPort(

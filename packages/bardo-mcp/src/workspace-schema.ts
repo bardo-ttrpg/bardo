@@ -5,6 +5,7 @@ export const BARDO_ROOT_DIRNAME = "bardo";
 export const CANONICAL_DIRECTORIES = [
 	"_settings",
 	"context",
+	"docs",
 	"rules",
 	"party",
 	"entities",
@@ -21,6 +22,7 @@ export const CANONICAL_DIRECTORIES = [
 ] as const;
 
 export const NESTED_DIRECTORIES = [
+	"docs/clients",
 	"rules/sources/system",
 	"rules/sources/rulebook",
 	"rules/sources/character-sheets",

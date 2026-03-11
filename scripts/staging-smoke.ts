@@ -1,5 +1,5 @@
 import {
-	appendVercelProtectionBypass,
+	createVercelProtectionHeaders,
 	parseJsonOrSseJson,
 } from "./staging-smoke-lib";
 
@@ -115,6 +115,29 @@ function assertJsonRpcSuccess<T>(
 	return "result" in payload;
 }
 
+function hasStructuredReportMarkdown(value: unknown, heading: string): boolean {
+	if (!value || typeof value !== "object") {
+		return false;
+	}
+
+	const candidate = value as {
+		rawMarkdown?: unknown;
+		content?: Array<{ text?: unknown }>;
+	};
+
+	if (
+		typeof candidate.rawMarkdown === "string" &&
+		candidate.rawMarkdown.includes(heading)
+	) {
+		return true;
+	}
+
+	const contentText = candidate.content
+		?.map((entry) => (typeof entry.text === "string" ? entry.text : ""))
+		.join("\n");
+	return typeof contentText === "string" && contentText.includes(heading);
+}
+
 async function main() {
 	const websiteUrl = readRequiredEnv("STAGING_WEBSITE_URL");
 	const mcpUrl = readRequiredEnv("STAGING_MCP_URL");
@@ -128,15 +151,19 @@ async function main() {
 		"STAGING_VERCEL_PROTECTION_BYPASS_SECRET",
 		"",
 	);
-	const withWebsiteBypass = (url: string) =>
-		appendVercelProtectionBypass(url, websiteProtectionBypassSecret);
+	const websiteProtectionHeaders = createVercelProtectionHeaders(
+		websiteProtectionBypassSecret,
+	);
 
 	const checks: CheckResult[] = [];
 
 	checks.push(
 		await expectStatus({
 			name: "website root",
-			url: withWebsiteBypass(websiteUrl),
+			url: websiteUrl,
+			init: {
+				headers: websiteProtectionHeaders,
+			},
 			expectedStatuses: [200, 301, 302, 307, 308],
 		}),
 	);
@@ -149,10 +176,9 @@ async function main() {
 	checks.push(healthResult);
 
 	const introspection = await postJson<{ valid?: boolean }>({
-		url: withWebsiteBypass(
-			new URL("/api/auth/introspect-key", websiteUrl).toString(),
-		),
+		url: new URL("/api/auth/introspect-key", websiteUrl).toString(),
 		headers: {
+			...websiteProtectionHeaders,
 			"x-bardo-introspection-token": introspectionToken,
 		},
 		body: {
@@ -309,6 +335,125 @@ async function main() {
 		details: promptNames.join(", "),
 	});
 
+	const reportResource = await postJson<
+		JsonRpcResponse<{ contents?: Array<{ text?: string }> }>
+	>({
+		url: mcpUrl,
+		headers: sessionHeaders,
+		body: {
+			jsonrpc: "2.0",
+			id: 51,
+			method: "resources/read",
+			params: {
+				uri: "resource://reports/world-state-overview",
+			},
+		},
+	});
+	const reportResourceMarkdown =
+		reportResource.response.ok && assertJsonRpcSuccess(reportResource.json)
+			? (reportResource.json.result.contents?.[0]?.text ?? "")
+			: "";
+	checks.push({
+		name: "mcp report resource",
+		ok:
+			reportResource.response.ok &&
+			reportResourceMarkdown.includes("# World State Overview") &&
+			reportResourceMarkdown.includes("events/canonical.ndjson"),
+		details: reportResourceMarkdown.slice(0, 120),
+	});
+
+	const lastSessionResource = await postJson<
+		JsonRpcResponse<{ contents?: Array<{ text?: string }> }>
+	>({
+		url: mcpUrl,
+		headers: sessionHeaders,
+		body: {
+			jsonrpc: "2.0",
+			id: 52,
+			method: "resources/read",
+			params: {
+				uri: "resource://reports/last-session-diff",
+			},
+		},
+	});
+	const lastSessionResourceMarkdown =
+		lastSessionResource.response.ok &&
+		assertJsonRpcSuccess(lastSessionResource.json)
+			? (lastSessionResource.json.result.contents?.[0]?.text ?? "")
+			: "";
+	checks.push({
+		name: "mcp last-session resource",
+		ok:
+			lastSessionResource.response.ok &&
+			lastSessionResourceMarkdown.includes("# Timeline Diff") &&
+			lastSessionResourceMarkdown.includes("Evidence references:"),
+		details: lastSessionResourceMarkdown.slice(0, 120),
+	});
+
+	const reportTool = await postJson<
+		JsonRpcResponse<{
+			structuredContent?: { success?: boolean; rawMarkdown?: string };
+		}>
+	>({
+		url: mcpUrl,
+		headers: sessionHeaders,
+		body: {
+			jsonrpc: "2.0",
+			id: 53,
+			method: "tools/call",
+			params: {
+				name: "world_state_overview",
+				arguments: {},
+			},
+		},
+	});
+	const reportToolContent =
+		reportTool.response.ok && assertJsonRpcSuccess(reportTool.json)
+			? reportTool.json.result.structuredContent
+			: undefined;
+	checks.push({
+		name: "mcp report tool",
+		ok:
+			reportTool.response.ok &&
+			reportToolContent?.success === true &&
+			hasStructuredReportMarkdown(reportToolContent, "# World State Overview"),
+		details: JSON.stringify(
+			reportToolContent ?? "missing structured content",
+		).slice(0, 120),
+	});
+
+	const lastSessionTool = await postJson<
+		JsonRpcResponse<{
+			structuredContent?: { success?: boolean; rawMarkdown?: string };
+		}>
+	>({
+		url: mcpUrl,
+		headers: sessionHeaders,
+		body: {
+			jsonrpc: "2.0",
+			id: 54,
+			method: "tools/call",
+			params: {
+				name: "last_session_diff",
+				arguments: {},
+			},
+		},
+	});
+	const lastSessionToolContent =
+		lastSessionTool.response.ok && assertJsonRpcSuccess(lastSessionTool.json)
+			? lastSessionTool.json.result.structuredContent
+			: undefined;
+	checks.push({
+		name: "mcp last-session tool",
+		ok:
+			lastSessionTool.response.ok &&
+			lastSessionToolContent?.success === true &&
+			hasStructuredReportMarkdown(lastSessionToolContent, "# Timeline Diff"),
+		details: JSON.stringify(
+			lastSessionToolContent ?? "missing structured content",
+		).slice(0, 120),
+	});
+
 	const sceneTurn = await postJson<
 		JsonRpcResponse<{
 			structuredContent?: {
@@ -358,11 +503,10 @@ async function main() {
 	});
 
 	const runtimeStatus = await fetchWithTimeout(
-		withWebsiteBypass(
-			new URL("/api/connect/runtime-status", websiteUrl).toString(),
-		),
+		new URL("/api/connect/runtime-status", websiteUrl).toString(),
 		{
 			headers: {
+				...websiteProtectionHeaders,
 				BARDO_API_KEY: apiKey,
 			},
 		},
@@ -375,9 +519,8 @@ async function main() {
 	});
 
 	const snippets = await postJson<{ baseUrl?: string; snippet?: string }>({
-		url: withWebsiteBypass(
-			new URL("/api/connect/snippets", websiteUrl).toString(),
-		),
+		url: new URL("/api/connect/snippets", websiteUrl).toString(),
+		headers: websiteProtectionHeaders,
 		body: {
 			client: connectClient,
 			mode: connectMode,
@@ -405,9 +548,8 @@ async function main() {
 		  }
 		| { error?: string }
 	>({
-		url: withWebsiteBypass(
-			new URL("/api/connect/cli-session/start", websiteUrl).toString(),
-		),
+		url: new URL("/api/connect/cli-session/start", websiteUrl).toString(),
+		headers: websiteProtectionHeaders,
 		body: {},
 	});
 	const pollUrl =
@@ -430,7 +572,9 @@ async function main() {
 	});
 
 	if (pollUrl) {
-		const pendingPoll = await fetchWithTimeout(withWebsiteBypass(pollUrl), {});
+		const pendingPoll = await fetchWithTimeout(pollUrl, {
+			headers: websiteProtectionHeaders,
+		});
 		const pendingPollJson = (await pendingPoll.json()) as {
 			status?: string;
 			intervalMs?: number;
@@ -455,13 +599,12 @@ async function main() {
 		});
 	} else {
 		const authHeaders = {
+			...websiteProtectionHeaders,
 			cookie: authCookie,
 		};
 
 		const authKeys = await fetchWithTimeout(
-			withWebsiteBypass(
-				new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
-			),
+			new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
 			{
 				headers: authHeaders,
 			},
@@ -480,13 +623,33 @@ async function main() {
 			details: `${authKeys.status} keys=${String(authKeysJson.keys?.length ?? 0)}`,
 		});
 
+		const existingKeyId = authKeysJson.keys?.[0]?.id?.trim() || "";
+		if (existingKeyId) {
+			const keySlotRecovery = await fetchWithTimeout(
+				new URL(`/api/keys/${existingKeyId}`, websiteUrl).toString(),
+				{
+					method: "DELETE",
+					headers: authHeaders,
+				},
+			);
+			const keySlotRecoveryJson = (await keySlotRecovery.json()) as {
+				revoked?: boolean;
+				error?: string;
+			};
+			checks.push({
+				name: "website authenticated key-slot recovery",
+				ok: keySlotRecovery.ok && keySlotRecoveryJson.revoked === true,
+				details: `${keySlotRecovery.status} revoked=${String(keySlotRecoveryJson.revoked)}`,
+			});
+		}
+
 		const keyName = `staging-smoke-${Date.now()}`;
 		const createdKey = await postJson<{
 			key?: { id?: string; name?: string };
 			secret?: string;
 			error?: string;
 		}>({
-			url: withWebsiteBypass(new URL("/api/keys", websiteUrl).toString()),
+			url: new URL("/api/keys", websiteUrl).toString(),
 			headers: authHeaders,
 			body: {
 				name: keyName,
@@ -507,9 +670,7 @@ async function main() {
 
 		if (createdKeyId) {
 			const deleteResponse = await fetchWithTimeout(
-				withWebsiteBypass(
-					new URL(`/api/keys/${createdKeyId}`, websiteUrl).toString(),
-				),
+				new URL(`/api/keys/${createdKeyId}`, websiteUrl).toString(),
 				{
 					method: "DELETE",
 					headers: authHeaders,
@@ -528,9 +689,7 @@ async function main() {
 
 		if (cliSessionId) {
 			const approval = await postJson<{ ok?: boolean; error?: string }>({
-				url: withWebsiteBypass(
-					new URL("/api/connect/cli-session/approve", websiteUrl).toString(),
-				),
+				url: new URL("/api/connect/cli-session/approve", websiteUrl).toString(),
 				headers: authHeaders,
 				body: {
 					sessionId: cliSessionId,
@@ -543,10 +702,9 @@ async function main() {
 			});
 
 			if (pollUrl) {
-				const approvedPoll = await fetchWithTimeout(
-					withWebsiteBypass(pollUrl),
-					{},
-				);
+				const approvedPoll = await fetchWithTimeout(pollUrl, {
+					headers: websiteProtectionHeaders,
+				});
 				const approvedPollJson = (await approvedPoll.json()) as {
 					status?: string;
 					apiKey?: string;
@@ -564,9 +722,10 @@ async function main() {
 
 				if (approvedPollJson.apiKey && approvedPollJson.statusUrl) {
 					const approvedRuntimeStatus = await fetchWithTimeout(
-						withWebsiteBypass(approvedPollJson.statusUrl),
+						approvedPollJson.statusUrl,
 						{
 							headers: {
+								...websiteProtectionHeaders,
 								BARDO_API_KEY: approvedPollJson.apiKey,
 							},
 						},
@@ -582,6 +741,38 @@ async function main() {
 							approvedRuntimeStatusJson.valid === true,
 						details: `${approvedRuntimeStatus.status} valid=${String(approvedRuntimeStatusJson.valid)}`,
 					});
+
+					const approvedKeyList = await fetchWithTimeout(
+						new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
+						{
+							headers: authHeaders,
+						},
+					);
+					const approvedKeyListJson = (await approvedKeyList.json()) as {
+						keys?: Array<{ id?: string }>;
+					};
+					const approvedKeyId = approvedKeyListJson.keys?.[0]?.id?.trim() || "";
+					if (approvedKeyId) {
+						const releaseApprovedKey = await fetchWithTimeout(
+							new URL(`/api/keys/${approvedKeyId}`, websiteUrl).toString(),
+							{
+								method: "DELETE",
+								headers: authHeaders,
+							},
+						);
+						const releaseApprovedKeyJson =
+							(await releaseApprovedKey.json()) as {
+								revoked?: boolean;
+								error?: string;
+							};
+						checks.push({
+							name: "website cli-session key cleanup",
+							ok:
+								releaseApprovedKey.ok &&
+								releaseApprovedKeyJson.revoked === true,
+							details: `${releaseApprovedKey.status} revoked=${String(releaseApprovedKeyJson.revoked)}`,
+						});
+					}
 				}
 			}
 		}
@@ -591,9 +782,7 @@ async function main() {
 			exchangeUrl?: string;
 			error?: string;
 		}>({
-			url: withWebsiteBypass(
-				new URL("/api/connect/cli-token", websiteUrl).toString(),
-			),
+			url: new URL("/api/connect/cli-token", websiteUrl).toString(),
 			headers: authHeaders,
 			body: {},
 		});
@@ -612,7 +801,8 @@ async function main() {
 				statusUrl?: string;
 				error?: string;
 			}>({
-				url: withWebsiteBypass(cliToken.json.exchangeUrl),
+				url: cliToken.json.exchangeUrl,
+				headers: websiteProtectionHeaders,
 				body: {
 					token: cliToken.json.loginToken,
 				},
@@ -628,9 +818,10 @@ async function main() {
 
 			if (cliExchange.json.apiKey && cliExchange.json.statusUrl) {
 				const exchangedRuntimeStatus = await fetchWithTimeout(
-					withWebsiteBypass(cliExchange.json.statusUrl),
+					cliExchange.json.statusUrl,
 					{
 						headers: {
+							...websiteProtectionHeaders,
 							BARDO_API_KEY: cliExchange.json.apiKey,
 						},
 					},

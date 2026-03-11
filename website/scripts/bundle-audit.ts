@@ -18,10 +18,15 @@ async function collectFiles(dir: string): Promise<string[]> {
 
 async function main() {
 	const nextDir = join(process.cwd(), ".next");
-	const analyzeDir = join(nextDir, "analyze");
+	const analyzeDir = join(nextDir, "diagnostics", "analyze");
+	const legacyAnalyzeDir = join(nextDir, "analyze");
 	const chunkDir = join(nextDir, "static", "chunks");
 
-	const analyzeArtifacts = (await readdir(analyzeDir).catch(() => []))
+	const analyzeArtifacts = (
+		await readdir(analyzeDir).catch(async () => {
+			return await readdir(legacyAnalyzeDir).catch(() => []);
+		})
+	)
 		.filter((name) => name.endsWith(".html"))
 		.sort();
 	const chunkPaths = (await collectFiles(chunkDir)).filter((path) =>

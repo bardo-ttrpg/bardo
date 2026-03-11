@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { authStorageStatePath } from "./e2e/clerk-env";
 import {
 	resolvePlaywrightBaseUrl,
+	resolvePlaywrightExtraHttpHeaders,
+	resolvePlaywrightLocalAppUrl,
 	resolvePlaywrightWebServerHost,
 	resolvePlaywrightWebServerPort,
 } from "./e2e/playwright-config-lib";
@@ -19,7 +21,9 @@ const webServerPort = resolvePlaywrightWebServerPort(
 	baseURL,
 	port,
 );
-const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${webServerHost} PORT=${String(webServerPort)} bun run dev:e2e`;
+const localAppUrl = resolvePlaywrightLocalAppUrl(webServerHost, webServerPort);
+const extraHTTPHeaders = resolvePlaywrightExtraHttpHeaders(process.env);
+const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${webServerHost} NEXT_PUBLIC_APP_URL=${localAppUrl} PORT=${String(webServerPort)} bun run dev:e2e`;
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -38,6 +42,7 @@ export default defineConfig({
 		baseURL,
 		trace: "on-first-retry",
 		headless: true,
+		extraHTTPHeaders,
 	},
 	projects: [
 		{
