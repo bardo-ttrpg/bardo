@@ -95,7 +95,35 @@ describe("resolveUsageMetering", () => {
 		expect(batch.units).toBe(2);
 	});
 
-	test("still bills orchestrator API routes once per POST", async () => {
+	test("does not bill non-tool MCP methods", async () => {
+		const result = await resolveUsageMetering(
+			new Request("http://localhost/mcp", {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					jsonrpc: "2.0",
+					id: 7,
+					method: "resources/read",
+					params: {
+						uri: "resource://campaign/current-summary",
+					},
+				}),
+			}),
+			{
+				isMcpRoute: true,
+				isTurnsApiRoute: false,
+				isInitBootstrapApiRoute: false,
+				isWorldTickApiRoute: false,
+			},
+		);
+
+		expect(result.units).toBe(0);
+		expect(result.metadata?.method).toBe("resources/read");
+	});
+
+	test("does not bill orchestrator API routes directly", async () => {
 		const result = await resolveUsageMetering(
 			new Request("http://localhost/api/v1/turns/resolve", {
 				method: "POST",
@@ -112,7 +140,7 @@ describe("resolveUsageMetering", () => {
 			},
 		);
 
-		expect(result.units).toBe(1);
+		expect(result.units).toBe(0);
 		expect(result.metadata).toBeNull();
 	});
 });

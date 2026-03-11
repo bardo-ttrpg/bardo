@@ -31,8 +31,12 @@ describe("GET /api/billing", () => {
 			plan: "solo",
 			creditsTotal: 25000,
 			creditsUsed: 12,
+			creditsRemaining: 24988,
 			mcpCallsTotal: 42,
 			mcpCallsThisPeriod: 12,
+			currentPeriodEnd: 2,
+			billingInterval: "month",
+			subscriptionStatus: "active",
 		});
 		expect(body.billing.apiKeyCallsTotal).toBeUndefined();
 		expect(body.billing.apiKeyCallsThisPeriod).toBeUndefined();

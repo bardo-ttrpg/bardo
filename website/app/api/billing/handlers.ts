@@ -61,6 +61,7 @@ export function createBillingGetHandler(
 			plan: live.plan,
 			creditsTotal,
 			creditsUsed: usage.thisPeriod,
+			creditsRemaining: Math.max(creditsTotal - usage.thisPeriod, 0),
 			periodStart: live.periodStart,
 			mcpCallsTotal: usage.total,
 			mcpCallsThisPeriod: usage.thisPeriod,

@@ -37,9 +37,15 @@ type BillingState = {
 	plan: string;
 	creditsTotal: number;
 	creditsUsed: number;
+	creditsRemaining: number;
 	periodStart: number;
 	mcpCallsTotal: number;
 	mcpCallsThisPeriod: number;
+	subscriptionStatus: string;
+	subscriptionId: string | null;
+	billingInterval: "month" | "year" | null;
+	currentPeriodEnd: number | null;
+	cancelAtPeriodEnd: boolean;
 };
 
 export type DashboardData = {

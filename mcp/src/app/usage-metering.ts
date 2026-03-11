@@ -26,7 +26,7 @@ export async function resolveUsageMetering(
 	}
 
 	if (!flags.isMcpRoute) {
-		return { units: 1, metadata: null };
+		return { units: 0, metadata: null };
 	}
 
 	const metadata = await readJsonRpcMetadata(request);

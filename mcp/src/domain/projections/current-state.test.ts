@@ -161,4 +161,62 @@ describe("regenerateCurrentStateProjection", () => {
 
 		await rm(root, { recursive: true, force: true });
 	});
+
+	test("regenerates markdown world-state reports alongside the projection", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-projection-reports-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: "evt-report-1",
+				type: "player_action_resolved",
+				atISO: "2026-02-23T02:30:00.000Z",
+				source: "player_action",
+				data: {
+					action: "I question the ferrymaster about the missing tax barge",
+					worldTimeAfterISO: "2026-02-23T02:30:00.000Z",
+					locationAfter: "river-market",
+					createdNpcIds: ["ferrymaster"],
+					createdLocationIds: ["river-market"],
+				},
+			},
+		});
+
+		await regenerateCurrentStateProjection({ bardoRoot });
+
+		const reportPaths = [
+			"logs/world-state-overview.md",
+			"logs/continuity-audit.md",
+			"logs/timeline-diff.md",
+			"logs/faction-pressure.md",
+			"logs/player-knowledge.md",
+			"logs/canon-vs-inference.md",
+		];
+
+		for (const reportPath of reportPaths) {
+			const raw = await readFile(path.join(bardoRoot, reportPath), "utf8");
+			expect(raw).toContain("## Canon");
+			expect(raw).toContain("## Inference");
+			expect(raw).toContain("## Suggestion");
+		}
+
+		const worldStateOverview = await readFile(
+			path.join(bardoRoot, "logs/world-state-overview.md"),
+			"utf8",
+		);
+		expect(worldStateOverview).toContain("river-market");
+		expect(worldStateOverview).toContain("evt-report-1");
+
+		const continuityAudit = await readFile(
+			path.join(bardoRoot, "logs/continuity-audit.md"),
+			"utf8",
+		);
+		expect(continuityAudit).toContain("Consistency check");
+		expect(continuityAudit).toContain("events/canonical.ndjson");
+
+		await rm(root, { recursive: true, force: true });
+	});
 });

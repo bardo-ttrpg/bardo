@@ -29,7 +29,7 @@ function formatDate(value: number | null | undefined): string {
 	return new Date(value).toLocaleString();
 }
 
-function BillingPlanCard({
+export function BillingPlanCard({
 	billingLoading,
 	billing,
 	mcpPeriodLimit,
@@ -55,11 +55,18 @@ function BillingPlanCard({
 						<strong>{billing.mcpCallsThisPeriod.toLocaleString()}</strong> /{" "}
 						{mcpPeriodLimit.toLocaleString()}
 					</p>
+					<p className="text-sm">
+						Credits remaining:{" "}
+						<strong>{billing.creditsRemaining.toLocaleString()}</strong>
+					</p>
 					<p className="text-sm text-muted-foreground">
 						MCP calls total: {billing.mcpCallsTotal.toLocaleString()}
 					</p>
 					<p className="text-sm text-muted-foreground">
-						Credits: {billing.creditsTotal.toLocaleString()}
+						Credits total: {billing.creditsTotal.toLocaleString()}
+					</p>
+					<p className="text-sm text-muted-foreground">
+						Next reset: {formatDate(billing.currentPeriodEnd)}
 					</p>
 				</div>
 			) : (
