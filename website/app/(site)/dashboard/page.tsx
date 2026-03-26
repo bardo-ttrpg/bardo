@@ -1,9 +1,8 @@
+import { createPrivateMetadata } from "@/lib/site-metadata";
 import { DashboardClient } from "./dashboard-client";
 
-export const metadata = {
-	title: "Dashboard",
-};
+export const metadata = createPrivateMetadata("Dashboard");
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
 	return <DashboardClient />;
 }

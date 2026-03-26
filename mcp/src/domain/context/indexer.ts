@@ -1,5 +1,4 @@
 import { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
 import { readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withKeyedLock } from "../../infra/concurrency/keyed-lock";
@@ -31,6 +30,12 @@ CREATE TABLE IF NOT EXISTS docs (
 
 CREATE INDEX IF NOT EXISTS idx_docs_source_dir ON docs(source_dir);
 CREATE INDEX IF NOT EXISTS idx_docs_updated_at_iso ON docs(updated_at_iso);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(
+  relative_path UNINDEXED,
+  title,
+  body
+);
 `;
 
 function contextIndexPath(bardoRoot: string): string {
@@ -45,10 +50,16 @@ function contextIndexManifestPath(bardoRoot: string): string {
 }
 
 type ContextIndexManifest = {
-	version: 1;
-	corpusFingerprint: string;
+	version: 2;
 	docsIndexed: number;
 	updatedAtISO: string;
+	docs: Record<
+		string,
+		{
+			size: number;
+			mtimeMs: number;
+		}
+	>;
 };
 
 function topLevelDir(relativePath: string): string {
@@ -127,6 +138,7 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 	try {
 		db.exec(INDEX_SCHEMA);
 		db.exec("DELETE FROM docs");
+		db.exec("DELETE FROM docs_fts");
 
 		const insertStmt = db.prepare(
 			`INSERT INTO docs (
@@ -137,6 +149,13 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 				body_chars,
 				updated_at_iso
 			) VALUES (?, ?, ?, ?, ?, ?)`,
+		);
+		const insertFtsStmt = db.prepare(
+			`INSERT INTO docs_fts (
+				relative_path,
+				title,
+				body
+			) VALUES (?, ?, ?)`,
 		);
 
 		const markdownPaths = await listMarkdownFilesRecursive(bardoRoot);
@@ -165,6 +184,7 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 				doc.bodyChars,
 				doc.updatedAtISO,
 			);
+			insertFtsStmt.run(doc.relativePath, doc.title, doc.body);
 			docsIndexed += 1;
 		}
 
@@ -174,24 +194,32 @@ export async function rebuildContextIndex(bardoRoot: string): Promise<{
 	}
 }
 
-function parseManifest(
-	raw: string | null,
-): { corpusFingerprint: string; docsIndexed: number } | null {
+function parseManifest(raw: string | null): ContextIndexManifest | null {
 	if (!raw || raw.trim().length === 0) {
 		return null;
 	}
 	try {
 		const parsed = JSON.parse(raw) as Partial<ContextIndexManifest>;
 		if (
-			typeof parsed.corpusFingerprint !== "string" ||
-			typeof parsed.docsIndexed !== "number"
+			parsed.version !== 2 ||
+			typeof parsed.docsIndexed !== "number" ||
+			typeof parsed.updatedAtISO !== "string" ||
+			!parsed.docs ||
+			typeof parsed.docs !== "object"
 		) {
 			return null;
 		}
-		return {
-			corpusFingerprint: parsed.corpusFingerprint,
-			docsIndexed: parsed.docsIndexed,
-		};
+		for (const value of Object.values(parsed.docs)) {
+			if (
+				!value ||
+				typeof value !== "object" ||
+				typeof value.size !== "number" ||
+				typeof value.mtimeMs !== "number"
+			) {
+				return null;
+			}
+		}
+		return parsed as ContextIndexManifest;
 	} catch {
 		return null;
 	}
@@ -206,9 +234,25 @@ async function hasIndexFile(indexPath: string): Promise<boolean> {
 	}
 }
 
-async function computeCorpusFingerprint(bardoRoot: string): Promise<string> {
+async function scanMarkdownCorpus(bardoRoot: string): Promise<
+	Map<
+		string,
+		{
+			filePath: string;
+			size: number;
+			mtimeMs: number;
+		}
+	>
+> {
 	const markdownPaths = await listMarkdownFilesRecursive(bardoRoot);
-	const rows: string[] = [];
+	const docs = new Map<
+		string,
+		{
+			filePath: string;
+			size: number;
+			mtimeMs: number;
+		}
+	>();
 	for (const filePath of markdownPaths) {
 		const relativePath = path
 			.relative(bardoRoot, filePath)
@@ -217,15 +261,82 @@ async function computeCorpusFingerprint(bardoRoot: string): Promise<string> {
 			continue;
 		}
 		const details = await stat(filePath);
-		rows.push(`${relativePath}|${details.size}|${details.mtimeMs}`);
+		docs.set(relativePath, {
+			filePath,
+			size: details.size,
+			mtimeMs: details.mtimeMs,
+		});
 	}
-	rows.sort((left, right) => left.localeCompare(right));
-	const hasher = createHash("sha256");
-	for (const row of rows) {
-		hasher.update(row);
-		hasher.update("\n");
+	return docs;
+}
+
+function diffCorpusAgainstManifest(args: {
+	scannedDocs: Map<
+		string,
+		{
+			filePath: string;
+			size: number;
+			mtimeMs: number;
+		}
+	>;
+	manifest: ContextIndexManifest | null;
+}): {
+	changed: string[];
+	removed: string[];
+} {
+	if (!args.manifest) {
+		return {
+			changed: Array.from(args.scannedDocs.keys()),
+			removed: [],
+		};
 	}
-	return hasher.digest("hex");
+
+	const changed: string[] = [];
+	for (const [relativePath, details] of args.scannedDocs.entries()) {
+		const previous = args.manifest.docs[relativePath];
+		if (
+			!previous ||
+			previous.size !== details.size ||
+			previous.mtimeMs !== details.mtimeMs
+		) {
+			changed.push(relativePath);
+		}
+	}
+	const removed = Object.keys(args.manifest.docs).filter(
+		(relativePath) => !args.scannedDocs.has(relativePath),
+	);
+	return { changed, removed };
+}
+
+async function writeContextIndexManifest(args: {
+	bardoRoot: string;
+	docsIndexed: number;
+	scannedDocs: Map<
+		string,
+		{
+			filePath: string;
+			size: number;
+			mtimeMs: number;
+		}
+	>;
+}): Promise<void> {
+	const manifestPath = contextIndexManifestPath(args.bardoRoot);
+	const nextManifest: ContextIndexManifest = {
+		version: 2,
+		docsIndexed: args.docsIndexed,
+		updatedAtISO: new Date().toISOString(),
+		docs: Object.fromEntries(
+			Array.from(args.scannedDocs.entries()).map(([relativePath, details]) => [
+				relativePath,
+				{
+					size: details.size,
+					mtimeMs: details.mtimeMs,
+				},
+			]),
+		),
+	};
+	await ensureParentDirectoryExists(manifestPath);
+	await writeFile(manifestPath, JSON.stringify(nextManifest, null, 2), "utf8");
 }
 
 export async function refreshContextIndex(bardoRoot: string): Promise<{
@@ -235,17 +346,18 @@ export async function refreshContextIndex(bardoRoot: string): Promise<{
 }> {
 	return withKeyedLock(`context-index:${bardoRoot}`, async () => {
 		const indexPath = contextIndexPath(bardoRoot);
-		const manifestPath = contextIndexManifestPath(bardoRoot);
-		const corpusFingerprint = await computeCorpusFingerprint(bardoRoot);
+		const scannedDocs = await scanMarkdownCorpus(bardoRoot);
 		const [manifestRaw, indexExists] = await Promise.all([
-			readTextIfExists(manifestPath),
+			readTextIfExists(contextIndexManifestPath(bardoRoot)),
 			hasIndexFile(indexPath),
 		]);
 		const manifest = parseManifest(manifestRaw);
+		const delta = diffCorpusAgainstManifest({ scannedDocs, manifest });
 		if (
 			indexExists &&
 			manifest &&
-			manifest.corpusFingerprint === corpusFingerprint
+			delta.changed.length === 0 &&
+			delta.removed.length === 0
 		) {
 			return {
 				indexPath,
@@ -254,25 +366,125 @@ export async function refreshContextIndex(bardoRoot: string): Promise<{
 			};
 		}
 
-		const rebuilt = await rebuildContextIndex(bardoRoot);
-		const nextManifest: ContextIndexManifest = {
-			version: 1,
-			corpusFingerprint,
-			docsIndexed: rebuilt.docsIndexed,
-			updatedAtISO: new Date().toISOString(),
-		};
-		await ensureParentDirectoryExists(manifestPath);
-		await writeFile(
-			manifestPath,
-			JSON.stringify(nextManifest, null, 2),
-			"utf8",
-		);
+		if (!indexExists || !manifest) {
+			const rebuilt = await rebuildContextIndex(bardoRoot);
+			await writeContextIndexManifest({
+				bardoRoot,
+				docsIndexed: rebuilt.docsIndexed,
+				scannedDocs,
+			});
+			return {
+				indexPath: rebuilt.indexPath,
+				docsIndexed: rebuilt.docsIndexed,
+				indexRebuilt: true,
+			};
+		}
+
+		const db = new Database(indexPath);
+		try {
+			db.exec(INDEX_SCHEMA);
+			const deleteDocStmt = db.prepare(
+				"DELETE FROM docs WHERE relative_path = ?",
+			);
+			const deleteFtsStmt = db.prepare(
+				"DELETE FROM docs_fts WHERE relative_path = ?",
+			);
+			const upsertDocStmt = db.prepare(
+				`INSERT INTO docs (
+					relative_path,
+					source_dir,
+					title,
+					body,
+					body_chars,
+					updated_at_iso
+				) VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT(relative_path) DO UPDATE SET
+					source_dir = excluded.source_dir,
+					title = excluded.title,
+					body = excluded.body,
+					body_chars = excluded.body_chars,
+					updated_at_iso = excluded.updated_at_iso`,
+			);
+			const insertFtsStmt = db.prepare(
+				`INSERT INTO docs_fts (
+					relative_path,
+					title,
+					body
+				) VALUES (?, ?, ?)`,
+			);
+			const nowIso = new Date().toISOString();
+
+			for (const relativePath of delta.removed) {
+				deleteDocStmt.run(relativePath);
+				deleteFtsStmt.run(relativePath);
+			}
+
+			for (const relativePath of delta.changed) {
+				const details = scannedDocs.get(relativePath);
+				if (!details) {
+					continue;
+				}
+				const raw = await readTextIfExists(details.filePath);
+				if (raw === null) {
+					deleteDocStmt.run(relativePath);
+					deleteFtsStmt.run(relativePath);
+					continue;
+				}
+				const doc = normalizeDoc({
+					bardoRoot,
+					filePath: details.filePath,
+					raw,
+					nowIso,
+				});
+				upsertDocStmt.run(
+					doc.relativePath,
+					doc.sourceDir,
+					doc.title,
+					doc.body,
+					doc.bodyChars,
+					doc.updatedAtISO,
+				);
+				deleteFtsStmt.run(doc.relativePath);
+				insertFtsStmt.run(doc.relativePath, doc.title, doc.body);
+			}
+		} finally {
+			db.close();
+		}
+
+		await writeContextIndexManifest({
+			bardoRoot,
+			docsIndexed: scannedDocs.size,
+			scannedDocs,
+		});
 		return {
-			indexPath: rebuilt.indexPath,
-			docsIndexed: rebuilt.docsIndexed,
+			indexPath,
+			docsIndexed: scannedDocs.size,
 			indexRebuilt: true,
 		};
 	});
+}
+
+function tokenizeSearchTerms(query: string): string[] {
+	const normalized = query
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9_]+/g, " ")
+		.trim();
+	if (!normalized) {
+		return [];
+	}
+	return normalized
+		.split(/\s+/)
+		.map((token) => token.trim())
+		.filter((token) => token.length >= 2);
+}
+
+function buildFtsQuery(tokens: string[]): string | null {
+	if (tokens.length === 0) {
+		return null;
+	}
+	return tokens
+		.map((token) => `"${token.replaceAll('"', '""')}"*`)
+		.join(" OR ");
 }
 
 export function queryContextDocs(args: {
@@ -294,25 +506,51 @@ export function queryContextDocs(args: {
 
 	try {
 		const focusDir = args.focus === "all" ? null : args.focus;
-		const queryLower = args.query.toLowerCase();
-		const tokens = queryLower
-			.split(/\s+/)
-			.map((token) => token.trim())
-			.filter((token) => token.length >= 2);
-
-		const stmt = db.prepare(
-			`SELECT
-				relative_path,
-				title,
-				source_dir,
-				body,
-				body_chars,
-				updated_at_iso
-			FROM docs
-			WHERE (? IS NULL OR source_dir = ?)`,
-		);
-
-		const rows = stmt.all(focusDir, focusDir) as Array<{
+		const queryLower = args.query.toLowerCase().trim();
+		const tokens = tokenizeSearchTerms(queryLower);
+		const ftsQuery = buildFtsQuery(tokens);
+		const candidateLimit = Math.max(args.limit * 5, 20);
+		const rows = (
+			queryLower
+				? db
+						.prepare(
+							`SELECT
+							d.relative_path,
+							d.title,
+							d.source_dir,
+							d.body,
+							d.body_chars,
+							d.updated_at_iso
+						FROM docs_fts
+						JOIN docs d
+							ON d.relative_path = docs_fts.relative_path
+						WHERE docs_fts MATCH ?
+							AND (? IS NULL OR d.source_dir = ?)
+						ORDER BY bm25(docs_fts, 8.0, 1.5)
+						LIMIT ?`,
+						)
+						.all(
+							ftsQuery ?? `"${queryLower.replaceAll('"', '""')}"*`,
+							focusDir,
+							focusDir,
+							candidateLimit,
+						)
+				: db
+						.prepare(
+							`SELECT
+							relative_path,
+							title,
+							source_dir,
+							body,
+							body_chars,
+							updated_at_iso
+						FROM docs
+						WHERE (? IS NULL OR source_dir = ?)
+						ORDER BY updated_at_iso DESC
+						LIMIT ?`,
+						)
+						.all(focusDir, focusDir, candidateLimit)
+		) as Array<{
 			relative_path: string;
 			title: string;
 			source_dir: string;

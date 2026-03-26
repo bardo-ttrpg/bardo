@@ -35,8 +35,9 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain(`[mcp_servers."${serverName}"]`);
-		expect(output).toContain('command = "bunx"');
+		expect(output).toContain('command = "bardo"');
 		expect(output).toContain("--workspace-root");
+		expect(output).not.toContain("--api-key");
 		expect(output.match(/\[mcp_servers\./g)?.length).toBe(1);
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
@@ -57,8 +58,9 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain("[mcp_servers.bardo]");
-		expect(output).toContain('command = "bunx"');
+		expect(output).toContain('command = "bardo"');
 		expect(output).toContain("--workspace-root");
+		expect(output).not.toContain("--api-key");
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
 	});
@@ -77,9 +79,10 @@ http_headers = { "Authorization" = "Bearer old-token" }
 		});
 
 		expect(output).toContain("[mcp_servers.bardo]");
-		expect(output).toContain('command = "bunx"');
+		expect(output).toContain('command = "bardo"');
 		expect(output).not.toContain("https://old.example.com/mcp");
 		expect(output).not.toContain("old-token");
+		expect(output).not.toContain("--api-key");
 		expect(output.match(/\[mcp_servers\.bardo\]/g)?.length).toBe(1);
 	});
 
@@ -93,8 +96,9 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			existingContent: "",
 		});
 		const config = JSON.parse(output);
-		expect(config.mcpServers.bardo.command).toBe("bunx");
+		expect(config.mcpServers.bardo.command).toBe("bardo");
 		expect(Array.isArray(config.mcpServers.bardo.args)).toBe(true);
+		expect(config.mcpServers.bardo.args).not.toContain("--api-key");
 	});
 
 	test("codex local snippet uses the same escaping as the install path", () => {
@@ -132,6 +136,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 
 		expect(output).toContain('[mcp_servers."gm]\\n[injected"]');
 		expect(output).not.toContain("[injected]");
-		expect(output).toContain('command = "bunx"');
+		expect(output).toContain('command = "bardo"');
+		expect(output).not.toContain("--api-key");
 	});
 });

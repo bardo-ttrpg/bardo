@@ -3,6 +3,7 @@ import {
 	appendVercelProtectionBypass,
 	createVercelProtectionHeaders,
 	parseJsonOrSseJson,
+	WEBSITE_REACHABLE_STATUSES,
 } from "./staging-smoke-lib";
 
 describe("appendVercelProtectionBypass", () => {
@@ -82,5 +83,11 @@ describe("parseJsonOrSseJson", () => {
 		expect(() => parseJsonOrSseJson("not-json")).toThrow(
 			"Response was neither JSON nor SSE JSON.",
 		);
+	});
+});
+
+describe("WEBSITE_REACHABLE_STATUSES", () => {
+	test("treats common canonical redirects as healthy website smoke responses", () => {
+		expect(WEBSITE_REACHABLE_STATUSES).toEqual([200, 301, 302, 307, 308]);
 	});
 });

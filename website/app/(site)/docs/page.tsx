@@ -1,18 +1,26 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { createPublicMetadata } from "@/lib/site-metadata";
 import DocsShell from "./_components/docs-shell";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "Docs",
 	description:
-		"Start with install, client connection, campaign truth, and credits for Bardo.",
-};
+		"Install Bardo, connect your MCP client, understand campaign truth, and learn the flat credit model.",
+	path: "/docs",
+	keywords: [
+		"Bardo docs",
+		"MCP client setup",
+		"AI game master install",
+		"campaign truth markdown",
+	],
+});
 
 const entries = [
 	{
 		href: "/docs/install",
 		title: "Install",
-		description: "Install the CLI and understand the first commands to run.",
+		description:
+			"Install the local bridge and understand the exact first commands to run.",
 	},
 	{
 		href: "/docs/connect-client",
@@ -38,6 +46,7 @@ export default function DocsIndexPage() {
 			eyebrow="Documentation"
 			title="Bardo Docs"
 			lede="The website stays intentionally small. Use these pages to get started fast, then rely on the local docs inside your workspace for the comprehensive reference."
+			currentPath="/docs"
 		>
 			<section className="grid gap-4 sm:grid-cols-2">
 				{entries.map((entry) => (

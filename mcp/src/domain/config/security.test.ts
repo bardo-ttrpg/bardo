@@ -25,7 +25,8 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.authMode).toBe("required");
 		expect(policy.allowQueryApiKey).toBe(false);
 		expect(policy.rateLimitFailClosed).toBe(true);
-		expect(policy.transportMode).toBe("stateful");
+		expect(policy.transportMode).toBe("stateless");
+		expect(policy.mcpEnableJsonResponse).toBe(true);
 	});
 
 	test("supports explicit environment overrides", () => {
@@ -59,12 +60,12 @@ describe("resolveSecurityPolicy", () => {
 		expect(policy.mcpEnableJsonResponse).toBe(true);
 	});
 
-	test("defaults to stateful transport when mode is not set", () => {
+	test("defaults to stateless transport in production when mode is not set", () => {
 		const policy = resolveSecurityPolicy({
-			RAILWAY_ENVIRONMENT_NAME: "production",
+			NODE_ENV: "production",
 		});
 
-		expect(policy.transportMode).toBe("stateful");
-		expect(policy.mcpEnableJsonResponse).toBe(false);
+		expect(policy.transportMode).toBe("stateless");
+		expect(policy.mcpEnableJsonResponse).toBe(true);
 	});
 });

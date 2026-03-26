@@ -25,7 +25,7 @@ const pendingEntrySeqByPath = new Map<string, number>();
 
 function withAppendLock<T>(fn: () => Promise<T>): Promise<T> {
 	const releasePrevious = appendQueue;
-	let releaseCurrent: (() => void) | null = null;
+	let releaseCurrent = () => {};
 	appendQueue = new Promise<void>((resolve) => {
 		releaseCurrent = resolve;
 	});
@@ -34,7 +34,7 @@ function withAppendLock<T>(fn: () => Promise<T>): Promise<T> {
 		try {
 			return await fn();
 		} finally {
-			releaseCurrent?.();
+			releaseCurrent();
 		}
 	})();
 }

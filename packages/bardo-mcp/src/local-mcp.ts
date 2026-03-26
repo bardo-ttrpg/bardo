@@ -12,7 +12,8 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -20,8 +21,7 @@ import {
 	ListToolsRequestSchema,
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { normalizePlan, type PlanTier } from "./plan-utils";
-import { createValidateAndMeterClient } from "./validate-and-meter-client";
+import type { PlanTier } from "./plan-utils";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
@@ -111,17 +111,6 @@ const RULEBOOK_MODIFIED_OPTIONS = [
 
 function sha256(input: string): string {
 	return createHash("sha256").update(input, "utf8").digest("hex");
-}
-
-function resolveValidateAndMeterUrl(
-	mcpUrl: string,
-	env: Record<string, string | undefined>,
-): string {
-	const explicit = env.BARDO_VALIDATE_AND_METER_URL?.trim();
-	if (explicit) {
-		return explicit;
-	}
-	return new URL("/api/v1/validate-and-meter", mcpUrl).toString();
 }
 
 function parsePositiveInteger(
@@ -497,6 +486,7 @@ async function movePathToWorkspaceTrash(args: {
 	recursive: boolean;
 }): Promise<
 	| { deleted: false; trashed: false; targetPath: string; trashPath: null }
+	| { deleted: true; trashed: false; targetPath: string; trashPath: null }
 	| { deleted: true; trashed: true; targetPath: string; trashPath: string }
 > {
 	const details = await stat(args.targetPath).catch((error: unknown) => {
@@ -791,6 +781,14 @@ export async function ensureWorkspaceCoreFiles(args: {
 		),
 	);
 	await ensureFile(
+		path.join(args.bardoRoot, "projections/current-state.md"),
+		renderMarkdown(
+			"Current State Projection",
+			"Derived campaign state projection generated from canonical event log.",
+			JSON.stringify({}, null, 2),
+		),
+	);
+	await ensureFile(
 		path.join(args.bardoRoot, "events/history.md"),
 		renderMarkdown(
 			"Campaign History",
@@ -1034,76 +1032,72 @@ export function createRemoteConnectionCoordinator(
 	};
 }
 
+async function connectRemoteMcpClient(args: {
+	apiKey: string;
+	url: string;
+	workspaceRoot: string;
+}): Promise<RemoteConnectionResult> {
+	const transport = new StreamableHTTPClientTransport(new URL(args.url), {
+		requestInit: {
+			headers: {
+				authorization: `Bearer ${args.apiKey}`,
+				"x-bardo-workspace-root": args.workspaceRoot,
+			},
+		},
+	});
+	const client = new Client(
+		{
+			name: "bardo-local-bridge",
+			version: "0.1.0",
+		},
+		{
+			capabilities: {},
+		},
+	);
+	await client.connect(transport);
+	const list = await client.listTools();
+	return {
+		client,
+		tools: list.tools.map((tool) => ({
+			name: tool.name,
+			title: tool.title,
+			description: tool.description,
+			inputSchema:
+				typeof tool.inputSchema === "object" && tool.inputSchema !== null
+					? (tool.inputSchema as JsonSchema)
+					: undefined,
+			outputSchema:
+				typeof tool.outputSchema === "object" && tool.outputSchema !== null
+					? (tool.outputSchema as JsonSchema)
+					: undefined,
+			annotations:
+				typeof tool.annotations === "object" && tool.annotations !== null
+					? tool.annotations
+					: undefined,
+		})),
+	};
+}
+
 function planRank(plan: PlanTier): number {
 	switch (plan) {
 		case "free":
 			return 0;
 		case "solo":
 			return 1;
-		case "solo_plus":
-			return 2;
 	}
-}
-
-function parseToolNameList(value: string | undefined): Set<string> {
-	return new Set(
-		(value ?? "")
-			.split(",")
-			.map((entry) => entry.trim())
-			.filter((entry) => entry.length > 0),
-	);
-}
-
-function annotatedToolPlan(tool: RemoteToolDefinition): PlanTier | null {
-	const annotations =
-		typeof tool.annotations === "object" && tool.annotations !== null
-			? tool.annotations
-			: {};
-	for (const key of [
-		"x-bardo-min-plan",
-		"bardo:min-plan",
-		"bardo_min_plan",
-		"bardoMinPlan",
-		"requiredPlan",
-	]) {
-		const plan = normalizePlan((annotations as Record<string, unknown>)[key]);
-		if (plan) {
-			return plan;
-		}
-	}
-	return null;
-}
-
-function requiredPlanForTool(
-	tool: RemoteToolDefinition,
-	options: RemoteToolAccessControllerOptions,
-): PlanTier {
-	const annotated = annotatedToolPlan(tool);
-	if (annotated) {
-		return annotated;
-	}
-
-	const env = options.env ?? process.env;
-	const soloPlusTools = parseToolNameList(env.BARDO_SOLO_PLUS_REMOTE_TOOLS);
-	if (soloPlusTools.has(tool.name)) {
-		return "solo_plus";
-	}
-	const premiumTools = parseToolNameList(env.BARDO_PREMIUM_REMOTE_TOOLS);
-	if (premiumTools.has(tool.name)) {
-		return "solo";
-	}
-	return "free";
 }
 
 export function createRemoteToolAccessController(
 	options: RemoteToolAccessControllerOptions,
 ) {
-	function isAllowed(tool: RemoteToolDefinition): boolean {
+	function isAllowed(_tool: RemoteToolDefinition): boolean {
 		if (!options.plan) {
 			return true;
 		}
-		const requiredPlan = requiredPlanForTool(tool, options);
-		return planRank(options.plan) >= planRank(requiredPlan);
+		if (options.plan === "free") {
+			return false;
+		}
+		return planRank(options.plan) >= planRank("solo");
 	}
 
 	return {
@@ -1111,15 +1105,19 @@ export function createRemoteToolAccessController(
 			return tools.filter((tool) => isAllowed(tool));
 		},
 		isAllowed,
-		blockedMessage(toolName: string, tool?: RemoteToolDefinition): string {
-			const requiredPlan = requiredPlanForTool(
-				tool ?? { name: toolName },
-				options,
-			);
+		blockedMessage(toolName: string, _tool?: RemoteToolDefinition): string {
 			const currentPlan = options.plan ?? "unknown";
-			return `Remote tool "${toolName}" requires the ${requiredPlan} plan. Current plan: ${currentPlan}.`;
+			return `Remote tool "${toolName}" requires an active subscription. Current plan: ${currentPlan}.`;
 		},
 	};
+}
+
+function shouldExposeBridgeLocalTools(
+	env: Record<string, string | undefined>,
+): boolean {
+	// Diagnostic escape hatch only. Public Bardo value lives in the six
+	// high-level remote GM/world-simulation tools, not raw workspace CRUD.
+	return env.BARDO_EXPOSE_BRIDGE_LOCAL_TOOLS?.trim().toLowerCase() === "true";
 }
 
 export function resolveWorkspaceRootFromRoots(
@@ -1491,11 +1489,6 @@ export async function startLocalMcpServer(
 	const stderr = options.stderr ?? process.stderr;
 	const env = options.env ?? process.env;
 	const textFileLimitBytes = resolveTextFileLimitBytes(env);
-	const validateAndMeterUrl = resolveValidateAndMeterUrl(options.url, env);
-	const meterClientByWorkspace = new Map<
-		string,
-		ReturnType<typeof createValidateAndMeterClient>
-	>();
 	const lockedWorkspaces = new Set<string>();
 	const ensureWorkspaceLock = async (workspaceRoot: string) => {
 		if (lockedWorkspaces.has(workspaceRoot)) {
@@ -1511,23 +1504,6 @@ export async function startLocalMcpServer(
 		lockedWorkspaces.clear();
 	};
 
-	function getMeterClient(workspaceRoot: string) {
-		if (!options.apiKey) {
-			return null;
-		}
-		const existing = meterClientByWorkspace.get(workspaceRoot);
-		if (existing) {
-			return existing;
-		}
-		const client = createValidateAndMeterClient({
-			apiKey: options.apiKey,
-			workspaceId: workspaceRoot,
-			controlPlaneUrl: validateAndMeterUrl,
-		});
-		meterClientByWorkspace.set(workspaceRoot, client);
-		return client;
-	}
-
 	const server = new Server(
 		{
 			name: "bardo",
@@ -1540,7 +1516,7 @@ export async function startLocalMcpServer(
 				},
 			},
 			instructions:
-				"Use the bardo_workspace_* tools for local filesystem and bootstrap operations. This runtime intentionally does not proxy remote tools.",
+				"Use the high-level Bardo GM and world-simulation tools through this local bridge. The bridge keeps workspace access on the local machine and proxies protected tool execution to the remote Bardo MCP.",
 		},
 	);
 	const manager = createWorkspaceRootManager({
@@ -1553,7 +1529,27 @@ export async function startLocalMcpServer(
 		textFileLimitBytes,
 		ensureWorkspaceLock,
 	);
+	const exposeLocalTools = shouldExposeBridgeLocalTools(env);
+	const listedLocalTools = exposeLocalTools ? localTools : [];
 	const localToolMap = new Map(localTools.map((tool) => [tool.name, tool]));
+	const remoteToolAccess = createRemoteToolAccessController({
+		plan: options.plan ?? null,
+		env,
+	});
+	const remoteConnection = createRemoteConnectionCoordinator({
+		apiKey: options.apiKey,
+		stderr,
+		getWorkspaceContext: () => manager.getWorkspaceContext(),
+		connectRemoteClient: async (workspaceRoot) =>
+			await connectRemoteMcpClient({
+				apiKey: options.apiKey ?? "",
+				url: options.url,
+				workspaceRoot,
+			}),
+		closeRemoteClient: async (client) => {
+			await client?.close();
+		},
+	});
 
 	server.oninitialized = () => {
 		void manager.refreshFromClientRoots();
@@ -1561,32 +1557,41 @@ export async function startLocalMcpServer(
 	server.setNotificationHandler(
 		RootsListChangedNotificationSchema,
 		async () => {
+			await remoteConnection.invalidate();
 			await manager.refreshFromClientRoots();
 		},
 	);
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
+		const remote = await remoteConnection.ensureRemoteConnection();
+		const remoteTools = remoteToolAccess.filterTools(remote.tools);
 		return {
-			tools: localTools.map((tool) => ({
-				name: tool.name,
-				title: tool.title,
-				description: tool.description,
-				inputSchema: tool.inputSchema,
-				annotations: tool.annotations,
-			})),
+			tools: [
+				...listedLocalTools.map((tool) => ({
+					name: tool.name,
+					title: tool.title,
+					description: tool.description,
+					inputSchema: tool.inputSchema,
+					annotations: tool.annotations,
+				})),
+				...remoteTools.map((tool) => ({
+					name: tool.name,
+					title: tool.title,
+					description: tool.description,
+					inputSchema: tool.inputSchema ?? {
+						type: "object",
+						properties: {},
+						additionalProperties: true,
+					},
+					outputSchema: tool.outputSchema,
+					annotations: tool.annotations,
+				})),
+			],
 		};
 	});
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		const localTool = localToolMap.get(request.params.name);
-		if (localTool) {
+		if (localTool && exposeLocalTools) {
 			try {
-				const context = await manager.getWorkspaceContext();
-				const meterClient = getMeterClient(context.workspaceRoot);
-				if (meterClient) {
-					await meterClient.validateAndMeter({
-						tool: request.params.name,
-						action: "invoke",
-					});
-				}
 				const payload = await localTool.handler(
 					(request.params.arguments as Record<string, unknown>) ?? {},
 				);
@@ -1600,11 +1605,36 @@ export async function startLocalMcpServer(
 			}
 		}
 
-		return makeToolResult(
-			`Remote proxy is disabled in this runtime. Tool "${request.params.name}" is unavailable.`,
-			{ success: false, reason: "REMOTE_PROXY_DISABLED" },
-			true,
-		);
+		try {
+			const remote = await remoteConnection.ensureRemoteConnection();
+			const remoteTool = remote.tools.find(
+				(tool) => tool.name === request.params.name,
+			);
+			if (!remote.client || !remoteTool) {
+				return makeToolResult(
+					`Remote tool "${request.params.name}" is unavailable for the current bridge session.`,
+					{ success: false, reason: "REMOTE_TOOL_UNAVAILABLE" },
+					true,
+				);
+			}
+			if (!remoteToolAccess.isAllowed(remoteTool)) {
+				return makeToolResult(
+					remoteToolAccess.blockedMessage(request.params.name, remoteTool),
+					{ success: false, reason: "PLAN_RESTRICTED" },
+					true,
+				);
+			}
+			return await remote.client.callTool({
+				name: request.params.name,
+				arguments: (request.params.arguments as Record<string, unknown>) ?? {},
+			});
+		} catch (error) {
+			return makeToolResult(
+				error instanceof Error ? error.message : String(error),
+				{ success: false, reason: "REMOTE_TOOL_CALL_FAILED" },
+				true,
+			);
+		}
 	});
 
 	const transport = new StdioServerTransport();
@@ -1616,6 +1646,7 @@ export async function startLocalMcpServer(
 	try {
 		await transportClosed;
 	} finally {
+		await remoteConnection.invalidate();
 		await releaseWorkspaceLocks();
 	}
 }

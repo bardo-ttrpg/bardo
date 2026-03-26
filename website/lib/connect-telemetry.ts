@@ -1,18 +1,13 @@
 type ConnectCounterName =
-	| "cli_token_issued"
-	| "cli_token_failed"
-	| "cli_exchange_success"
-	| "cli_exchange_rejected"
-	| "cli_exchange_failed"
-	| "cli_session_started"
-	| "cli_session_start_failed"
-	| "cli_session_poll_pending"
-	| "cli_session_poll_approved"
-	| "cli_session_poll_rejected"
-	| "cli_session_poll_failed"
-	| "cli_session_approved"
-	| "cli_session_approve_rejected"
-	| "cli_session_approve_failed"
+	| "bridge_session_started"
+	| "bridge_session_start_failed"
+	| "bridge_session_poll_pending"
+	| "bridge_session_poll_approved"
+	| "bridge_session_poll_rejected"
+	| "bridge_session_poll_failed"
+	| "bridge_session_approved"
+	| "bridge_session_approve_rejected"
+	| "bridge_session_approve_failed"
 	| "runtime_status_success"
 	| "runtime_status_invalid"
 	| "runtime_status_failed"
@@ -34,20 +29,15 @@ type ConnectTelemetryOptions = {
 type ConnectTelemetrySnapshot = Record<ConnectCounterName, number>;
 
 const CONNECT_COUNTER_NAMES: readonly ConnectCounterName[] = [
-	"cli_token_issued",
-	"cli_token_failed",
-	"cli_exchange_success",
-	"cli_exchange_rejected",
-	"cli_exchange_failed",
-	"cli_session_started",
-	"cli_session_start_failed",
-	"cli_session_poll_pending",
-	"cli_session_poll_approved",
-	"cli_session_poll_rejected",
-	"cli_session_poll_failed",
-	"cli_session_approved",
-	"cli_session_approve_rejected",
-	"cli_session_approve_failed",
+	"bridge_session_started",
+	"bridge_session_start_failed",
+	"bridge_session_poll_pending",
+	"bridge_session_poll_approved",
+	"bridge_session_poll_rejected",
+	"bridge_session_poll_failed",
+	"bridge_session_approved",
+	"bridge_session_approve_rejected",
+	"bridge_session_approve_failed",
 	"runtime_status_success",
 	"runtime_status_invalid",
 	"runtime_status_failed",
@@ -78,20 +68,15 @@ function parsePositiveInteger(
 
 function emptySnapshot(): ConnectTelemetrySnapshot {
 	return {
-		cli_token_issued: 0,
-		cli_token_failed: 0,
-		cli_exchange_success: 0,
-		cli_exchange_rejected: 0,
-		cli_exchange_failed: 0,
-		cli_session_started: 0,
-		cli_session_start_failed: 0,
-		cli_session_poll_pending: 0,
-		cli_session_poll_approved: 0,
-		cli_session_poll_rejected: 0,
-		cli_session_poll_failed: 0,
-		cli_session_approved: 0,
-		cli_session_approve_rejected: 0,
-		cli_session_approve_failed: 0,
+		bridge_session_started: 0,
+		bridge_session_start_failed: 0,
+		bridge_session_poll_pending: 0,
+		bridge_session_poll_approved: 0,
+		bridge_session_poll_rejected: 0,
+		bridge_session_poll_failed: 0,
+		bridge_session_approved: 0,
+		bridge_session_approve_rejected: 0,
+		bridge_session_approve_failed: 0,
 		runtime_status_success: 0,
 		runtime_status_invalid: 0,
 		runtime_status_failed: 0,

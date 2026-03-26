@@ -1,4 +1,5 @@
 import { BackendAvailabilityError } from "./backend-availability";
+import { createWebsiteBackendClient } from "./website-backend";
 
 export type RequestRateLimitBudget = {
 	allowed: boolean;
@@ -11,7 +12,6 @@ export type RequestRateLimitBudget = {
 type CreateRequestRateLimiterOptions = {
 	nowMs?: () => number;
 	env?: Record<string, string | undefined>;
-	fetchImpl?: typeof fetch;
 	defaultLimit: number;
 	defaultWindowMs: number;
 	defaultAllowMemoryFallback: boolean;
@@ -20,12 +20,24 @@ type CreateRequestRateLimiterOptions = {
 	allowMemoryFallbackEnvName: string;
 	keyPrefix: string;
 	unavailableMessage: string;
-};
-
-type UpstashConfig = {
-	url: string;
-	token: string;
-	timeoutMs: number;
+	websiteBackend?: {
+		consumeRateLimitWindow(args: {
+			scope: string;
+			counterKey: string;
+			limit: number;
+			windowMs: number;
+			nowMs?: number;
+		}): Promise<RequestRateLimitBudget>;
+	} | null;
+	controlPlane?: {
+		consumeRateLimitWindow(args: {
+			scope: string;
+			counterKey: string;
+			limit: number;
+			windowMs: number;
+			nowMs?: number;
+		}): Promise<RequestRateLimitBudget>;
+	} | null;
 };
 
 type WindowCounter = {
@@ -55,21 +67,6 @@ function parsePositiveInteger(
 	return Math.floor(parsed);
 }
 
-function readUpstashConfig(
-	env: Record<string, string | undefined>,
-): UpstashConfig | null {
-	const url = env.UPSTASH_REDIS_REST_URL?.trim();
-	const token = env.UPSTASH_REDIS_REST_TOKEN?.trim();
-	if (!url || !token) {
-		return null;
-	}
-	return {
-		url: url.replace(/\/+$/, ""),
-		token,
-		timeoutMs: parsePositiveInteger(env.BARDO_UPSTASH_TIMEOUT_MS, 1200),
-	};
-}
-
 function resolveClientId(request: Request): string {
 	const direct =
 		request.headers.get("cf-connecting-ip")?.trim() ||
@@ -94,71 +91,11 @@ function retryAfterSeconds(
 	return Math.max(1, Math.ceil((windowStartMs + windowMs - nowMs) / 1000));
 }
 
-async function upstashIncrement(args: {
-	config: UpstashConfig;
-	fetchImpl: typeof fetch;
-	key: string;
-}): Promise<number | null> {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), args.config.timeoutMs);
-	try {
-		const response = await args.fetchImpl(
-			`${args.config.url}/incr/${encodeURIComponent(args.key)}`,
-			{
-				method: "POST",
-				headers: {
-					authorization: `Bearer ${args.config.token}`,
-				},
-				signal: controller.signal,
-			},
-		);
-		if (!response.ok) {
-			return null;
-		}
-		const payload = (await response.json()) as { result?: unknown };
-		return typeof payload.result === "number"
-			? Math.floor(payload.result)
-			: null;
-	} catch {
-		return null;
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
-async function upstashEnsureExpiry(args: {
-	config: UpstashConfig;
-	fetchImpl: typeof fetch;
-	key: string;
-	ttlSeconds: number;
-}): Promise<boolean> {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), args.config.timeoutMs);
-	try {
-		const response = await args.fetchImpl(
-			`${args.config.url}/expire/${encodeURIComponent(args.key)}/${args.ttlSeconds}`,
-			{
-				method: "POST",
-				headers: {
-					authorization: `Bearer ${args.config.token}`,
-				},
-				signal: controller.signal,
-			},
-		);
-		return response.ok;
-	} catch {
-		return false;
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
 export function createRequestRateLimiter(
 	options: CreateRequestRateLimiterOptions,
 ) {
 	const now = options.nowMs ?? (() => Date.now());
 	const env = options.env ?? process.env;
-	const fetchImpl = options.fetchImpl ?? fetch;
 	const limit = parsePositiveInteger(
 		env[options.limitEnvName],
 		options.defaultLimit,
@@ -171,9 +108,19 @@ export function createRequestRateLimiter(
 		env[options.allowMemoryFallbackEnvName],
 		options.defaultAllowMemoryFallback,
 	);
-	const upstash = readUpstashConfig(env);
+	const websiteBackend =
+		options.websiteBackend !== undefined
+			? options.websiteBackend
+			: options.controlPlane === undefined
+				? (() => {
+						try {
+							return createWebsiteBackendClient(env);
+						} catch {
+							return null;
+						}
+					})()
+				: options.controlPlane;
 	const counters = new Map<string, WindowCounter>();
-	const ttlConfirmed = new Map<string, number>();
 	let callsSinceCleanup = 0;
 
 	function maybePrune(currentMs: number) {
@@ -186,64 +133,37 @@ export function createRequestRateLimiter(
 				counters.delete(clientId);
 			}
 		}
-		for (const [key, expiresAt] of ttlConfirmed) {
-			if (expiresAt <= currentMs) {
-				ttlConfirmed.delete(key);
-			}
-		}
 	}
 
 	async function consume(request: Request): Promise<RequestRateLimitBudget> {
 		const clientId = resolveClientId(request);
 		const currentMs = now();
 		const windowStartMs = Math.floor(currentMs / windowMs) * windowMs;
-		const key = `${options.keyPrefix}:${clientId}:${windowStartMs}`;
 		maybePrune(currentMs);
 
-		if (upstash) {
-			const used = await upstashIncrement({
-				config: upstash,
-				fetchImpl,
-				key,
-			});
-			if (used !== null) {
-				const ttlExpiresAt = ttlConfirmed.get(key) ?? 0;
-				if (ttlExpiresAt <= currentMs) {
-					const ensured = await upstashEnsureExpiry({
-						config: upstash,
-						fetchImpl,
-						key,
-						ttlSeconds: Math.max(1, Math.ceil(windowMs / 1000)),
+		if (websiteBackend) {
+			try {
+				return await websiteBackend.consumeRateLimitWindow({
+					scope: options.keyPrefix,
+					counterKey: clientId,
+					limit,
+					windowMs,
+					nowMs: currentMs,
+				});
+			} catch {
+				if (!allowMemoryFallback) {
+					throw new BackendAvailabilityError({
+						message: options.unavailableMessage,
+						code: "website_backend_unavailable",
 					});
-					if (ensured) {
-						ttlConfirmed.set(key, windowStartMs + windowMs);
-					}
 				}
-				return used <= limit
-					? {
-							allowed: true,
-							limit,
-							remaining: Math.max(0, limit - used),
-							resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
-						}
-					: {
-							allowed: false,
-							retryAfterSeconds: retryAfterSeconds(
-								currentMs,
-								windowStartMs,
-								windowMs,
-							),
-							limit,
-							remaining: 0,
-							resetEpochSeconds: Math.ceil((windowStartMs + windowMs) / 1000),
-						};
 			}
 		}
 
 		if (!allowMemoryFallback) {
 			throw new BackendAvailabilityError({
 				message: options.unavailableMessage,
-				code: "upstash_unavailable",
+				code: "website_backend_unavailable",
 			});
 		}
 

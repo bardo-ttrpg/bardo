@@ -19,10 +19,40 @@ describe("saved config", () => {
 		});
 	});
 
+	test("accepts version 2 bridge-session config", () => {
+		const migrated = migrateSavedConfig({
+			version: 2,
+			accessToken: "bridge_access_token",
+			refreshToken: "bridge_refresh_token",
+			expiresAtISO: "2026-03-04T00:10:00.000Z",
+			url: "https://example.com/mcp",
+			updatedAtISO: "2026-03-04T00:00:00.000Z",
+			serverName: "bardo",
+			statusUrl: "https://example.com/api/connect/runtime-status",
+			refreshUrl: "https://example.com/api/connect/bridge-session/refresh",
+			accountLabel: "Armando",
+			plan: "solo",
+		});
+
+		expect(migrated).toEqual({
+			version: 2,
+			accessToken: "bridge_access_token",
+			refreshToken: "bridge_refresh_token",
+			expiresAtISO: "2026-03-04T00:10:00.000Z",
+			url: "https://example.com/mcp",
+			updatedAtISO: "2026-03-04T00:00:00.000Z",
+			serverName: "bardo",
+			statusUrl: "https://example.com/api/connect/runtime-status",
+			refreshUrl: "https://example.com/api/connect/bridge-session/refresh",
+			accountLabel: "Armando",
+			plan: "solo",
+		});
+	});
+
 	test("rejects unsupported config versions", () => {
 		expect(
 			migrateSavedConfig({
-				version: 2,
+				version: 3,
 				apiKey: "test-key",
 				url: "https://example.com/mcp",
 			}),

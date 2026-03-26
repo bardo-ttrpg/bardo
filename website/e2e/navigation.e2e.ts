@@ -12,7 +12,7 @@ test("primary navigation opens pricing and legal pages", async ({ page }) => {
 	await expect(page).toHaveURL(/\/pricing$/);
 	await expect(
 		page.getByRole("heading", {
-			name: /Simple pricing with one tool call equaling one credit/i,
+			name: /One subscription unlocks the full Bardo MCP toolset/i,
 		}),
 	).toBeVisible();
 

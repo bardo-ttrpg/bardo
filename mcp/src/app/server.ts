@@ -16,8 +16,8 @@ import { SessionStore } from "../session/session-store";
 import {
 	applySpanAttributes,
 	buildRequestSpanAttributes,
-	captureSentryException,
-	logSentryMessage,
+	captureTelemetryException,
+	logTelemetryMessage,
 	normalizeRouteLabel,
 	recordHttpRequestMetric,
 	recordRateLimitEventMetric,
@@ -55,6 +55,67 @@ type ServerOptions = {
 };
 
 type RequestTimeoutFn = (request: Request, timeoutSeconds: number) => void;
+
+function buildUsageLimitExceededResponse(usage: {
+	limit: number | null;
+	usedThisPeriod: number | null;
+	remaining: number | null;
+	period: string | null;
+}): Response {
+	return withCors(
+		new Response(
+			JSON.stringify({
+				error: "MCP usage limit reached for current plan.",
+				usage: {
+					limit: usage.limit,
+					used: usage.usedThisPeriod,
+					remaining: usage.remaining,
+					period: usage.period,
+				},
+			}),
+			{
+				status: 429,
+				headers: {
+					"content-type": "application/json",
+				},
+			},
+		),
+	);
+}
+
+async function shouldChargeAcceptedToolCalls(
+	response: Response,
+	metadata: JsonRpcMetadata | null,
+): Promise<boolean> {
+	if (!response.ok || !metadata || metadata.toolCalls.length < 1) {
+		return false;
+	}
+
+	const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+	if (!contentType.includes("application/json")) {
+		return true;
+	}
+
+	try {
+		const payload = await response.clone().json();
+		if (Array.isArray(payload)) {
+			return payload.every((entry) => {
+				if (typeof entry !== "object" || entry === null) {
+					return true;
+				}
+				return !("error" in entry && entry.error != null);
+			});
+		}
+
+		if (typeof payload !== "object" || payload === null) {
+			return true;
+		}
+
+		return !("error" in payload && payload.error != null);
+	} catch {
+		return true;
+	}
+}
 
 function metricsAuthRequiredResponse(): Response {
 	return withCors(
@@ -154,6 +215,7 @@ export function createHttpRequestHandler({
 				let rateLimitOutcome: "allowed" | "blocked" | "error" | undefined;
 				let usageLimitOutcome: "allowed" | "blocked" | "skipped" = "skipped";
 				let jsonRpcMetadata: JsonRpcMetadata | null = null;
+				let usageRequestHash: string | null = null;
 
 				const finalize = (response: Response): Response => {
 					if (securityPolicy.telemetryEnabled) {
@@ -360,59 +422,77 @@ export function createHttpRequestHandler({
 						isWorldTickApiRoute,
 					});
 					jsonRpcMetadata = usageMetering.metadata;
-					if (usageMetering.units > 0) {
-						const usage = await meteringLimiter.consume({
-							subjectId: auth.subjectId ?? null,
-							keyId: auth.keyId ?? null,
-							plan: auth.plan ?? null,
-							mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
-							providerId: request.headers.get("x-provider-id")?.trim() ?? null,
-							modelId: request.headers.get("x-model-id")?.trim() ?? null,
-							units: usageMetering.units,
-						});
-						usageLimitOutcome = usage.allowed ? "allowed" : "blocked";
-						if (!usage.allowed) {
-							return finalize(
-								withCors(
-									new Response(
-										JSON.stringify({
-											error: "MCP usage limit reached for current plan.",
-											usage: {
-												limit: usage.limit,
-												used: usage.usedThisPeriod,
-												remaining: usage.remaining,
-												period: usage.period,
-											},
-										}),
-										{
-											status: 429,
-											headers: {
-												"content-type": "application/json",
-											},
-										},
-									),
-								),
-							);
-						}
-					}
+					usageRequestHash = usageMetering.requestHash;
 
 					if (isMcpRoute) {
-						return finalize(
-							await handleMcpRequest(
-								request,
-								auth,
-								store,
-								sessionRegistry,
-								toolPolicy,
-								loopPolicy,
-								securityPolicy.telemetryEnabled,
-								{
-									transportMode: securityPolicy.transportMode,
-									enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
-									metadata: jsonRpcMetadata,
-								},
-							),
+						if (usageMetering.units > 0) {
+							const usage = await meteringLimiter.check({
+								subjectId: auth.subjectId ?? null,
+								keyId: auth.keyId ?? null,
+								plan: auth.plan ?? null,
+								mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
+								tokenIdentifier: null,
+								providerId:
+									request.headers.get("x-provider-id")?.trim() ?? null,
+								modelId: request.headers.get("x-model-id")?.trim() ?? null,
+								toolName: jsonRpcMetadata?.toolName ?? null,
+								idempotencyKey:
+									usageRequestHash && auth.keyId
+										? `${auth.keyId}:${usageRequestHash}`
+										: null,
+								units: usageMetering.units,
+							});
+							usageLimitOutcome = usage.allowed ? "allowed" : "blocked";
+							if (!usage.allowed) {
+								return finalize(buildUsageLimitExceededResponse(usage));
+							}
+						}
+
+						const response = await handleMcpRequest(
+							request,
+							auth,
+							store,
+							sessionRegistry,
+							toolPolicy,
+							loopPolicy,
+							securityPolicy.telemetryEnabled,
+							{
+								transportMode: securityPolicy.transportMode,
+								enableJsonResponse: securityPolicy.mcpEnableJsonResponse,
+								metadata: jsonRpcMetadata,
+							},
 						);
+						if (
+							usageMetering.units > 0 &&
+							(await shouldChargeAcceptedToolCalls(response, jsonRpcMetadata))
+						) {
+							const usage = await meteringLimiter.consume({
+								subjectId: auth.subjectId ?? null,
+								keyId: auth.keyId ?? null,
+								plan: auth.plan ?? null,
+								mcpPeriodLimit: auth.mcpPeriodLimit ?? null,
+								tokenIdentifier: null,
+								providerId:
+									request.headers.get("x-provider-id")?.trim() ?? null,
+								modelId: request.headers.get("x-model-id")?.trim() ?? null,
+								toolName: jsonRpcMetadata?.toolName ?? null,
+								idempotencyKey:
+									usageRequestHash && auth.keyId
+										? `${auth.keyId}:${usageRequestHash}`
+										: null,
+								units: usageMetering.units,
+							});
+							usageLimitOutcome = usage.allowed ? "allowed" : "blocked";
+							if (!usage.allowed) {
+								logTelemetryMessage("warn", "mcp.usage_limit.commit_race", {
+									"bardo.service": "mcp",
+									"bardo.route": route,
+									"bardo.key_id_present": Boolean(auth.keyId),
+									"bardo.subject_present": Boolean(auth.subjectId),
+								});
+							}
+						}
+						return finalize(response);
 					}
 
 					if (request.method !== "POST") {
@@ -460,8 +540,12 @@ export function createHttpRequestHandler({
 					if (securityPolicy.telemetryEnabled) {
 						recordRateLimitEventMetric("error");
 					}
-					captureSentryException(error);
-					logSentryMessage("error", "mcp.request.unhandled_error", {
+					captureTelemetryException(error, {
+						"bardo.service": "mcp",
+						"bardo.route": route,
+						"http.method": method,
+					});
+					logTelemetryMessage("error", "mcp.request.unhandled_error", {
 						"bardo.service": "mcp",
 						"bardo.route": route,
 						"http.method": method,

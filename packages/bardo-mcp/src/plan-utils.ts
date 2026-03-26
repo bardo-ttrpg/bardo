@@ -1,4 +1,4 @@
-export type PlanTier = "free" | "solo" | "solo_plus";
+export type PlanTier = "free" | "solo";
 
 export function normalizePlan(value: unknown): PlanTier | null {
 	switch (typeof value === "string" ? value.trim().toLowerCase() : "") {
@@ -9,7 +9,7 @@ export function normalizePlan(value: unknown): PlanTier | null {
 		case "solo_plus":
 		case "solo-plus":
 		case "soloplus":
-			return "solo_plus";
+			return "solo";
 		default:
 			return null;
 	}

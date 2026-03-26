@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	createClerkBillingReader,
 	fetchLiveBillingSnapshotFromClerk,
 	resolveLiveBillingSnapshotFromSubscription,
 } from "./clerk-live-billing";
@@ -18,7 +19,7 @@ describe("clerk-live-billing", () => {
 		expect(snapshot.cancelAtPeriodEnd).toBe(false);
 	});
 
-	test("maps Clerk plan id to solo_plus and annual interval", () => {
+	test("maps Clerk plan id to solo and annual interval", () => {
 		const snapshot = resolveLiveBillingSnapshotFromSubscription(
 			{
 				id: "sub_123",
@@ -26,7 +27,7 @@ describe("clerk-live-billing", () => {
 				subscriptionItems: [
 					{
 						status: "active",
-						planId: "cplan_solo_plus",
+						planId: "cplan_solo",
 						planPeriod: "annual",
 						periodStart: 100,
 						periodEnd: 200,
@@ -36,12 +37,11 @@ describe("clerk-live-billing", () => {
 			},
 			{
 				CLERK_BILLING_PLAN_SOLO: "cplan_solo",
-				CLERK_BILLING_PLAN_SOLO_PLUS: "cplan_solo_plus",
 			},
 			150,
 		);
 
-		expect(snapshot.plan).toBe("solo_plus");
+		expect(snapshot.plan).toBe("solo");
 		expect(snapshot.billingInterval).toBe("year");
 		expect(snapshot.subscriptionStatus).toBe("active");
 		expect(snapshot.subscriptionId).toBe("sub_123");
@@ -85,6 +85,25 @@ describe("clerk-live-billing", () => {
 		expect(snapshot.billingUnavailable).toBe(false);
 	});
 
+	test("creates a billing reader that preserves the Clerk billing method binding", async () => {
+		const billing = {
+			prefix: "bound",
+			async getUserBillingSubscription(userId) {
+				return {
+					id: `${this.prefix}:${userId}`,
+					status: "active",
+					subscriptionItems: [],
+				};
+			},
+		};
+
+		const reader = createClerkBillingReader({ billing });
+		expect(typeof reader).toBe("function");
+
+		const subscription = await reader?.("user_123");
+		expect(subscription?.id).toBe("bound:user_123");
+	});
+
 	test("marks cancel_at_period_end when canceled_at exists before period end", () => {
 		const snapshot = resolveLiveBillingSnapshotFromSubscription(
 			{
@@ -103,7 +122,6 @@ describe("clerk-live-billing", () => {
 			},
 			{
 				CLERK_BILLING_PLAN_SOLO: "cplan_solo",
-				CLERK_BILLING_PLAN_SOLO_PLUS: "cplan_solo_plus",
 			},
 			200,
 		);

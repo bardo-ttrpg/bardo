@@ -3,13 +3,19 @@ import {
 	resolvePathInsideRoot,
 } from "../../infra/filesystem/filesystem";
 import { recordLegacyFallbackReadMetric } from "../../telemetry";
-import { safeParseState } from "../campaign/state";
+import { parseStateOrThrow, safeParseState } from "../campaign/state";
 import type { CampaignState } from "../campaign/types";
 import { resolveFeatureFlags } from "../config/features";
-import { readCanonicalEvents } from "../events/store";
+import {
+	readCanonicalEventLogStats,
+	readCanonicalEvents,
+} from "../events/store";
 import { parseMarkdown } from "../markdown/markdown";
 import { regenerateCurrentStateProjection } from "./current-state";
-import { latestRelevantEventSequenceForProjection } from "./refresh";
+import {
+	latestRelevantEventSequenceForProjection,
+	projectionIdsForEventTypes,
+} from "./refresh";
 
 export type PreferredStateSource =
 	| "projection"
@@ -42,7 +48,11 @@ async function readStateFile(filePath: string): Promise<ParsedStateFile> {
 		exists: true,
 		frontmatter: parsed.frontmatter,
 		rawContent: parsed.content,
-		state: safeParseState(parsed.content),
+		state: parseStateOrThrow({
+			rawBody: parsed.content,
+			sourcePath: filePath,
+			allowEmpty: false,
+		}),
 	};
 }
 
@@ -86,11 +96,25 @@ export async function loadPreferredCurrentState(args: {
 
 	if (projection.exists) {
 		if (strictCanonicalMode || args.refreshStaleProjection) {
-			const events = await readCanonicalEvents({ bardoRoot: args.bardoRoot });
-			const latestSequence = latestRelevantEventSequenceForProjection({
-				projectionId: "current_state",
-				events,
+			const eventStats = await readCanonicalEventLogStats({
+				bardoRoot: args.bardoRoot,
 			});
+			let latestSequence = 0;
+			if (!eventStats.lastEvent) {
+				latestSequence = 0;
+			} else if (
+				projectionIdsForEventTypes([eventStats.lastEvent.type]).includes(
+					"current_state",
+				)
+			) {
+				latestSequence = eventStats.lastEvent.sequence;
+			} else {
+				const events = await readCanonicalEvents({ bardoRoot: args.bardoRoot });
+				latestSequence = latestRelevantEventSequenceForProjection({
+					projectionId: "current_state",
+					events,
+				});
+			}
 			const projectionSeqMax = parsePositiveInteger(
 				projection.frontmatter.source_event_seq_max,
 			);

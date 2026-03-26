@@ -254,19 +254,18 @@ describe("migrate_legacy_state tool", () => {
 			idempotencyKey: "migrate_legacy_malformed_key_12345",
 		});
 
-		expect(result.isError).toBe(false);
-		expect(result.structuredContent.success).toBe(true);
-		expect(result.structuredContent.migrated).toBe(true);
-		expect(result.structuredContent.report.status).toBe("migrated");
-		expect(result.structuredContent.report.warnings.length).toBeGreaterThan(0);
+		expect(result.isError).toBe(true);
+		expect(result.structuredContent.success).toBe(false);
+		expect(result.structuredContent.migrated).toBe(false);
+		expect(result.structuredContent.report.status).toBe("skipped");
+		expect(result.structuredContent.report.errors.length).toBeGreaterThan(0);
 		expect(
-			result.structuredContent.report.warnings.some((warning) =>
-				warning.includes("malformed"),
+			result.structuredContent.report.errors.some((error) =>
+				error.includes("MALFORMED_CAMPAIGN_STATE"),
 			),
 		).toBe(true);
 		const events = await readCanonicalEvents({ bardoRoot });
-		expect(events.length).toBe(1);
-		expect(events[0]?.type).toBe("legacy_state_migrated");
+		expect(events.length).toBe(0);
 
 		await rm(root, { recursive: true, force: true });
 	});

@@ -1,6 +1,11 @@
+"use client";
+
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import CheckoutAction from "./checkout-action";
+import { resolveCheckoutRenderState } from "./pricing-cta-state";
 
 type CheckoutButtonProps = {
 	clerkEnabled: boolean;
@@ -8,7 +13,6 @@ type CheckoutButtonProps = {
 	planPeriod: ClerkPlanPeriod;
 	label: string;
 	className: string;
-	isSignedIn?: boolean;
 };
 
 export default function CheckoutButton({
@@ -17,7 +21,6 @@ export default function CheckoutButton({
 	planPeriod,
 	label,
 	className,
-	isSignedIn = false,
 }: CheckoutButtonProps) {
 	const planId = clerkPlanId ?? undefined;
 	const isUnavailable = !planId;
@@ -36,26 +39,64 @@ export default function CheckoutButton({
 	}
 
 	return (
+		<EnabledCheckoutButton
+			isUnavailable={isUnavailable}
+			planId={planId}
+			planPeriod={planPeriod}
+			label={label}
+			className={className}
+		/>
+	);
+}
+
+function EnabledCheckoutButton({
+	isUnavailable,
+	planId,
+	planPeriod,
+	label,
+	className,
+}: {
+	isUnavailable: boolean;
+	planId: string | undefined;
+	planPeriod: ClerkPlanPeriod;
+	label: string;
+	className: string;
+}) {
+	const { isLoaded, isSignedIn } = useAuth();
+	const [isHydrated, setIsHydrated] = useState(false);
+	const resolvedPlanId = planId ?? "";
+	const renderState = resolveCheckoutRenderState({
+		isHydrated,
+		isLoaded: isLoaded ?? false,
+		isSignedIn: isSignedIn ?? false,
+		isUnavailable,
+	});
+
+	useEffect(() => {
+		setIsHydrated(true);
+	}, []);
+
+	return (
 		<div>
-			{isSignedIn ? (
-				isUnavailable ? (
-					<button type="button" className={className} disabled>
-						{label}
-					</button>
-				) : (
-					<CheckoutAction
-						planId={planId}
-						planPeriod={planPeriod}
-						label={label}
-						className={className}
-					/>
-				)
-			) : (
+			{renderState === "sign_in" ? (
 				<Link href="/sign-in" prefetch={false} className={className}>
 					{label}
 				</Link>
-			)}
-			{isUnavailable ? (
+			) : null}
+			{renderState === "disabled_unavailable" ? (
+				<button type="button" className={className} disabled>
+					{label}
+				</button>
+			) : null}
+			{renderState === "checkout" ? (
+				<CheckoutAction
+					planId={resolvedPlanId}
+					planPeriod={planPeriod}
+					label={label}
+					className={className}
+				/>
+			) : null}
+			{renderState === "disabled_unavailable" ? (
 				<p className="mt-2 text-xs text-red-500/80">
 					Billing is unavailable. Missing Clerk plan configuration.
 				</p>

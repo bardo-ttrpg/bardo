@@ -29,17 +29,8 @@ export type ConnectionClientAdapter = {
 	installVariant?: JsonConfigVariant | "codex";
 };
 
-const LOCAL_ADAPTER_PACKAGE = "@bardo/mcp";
-const LOCAL_ADAPTER_BIN = "bardo";
-const LOCAL_ADAPTER_COMMAND = "bunx";
-const LOCAL_ADAPTER_PREFIX_ARGS = [
-	"--bun",
-	"--package",
-	LOCAL_ADAPTER_PACKAGE,
-	LOCAL_ADAPTER_BIN,
-	"mcp",
-	"serve",
-] as const;
+const LOCAL_ADAPTER_COMMAND = "bardo";
+const LOCAL_ADAPTER_PREFIX_ARGS = ["mcp", "serve"] as const;
 
 const CONNECTION_CLIENT_ADAPTERS: Record<
 	ConnectionClient,
@@ -280,11 +271,9 @@ function shellQuote(value: string): string {
 	return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-function buildLocalAdapterArgs(apiKey: string, baseUrl: string): string[] {
+function buildLocalAdapterArgs(baseUrl: string): string[] {
 	return [
 		...LOCAL_ADAPTER_PREFIX_ARGS,
-		"--api-key",
-		apiKey,
 		"--url",
 		baseUrl,
 		"--workspace-root",
@@ -292,18 +281,12 @@ function buildLocalAdapterArgs(apiKey: string, baseUrl: string): string[] {
 	];
 }
 
-function buildLocalAdapterCommandParts(
-	apiKey: string,
-	baseUrl: string,
-): string[] {
-	return [LOCAL_ADAPTER_COMMAND, ...buildLocalAdapterArgs(apiKey, baseUrl)];
+function buildLocalAdapterCommandParts(baseUrl: string): string[] {
+	return [LOCAL_ADAPTER_COMMAND, ...buildLocalAdapterArgs(baseUrl)];
 }
 
-function buildLocalAdapterShellCommand(
-	apiKey: string,
-	baseUrl: string,
-): string {
-	return buildLocalAdapterCommandParts(apiKey, baseUrl)
+function buildLocalAdapterShellCommand(baseUrl: string): string {
+	return buildLocalAdapterCommandParts(baseUrl)
 		.map((part) => shellQuote(part))
 		.join(" ");
 }
@@ -311,14 +294,13 @@ function buildLocalAdapterShellCommand(
 function buildCodexServerBlock(args: {
 	mode: ConnectionMode;
 	serverName: string;
-	apiKey: string;
 	url: string;
 }) {
 	const tableName = formatCodexTableName(args.serverName);
 	return [
 		`[${tableName}]`,
-		`command = "bunx"`,
-		`args = ${JSON.stringify(buildLocalAdapterArgs(args.apiKey, args.url))}`,
+		`command = ${JSON.stringify(LOCAL_ADAPTER_COMMAND)}`,
+		`args = ${JSON.stringify(buildLocalAdapterArgs(args.url))}`,
 		"",
 	].join("\n");
 }
@@ -355,10 +337,9 @@ function mergeJsonVariant(args: {
 	existing: Record<string, unknown>;
 	mode: ConnectionMode;
 	serverName: string;
-	apiKey: string;
 	url: string;
 }): Record<string, unknown> {
-	const localArgs = buildLocalAdapterArgs(args.apiKey, args.url);
+	const localArgs = buildLocalAdapterArgs(args.url);
 	if (args.variant === "vscode") {
 		const root = structuredClone(args.existing);
 		const mcp =
@@ -387,7 +368,7 @@ function mergeJsonVariant(args: {
 				: {};
 		mcp[args.serverName] = {
 			type: "local",
-			command: buildLocalAdapterCommandParts(args.apiKey, args.url),
+			command: buildLocalAdapterCommandParts(args.url),
 			enabled: true,
 		};
 		root.mcp = mcp;
@@ -484,7 +465,6 @@ export function buildInstallConfigContent(args: {
 				existing,
 				mode: args.mode,
 				serverName: args.serverName,
-				apiKey: args.apiKey,
 				url: args.url,
 			}),
 			null,
@@ -503,17 +483,15 @@ export function buildConnectionSnippet(args: {
 	serverName?: string;
 }): string {
 	const serverName = args.serverName?.trim() || "bardo";
-	const apiKey = args.apiKey;
 	const baseUrl = args.baseUrl;
 
 	switch (args.client) {
 		case "claude":
-			return `claude mcp add --scope user ${shellQuote(serverName)} -- ${LOCAL_ADAPTER_COMMAND} --bun --package ${shellQuote(LOCAL_ADAPTER_PACKAGE)} ${shellQuote(LOCAL_ADAPTER_BIN)} mcp serve --api-key ${shellQuote(apiKey)} --url ${shellQuote(baseUrl)} --workspace-root "$PWD"`;
+			return `claude mcp add --scope user ${shellQuote(serverName)} -- ${LOCAL_ADAPTER_COMMAND} mcp serve --url ${shellQuote(baseUrl)} --workspace-root "$PWD"`;
 		case "codex":
 			return buildCodexServerBlock({
 				mode: "local",
 				serverName,
-				apiKey,
 				url: baseUrl,
 			}).trim();
 		case "vscode":
@@ -523,7 +501,6 @@ export function buildConnectionSnippet(args: {
 					existing: {},
 					mode: args.mode,
 					serverName,
-					apiKey,
 					url: baseUrl,
 				}),
 				null,
@@ -536,7 +513,6 @@ export function buildConnectionSnippet(args: {
 					existing: {},
 					mode: args.mode,
 					serverName,
-					apiKey,
 					url: baseUrl,
 				}),
 				null,
@@ -553,14 +529,13 @@ export function buildConnectionSnippet(args: {
 					existing: {},
 					mode: args.mode,
 					serverName,
-					apiKey,
 					url: baseUrl,
 				}),
 				null,
 				2,
 			)}`;
 		case "generic":
-			return buildLocalAdapterShellCommand(apiKey, baseUrl);
+			return buildLocalAdapterShellCommand(baseUrl);
 	}
 
 	throw new Error(`Unsupported client ${args.client}.`);

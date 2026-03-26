@@ -75,30 +75,34 @@ describe("createMcpUsageLimiter", () => {
 		expect(result.remaining).toBeNull();
 	});
 
-	test("uses INCRBY for multi-unit Upstash increments instead of per-unit INCR loops", async () => {
-		const counters = new Map<string, number>();
-		const incrbyCalls: Array<{ key: string; by: number }> = [];
+	test("uses an injected usage ledger for idempotent accepted tool-call charging", async () => {
+		const charges: Array<{ idempotencyKey: string; units: number }> = [];
 		const limiter = createMcpUsageLimiter({
 			nowMs: () => Date.UTC(2026, 1, 27, 12, 0, 0),
-			env: {
-				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "token",
-				BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
-				BARDO_MCP_USAGE_WRITE_TOTALS: "true",
+			controlPlane: {
+				readKeyUsage: async () => ({
+					total: 0,
+					thisPeriod: 0,
+					lastUsedAt: null,
+					lastUsedProviderId: null,
+					lastUsedModelId: null,
+					backend: "none" as const,
+				}),
+				consumeAcceptedToolCalls: async (input) => {
+					charges.push({
+						idempotencyKey: input.idempotencyKey,
+						units: input.units,
+					});
+					return {
+						allowed: true,
+						limit: 25_000,
+						usedThisPeriod: 3,
+						remaining: 24_997,
+						period: "2026-02",
+						backend: "memory" as const,
+					};
+				},
 			},
-			redis: {
-				incr: async () => {
-					throw new Error("INCR should not be used for unit-based accounting.");
-				},
-				incrby: async (key: string, by: number) => {
-					incrbyCalls.push({ key, by });
-					const next = (counters.get(key) ?? 0) + by;
-					counters.set(key, next);
-					return next;
-				},
-				expire: async () => 1,
-				set: async () => "OK",
-			} as never,
 		});
 
 		const result = await limiter.consume({
@@ -107,18 +111,95 @@ describe("createMcpUsageLimiter", () => {
 			plan: "solo",
 			mcpPeriodLimit: 25_000,
 			units: 3,
+			idempotencyKey: "tool-call-123",
 		});
 
 		expect(result.allowed).toBe(true);
-		expect(result.backend).toBe("upstash");
+		expect(result.backend).toBe("memory");
 		expect(result.usedThisPeriod).toBe(3);
-		expect(incrbyCalls.some((entry) => entry.by === 3)).toBe(true);
-		expect(
-			incrbyCalls.filter((entry) => entry.key.includes(":month:")).length,
-		).toBe(2);
-		expect(
-			incrbyCalls.filter((entry) => entry.key.endsWith(":total")).length,
-		).toBe(2);
+		expect(charges).toEqual([{ idempotencyKey: "tool-call-123", units: 3 }]);
+	});
+
+	test("checks durable usage without charging until the accepted tool call is committed", async () => {
+		const charges: string[] = [];
+		const limiter = createMcpUsageLimiter({
+			nowMs: () => Date.UTC(2026, 1, 27, 12, 0, 0),
+			env: {
+				NODE_ENV: "production",
+				BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+			},
+			controlPlane: {
+				readKeyUsage: async () => ({
+					total: 12,
+					thisPeriod: 2,
+					lastUsedAt: null,
+					lastUsedProviderId: null,
+					lastUsedModelId: null,
+					backend: "none" as const,
+				}),
+				consumeAcceptedToolCalls: async (input) => {
+					charges.push(input.idempotencyKey);
+					return {
+						allowed: true,
+						limit: 25_000,
+						usedThisPeriod: 3,
+						remaining: 24_997,
+						period: "2026-02",
+						backend: "memory" as const,
+					};
+				},
+			},
+		});
+
+		const check = await limiter.check({
+			subjectId: "user_check",
+			keyId: "key_check",
+			plan: "solo",
+			mcpPeriodLimit: 25_000,
+			units: 1,
+			idempotencyKey: "accepted-tool-call-1",
+		});
+		expect(check.allowed).toBe(true);
+		expect(check.usedThisPeriod).toBe(2);
+		expect(charges).toEqual([]);
+
+		const consumed = await limiter.consume({
+			subjectId: "user_check",
+			keyId: "key_check",
+			plan: "solo",
+			mcpPeriodLimit: 25_000,
+			units: 1,
+			idempotencyKey: "accepted-tool-call-1",
+		});
+		expect(consumed.allowed).toBe(true);
+		expect(charges).toEqual(["accepted-tool-call-1"]);
+	});
+
+	test("fails closed when durable metering is unavailable and memory fallback is disabled", async () => {
+		const limiter = createMcpUsageLimiter({
+			nowMs: () => Date.UTC(2026, 1, 27, 12, 0, 0),
+			env: {
+				NODE_ENV: "production",
+				BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+			},
+			controlPlane: null,
+		});
+
+		const result = await limiter.consume({
+			subjectId: "user_prod",
+			keyId: "key_prod",
+			plan: "solo",
+			mcpPeriodLimit: 25_000,
+			units: 1,
+			idempotencyKey: "tool-call-prod-1",
+		});
+
+		expect(result.allowed).toBe(false);
+		expect(result.limit).toBe(25_000);
+		expect(result.usedThisPeriod).toBe(25_000);
+		expect(result.remaining).toBe(0);
+		expect(result.period).toBe("2026-02");
+		expect(result.backend).toBe("none");
 	});
 
 	test("prunes stale in-memory counters and expired block-cache entries", () => {

@@ -219,4 +219,58 @@ describe("regenerateCurrentStateProjection", () => {
 
 		await rm(root, { recursive: true, force: true });
 	});
+
+	test("short-circuits when the projection is already current", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-projection-short-circuit-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+
+		await appendCanonicalEvent({
+			bardoRoot,
+			event: {
+				id: "evt-short-circuit-1",
+				type: "player_action_resolved",
+				atISO: "2026-02-23T03:00:00.000Z",
+				source: "player_action",
+				data: {
+					action: "I inspect the lantern pier",
+					worldTimeAfterISO: "2026-02-23T03:00:00.000Z",
+					locationAfter: "lantern-pier",
+					createdLocationIds: ["lantern-pier"],
+					stateAfter: {
+						worldTimeISO: "2026-02-23T03:00:00.000Z",
+						currentLocation: "lantern-pier",
+						counters: { unknownNpc: 0, unknownLocation: 1 },
+						locations: {
+							"lantern-pier": {
+								name: "Lantern Pier",
+								visits: 1,
+								npcIds: [],
+							},
+						},
+						lastAction: "I inspect the lantern pier",
+					},
+				},
+			},
+		});
+
+		const first = await regenerateCurrentStateProjection({ bardoRoot });
+		const firstRaw = await readFile(first.projectionPath, "utf8");
+		const firstParsed = parseMarkdown(firstRaw);
+
+		await Bun.sleep(20);
+		const second = await regenerateCurrentStateProjection({ bardoRoot });
+		const secondRaw = await readFile(second.projectionPath, "utf8");
+		const secondParsed = parseMarkdown(secondRaw);
+
+		expect(second.eventCount).toBe(1);
+		expect(second.state.currentLocation).toBe("lantern-pier");
+		expect(secondRaw).toBe(firstRaw);
+		expect(secondParsed.frontmatter.generated_at_iso).toBe(
+			firstParsed.frontmatter.generated_at_iso,
+		);
+
+		await rm(root, { recursive: true, force: true });
+	});
 });

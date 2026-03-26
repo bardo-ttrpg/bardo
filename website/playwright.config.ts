@@ -8,6 +8,7 @@ import {
 	resolvePlaywrightLocalAppUrl,
 	resolvePlaywrightWebServerHost,
 	resolvePlaywrightWebServerPort,
+	shouldStartPlaywrightWebServer,
 } from "./e2e/playwright-config-lib";
 
 const port = Number.parseInt(
@@ -24,6 +25,16 @@ const webServerPort = resolvePlaywrightWebServerPort(
 const localAppUrl = resolvePlaywrightLocalAppUrl(webServerHost, webServerPort);
 const extraHTTPHeaders = resolvePlaywrightExtraHttpHeaders(process.env);
 const webServerCommand = `PLAYWRIGHT_LOOPBACK_HOST=${webServerHost} NEXT_PUBLIC_APP_URL=${localAppUrl} PORT=${String(webServerPort)} bun run dev:e2e`;
+const webServer = shouldStartPlaywrightWebServer(baseURL)
+	? {
+			command: webServerCommand,
+			url: baseURL,
+			reuseExistingServer: !process.env.CI,
+			timeout: 120_000,
+			stdout: "pipe" as const,
+			stderr: "pipe" as const,
+		}
+	: undefined;
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -65,12 +76,5 @@ export default defineConfig({
 			},
 		},
 	],
-	webServer: {
-		command: webServerCommand,
-		url: baseURL,
-		reuseExistingServer: !process.env.CI,
-		timeout: 120_000,
-		stdout: "pipe",
-		stderr: "pipe",
-	},
+	webServer,
 });

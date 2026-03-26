@@ -1,3 +1,5 @@
+import { runSimulationTick } from "../../mcp/tools/simulation-tick";
+import { runWorldSync } from "../../mcp/tools/world-sync/register";
 import { recordOrchestratorWorkflowMetric } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
 import {
@@ -13,38 +15,6 @@ import {
 } from "./turns-orchestrator-internal";
 
 export { parseResolveTurnPayload, parseSseJsonEvents };
-
-function readPromptResult(lastEvent: unknown): unknown {
-	if (!isRecord(lastEvent) || !isRecord(lastEvent.result)) {
-		return null;
-	}
-	return lastEvent.result;
-}
-
-function readResourceResult(lastEvent: unknown): unknown {
-	if (!isRecord(lastEvent) || !isRecord(lastEvent.result)) {
-		return null;
-	}
-
-	const result = lastEvent.result;
-	const contents = result.contents;
-	if (!Array.isArray(contents)) {
-		return result;
-	}
-
-	for (const item of contents) {
-		if (!isRecord(item) || typeof item.text !== "string") {
-			continue;
-		}
-		try {
-			return JSON.parse(item.text);
-		} catch {
-			return item.text;
-		}
-	}
-
-	return result;
-}
 
 function getToolFailure(step: string, result: unknown): string | null {
 	if (!isRecord(result)) {
@@ -193,38 +163,9 @@ export async function handleResolveTurnRequest(
 				? readToolPayload(contextCall.lastEvent.result)
 				: null;
 
-		let workflowPrompt: unknown = null;
-		try {
-			const promptCall = await runOrchestratorStep({
-				workflow,
-				step: "resolve_player_action_prompt",
-				telemetryEnabled,
-				fn: () =>
-					callMcpJsonRpc({
-						request,
-						auth,
-						sessionId: activeSessionId,
-						body: {
-							jsonrpc: "2.0",
-							id: 2.5,
-							method: "prompts/get",
-							params: {
-								name: "resolve_player_action",
-								arguments: {
-									action: payload.action,
-								},
-							},
-						},
-					}),
-			});
-			workflowPrompt = readPromptResult(promptCall.lastEvent);
-		} catch {
-			workflowPrompt = null;
-		}
-
-		const actionCall = await runOrchestratorStep({
+		const sceneTurnCall = await runOrchestratorStep({
 			workflow,
-			step: "player_action",
+			step: "scene_turn",
 			telemetryEnabled,
 			fn: () =>
 				callMcpJsonRpc({
@@ -236,9 +177,14 @@ export async function handleResolveTurnRequest(
 						id: 3,
 						method: "tools/call",
 						params: {
-							name: "player_action",
+							name: "scene_turn",
 							arguments: {
 								action: payload.action,
+								...(payload.transcript
+									? { transcript: payload.transcript }
+									: {}),
+								idempotencyKey: workflowId,
+								skipWorldSync: !payload.syncWorld,
 							},
 						},
 					},
@@ -246,14 +192,15 @@ export async function handleResolveTurnRequest(
 		});
 
 		const actionToolRpcResult =
-			isRecord(actionCall.lastEvent) && isRecord(actionCall.lastEvent.result)
-				? actionCall.lastEvent.result
+			isRecord(sceneTurnCall.lastEvent) &&
+			isRecord(sceneTurnCall.lastEvent.result)
+				? sceneTurnCall.lastEvent.result
 				: null;
 		const actionResult = actionToolRpcResult
 			? readToolPayload(actionToolRpcResult)
 			: null;
 		assertToolSuccess({
-			step: "player_action",
+			step: "scene_turn",
 			toolRpcResult: actionToolRpcResult,
 			result: actionResult,
 		});
@@ -278,7 +225,7 @@ export async function handleResolveTurnRequest(
 						result: actionResult,
 					},
 					context: contextResult,
-					workflowPrompt,
+					workflowPrompt: null,
 					worldSync: null,
 					tick: null,
 					consistency: null,
@@ -291,129 +238,63 @@ export async function handleResolveTurnRequest(
 			);
 		}
 
+		const consistencyResult =
+			isRecord(actionResult) && isRecord(actionResult.consistency)
+				? actionResult.consistency
+				: null;
 		let worldSyncResult: unknown = null;
-		if (payload.syncWorld && payload.transcript) {
-			const syncCall = await runOrchestratorStep({
+		if (payload.syncWorld) {
+			worldSyncResult = await runOrchestratorStep({
 				workflow,
 				step: "world_sync",
 				telemetryEnabled,
 				fn: () =>
-					callMcpJsonRpc({
-						request,
+					runWorldSync({
 						auth,
-						sessionId: activeSessionId,
-						body: {
-							jsonrpc: "2.0",
-							id: 4,
-							method: "tools/call",
-							params: {
-								name: "world_sync",
-								arguments: {
-									transcript: payload.transcript,
-								},
-							},
-						},
+						...(payload.transcript ? { transcript: payload.transcript } : {}),
+						...(isRecord(actionResult) &&
+						isRecord(actionResult.actionResult) &&
+						typeof actionResult.actionResult.locationAfter === "string"
+							? {
+									currentLocationHint: actionResult.actionResult.locationAfter,
+								}
+							: {}),
 					}),
 			});
-
-			const worldSyncToolRpcResult =
-				isRecord(syncCall.lastEvent) && isRecord(syncCall.lastEvent.result)
-					? syncCall.lastEvent.result
-					: null;
-			worldSyncResult = worldSyncToolRpcResult
-				? readToolPayload(worldSyncToolRpcResult)
-				: null;
 			assertToolSuccess({
 				step: "world_sync",
-				toolRpcResult: worldSyncToolRpcResult,
+				toolRpcResult: null,
 				result: worldSyncResult,
 			});
 		}
-
 		let tickResult: unknown = null;
 		if (payload.autoTick) {
-			const tickCall = await runOrchestratorStep({
+			tickResult = await runOrchestratorStep({
 				workflow,
 				step: "simulation_tick",
 				telemetryEnabled,
 				fn: () =>
-					callMcpJsonRpc({
-						request,
+					runSimulationTick({
 						auth,
-						sessionId: activeSessionId,
-						body: {
-							jsonrpc: "2.0",
-							id: 5,
-							method: "tools/call",
-							params: {
-								name: "simulation_tick",
-								arguments: {
-									mode: "turn",
-									tickCount: 1,
-									idempotencyKey: workflowId,
-								},
-							},
-						},
+						mode: "turn",
+						tickCount: 1,
+						idempotencyKey: `${workflowId}::tick`,
+						dryRun: false,
 					}),
 			});
-
-			const tickToolRpcResult =
-				isRecord(tickCall.lastEvent) && isRecord(tickCall.lastEvent.result)
-					? tickCall.lastEvent.result
-					: null;
-			tickResult = tickToolRpcResult
-				? readToolPayload(tickToolRpcResult)
-				: null;
 			assertToolSuccess({
 				step: "simulation_tick",
-				toolRpcResult: tickToolRpcResult,
+				toolRpcResult: null,
 				result: tickResult,
 			});
 		}
 
-		const consistencyCall = await runOrchestratorStep({
-			workflow,
-			step: "consistency_check",
-			telemetryEnabled,
-			fn: () =>
-				callMcpJsonRpc({
-					request,
-					auth,
-					sessionId: activeSessionId,
-					body: {
-						jsonrpc: "2.0",
-						id: 7,
-						method: "tools/call",
-						params: {
-							name: "consistency_check",
-							arguments: {
-								includeWarnings: false,
-							},
-						},
-					},
-				}),
-		});
-
-		const consistencyToolRpcResult =
-			isRecord(consistencyCall.lastEvent) &&
-			isRecord(consistencyCall.lastEvent.result)
-				? consistencyCall.lastEvent.result
-				: null;
-		const consistencyResult = consistencyToolRpcResult
-			? readToolPayload(consistencyToolRpcResult)
-			: null;
-		assertToolSuccess({
-			step: "consistency_check",
-			toolRpcResult: consistencyToolRpcResult,
-			result: consistencyResult,
-		});
-
 		let stateResult: unknown = null;
 		let resourcesResult: unknown = null;
 		if (payload.includeState) {
-			const campaignSummaryCall = await runOrchestratorStep({
+			const worldStateCall = await runOrchestratorStep({
 				workflow,
-				step: "resource_campaign_current_summary",
+				step: "world_state_overview",
 				telemetryEnabled,
 				fn: () =>
 					callMcpJsonRpc({
@@ -423,16 +304,17 @@ export async function handleResolveTurnRequest(
 						body: {
 							jsonrpc: "2.0",
 							id: 8,
-							method: "resources/read",
+							method: "tools/call",
 							params: {
-								uri: "resource://campaign/current-summary",
+								name: "world_state_overview",
+								arguments: {},
 							},
 						},
 					}),
 			});
-			const sceneCurrentCall = await runOrchestratorStep({
+			const timelineDiffCall = await runOrchestratorStep({
 				workflow,
-				step: "resource_scene_current",
+				step: "timeline_diff",
 				telemetryEnabled,
 				fn: () =>
 					callMcpJsonRpc({
@@ -442,16 +324,17 @@ export async function handleResolveTurnRequest(
 						body: {
 							jsonrpc: "2.0",
 							id: 9,
-							method: "resources/read",
+							method: "tools/call",
 							params: {
-								uri: "resource://scene/current",
+								name: "timeline_diff",
+								arguments: {},
 							},
 						},
 					}),
 			});
-			const recentDigestCall = await runOrchestratorStep({
+			const playerKnowledgeCall = await runOrchestratorStep({
 				workflow,
-				step: "resource_events_recent_digest",
+				step: "player_knowledge_view",
 				telemetryEnabled,
 				fn: () =>
 					callMcpJsonRpc({
@@ -461,22 +344,37 @@ export async function handleResolveTurnRequest(
 						body: {
 							jsonrpc: "2.0",
 							id: 10,
-							method: "resources/read",
+							method: "tools/call",
 							params: {
-								uri: "resource://events/recent-digest",
+								name: "player_knowledge_view",
+								arguments: {
+									playerView: true,
+								},
 							},
 						},
 					}),
 			});
 
-			const campaignSummary = readResourceResult(campaignSummaryCall.lastEvent);
-			const sceneCurrent = readResourceResult(sceneCurrentCall.lastEvent);
-			const recentEvents = readResourceResult(recentDigestCall.lastEvent);
-			stateResult = campaignSummary;
+			const worldStateResult =
+				isRecord(worldStateCall.lastEvent) &&
+				isRecord(worldStateCall.lastEvent.result)
+					? readToolPayload(worldStateCall.lastEvent.result)
+					: null;
+			const timelineDiffResult =
+				isRecord(timelineDiffCall.lastEvent) &&
+				isRecord(timelineDiffCall.lastEvent.result)
+					? readToolPayload(timelineDiffCall.lastEvent.result)
+					: null;
+			const playerKnowledgeResult =
+				isRecord(playerKnowledgeCall.lastEvent) &&
+				isRecord(playerKnowledgeCall.lastEvent.result)
+					? readToolPayload(playerKnowledgeCall.lastEvent.result)
+					: null;
+			stateResult = worldStateResult;
 			resourcesResult = {
-				campaignSummary,
-				sceneCurrent,
-				recentEvents,
+				worldStateOverview: worldStateResult,
+				timelineDiff: timelineDiffResult,
+				playerKnowledge: playerKnowledgeResult,
 			};
 		}
 
@@ -494,7 +392,7 @@ export async function handleResolveTurnRequest(
 					result: actionResult,
 				},
 				context: contextResult,
-				workflowPrompt,
+				workflowPrompt: null,
 				worldSync: worldSyncResult,
 				tick: tickResult,
 				consistency: consistencyResult,

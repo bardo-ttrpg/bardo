@@ -22,13 +22,18 @@ import {
 	startLocalMcpServer,
 } from "./local-mcp";
 import { normalizePlan, type PlanTier } from "./plan-utils";
-import { migrateSavedConfig, type SavedConfig } from "./saved-config";
+import {
+	migrateSavedConfig,
+	type SavedConfig,
+	type SavedConfigV2,
+} from "./saved-config";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
 const DEFAULT_LOGIN_START_URL =
-	"https://app.bardo.ai/api/connect/cli-session/start";
+	"https://app.bardo.ai/api/connect/bridge-session/start";
 const CONFIG_FILE_NAME = "config.json";
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
 type Writer = {
 	write(chunk: string): void;
@@ -39,8 +44,6 @@ type FetchLike = typeof fetch;
 type LoginCommandOptions = {
 	apiKey: string | null;
 	url: string | null;
-	token: string | null;
-	exchangeUrl: string | null;
 	statusUrl: string | null;
 	startUrl: string | null;
 };
@@ -70,8 +73,6 @@ type ConnectCommandOptions = WorkspaceCommandOptions & {
 	dryRun: boolean;
 	apiKey: string | null;
 	url: string | null;
-	token: string | null;
-	exchangeUrl: string | null;
 	statusUrl: string | null;
 	startUrl: string | null;
 	rulebookPath: string | null;
@@ -159,7 +160,7 @@ type DoctorOutput = {
 			status: number | null;
 			error: string | null;
 		};
-		controlPlane: {
+		websiteBackend: {
 			url: string | null;
 			reachable: boolean;
 			status: number | null;
@@ -196,7 +197,7 @@ type DoctorOutput = {
 	} | null;
 };
 
-function deriveRuntimeStatusUrlFromControlPlaneUrl(
+function deriveRuntimeStatusUrlFromWebsiteBackendUrl(
 	value: string | null | undefined,
 ): string | null {
 	const trimmed = value?.trim();
@@ -213,15 +214,15 @@ function deriveRuntimeStatusUrlFromControlPlaneUrl(
 
 function resolveRuntimeStatusUrl(args: {
 	explicitStatusUrl: string | null | undefined;
-	controlPlaneUrls: Array<string | null | undefined>;
+	websiteBackendUrls: Array<string | null | undefined>;
 }): string | null {
 	const explicit = args.explicitStatusUrl?.trim();
 	if (explicit) {
 		return explicit;
 	}
 
-	for (const candidate of args.controlPlaneUrls) {
-		const derived = deriveRuntimeStatusUrlFromControlPlaneUrl(candidate);
+	for (const candidate of args.websiteBackendUrls) {
+		const derived = deriveRuntimeStatusUrlFromWebsiteBackendUrl(candidate);
 		if (derived) {
 			return derived;
 		}
@@ -329,8 +330,6 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 function parseLoginOptions(argv: string[]): LoginCommandOptions {
 	let apiKey: string | null = null;
 	let url: string | null = null;
-	let token: string | null = null;
-	let exchangeUrl: string | null = null;
 	let statusUrl: string | null = null;
 	let startUrl: string | null = null;
 
@@ -352,16 +351,6 @@ function parseLoginOptions(argv: string[]): LoginCommandOptions {
 			index += 1;
 			continue;
 		}
-		if (arg === "--token" && typeof argv[index + 1] === "string") {
-			token = argv[index + 1] ?? null;
-			index += 1;
-			continue;
-		}
-		if (arg === "--exchange-url" && typeof argv[index + 1] === "string") {
-			exchangeUrl = argv[index + 1] ?? null;
-			index += 1;
-			continue;
-		}
 		if (arg === "--status-url" && typeof argv[index + 1] === "string") {
 			statusUrl = argv[index + 1] ?? null;
 			index += 1;
@@ -373,7 +362,7 @@ function parseLoginOptions(argv: string[]): LoginCommandOptions {
 		}
 	}
 
-	return { apiKey, url, token, exchangeUrl, statusUrl, startUrl };
+	return { apiKey, url, statusUrl, startUrl };
 }
 
 function parseWorkspaceRootOption(
@@ -517,8 +506,6 @@ function parseConnectOptions(argv: string[]): ConnectCommandOptions {
 	let dryRun = false;
 	let apiKey: string | null = null;
 	let url: string | null = null;
-	let token: string | null = null;
-	let exchangeUrl: string | null = null;
 	let statusUrl: string | null = null;
 	let startUrl: string | null = null;
 	let rulebookPath: string | null = null;
@@ -570,16 +557,6 @@ function parseConnectOptions(argv: string[]): ConnectCommandOptions {
 			index += 1;
 			continue;
 		}
-		if (arg === "--token" && typeof argv[index + 1] === "string") {
-			token = argv[index + 1] ?? null;
-			index += 1;
-			continue;
-		}
-		if (arg === "--exchange-url" && typeof argv[index + 1] === "string") {
-			exchangeUrl = argv[index + 1] ?? null;
-			index += 1;
-			continue;
-		}
 		if (arg === "--status-url" && typeof argv[index + 1] === "string") {
 			statusUrl = argv[index + 1] ?? null;
 			index += 1;
@@ -621,8 +598,6 @@ function parseConnectOptions(argv: string[]): ConnectCommandOptions {
 		dryRun,
 		apiKey,
 		url,
-		token,
-		exchangeUrl,
 		statusUrl,
 		startUrl,
 		rulebookPath,
@@ -753,9 +728,8 @@ function renderHelp(): string {
 
 Usage:
   bardo clients list [--json]
-  bardo login --api-key <key> [--url <mcp-url>]
-  bardo login --token <login-token> --exchange-url <https-url> [--status-url <https-url>]
   bardo login [--start-url <https-url>]
+  bardo login --api-key <key> [--url <mcp-url>]
   bardo logout
   bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
   bardo install --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local|remote>] [--config-path <path>] [--dry-run]
@@ -771,10 +745,10 @@ Compatibility:
 Notes:
   clients list shows the supported client matrix and whether each client can be auto-installed.
   For the simplest setup, run bardo connect --client <client> from your project root.
-  login accepts either an API key directly or a short-lived website-issued login token.
-  Without arguments, login can start a browser approval flow against the website control plane.
+  login starts a browser approval flow by default and stores bridge session credentials for the local bridge.
+  login also supports direct API keys when you already have a bridge credential for local testing.
   connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
-  --status-url lets doctor fetch plan and key status details from the website control plane.
+  --status-url lets doctor fetch plan and bridge credential status details from the website runtime status service.
   If you are testing from the source tree, run commands as: bun run --cwd packages/bardo-mcp start -- <command>.
   The workspace root defaults to the current working directory.
 `;
@@ -788,7 +762,32 @@ async function handleLogin(
 ): Promise<number> {
 	try {
 		const env = deps.env ?? process.env;
-		let apiKey = options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
+		const existingConfig = await readConfig(resolveConfigPath(deps));
+		const explicitApiKey =
+			options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
+		const explicitRefreshToken = env.BARDO_REFRESH_TOKEN?.trim() || null;
+		const usingExplicitApiKey = explicitApiKey !== null;
+		let apiKey = explicitApiKey || resolveConfigAccessToken(existingConfig);
+		let refreshToken = usingExplicitApiKey
+			? explicitRefreshToken
+			: explicitRefreshToken ||
+				(existingConfig?.version === 2 ? existingConfig.refreshToken : null);
+		let expiresAtISO =
+			usingExplicitApiKey || existingConfig?.version !== 2
+				? null
+				: existingConfig.expiresAtISO;
+		let refreshUrl =
+			usingExplicitApiKey || existingConfig?.version !== 2
+				? undefined
+				: existingConfig.refreshUrl;
+		let accountLabel =
+			usingExplicitApiKey || existingConfig?.version !== 2
+				? undefined
+				: existingConfig.accountLabel;
+		let plan =
+			usingExplicitApiKey || existingConfig?.version !== 2
+				? undefined
+				: existingConfig.plan;
 		let url =
 			options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
 		let serverName: string | undefined;
@@ -801,30 +800,10 @@ async function handleLogin(
 				options.statusUrl?.trim() ||
 				env.BARDO_RUNTIME_STATUS_URL?.trim() ||
 				null,
-			controlPlaneUrls: [
-				startUrl,
-				options.exchangeUrl?.trim() ||
-					env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
-					null,
-			],
+			websiteBackendUrls: [startUrl],
 		});
 
-		if (!apiKey && options.token?.trim()) {
-			const exchange = await exchangeLoginToken({
-				token: options.token.trim(),
-				exchangeUrl:
-					options.exchangeUrl?.trim() ||
-					env.BARDO_LOGIN_EXCHANGE_URL?.trim() ||
-					null,
-				fetchImpl: deps.fetch ?? fetch,
-			});
-			apiKey = exchange.apiKey;
-			url = exchange.mcpUrl;
-			serverName = exchange.serverName;
-			statusUrl = exchange.statusUrl ?? statusUrl;
-		}
-
-		if (!apiKey && !options.token?.trim()) {
+		if (!apiKey) {
 			const interactive = await runInteractiveLoginFlow({
 				startUrl,
 				fetchImpl: deps.fetch ?? fetch,
@@ -833,28 +812,48 @@ async function handleLogin(
 					(async (ms) => new Promise((resolve) => setTimeout(resolve, ms))),
 				stdout,
 			});
-			apiKey = interactive.apiKey;
+			apiKey = interactive.accessToken;
+			refreshToken = interactive.refreshToken;
+			expiresAtISO = interactive.expiresAtISO;
+			refreshUrl = interactive.refreshUrl;
+			accountLabel = interactive.accountLabel;
+			plan = interactive.plan;
 			url = interactive.mcpUrl;
 			statusUrl = interactive.statusUrl ?? statusUrl;
 			serverName = interactive.serverName;
 		}
 
 		if (!apiKey) {
-			stderr.write(
-				"Missing API key. Pass --api-key, set BARDO_API_KEY, or use --token with --exchange-url.\n",
-			);
+			stderr.write("Missing API key. Pass --api-key or set BARDO_API_KEY.\n");
 			return 1;
 		}
 
 		const now = (deps.now ?? (() => new Date()))().toISOString();
-		await writeConfig(resolveConfigPath(deps), {
-			version: 1,
-			apiKey,
-			url,
-			updatedAtISO: now,
-			serverName,
-			statusUrl: statusUrl ?? undefined,
-		});
+		await writeConfig(
+			resolveConfigPath(deps),
+			refreshToken && expiresAtISO
+				? {
+						version: 2,
+						accessToken: apiKey,
+						refreshToken,
+						expiresAtISO,
+						url,
+						updatedAtISO: now,
+						serverName,
+						statusUrl: statusUrl ?? undefined,
+						refreshUrl,
+						accountLabel,
+						plan,
+					}
+				: {
+						version: 1,
+						apiKey,
+						url,
+						updatedAtISO: now,
+						serverName,
+						statusUrl: statusUrl ?? undefined,
+					},
+		);
 		stdout.write(`Saved Bardo credentials to ${resolveConfigPath(deps)}\n`);
 		return 0;
 	} catch (error) {
@@ -1058,7 +1057,7 @@ async function handleConnect(
 			return 0;
 		}
 
-		const hasLoginInputs = [options.token, options.apiKey].some(
+		const hasLoginInputs = [options.apiKey].some(
 			(value) => typeof value === "string" && value.trim().length > 0,
 		);
 		const hasMetadataOverrides = [
@@ -1072,8 +1071,6 @@ async function handleConnect(
 				{
 					apiKey: options.apiKey,
 					url: options.url,
-					token: options.token,
-					exchangeUrl: options.exchangeUrl,
 					statusUrl: options.statusUrl,
 					startUrl: options.startUrl,
 				},
@@ -1085,18 +1082,39 @@ async function handleConnect(
 				return loginExitCode;
 			}
 		} else if (hasMetadataOverrides) {
-			await writeConfig(resolveConfigPath(deps), {
-				version: 1,
-				apiKey: credentials.apiKey,
-				url: credentials.url,
-				statusUrl:
-					options.statusUrl?.trim() ||
-					config?.statusUrl ||
-					env.BARDO_RUNTIME_STATUS_URL?.trim() ||
-					undefined,
-				serverName: options.serverName?.trim() || config?.serverName,
-				updatedAtISO: (deps.now ?? (() => new Date()))().toISOString(),
-			});
+			const updatedAtISO = (deps.now ?? (() => new Date()))().toISOString();
+			const statusUrl =
+				options.statusUrl?.trim() ||
+				config?.statusUrl ||
+				env.BARDO_RUNTIME_STATUS_URL?.trim() ||
+				undefined;
+			const serverName = options.serverName?.trim() || config?.serverName;
+			const configPath = resolveConfigPath(deps);
+
+			if (config?.version === 2) {
+				await writeConfig(configPath, {
+					version: 2,
+					accessToken: config.accessToken,
+					refreshToken: config.refreshToken,
+					expiresAtISO: config.expiresAtISO,
+					url: credentials.url,
+					updatedAtISO,
+					serverName,
+					statusUrl,
+					refreshUrl: config.refreshUrl,
+					accountLabel: config.accountLabel,
+					plan: config.plan,
+				});
+			} else {
+				await writeConfig(configPath, {
+					version: 1,
+					apiKey: credentials.apiKey,
+					url: credentials.url,
+					statusUrl,
+					serverName,
+					updatedAtISO,
+				});
+			}
 		}
 
 		if (!options.skipInit) {
@@ -1199,6 +1217,7 @@ async function handlePackDebug(
 		const config = await readConfig(resolveConfigPath(deps));
 		const doctor = await buildDoctorReport(
 			{
+				client: null,
 				workspaceRoot: options.workspaceRoot,
 				json: true,
 			},
@@ -1216,8 +1235,8 @@ async function handlePackDebug(
 		const payload = {
 			generatedAtISO: (deps.now ?? (() => new Date()))().toISOString(),
 			config: {
-				apiKeyRedacted: Boolean(config?.apiKey),
-				apiKeyPreview: redactApiKey(config?.apiKey ?? null),
+				apiKeyRedacted: Boolean(resolveConfigAccessToken(config)),
+				apiKeyPreview: redactApiKey(resolveConfigAccessToken(config)),
 				url: config?.url ?? null,
 				statusUrl: config?.statusUrl ?? null,
 				serverName: config?.serverName ?? null,
@@ -1274,41 +1293,67 @@ async function handleServe(
 	stderr: Writer,
 ): Promise<number> {
 	const env = deps.env ?? process.env;
-	const config = await readConfig(resolveConfigPath(deps));
+	const configPath = resolveConfigPath(deps);
+	let config = await readConfig(configPath);
+	const explicitCliApiKey = options.apiKey?.trim() || "";
+	if (!explicitCliApiKey && config?.version === 2) {
+		const now = deps.now ?? (() => new Date());
+		const expiresAt = Date.parse(config.expiresAtISO);
+		const shouldRefresh =
+			!Number.isFinite(expiresAt) || expiresAt <= now().getTime() + 60_000;
+		if (shouldRefresh) {
+			try {
+				config = await refreshBridgeSessionConfig({
+					config,
+					configPath,
+					fetchImpl: deps.fetch ?? fetch,
+					now,
+					env,
+				});
+			} catch (error) {
+				if (!Number.isFinite(expiresAt) || expiresAt <= now().getTime()) {
+					stderr.write(
+						`Bridge session refresh failed: ${toErrorMessage(error)}\n`,
+					);
+					return 1;
+				}
+				stderr.write(
+					`Bridge session refresh failed, continuing with existing access token: ${toErrorMessage(error)}\n`,
+				);
+			}
+		}
+	}
+	const configApiKey = resolveConfigAccessToken(config)?.trim() || "";
+	const envApiKey =
+		env.BARDO_ACCESS_TOKEN?.trim() || env.BARDO_API_KEY?.trim() || "";
 	const statusUrl =
 		resolveRuntimeStatusUrl({
-			explicitStatusUrl: env.BARDO_RUNTIME_STATUS_URL?.trim() || null,
-			controlPlaneUrls: [
+			explicitStatusUrl:
+				config?.statusUrl?.trim() ||
+				env.BARDO_RUNTIME_STATUS_URL?.trim() ||
+				null,
+			websiteBackendUrls: [
 				env.BARDO_LOGIN_START_URL?.trim() || null,
-				env.BARDO_LOGIN_EXCHANGE_URL?.trim() || null,
 				DEFAULT_LOGIN_START_URL,
 			],
 		}) ||
 		resolveRuntimeStatusUrl({
-			explicitStatusUrl: config?.statusUrl?.trim() || null,
-			controlPlaneUrls: [DEFAULT_LOGIN_START_URL],
+			explicitStatusUrl: null,
+			websiteBackendUrls: [DEFAULT_LOGIN_START_URL],
 		});
 	const resolved = {
-		apiKey:
-			options.apiKey?.trim() ||
-			env.BARDO_API_KEY?.trim() ||
-			config?.apiKey?.trim() ||
-			"",
+		apiKey: explicitCliApiKey || configApiKey || envApiKey || "",
 		url:
 			options.url?.trim() ||
-			env.BARDO_MCP_URL?.trim() ||
 			config?.url?.trim() ||
+			env.BARDO_MCP_URL?.trim() ||
 			DEFAULT_MCP_URL,
 		workspaceRoot: resolveWorkspaceRoot(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		),
 		plan: await resolveServePlan({
-			apiKey:
-				options.apiKey?.trim() ||
-				env.BARDO_API_KEY?.trim() ||
-				config?.apiKey?.trim() ||
-				"",
+			apiKey: explicitCliApiKey || configApiKey || envApiKey || "",
 			statusUrl,
 			env,
 			fetchImpl: deps.fetch ?? fetch,
@@ -1336,8 +1381,132 @@ async function handleServe(
 	}
 }
 
+function resolveBridgeRefreshUrl(config: SavedConfigV2): string | null {
+	if (config.refreshUrl?.trim()) {
+		return config.refreshUrl.trim();
+	}
+	if (config.statusUrl?.trim()) {
+		try {
+			return new URL(
+				"/api/connect/bridge-session/refresh",
+				config.statusUrl,
+			).toString();
+		} catch {
+			return null;
+		}
+	}
+	return null;
+}
+
+async function refreshBridgeSessionConfig(args: {
+	config: SavedConfigV2;
+	configPath: string;
+	fetchImpl: FetchLike;
+	now: () => Date;
+	env: Record<string, string | undefined>;
+}): Promise<SavedConfigV2> {
+	const preferredLoopbackHost =
+		resolveLoopbackHost(args.config.url) ??
+		resolveLoopbackHost(args.config.statusUrl ?? null) ??
+		resolveLoopbackHost(args.config.refreshUrl ?? null);
+	const refreshUrl = rewriteLoopbackHost(
+		resolveBridgeRefreshUrl(args.config),
+		preferredLoopbackHost,
+	);
+	if (!refreshUrl) {
+		throw new Error("Missing bridge session refresh URL.");
+	}
+
+	let response: Response;
+	try {
+		response = await fetchWithTimeout({
+			fetchImpl: args.fetchImpl,
+			url: refreshUrl,
+			timeoutMs: resolveBridgeRefreshTimeoutMs(args.env),
+			init: {
+				method: "POST",
+				headers: {
+					accept: "application/json",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					refreshToken: args.config.refreshToken,
+				}),
+			},
+		});
+	} catch (error) {
+		throw new Error(formatControlPlaneRequestError(refreshUrl, error));
+	}
+
+	const body = (await response.json().catch(() => ({}))) as Partial<{
+		accessToken: string;
+		refreshToken: string;
+		expiresAt: string;
+		expiresAtISO: string;
+		mcpBaseUrl: string;
+		mcpUrl: string;
+		statusUrl: string;
+		refreshUrl: string;
+		accountLabel: string;
+		plan: string;
+		serverName: string;
+		error: string;
+	}>;
+	if (!response.ok) {
+		throw new Error(
+			body.error ||
+				`Bridge session refresh failed with status ${response.status}.`,
+		);
+	}
+
+	const refreshed = resolveApprovedInteractivePayload(body);
+	if (!refreshed?.refreshToken || !refreshed.expiresAtISO) {
+		throw new Error("Bridge session refresh returned an invalid payload.");
+	}
+
+	const nextConfig: SavedConfigV2 = {
+		version: 2,
+		accessToken: refreshed.accessToken,
+		refreshToken: refreshed.refreshToken,
+		expiresAtISO: refreshed.expiresAtISO,
+		url:
+			rewriteLoopbackHost(refreshed.mcpUrl, preferredLoopbackHost) ??
+			refreshed.mcpUrl,
+		updatedAtISO: args.now().toISOString(),
+		serverName: refreshed.serverName ?? args.config.serverName,
+		statusUrl:
+			rewriteLoopbackHost(
+				refreshed.statusUrl ?? args.config.statusUrl ?? null,
+				preferredLoopbackHost,
+			) ?? undefined,
+		refreshUrl:
+			rewriteLoopbackHost(
+				refreshed.refreshUrl ?? refreshUrl,
+				preferredLoopbackHost,
+			) ?? undefined,
+		accountLabel: refreshed.accountLabel ?? args.config.accountLabel,
+		plan: refreshed.plan ?? args.config.plan,
+	};
+	await writeConfig(args.configPath, nextConfig);
+	return nextConfig;
+}
+
 function resolveWorkspaceRoot(input: string | null, cwd: string): string {
 	return path.resolve(input?.trim() || cwd);
+}
+
+function resolveBridgeRefreshTimeoutMs(
+	env: Record<string, string | undefined>,
+): number {
+	const raw = Number(
+		env.BARDO_BRIDGE_REFRESH_TIMEOUT_MS ??
+			env.BARDO_RUNTIME_STATUS_TIMEOUT_MS ??
+			"3000",
+	);
+	if (!Number.isFinite(raw) || raw < 100) {
+		return 3000;
+	}
+	return Math.floor(raw);
 }
 
 function resolveRuntimeStatusTimeoutMs(
@@ -1348,6 +1517,39 @@ function resolveRuntimeStatusTimeoutMs(
 		return 1500;
 	}
 	return Math.floor(raw);
+}
+
+function resolveDoctorTimeoutMs(
+	env: Record<string, string | undefined>,
+): number {
+	const raw = Number(
+		env.BARDO_DOCTOR_TIMEOUT_MS ??
+			env.BARDO_RUNTIME_STATUS_TIMEOUT_MS ??
+			"1500",
+	);
+	if (!Number.isFinite(raw) || raw < 100) {
+		return 1500;
+	}
+	return Math.floor(raw);
+}
+
+async function fetchWithTimeout(args: {
+	fetchImpl: FetchLike;
+	url: string;
+	timeoutMs: number;
+	init: RequestInit;
+}): Promise<Response> {
+	const abortController = new AbortController();
+	const timeoutId = setTimeout(() => abortController.abort(), args.timeoutMs);
+
+	try {
+		return await args.fetchImpl(args.url, {
+			...args.init,
+			signal: abortController.signal,
+		});
+	} finally {
+		clearTimeout(timeoutId);
+	}
 }
 
 async function resolveServePlan(args: {
@@ -1469,6 +1671,14 @@ async function ensureWorkspaceCoreFiles(args: {
 		),
 	);
 	await ensureFile(
+		path.join(args.bardoRoot, "projections/current-state.md"),
+		renderJsonMarkdown(
+			"Current State Projection",
+			"Derived campaign state projection generated from canonical event log.",
+			{},
+		),
+	);
+	await ensureFile(
 		path.join(args.bardoRoot, "events/history.md"),
 		renderMarkdown(
 			"Campaign History",
@@ -1552,10 +1762,29 @@ async function writeConfig(
 async function readConfig(filePath: string): Promise<SavedConfig | null> {
 	try {
 		const raw = await readFile(filePath, "utf8");
-		return migrateSavedConfig(JSON.parse(raw));
+		try {
+			return migrateSavedConfig(JSON.parse(raw));
+		} catch {
+			return migrateSavedConfig(JSON.parse(sanitizeSavedConfigRaw(raw)));
+		}
 	} catch {
 		return null;
 	}
+}
+
+function sanitizeSavedConfigRaw(raw: string): string {
+	return raw.replace(/(?:\\r|\\n)+$/g, "").trimEnd();
+}
+
+function resolveConfigAccessToken(config: SavedConfig | null): string | null {
+	if (!config) {
+		return null;
+	}
+	return config.version === 2 ? config.accessToken : config.apiKey;
+}
+
+function resolveConfigStatusUrl(config: SavedConfig | null): string | null {
+	return config?.statusUrl || null;
 }
 
 function resolveStoredCredentials(
@@ -1563,8 +1792,11 @@ function resolveStoredCredentials(
 	env: Record<string, string | undefined>,
 ) {
 	return {
-		apiKey: env.BARDO_API_KEY?.trim() || config?.apiKey || null,
-		url: env.BARDO_MCP_URL?.trim() || config?.url || null,
+		apiKey:
+			resolveConfigAccessToken(config) ||
+			env.BARDO_ACCESS_TOKEN?.trim() ||
+			env.BARDO_API_KEY?.trim(),
+		url: config?.url || env.BARDO_MCP_URL?.trim() || null,
 	};
 }
 
@@ -1576,11 +1808,12 @@ function resolveConnectCredentials(
 	return {
 		apiKey:
 			options.apiKey?.trim() ||
+			resolveConfigAccessToken(config) ||
+			env.BARDO_ACCESS_TOKEN?.trim() ||
 			env.BARDO_API_KEY?.trim() ||
-			config?.apiKey ||
 			null,
 		url:
-			options.url?.trim() || env.BARDO_MCP_URL?.trim() || config?.url || null,
+			options.url?.trim() || config?.url || env.BARDO_MCP_URL?.trim() || null,
 	};
 }
 
@@ -1620,71 +1853,20 @@ function redactApiKey(apiKey: string | null): string | null {
 	return `${apiKey.slice(0, 10)}***${apiKey.slice(-4)}`;
 }
 
-async function exchangeLoginToken(args: {
-	token: string;
-	exchangeUrl: string | null;
-	fetchImpl: FetchLike;
-}): Promise<{
-	apiKey: string;
-	mcpUrl: string;
-	statusUrl?: string;
-	serverName?: string;
-}> {
-	if (!args.exchangeUrl) {
-		throw new Error(
-			"Missing exchange URL. Pass --exchange-url or set BARDO_LOGIN_EXCHANGE_URL.",
-		);
-	}
-
-	let response: Response;
-	try {
-		response = await args.fetchImpl(args.exchangeUrl, {
-			method: "POST",
-			headers: {
-				"content-type": "application/json",
-				accept: "application/json",
-			},
-			body: JSON.stringify({ token: args.token }),
-		});
-	} catch (error) {
-		throw new Error(formatControlPlaneRequestError(args.exchangeUrl, error));
-	}
-	const body = (await response.json().catch(() => ({}))) as {
-		apiKey?: string;
-		mcpUrl?: string;
-		statusUrl?: string;
-		serverName?: string;
-		error?: string;
-	};
-
-	if (!response.ok) {
-		throw new Error(
-			body.error || `Token exchange failed with status ${response.status}.`,
-		);
-	}
-
-	if (typeof body.apiKey !== "string" || typeof body.mcpUrl !== "string") {
-		throw new Error("Token exchange returned an invalid payload.");
-	}
-
-	return {
-		apiKey: body.apiKey,
-		mcpUrl: body.mcpUrl,
-		statusUrl: typeof body.statusUrl === "string" ? body.statusUrl : undefined,
-		serverName:
-			typeof body.serverName === "string" ? body.serverName : undefined,
-	};
-}
-
 async function runInteractiveLoginFlow(args: {
 	startUrl: string;
 	fetchImpl: FetchLike;
 	sleep: (ms: number) => Promise<void>;
 	stdout: Writer;
 }): Promise<{
-	apiKey: string;
+	accessToken: string;
+	refreshToken: string;
+	expiresAtISO: string;
+	accountLabel?: string;
+	plan?: PlanTier;
 	mcpUrl: string;
 	statusUrl?: string;
+	refreshUrl?: string;
 	serverName?: string;
 }> {
 	let startResponse: Response;
@@ -1746,32 +1928,41 @@ async function runInteractiveLoginFlow(args: {
 		}
 		const pollBody = (await pollResponse.json().catch(() => ({}))) as Partial<{
 			status: string;
+			accessToken: string;
+			refreshToken: string;
+			expiresAt: string;
+			expiresAtISO: string;
 			apiKey: string;
+			mcpBaseUrl: string;
 			mcpUrl: string;
 			statusUrl: string;
+			refreshUrl: string;
+			accountLabel: string;
+			plan: string;
 			serverName: string;
 			error: string;
 			intervalMs: number;
 		}>;
 
 		if (pollResponse.ok && pollBody.status === "approved") {
-			if (
-				typeof pollBody.apiKey !== "string" ||
-				typeof pollBody.mcpUrl !== "string"
-			) {
+			const approved = resolveApprovedInteractivePayload(pollBody);
+			if (!approved) {
 				throw new Error("CLI login poll returned an invalid approved payload.");
 			}
+			const canonical = canonicalizeInteractivePayloadUrls({
+				startUrl: args.startUrl,
+				payload: approved,
+			});
 			return {
-				apiKey: pollBody.apiKey,
-				mcpUrl: pollBody.mcpUrl,
-				statusUrl:
-					typeof pollBody.statusUrl === "string"
-						? pollBody.statusUrl
-						: undefined,
-				serverName:
-					typeof pollBody.serverName === "string"
-						? pollBody.serverName
-						: undefined,
+				accessToken: canonical.accessToken,
+				refreshToken: canonical.refreshToken ?? "",
+				expiresAtISO: canonical.expiresAtISO ?? "",
+				accountLabel: canonical.accountLabel,
+				plan: canonical.plan,
+				mcpUrl: canonical.mcpUrl,
+				statusUrl: canonical.statusUrl,
+				refreshUrl: canonical.refreshUrl,
+				serverName: canonical.serverName,
 			};
 		}
 
@@ -1791,11 +1982,185 @@ async function runInteractiveLoginFlow(args: {
 	}
 }
 
+function resolveApprovedInteractivePayload(
+	pollBody: Partial<{
+		accessToken: string;
+		refreshToken: string;
+		expiresAt: string;
+		expiresAtISO: string;
+		apiKey: string;
+		mcpBaseUrl: string;
+		mcpUrl: string;
+		statusUrl: string;
+		refreshUrl: string;
+		accountLabel: string;
+		plan: string;
+		serverName: string;
+	}>,
+): {
+	accessToken: string;
+	refreshToken?: string;
+	expiresAtISO?: string;
+	mcpUrl: string;
+	statusUrl?: string;
+	refreshUrl?: string;
+	accountLabel?: string;
+	plan?: PlanTier;
+	serverName?: string;
+} | null {
+	const accessToken = pollBody.accessToken ?? pollBody.apiKey;
+	if (typeof accessToken !== "string" || accessToken.trim().length === 0) {
+		return null;
+	}
+
+	if (typeof pollBody.mcpBaseUrl === "string" && pollBody.mcpBaseUrl.trim()) {
+		return {
+			accessToken,
+			refreshToken:
+				typeof pollBody.refreshToken === "string"
+					? pollBody.refreshToken
+					: undefined,
+			expiresAtISO:
+				typeof pollBody.expiresAt === "string" ? pollBody.expiresAt : undefined,
+			mcpUrl: new URL("/mcp", pollBody.mcpBaseUrl).toString(),
+			statusUrl:
+				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
+			refreshUrl:
+				typeof pollBody.refreshUrl === "string"
+					? pollBody.refreshUrl
+					: undefined,
+			accountLabel:
+				typeof pollBody.accountLabel === "string"
+					? pollBody.accountLabel
+					: undefined,
+			plan: normalizePlan(pollBody.plan) ?? undefined,
+			serverName:
+				typeof pollBody.serverName === "string"
+					? pollBody.serverName
+					: undefined,
+		};
+	}
+
+	if (typeof pollBody.mcpUrl === "string" && pollBody.mcpUrl.trim()) {
+		return {
+			accessToken,
+			expiresAtISO:
+				typeof pollBody.expiresAtISO === "string"
+					? pollBody.expiresAtISO
+					: typeof pollBody.expiresAt === "string"
+						? pollBody.expiresAt
+						: undefined,
+			mcpUrl: pollBody.mcpUrl,
+			statusUrl:
+				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
+			accountLabel:
+				typeof pollBody.accountLabel === "string"
+					? pollBody.accountLabel
+					: undefined,
+			plan: normalizePlan(pollBody.plan) ?? undefined,
+			serverName:
+				typeof pollBody.serverName === "string"
+					? pollBody.serverName
+					: undefined,
+		};
+	}
+
+	return null;
+}
+
+function isLoopbackHostname(hostname: string | null | undefined): boolean {
+	return typeof hostname === "string" && LOOPBACK_HOSTNAMES.has(hostname);
+}
+
+function resolveLoopbackHost(
+	urlValue: string | null | undefined,
+): string | null {
+	if (!urlValue?.trim()) {
+		return null;
+	}
+	try {
+		const parsed = new URL(urlValue);
+		return isLoopbackHostname(parsed.hostname) ? parsed.hostname : null;
+	} catch {
+		return null;
+	}
+}
+
+function rewriteLoopbackHost(
+	urlValue: string | null | undefined,
+	preferredHost: string | null,
+): string | null {
+	if (!urlValue?.trim()) {
+		return null;
+	}
+	if (!preferredHost || !isLoopbackHostname(preferredHost)) {
+		return urlValue;
+	}
+	try {
+		const parsed = new URL(urlValue);
+		if (
+			!isLoopbackHostname(parsed.hostname) ||
+			parsed.hostname === preferredHost
+		) {
+			return parsed.toString();
+		}
+		parsed.hostname = preferredHost;
+		return parsed.toString();
+	} catch {
+		return urlValue;
+	}
+}
+
+function canonicalizeInteractivePayloadUrls(args: {
+	startUrl: string;
+	payload: {
+		accessToken: string;
+		refreshToken?: string;
+		expiresAtISO?: string;
+		mcpUrl: string;
+		statusUrl?: string;
+		refreshUrl?: string;
+		accountLabel?: string;
+		plan?: PlanTier;
+		serverName?: string;
+	};
+}) {
+	const preferredLoopbackHost =
+		resolveLoopbackHost(args.startUrl) ??
+		resolveLoopbackHost(args.payload.mcpUrl);
+	const fallbackStatusUrl = new URL(
+		"/api/connect/runtime-status",
+		args.startUrl,
+	).toString();
+	const fallbackRefreshUrl = new URL(
+		"/api/connect/bridge-session/refresh",
+		args.startUrl,
+	).toString();
+
+	return {
+		...args.payload,
+		mcpUrl:
+			rewriteLoopbackHost(args.payload.mcpUrl, preferredLoopbackHost) ??
+			args.payload.mcpUrl,
+		statusUrl:
+			rewriteLoopbackHost(
+				args.payload.statusUrl ?? fallbackStatusUrl,
+				preferredLoopbackHost,
+			) ?? fallbackStatusUrl,
+		refreshUrl:
+			rewriteLoopbackHost(
+				args.payload.refreshUrl ?? fallbackRefreshUrl,
+				preferredLoopbackHost,
+			) ?? fallbackRefreshUrl,
+	};
+}
+
 async function buildDoctorReport(
 	options: DoctorCommandOptions,
 	deps: CliRuntimeDeps,
 ): Promise<DoctorOutput> {
 	const env = deps.env ?? process.env;
+	const doctorTimeoutMs = resolveDoctorTimeoutMs(env);
 	const config = await readConfig(resolveConfigPath(deps));
 	const workspaceRoot = resolveWorkspaceRoot(
 		options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
@@ -1804,35 +2169,33 @@ async function buildDoctorReport(
 	const bardoRoot = resolveBardoRoot(workspaceRoot, env);
 	const manifestPath = path.join(bardoRoot, "manifest.json");
 	const manifest = await readExistingJson(manifestPath);
-	const envApiKey = env.BARDO_API_KEY?.trim() || null;
+	const envApiKey =
+		env.BARDO_ACCESS_TOKEN?.trim() || env.BARDO_API_KEY?.trim() || null;
 	const envUrl = env.BARDO_MCP_URL?.trim() || null;
 	const envStatusUrl = resolveRuntimeStatusUrl({
 		explicitStatusUrl: env.BARDO_RUNTIME_STATUS_URL?.trim() || null,
-		controlPlaneUrls: [
-			env.BARDO_LOGIN_START_URL?.trim() || null,
-			env.BARDO_LOGIN_EXCHANGE_URL?.trim() || null,
-			DEFAULT_LOGIN_START_URL,
-		],
+		websiteBackendUrls: [env.BARDO_LOGIN_START_URL?.trim() || null],
 	});
 	const url = envUrl || config?.url || null;
-	const apiKey = envApiKey || config?.apiKey || null;
+	const apiKey = envApiKey || resolveConfigAccessToken(config) || null;
 	const statusUrl =
 		envStatusUrl ||
 		resolveRuntimeStatusUrl({
-			explicitStatusUrl: config?.statusUrl || null,
-			controlPlaneUrls: [DEFAULT_LOGIN_START_URL],
+			explicitStatusUrl: resolveConfigStatusUrl(config),
+			websiteBackendUrls: [DEFAULT_LOGIN_START_URL],
 		});
 	const source: DoctorOutput["auth"]["source"] = envApiKey
 		? "env"
-		: config?.apiKey
+		: resolveConfigAccessToken(config)
 			? "config"
 			: "none";
 
-	const health = await checkHealth(url, deps.fetch ?? fetch);
+	const health = await checkHealth(url, deps.fetch ?? fetch, doctorTimeoutMs);
 	const account = await checkAccountStatus({
 		statusUrl,
 		apiKey,
 		fetchImpl: deps.fetch ?? fetch,
+		timeoutMs: doctorTimeoutMs,
 	});
 	const client = await checkClientStatus({
 		client: options.client,
@@ -1856,9 +2219,10 @@ async function buildDoctorReport(
 		},
 		connectivity: {
 			health,
-			controlPlane: await checkControlPlaneReachability(
+			websiteBackend: await checkWebsiteBackendReachability(
 				statusUrl || env.BARDO_LOGIN_START_URL?.trim() || null,
 				deps.fetch ?? fetch,
+				doctorTimeoutMs,
 			),
 		},
 		account,
@@ -2166,9 +2530,13 @@ function detectBardoServerBlock(
 	const matchesExpectedName =
 		expected.serverName !== null && parsedServerName === expected.serverName;
 	const matchesDefaultName = parsedServerName === "bardo";
+	const commandValue = extractTomlStringValue(table.block, "command");
 	const hasServeCommand =
 		table.block.includes("@bardo/mcp") ||
-		table.block.includes('"bardo","mcp","serve"');
+		table.block.includes('"bardo","mcp","serve"') ||
+		(commandValue === "bardo" &&
+			table.block.includes('"mcp"') &&
+			table.block.includes('"serve"'));
 
 	return {
 		hasBardoServer:
@@ -2241,6 +2609,7 @@ async function checkAccountStatus(args: {
 	statusUrl: string | null;
 	apiKey: string | null;
 	fetchImpl: FetchLike;
+	timeoutMs: number;
 }): Promise<DoctorOutput["account"]> {
 	if (!args.statusUrl || !args.apiKey) {
 		return {
@@ -2261,11 +2630,16 @@ async function checkAccountStatus(args: {
 	}
 
 	try {
-		const response = await args.fetchImpl(args.statusUrl, {
-			method: "GET",
-			headers: {
-				accept: "application/json",
-				authorization: `Bearer ${args.apiKey}`,
+		const response = await fetchWithTimeout({
+			fetchImpl: args.fetchImpl,
+			url: args.statusUrl,
+			timeoutMs: args.timeoutMs,
+			init: {
+				method: "GET",
+				headers: {
+					accept: "application/json",
+					authorization: `Bearer ${args.apiKey}`,
+				},
 			},
 		});
 		const payload = (await response.json().catch(() => ({}))) as Partial<{
@@ -2324,6 +2698,10 @@ async function checkAccountStatus(args: {
 			error: null,
 		};
 	} catch (error) {
+		const message =
+			error instanceof Error && error.name === "AbortError"
+				? `Runtime status check timed out after ${args.timeoutMs}ms.`
+				: toErrorMessage(error);
 		return {
 			fetched: true,
 			ok: false,
@@ -2335,7 +2713,7 @@ async function checkAccountStatus(args: {
 			plan: null,
 			mcpPeriodLimit: null,
 			billingUnavailable: false,
-			error: toErrorMessage(error),
+			error: message,
 		};
 	}
 }
@@ -2343,6 +2721,7 @@ async function checkAccountStatus(args: {
 async function checkHealth(
 	mcpUrl: string | null,
 	fetchImpl: FetchLike,
+	timeoutMs: number,
 ): Promise<DoctorOutput["connectivity"]["health"]> {
 	if (!mcpUrl) {
 		return {
@@ -2366,10 +2745,15 @@ async function checkHealth(
 	}
 
 	try {
-		const response = await fetchImpl(healthUrl, {
-			method: "GET",
-			headers: {
-				accept: "application/json",
+		const response = await fetchWithTimeout({
+			fetchImpl,
+			url: healthUrl,
+			timeoutMs,
+			init: {
+				method: "GET",
+				headers: {
+					accept: "application/json",
+				},
 			},
 		});
 		return {
@@ -2381,19 +2765,24 @@ async function checkHealth(
 				: `Health check failed with status ${response.status}.`,
 		};
 	} catch (error) {
+		const message =
+			error instanceof Error && error.name === "AbortError"
+				? `Health check timed out after ${timeoutMs}ms.`
+				: toErrorMessage(error);
 		return {
 			url: healthUrl,
 			ok: false,
 			status: null,
-			error: toErrorMessage(error),
+			error: message,
 		};
 	}
 }
 
-async function checkControlPlaneReachability(
+async function checkWebsiteBackendReachability(
 	url: string | null,
 	fetchImpl: FetchLike,
-): Promise<DoctorOutput["connectivity"]["controlPlane"]> {
+	timeoutMs: number,
+): Promise<DoctorOutput["connectivity"]["websiteBackend"]> {
 	if (!url) {
 		return {
 			url: null,
@@ -2404,10 +2793,15 @@ async function checkControlPlaneReachability(
 	}
 
 	try {
-		const response = await fetchImpl(url, {
-			method: "GET",
-			headers: {
-				accept: "application/json",
+		const response = await fetchWithTimeout({
+			fetchImpl,
+			url,
+			timeoutMs,
+			init: {
+				method: "GET",
+				headers: {
+					accept: "application/json",
+				},
 			},
 		});
 		return {
@@ -2417,17 +2811,21 @@ async function checkControlPlaneReachability(
 			error: null,
 		};
 	} catch (error) {
+		const message =
+			error instanceof Error && error.name === "AbortError"
+				? `Bardo website runtime status check timed out after ${timeoutMs}ms.`
+				: toErrorMessage(error);
 		return {
 			url,
 			reachable: false,
 			status: null,
-			error: toErrorMessage(error),
+			error: message,
 		};
 	}
 }
 
 function formatControlPlaneRequestError(url: string, error: unknown): string {
-	return `Could not reach the Bardo website control plane at ${url}. If you are running locally, start it with \`bun run dev:website\`. Otherwise check your BARDO_* control-plane URLs or use \`bardo login --api-key <key>\`. Root cause: ${toErrorMessage(
+	return `Could not reach the Bardo website runtime status service at ${url}. If you are running locally, start it with \`bun run dev:website\`. Otherwise check your BARDO_* website URLs or use \`bardo login --api-key <key>\`. Root cause: ${toErrorMessage(
 		error,
 	)}`;
 }
@@ -2455,10 +2853,10 @@ function renderDoctorReport(report: DoctorOutput): string {
 				? `ok (${report.connectivity.health.status})`
 				: (report.connectivity.health.error ?? "failed")
 		}`,
-		`Control plane: ${
-			report.connectivity.controlPlane.reachable
-				? `reachable (${report.connectivity.controlPlane.status})`
-				: (report.connectivity.controlPlane.error ?? "not configured")
+		`Website backend: ${
+			report.connectivity.websiteBackend.reachable
+				? `reachable (${report.connectivity.websiteBackend.status})`
+				: (report.connectivity.websiteBackend.error ?? "not configured")
 		}`,
 		`Account status: ${
 			!report.account.fetched

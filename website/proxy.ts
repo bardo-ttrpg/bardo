@@ -5,13 +5,13 @@ import {
 	NextResponse,
 } from "next/server";
 import { isClerkAuthConfigured } from "./lib/clerk-config";
-import { shouldUseClerkOnlyProxyPathname } from "./lib/proxy-config";
+import {
+	shouldRunClerkForPagePathname,
+	shouldUseClerkOnlyProxyPathname,
+} from "./lib/proxy-config";
 import { resolveProxyLocalhostRedirectTarget } from "./lib/proxy-localhost";
 
-const isProtectedRoute = createRouteMatcher([
-	"/dashboard(.*)",
-	"/onboarding(.*)",
-]);
+const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
 const IS_CLERK_AUTH_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	secretKey: process.env.CLERK_SECRET_KEY,
@@ -80,6 +80,10 @@ export default async function proxy(
 	const localDomainRedirect = maybeRedirectToCanonicalLocalhost(request);
 	if (localDomainRedirect) {
 		return localDomainRedirect;
+	}
+
+	if (!shouldRunClerkForPagePathname(request.nextUrl.pathname)) {
+		return passThroughMiddleware(request);
 	}
 
 	if (!IS_CLERK_AUTH_CONFIGURED) {

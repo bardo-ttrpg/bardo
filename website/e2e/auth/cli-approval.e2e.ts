@@ -8,7 +8,7 @@ function json(body: unknown, status = 200) {
 	};
 }
 
-test("CLI approval flow starts a device session and approves it in the browser", async ({
+test("bridge approval flow starts a device session and approves it in the browser", async ({
 	page,
 }) => {
 	const sessionId = "cli_session_123";
@@ -17,39 +17,26 @@ test("CLI approval flow starts a device session and approves it in the browser",
 		await route.fulfill(
 			json({
 				billing: null,
-				keyPolicy: {
-					maxAllowed: 5,
-					dailyUserVerificationLimit: 7500,
-					dailyKeyVerificationLimit: 2000,
+				accessPolicy: {
+					subscribed: true,
 					mcpPeriodLimit: 25000,
 				},
 			}),
 		);
 	});
-	await page.route("**/api/keys?*", async (route) => {
-		await route.fulfill(
-			json({
-				keys: [],
-				page: {
-					hasMore: false,
-					nextOffset: null,
-				},
-			}),
-		);
-	});
-	await page.route("**/api/connect/cli-session/start", async (route) => {
+	await page.route("**/api/connect/bridge-session/start", async (route) => {
 		await route.fulfill(
 			json({
 				sessionId,
 				userCode: "ABCD-EFGH",
-				verificationUrl: `http://localhost:3001/dashboard/connect/cli/${sessionId}`,
-				pollUrl: `http://localhost:3001/api/connect/cli-session/poll?sessionId=${sessionId}&pollSecret=poll_secret_123`,
+				verificationUrl: `http://localhost:3001/dashboard/connect/bridge/${sessionId}`,
+				pollUrl: `http://localhost:3001/api/connect/bridge-session/poll?sessionId=${sessionId}&pollSecret=poll_secret_123`,
 				intervalMs: 1000,
 				expiresAtISO: new Date(Date.now() + 600_000).toISOString(),
 			}),
 		);
 	});
-	await page.route("**/api/connect/cli-session/approve", async (route) => {
+	await page.route("**/api/connect/bridge-session/approve", async (route) => {
 		const requestBody = route.request().postDataJSON() as {
 			sessionId?: string;
 		};
@@ -63,7 +50,7 @@ test("CLI approval flow starts a device session and approves it in the browser",
 	await page.goto("/dashboard");
 
 	const session = await page.evaluate(async () => {
-		const response = await fetch("/api/connect/cli-session/start", {
+		const response = await fetch("/api/connect/bridge-session/start", {
 			method: "POST",
 			headers: {
 				"content-type": "application/json",
@@ -75,13 +62,13 @@ test("CLI approval flow starts a device session and approves it in the browser",
 
 	expect(session.sessionId).toBe(sessionId);
 
-	await page.goto(`/dashboard/connect/cli/${session.sessionId}`);
+	await page.goto(`/dashboard/connect/bridge/${session.sessionId}`);
 	await expect(
 		page.getByRole("heading", {
-			name: "CLI access approved",
+			name: "Bridge access approved",
 		}),
 	).toBeVisible();
 	await expect(
-		page.getByText(/You can close this tab and return to your terminal\./i),
+		page.getByText(/You can close this tab and return to your AI client\./i),
 	).toBeVisible();
 });

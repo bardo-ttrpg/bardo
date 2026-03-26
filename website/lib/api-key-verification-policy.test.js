@@ -43,70 +43,47 @@ describe("createDailyVerificationBudgetLimiter", () => {
 		expect(solo.limit).toBe(2_000);
 	});
 
-	test("uses upstash backend when configured", async () => {
-		const counters = new Map();
-		const fetchImpl = async (input) => {
-			const url = typeof input === "string" ? input : input.toString();
-			if (url.includes("/incr/")) {
-				const encodedKey = url.slice(url.indexOf("/incr/") + "/incr/".length);
-				const key = decodeURIComponent(encodedKey);
-				const next = (counters.get(key) ?? 0) + 1;
-				counters.set(key, next);
-				return new Response(JSON.stringify({ result: next }), { status: 200 });
-			}
-			return new Response(JSON.stringify({ result: 1 }), { status: 200 });
+	test("uses the injected limiter when configured", async () => {
+		const controlPlane = {
+			consumeRateLimitWindow: async () => ({
+				allowed: true,
+				remaining: 499,
+				retryAfterSeconds: 0,
+				resetEpochSeconds: 1_772_192_400,
+			}),
 		};
 		const limiter = createDailyVerificationBudgetLimiter({
-			env: {
-				NODE_ENV: "production",
-				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "token",
-			},
-			fetchImpl,
+			env: { NODE_ENV: "production" },
+			controlPlane,
 		});
 
-		const result = await limiter.consumeUser("user_upstash", "free");
-		expect(result.backend).toBe("upstash");
+		const result = await limiter.consumeUser("user_remote", "free");
+		expect(result.backend).toBe("website");
 		expect(result.allowed).toBe(true);
 		expect(result.used).toBe(1);
 	});
 
-	test("retries Upstash expiry until it succeeds", async () => {
-		const counters = new Map();
-		let expireCalls = 0;
-		const fetchImpl = async (input) => {
-			const url = typeof input === "string" ? input : input.toString();
-			if (url.includes("/incr/")) {
-				const encodedKey = url.slice(url.indexOf("/incr/") + "/incr/".length);
-				const key = decodeURIComponent(encodedKey);
-				const next = (counters.get(key) ?? 0) + 1;
-				counters.set(key, next);
-				return new Response(JSON.stringify({ result: next }), { status: 200 });
-			}
-			if (url.includes("/expire/")) {
-				expireCalls += 1;
-				if (expireCalls === 1) {
-					throw new Error("transient expire failure");
-				}
-				return new Response(JSON.stringify({ result: 1 }), { status: 200 });
-			}
-			throw new Error(`unexpected url: ${url}`);
+	test("falls back to memory when the control plane is unavailable and fallback is allowed", async () => {
+		const controlPlane = {
+			consumeRateLimitWindow: async () => {
+				throw new Error("transient control plane failure");
+			},
 		};
 		const limiter = createDailyVerificationBudgetLimiter({
 			env: {
-				NODE_ENV: "production",
-				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "token",
+				NODE_ENV: "development",
+				BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "true",
 			},
-			fetchImpl,
+			controlPlane,
 		});
 
-		const first = await limiter.consumeUser("user_upstash_retry", "free");
-		const second = await limiter.consumeUser("user_upstash_retry", "free");
+		const first = await limiter.consumeUser("user_retry", "free");
+		const second = await limiter.consumeUser("user_retry", "free");
 
 		expect(first.allowed).toBe(true);
 		expect(second.allowed).toBe(true);
-		expect(expireCalls).toBe(2);
+		expect(first.backend).toBe("memory");
+		expect(second.backend).toBe("memory");
 	});
 
 	test("clears confirmed ttl keys when the day window changes", () => {

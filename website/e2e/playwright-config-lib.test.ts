@@ -5,6 +5,7 @@ import {
 	resolvePlaywrightLocalAppUrl,
 	resolvePlaywrightWebServerHost,
 	resolvePlaywrightWebServerPort,
+	shouldStartPlaywrightWebServer,
 } from "./playwright-config-lib";
 
 describe("playwright config helpers", () => {
@@ -59,5 +60,17 @@ describe("playwright config helpers", () => {
 			"x-vercel-protection-bypass": "secret-123",
 			"x-vercel-set-bypass-cookie": "true",
 		});
+	});
+
+	test("skips the local web server when targeting a remote host", () => {
+		expect(shouldStartPlaywrightWebServer("https://staging.example.com")).toBe(
+			false,
+		);
+	});
+
+	test("keeps the local web server for loopback targets", () => {
+		expect(shouldStartPlaywrightWebServer("http://localhost:3001")).toBe(true);
+		expect(shouldStartPlaywrightWebServer("http://127.0.0.1:3001")).toBe(true);
+		expect(shouldStartPlaywrightWebServer("http://[::1]:3001")).toBe(true);
 	});
 });

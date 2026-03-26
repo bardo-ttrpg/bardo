@@ -16,7 +16,13 @@ export default function OptionalClerkProvider({
 	}
 
 	return (
-		<ClerkProvider afterSignOutUrl="/">
+		<ClerkProvider
+			signInUrl="/sign-in"
+			signUpUrl="/sign-up"
+			signInFallbackRedirectUrl="/dashboard"
+			signUpFallbackRedirectUrl="/dashboard"
+			afterSignOutUrl="/"
+		>
 			<MotionConfig reducedMotion="user">{children}</MotionConfig>
 		</ClerkProvider>
 	);

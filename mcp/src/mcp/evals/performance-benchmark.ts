@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { retrieveContext } from "../../domain/context/retrieval";
-import { appendCanonicalEvent } from "../../domain/events/store";
+import { appendCanonicalEvents } from "../../domain/events/store";
 import { regenerateCurrentStateProjection } from "../../domain/projections/current-state";
 import type { AuthContext } from "../../types/contracts";
 import { runPlayerAction } from "../tools/player-action/register";
@@ -52,13 +52,14 @@ async function seedCampaignEvents(args: {
 	bardoRoot: string;
 	seedEvents: number;
 }): Promise<void> {
-	for (let index = 1; index <= args.seedEvents; index += 1) {
-		const atISO = new Date(
-			Date.UTC(2026, 1, 23, 8, 0, index % 60),
-		).toISOString();
-		await appendCanonicalEvent({
-			bardoRoot: args.bardoRoot,
-			event: {
+	await appendCanonicalEvents({
+		bardoRoot: args.bardoRoot,
+		events: Array.from({ length: args.seedEvents }, (_, offset) => {
+			const index = offset + 1;
+			const atISO = new Date(
+				Date.UTC(2026, 1, 23, 8, 0, index % 60),
+			).toISOString();
+			return {
 				id: `evt-perf-seed-${String(index).padStart(4, "0")}`,
 				type: "player_action_resolved",
 				atISO,
@@ -90,9 +91,9 @@ async function seedCampaignEvents(args: {
 						validationErrors: [],
 					},
 				},
-			},
-		});
-	}
+			};
+		}),
+	});
 	await regenerateCurrentStateProjection({ bardoRoot: args.bardoRoot });
 }
 

@@ -1,11 +1,18 @@
-import type { Metadata } from "next";
+import { createPublicMetadata } from "@/lib/site-metadata";
 import DocsShell from "../_components/docs-shell";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "Credits and Billing",
 	description:
-		"Understand Bardo's flat one-tool-call, one-credit billing model.",
-};
+		"Understand Bardo's flat one-tool-call, one-credit billing model and how monthly credit subscriptions work.",
+	path: "/docs/credits-and-billing",
+	keywords: [
+		"Bardo pricing",
+		"MCP credits",
+		"AI game master pricing",
+		"1 tool call 1 credit",
+	],
+});
 
 export default function CreditsDocsPage() {
 	return (
@@ -13,6 +20,7 @@ export default function CreditsDocsPage() {
 			eyebrow="Credits"
 			title="Credits and Billing"
 			lede="The billing model stays deliberately simple so users always know what counts and what does not."
+			currentPath="/docs/credits-and-billing"
 		>
 			<section>
 				<h2 className="mb-3 text-lg font-semibold text-foreground">One rule</h2>
@@ -30,7 +38,7 @@ export default function CreditsDocsPage() {
 				<ul className="space-y-2">
 					<li>MCP resources</li>
 					<li>MCP prompts</li>
-					<li>Initialize/bootstrap flows</li>
+					<li>Bridge sign-in and browser approval</li>
 					<li>Website browsing and dashboard activity</li>
 				</ul>
 			</section>

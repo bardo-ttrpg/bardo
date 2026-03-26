@@ -259,6 +259,7 @@ describe("local MCP workspace roots", () => {
 			await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
 			await mkdir(path.join(bardoRoot, "state"), { recursive: true });
 			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "projections"), { recursive: true });
 			await writeFile(
 				path.join(bardoRoot, "manifest.json"),
 				JSON.stringify(
@@ -289,6 +290,11 @@ describe("local MCP workspace roots", () => {
 			await writeFile(
 				path.join(bardoRoot, "events/history.md"),
 				"existing history",
+				"utf8",
+			);
+			await writeFile(
+				path.join(bardoRoot, "projections/current-state.md"),
+				"existing projection",
 				"utf8",
 			);
 
@@ -322,6 +328,9 @@ describe("local MCP workspace roots", () => {
 			await expect(
 				readFile(path.join(bardoRoot, "events/history.md"), "utf8"),
 			).resolves.toBe("existing history");
+			await expect(
+				readFile(path.join(bardoRoot, "projections/current-state.md"), "utf8"),
+			).resolves.toBe("existing projection");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -635,32 +644,17 @@ describe("local MCP workspace roots", () => {
 		}
 	});
 
-	test("hides premium remote tools from lower plans using annotations and env overrides", async () => {
+	test("requires an active subscription for remote tools", async () => {
 		const access = createRemoteToolAccessController({
 			plan: "free",
-			env: {
-				BARDO_PREMIUM_REMOTE_TOOLS: "remote_env_solo",
-				BARDO_SOLO_PLUS_REMOTE_TOOLS: "remote_env_plus",
-			},
 		});
 
-		const visible = access.filterTools([
-			{ name: "remote_free" },
-			{
-				name: "remote_annotated_solo",
-				annotations: { "x-bardo-min-plan": "solo" },
-			},
-			{ name: "remote_env_solo" },
-			{ name: "remote_env_plus" },
-		]);
+		const visible = access.filterTools([{ name: "scene_turn" }]);
 
-		expect(visible.map((tool) => tool.name)).toEqual(["remote_free"]);
-		expect(
-			access.isAllowed({
-				name: "remote_annotated_solo",
-				annotations: { "x-bardo-min-plan": "solo" },
-			}),
-		).toBe(false);
-		expect(access.blockedMessage("remote_env_plus")).toContain("solo_plus");
+		expect(visible).toEqual([]);
+		expect(access.isAllowed({ name: "scene_turn" })).toBe(false);
+		expect(access.blockedMessage("scene_turn")).toContain(
+			"active subscription",
+		);
 	});
 });

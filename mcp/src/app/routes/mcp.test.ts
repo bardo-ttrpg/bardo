@@ -66,7 +66,7 @@ describe("handleMcpRequest policy and loop protection", () => {
 				id: 1,
 				method: "tools/call",
 				params: {
-					name: "player_action",
+					name: "player_knowledge_view",
 					arguments: {
 						action: "hello",
 					},
@@ -208,7 +208,7 @@ describe("handleMcpRequest policy and loop protection", () => {
 					id: 1,
 					method: "tools/call",
 					params: {
-						name: "player_action",
+						name: "player_knowledge_view",
 						arguments: {
 							action: "hello",
 						},
@@ -288,138 +288,120 @@ describe("handleMcpRequest policy and loop protection", () => {
 		expect(deleteResponse.headers.get("allow")).toBe("POST, OPTIONS");
 	});
 
-	test("enforces setup contract v2 header for setup-sensitive tools when enabled", async () => {
-		const previous = Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
-		Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = "true";
-		try {
-			const sessionStore = new SessionStore();
-			const sessionRegistry = new SessionRegistry({
-				loopPolicy: resolveLoopDetectionPolicy({
-					BARDO_LOOP_DETECTION_ENABLED: "false",
-				}),
-			});
-			sessionStore.set("s1", createSession());
-			sessionRegistry.registerSession({
-				sessionId: "s1",
-				apiKey: "k1",
-				campaignBasePath: "/repo/customer-a",
-			});
+	test("enforces setup contract v2 header by default for setup-sensitive tools", async () => {
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry({
+			loopPolicy: resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+		});
+		sessionStore.set("s1", createSession());
+		sessionRegistry.registerSession({
+			sessionId: "s1",
+			apiKey: "k1",
+			campaignBasePath: "/repo/customer-a",
+		});
 
-			const request = new Request("http://localhost:3000/mcp", {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					"mcp-session-id": "s1",
+		const request = new Request("http://localhost:3000/mcp", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"mcp-session-id": "s1",
+			},
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "scene_turn",
+					arguments: { action: "I begin." },
 				},
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: 1,
-					method: "tools/call",
-					params: {
-						name: "player_action",
-						arguments: { action: "I begin." },
-					},
-				}),
-			});
+			}),
+		});
 
-			const response = await handleMcpRequest(
-				request,
-				createAuth(),
-				sessionStore,
-				sessionRegistry,
-				resolveToolPolicyConfig({
-					BARDO_TOOLS_PROFILE: "full",
-				}),
-				resolveLoopDetectionPolicy({
-					BARDO_LOOP_DETECTION_ENABLED: "false",
-				}),
-				true,
-			);
+		const response = await handleMcpRequest(
+			request,
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			resolveToolPolicyConfig({
+				BARDO_TOOLS_PROFILE: "full",
+			}),
+			resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+			true,
+		);
 
-			expect(response.status).toBe(428);
-			const payload = (await response.json()) as {
-				error?: { message?: string };
-			};
-			expect(payload.error?.message).toContain("setup contract v2");
-		} finally {
-			if (previous === undefined) {
-				delete Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
-			} else {
-				Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = previous;
-			}
-		}
+		expect(response.status).toBe(428);
+		const payload = (await response.json()) as {
+			error?: { message?: string };
+		};
+		expect(payload.error?.message).toContain("setup contract v2");
 	});
 
 	test("allows setup-sensitive tools when setup contract v2 header is present", async () => {
-		const previous = Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
-		Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = "true";
-		try {
-			const sessionStore = new SessionStore();
-			const sessionRegistry = new SessionRegistry({
-				loopPolicy: resolveLoopDetectionPolicy({
-					BARDO_LOOP_DETECTION_ENABLED: "false",
-				}),
-			});
+		const sessionStore = new SessionStore();
+		const sessionRegistry = new SessionRegistry({
+			loopPolicy: resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+		});
 
-			let forwarded = 0;
-			sessionStore.set(
-				"s1",
-				createSession({
-					handleRequest: async () => {
-						forwarded += 1;
-						return new Response(JSON.stringify({ ok: true }), {
-							status: 200,
-							headers: { "content-type": "application/json" },
-						});
-					},
-				}),
-			);
-			sessionRegistry.registerSession({
-				sessionId: "s1",
-				apiKey: "k1",
-				campaignBasePath: "/repo/customer-a",
-			});
-
-			const request = new Request("http://localhost:3000/mcp", {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					"mcp-session-id": "s1",
-					"x-bardo-setup-contract-version": "2.0",
+		let forwarded = 0;
+		sessionStore.set(
+			"s1",
+			createSession({
+				handleRequest: async () => {
+					forwarded += 1;
+					return new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					});
 				},
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: 1,
-					method: "tools/call",
-					params: {
-						name: "init",
-						arguments: {},
+			}),
+		);
+		sessionRegistry.registerSession({
+			sessionId: "s1",
+			apiKey: "k1",
+			campaignBasePath: "/repo/customer-a",
+		});
+
+		const request = new Request("http://localhost:3000/mcp", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"mcp-session-id": "s1",
+				"x-bardo-setup-contract-version": "2.0",
+			},
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "scene_turn",
+					arguments: {
+						action: "I step into the square.",
 					},
-				}),
-			});
+				},
+			}),
+		});
 
-			const response = await handleMcpRequest(
-				request,
-				createAuth(),
-				sessionStore,
-				sessionRegistry,
-				resolveToolPolicyConfig({
-					BARDO_TOOLS_PROFILE: "full",
-				}),
-				resolveLoopDetectionPolicy({
-					BARDO_LOOP_DETECTION_ENABLED: "false",
-				}),
-				true,
-			);
+		const response = await handleMcpRequest(
+			request,
+			createAuth(),
+			sessionStore,
+			sessionRegistry,
+			resolveToolPolicyConfig({
+				BARDO_TOOLS_PROFILE: "full",
+			}),
+			resolveLoopDetectionPolicy({
+				BARDO_LOOP_DETECTION_ENABLED: "false",
+			}),
+			true,
+		);
 
-			expect(response.status).toBe(200);
-			expect(forwarded).toBe(1);
-		} finally {
-			if (previous === undefined) {
-				delete Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED;
-			} else {
-				Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED = previous;
-			}
-		}
+		expect(response.status).toBe(200);
+		expect(forwarded).toBe(1);
 	});
 });

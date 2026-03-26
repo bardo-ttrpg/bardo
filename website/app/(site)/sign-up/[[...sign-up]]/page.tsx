@@ -1,10 +1,9 @@
 import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
+import { createPrivateMetadata } from "@/lib/site-metadata";
 
-export const metadata = {
-	title: "Sign up",
-};
+export const metadata = createPrivateMetadata("Sign Up");
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
@@ -38,7 +37,7 @@ export default function SignUpPage() {
 				path="/sign-up"
 				routing="path"
 				signInUrl="/sign-in"
-				forceRedirectUrl="/dashboard"
+				fallbackRedirectUrl="/dashboard"
 			/>
 			<p className="max-w-md text-center text-xs leading-relaxed text-muted-foreground">
 				By creating an account, you agree to the{" "}

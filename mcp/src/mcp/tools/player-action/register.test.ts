@@ -103,6 +103,41 @@ describe("runPlayerAction", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
+	test("dry run previews a player action without mutating canon or workspace files", async () => {
+		const root = await makeTempRoot("bardo-player-action-dry-run-");
+		const auth = authFor(root);
+		const bardoRoot = resolveBardoRoot(root);
+
+		const result = await runPlayerAction({
+			auth,
+			action: "I enter the tavern and ask the barkeep their name.",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-22T00:00:00.000Z",
+			dryRun: true,
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.idempotentReplay).toBe(false);
+		expect(result.requiresSetup).toBe(false);
+		expect(result.gmPacket.narrativeBeats.length).toBeGreaterThan(0);
+
+		const events = await readCanonicalEvents({ bardoRoot });
+		expect(events).toEqual([]);
+		expect(
+			await readTextIfExists(path.join(bardoRoot, "state/current.md")),
+		).toBeNull();
+		expect(
+			await readTextIfExists(
+				path.join(bardoRoot, "projections/current-state.md"),
+			),
+		).toBeNull();
+		expect(
+			await readTextIfExists(path.join(bardoRoot, "world/locations/tavern.md")),
+		).toBeNull();
+
+		await rm(root, { recursive: true, force: true });
+	});
+
 	test("returns strict setup prompt contract when setup is incomplete", async () => {
 		const root = await makeTempRoot("bardo-player-action-setup-prompt-");
 		const auth = authFor(root);
@@ -155,6 +190,92 @@ describe("runPlayerAction", () => {
 		expect(events[4]?.type).toBe("player_action_resolved");
 
 		await rm(root, { recursive: true, force: true });
+	});
+
+	test("uses the workspace ruleset instead of env defaults when mechanics resolve", async () => {
+		const root = await makeTempRoot("bardo-player-action-workspace-ruleset-");
+		const auth = authFor(root);
+		const bardoRoot = resolveBardoRoot(root);
+		const previousDefaultRuleset = Bun.env.BARDO_DEFAULT_RULESET;
+		Bun.env.BARDO_DEFAULT_RULESET = "d20_v1";
+
+		try {
+			const projectionPath = path.join(
+				bardoRoot,
+				"projections/current-state.md",
+			);
+			await mkdir(path.dirname(projectionPath), { recursive: true });
+			await writeFile(
+				projectionPath,
+				renderMarkdown(
+					{
+						title: "Current State Projection",
+						projection_schema: "v2",
+						source_event_seq_min: "0",
+						source_event_seq_max: "0",
+						source_event_count: "0",
+					},
+					JSON.stringify(
+						{
+							worldTimeISO: "2026-02-23T03:00:00.000Z",
+							currentLocation: "starting-area",
+							counters: {
+								unknownNpc: 0,
+								unknownLocation: 0,
+							},
+							scene: {
+								summary: "Ready.",
+								activeSituation: "A tense pause.",
+								exits: [],
+								sensoryCues: [],
+								unresolvedQuestions: [],
+							},
+							party: {
+								currentLocation: "starting-area",
+								statusSummary: "Ready.",
+								knownResources: [],
+								activeConditions: [],
+							},
+							npcs: {},
+							locations: {},
+							threads: {},
+							factions: {},
+							clocks: {},
+							mechanicsContext: {
+								ruleset: "narrative_v1",
+								difficultyHint: null,
+								combatActive: false,
+								initiativeOrder: [],
+								advantageHints: [],
+							},
+							lastAction: "",
+						},
+						null,
+						2,
+					),
+				),
+				"utf8",
+			);
+
+			const result = await runPlayerAction({
+				auth,
+				action: "I attack the bandit with my sword",
+				idempotencyKey: "player_action_workspace_ruleset_key_12345",
+				guidedSetupEnabled: false,
+				nowIso: "2026-02-23T03:05:00.000Z",
+			});
+
+			expect(result.success).toBe(true);
+			expect(result.mechanics.ruleset).toBe("narrative_v1");
+			expect(result.mechanics.actionType).toBe("narrative_check");
+		} finally {
+			if (previousDefaultRuleset === undefined) {
+				delete Bun.env.BARDO_DEFAULT_RULESET;
+			} else {
+				Bun.env.BARDO_DEFAULT_RULESET = previousDefaultRuleset;
+			}
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	test("returns a GM packet with semantic discoveries for tavern social actions", async () => {
@@ -427,5 +548,67 @@ describe("runPlayerAction", () => {
 			}
 			await rm(root, { recursive: true, force: true });
 		}
+	});
+
+	test("fails before canon mutation when required mechanics ruleset has no adapter", async () => {
+		const root = await makeTempRoot("bardo-player-action-unsupported-ruleset-");
+		const auth = authFor(root);
+		const bardoRoot = resolveBardoRoot(root);
+		await mkdir(path.join(bardoRoot, "projections"), { recursive: true });
+		await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+		const unsupportedState = JSON.stringify(
+			{
+				currentLocation: "trial-yard",
+				mechanicsContext: {
+					ruleset: "unknown_ruleset",
+				},
+			},
+			null,
+			2,
+		);
+		await writeFile(
+			path.join(bardoRoot, "projections/current-state.md"),
+			renderMarkdown(
+				{
+					title: "Current State Projection",
+					description: "Projection state",
+					projection_schema: "v2",
+					source_event_seq_min: "0",
+					source_event_seq_max: "0",
+					source_event_count: "0",
+				},
+				unsupportedState,
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{
+					title: "Campaign State",
+					description: "Legacy state",
+				},
+				unsupportedState,
+			),
+			"utf8",
+		);
+
+		const result = await runPlayerAction({
+			auth,
+			action: "I attack the duelist.",
+			idempotencyKey: "player_action_unsupported_ruleset_key_12345",
+			guidedSetupEnabled: false,
+			nowIso: "2026-02-23T07:00:00.000Z",
+		});
+
+		expect(result.success).toBe(false);
+		expect(result.message).toContain("Unsupported ruleset");
+		expect(result.mechanics.required).toBe(true);
+		expect(result.mechanics.unsupportedReason).toContain("unknown_ruleset");
+
+		const events = await readCanonicalEvents({ bardoRoot });
+		expect(events).toHaveLength(0);
+
+		await rm(root, { recursive: true, force: true });
 	});
 });

@@ -20,6 +20,12 @@ type BillingSubscriptionLike = {
 	subscriptionItems?: BillingSubscriptionItemLike[] | null;
 };
 
+type ClerkBillingLike = {
+	billing?: {
+		getUserBillingSubscription?: (userId: string) => Promise<unknown>;
+	};
+};
+
 const PRIORITY_ITEM_STATUSES = new Set([
 	"active",
 	"trialing",
@@ -63,7 +69,7 @@ function resolvePlanFromItem(
 	const planId = item?.planId;
 	if (!planId) return "free";
 	const resolved = resolvePlanFromClerkPlanId(planId, env);
-	return resolved ?? "free";
+	return resolved === "solo" ? "solo" : "free";
 }
 
 function resolveIntervalFromItem(
@@ -100,25 +106,36 @@ export function resolveLiveBillingSnapshotFromSubscription(
 	};
 }
 
+export function createClerkBillingReader(clerk: ClerkBillingLike) {
+	const billing = clerk.billing;
+	if (!billing || typeof billing.getUserBillingSubscription !== "function") {
+		return null;
+	}
+
+	return async (userId: string) =>
+		(await billing.getUserBillingSubscription?.(
+			userId,
+		)) as BillingSubscriptionLike;
+}
+
 export async function fetchLiveBillingSnapshotFromClerk(
-	clerk: {
-		billing: {
-			getUserBillingSubscription: (
-				userId: string,
-			) => Promise<BillingSubscriptionLike>;
-		};
-	},
+	clerk: ClerkBillingLike,
 	userId: string,
 	env: Record<string, string | undefined> = process.env,
 	now = Date.now(),
 ) {
 	let subscription: BillingSubscriptionLike | null = null;
 	let billingUnavailable = false;
+	const readSubscription = createClerkBillingReader(clerk);
+
 	try {
-		subscription = await clerk.billing.getUserBillingSubscription(userId);
+		if (!readSubscription) {
+			throw new Error("Clerk billing is unavailable.");
+		}
+		subscription = await readSubscription(userId);
 	} catch {
-		// Treat a Clerk billing failure as an unknown state rather than free tier
-		// so callers can return 503 instead of silently downgrading paid users.
+		// Treat a Clerk billing failure as an unknown billing state so callers can
+		// return 503 instead of silently downgrading subscribed users.
 		billingUnavailable = true;
 		subscription = null;
 	}

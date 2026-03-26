@@ -66,6 +66,13 @@ function normalizeDiscovery(
 	};
 }
 
+function shouldPersistDiscovery(discovery: DiscoveryCandidate): boolean {
+	if (discovery.persisted === true) {
+		return true;
+	}
+	return discovery.discoveryMode === "explicitly_named";
+}
+
 function resolveLocationReference(
 	locationHint: string,
 	knownLocations: Record<string, unknown>,
@@ -134,10 +141,12 @@ export async function runWorldSync(args: {
 	transcript?: string;
 	currentLocationHint?: string;
 	discoveries?: WorldSyncDiscoveryInput[];
+	dryRun?: boolean;
 }): Promise<WorldSyncOutput> {
 	const bardoRoot = resolveBardoRoot(args.auth.campaignBasePath);
 	const paths = resolveWorldSyncPaths(bardoRoot);
 	const transcript = args.transcript?.trim() || "";
+	const dryRun = args.dryRun ?? false;
 	const explicitDiscoveries = (args.discoveries ?? []).map(normalizeDiscovery);
 	const policyText =
 		transcript ||
@@ -155,36 +164,38 @@ export async function runWorldSync(args: {
 		if (runtimeViolations.length > 0) {
 			const blockedMessage =
 				summarizeRuntimePolicyViolations(runtimeViolations);
-			await appendCanonicalEvent({
-				bardoRoot,
-				event: {
-					id: `evt-world-sync-policy-${crypto.randomUUID()}`,
-					type: "runtime_policy_blocked",
-					atISO: new Date().toISOString(),
-					source: "world_sync",
-					data: {
-						transcript,
-						discoveries: explicitDiscoveries,
-						runtimeViolations,
-						tableContract: {
-							tone: tableContract.tone,
-							boundaries: tableContract.boundaries,
-							pvp: tableContract.pvp,
-							retconPolicy: tableContract.retconPolicy,
-						},
-						authorityPolicy: {
-							mode: authorityPolicy.mode,
-							factIntroduction: authorityPolicy.factIntroduction,
-							ruleAdjudication: authorityPolicy.ruleAdjudication,
-							safetyVeto: authorityPolicy.safetyVeto,
-							allowRuleBypass: authorityPolicy.allowRuleBypass,
-							allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
-							allowPlayerCanonDeclarations:
-								authorityPolicy.allowPlayerCanonDeclarations,
+			if (!dryRun) {
+				await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-world-sync-policy-${crypto.randomUUID()}`,
+						type: "runtime_policy_blocked",
+						atISO: new Date().toISOString(),
+						source: "world_sync",
+						data: {
+							transcript,
+							discoveries: explicitDiscoveries,
+							runtimeViolations,
+							tableContract: {
+								tone: tableContract.tone,
+								boundaries: tableContract.boundaries,
+								pvp: tableContract.pvp,
+								retconPolicy: tableContract.retconPolicy,
+							},
+							authorityPolicy: {
+								mode: authorityPolicy.mode,
+								factIntroduction: authorityPolicy.factIntroduction,
+								ruleAdjudication: authorityPolicy.ruleAdjudication,
+								safetyVeto: authorityPolicy.safetyVeto,
+								allowRuleBypass: authorityPolicy.allowRuleBypass,
+								allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+								allowPlayerCanonDeclarations:
+									authorityPolicy.allowPlayerCanonDeclarations,
+							},
 						},
 					},
-				},
-			});
+				});
+			}
 			return {
 				success: false,
 				message: `World sync blocked by runtime policy: ${blockedMessage}`,
@@ -203,7 +214,9 @@ export async function runWorldSync(args: {
 			};
 		}
 
-		await ensureWorldSyncDirectories(paths);
+		if (!dryRun) {
+			await ensureWorldSyncDirectories(paths);
+		}
 
 		const preferredState = await loadPreferredCurrentState({
 			bardoRoot,
@@ -276,7 +289,7 @@ export async function runWorldSync(args: {
 				preferredLocationSlug,
 				args.currentLocationHint.trim(),
 			);
-			if (optionalSystems.worldGeneration) {
+			if (!dryRun && optionalSystems.worldGeneration) {
 				const ensuredLocation = await ensureSyncedLocationFile({
 					bardoRoot,
 					locationSlug: preferredLocationSlug,
@@ -293,6 +306,14 @@ export async function runWorldSync(args: {
 		}
 
 		for (const discovery of mergedDiscoveries) {
+			if (!shouldPersistDiscovery(discovery)) {
+				persistedDiscoveries.push({
+					...discovery,
+					persisted: false,
+				});
+				continue;
+			}
+
 			if (discovery.kind === "location") {
 				const locationSlug =
 					discovery.id || slugify(discovery.displayName, "location");
@@ -305,7 +326,7 @@ export async function runWorldSync(args: {
 				if (discovery.metadata?.currentLocation !== false) {
 					preferredLocationSlug = locationSlug;
 				}
-				if (optionalSystems.worldGeneration) {
+				if (!dryRun && optionalSystems.worldGeneration) {
 					const ensuredLocation = await ensureSyncedLocationFile({
 						bardoRoot,
 						locationSlug,
@@ -336,16 +357,22 @@ export async function runWorldSync(args: {
 					state.locations[preferredLocationSlug]?.name ??
 						toDisplayName(preferredLocationSlug),
 				);
-				const ensuredNpc = await ensureSyncedNpcFile({
-					bardoRoot,
-					npcId,
-					npcName: discovery.displayName,
-					currentLocation: preferredLocationSlug,
-				});
-				if (ensuredNpc.created) {
-					createdNpcIds.push(npcId);
-				} else {
+				if (!dryRun) {
+					const ensuredNpc = await ensureSyncedNpcFile({
+						bardoRoot,
+						npcId,
+						npcName: discovery.displayName,
+						currentLocation: preferredLocationSlug,
+					});
+					if (ensuredNpc.created) {
+						createdNpcIds.push(npcId);
+					} else {
+						existingNpcIds.push(npcId);
+					}
+				} else if (state.npcs[npcId]) {
 					existingNpcIds.push(npcId);
+				} else {
+					createdNpcIds.push(npcId);
 				}
 				if (!state.npcs[npcId]) {
 					state.npcs[npcId] = {
@@ -456,32 +483,35 @@ export async function runWorldSync(args: {
 			.map((discovery) => discovery.summary)
 			.slice(0, 3);
 
-		const nowIso = new Date().toISOString();
-		await appendCanonicalEvent({
-			bardoRoot,
-			event: {
-				id: `evt-world-sync-${crypto.randomUUID()}`,
-				type: "world_sync_applied",
-				atISO: nowIso,
-				source: "world_sync",
-				data: {
-					transcript,
-					extractedLocationNames,
-					extractedNpcNames,
-					createdLocationIds,
-					createdNpcIds,
-					existingLocationIds,
-					existingNpcIds,
-					currentLocationAfter: state.currentLocation,
-					persistedDiscoveries,
-					stateAfter: state,
+		if (!dryRun) {
+			const nowIso = new Date().toISOString();
+			await appendCanonicalEvent({
+				bardoRoot,
+				event: {
+					id: `evt-world-sync-${crypto.randomUUID()}`,
+					type: "world_sync_applied",
+					atISO: nowIso,
+					source: "world_sync",
+					data: {
+						transcript,
+						extractedLocationNames,
+						extractedNpcNames,
+						createdLocationIds,
+						createdNpcIds,
+						existingLocationIds,
+						existingNpcIds,
+						currentLocationAfter: state.currentLocation,
+						persistedDiscoveries,
+						stateAfter: state,
+					},
 				},
-			},
-		});
-		await regenerateProjectionsForEventTypes({
-			bardoRoot,
-			eventTypes: ["world_sync_applied"],
-		});
+			});
+			await regenerateProjectionsForEventTypes({
+				bardoRoot,
+				eventTypes: ["world_sync_applied"],
+				regenerateReports: false,
+			});
+		}
 
 		return {
 			success: true,

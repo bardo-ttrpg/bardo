@@ -1,17 +1,9 @@
-import CrosshairMarker from "@/components/crosshair-marker";
 import SectionLabel from "@/components/section-label";
 import { withBardoItems, withoutBardoItems } from "./data";
 
 export default function ComparisonSection() {
 	return (
-		<section className="relative mt-16 border border-border [contain-intrinsic-size:760px] [content-visibility:auto]">
-			<CrosshairMarker className="-left-[5px] -top-[8px]" />
-			<CrosshairMarker className="-right-[5px] -top-[8px]" />
-			<CrosshairMarker className="-bottom-[8px] -left-[5px]" />
-			<CrosshairMarker className="-right-[5px] -bottom-[8px]" />
-			<CrosshairMarker className="-top-[8px] left-[calc(50%-5px)]" />
-			<CrosshairMarker className="-bottom-[8px] left-[calc(50%-5px)]" />
-
+		<section className="mt-16 border border-border [contain-intrinsic-size:760px] [content-visibility:auto]">
 			<div className="grid grid-cols-1 sm:grid-cols-2">
 				<div className="border-b border-border p-8 sm:border-b-0 sm:border-r">
 					<SectionLabel>Without Bardo</SectionLabel>

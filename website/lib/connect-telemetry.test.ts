@@ -4,25 +4,20 @@ import { createConnectTelemetry } from "./connect-telemetry";
 describe("connect telemetry", () => {
 	test("tracks route outcome counters", () => {
 		const telemetry = createConnectTelemetry();
-		telemetry.increment("cli_session_started");
-		telemetry.increment("cli_session_started");
+		telemetry.increment("bridge_session_started");
+		telemetry.increment("bridge_session_started");
 		telemetry.increment("runtime_status_success");
 
 		expect(telemetry.snapshot()).toEqual({
-			cli_token_issued: 0,
-			cli_token_failed: 0,
-			cli_exchange_success: 0,
-			cli_exchange_rejected: 0,
-			cli_exchange_failed: 0,
-			cli_session_started: 2,
-			cli_session_start_failed: 0,
-			cli_session_poll_pending: 0,
-			cli_session_poll_approved: 0,
-			cli_session_poll_rejected: 0,
-			cli_session_poll_failed: 0,
-			cli_session_approved: 0,
-			cli_session_approve_rejected: 0,
-			cli_session_approve_failed: 0,
+			bridge_session_started: 2,
+			bridge_session_start_failed: 0,
+			bridge_session_poll_pending: 0,
+			bridge_session_poll_approved: 0,
+			bridge_session_poll_rejected: 0,
+			bridge_session_poll_failed: 0,
+			bridge_session_approved: 0,
+			bridge_session_approve_rejected: 0,
+			bridge_session_approve_failed: 0,
 			runtime_status_success: 1,
 			runtime_status_invalid: 0,
 			runtime_status_failed: 0,
@@ -40,8 +35,8 @@ describe("connect telemetry", () => {
 			logger: { info },
 		});
 
-		telemetry.increment("cli_token_issued");
-		telemetry.increment("cli_exchange_success");
+		telemetry.increment("bridge_session_started");
+		telemetry.increment("bridge_session_poll_pending");
 
 		expect(info).toHaveBeenCalledTimes(1);
 		expect(info).toHaveBeenCalledWith(
@@ -49,8 +44,8 @@ describe("connect telemetry", () => {
 			expect.objectContaining({
 				"bardo.service": "website",
 				"bardo.flow": "connect",
-				"bardo.connect.cli_token_issued": 1,
-				"bardo.connect.cli_exchange_success": 1,
+				"bardo.connect.bridge_session_started": 1,
+				"bardo.connect.bridge_session_poll_pending": 1,
 			}),
 		);
 	});

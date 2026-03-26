@@ -1,5 +1,4 @@
 import { clerkClient } from "@clerk/nextjs/server";
-import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 
 function parsePositiveInteger(
@@ -103,7 +102,7 @@ export async function revokeApiKeyForUser({
 		);
 	} catch (err) {
 		if (isTimeoutLike(err)) {
-			Sentry.logger.warn("website.api_keys.lookup_timed_out", {
+			console.warn("website.api_keys.lookup_timed_out", {
 				"bardo.service": "website",
 				"bardo.route": route,
 				"bardo.operation": "clerk.apiKeys.get",
@@ -116,11 +115,11 @@ export async function revokeApiKeyForUser({
 		if (extractHttpStatus(err) === 404) {
 			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
-		Sentry.captureException(err);
-		Sentry.logger.error("website.api_keys.lookup_failed", {
+		console.error("website.api_keys.lookup_failed", {
 			"bardo.service": "website",
 			"bardo.route": route,
 			"bardo.operation": "clerk.apiKeys.get",
+			error: err instanceof Error ? err.message : String(err),
 		});
 		return NextResponse.json(
 			{ error: "Key lookup failed. Please retry." },
@@ -140,7 +139,7 @@ export async function revokeApiKeyForUser({
 		);
 	} catch (err) {
 		if (isTimeoutLike(err)) {
-			Sentry.logger.warn("website.api_keys.delete_timed_out", {
+			console.warn("website.api_keys.delete_timed_out", {
 				"bardo.service": "website",
 				"bardo.route": route,
 				"bardo.operation": "clerk.apiKeys.delete",
@@ -153,11 +152,11 @@ export async function revokeApiKeyForUser({
 		if (extractHttpStatus(err) === 404) {
 			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		}
-		Sentry.captureException(err);
-		Sentry.logger.error("website.api_keys.delete_failed", {
+		console.error("website.api_keys.delete_failed", {
 			"bardo.service": "website",
 			"bardo.route": route,
 			"bardo.operation": "clerk.apiKeys.delete",
+			error: err instanceof Error ? err.message : String(err),
 		});
 		return NextResponse.json(
 			{ error: "Key deletion failed. Please retry." },

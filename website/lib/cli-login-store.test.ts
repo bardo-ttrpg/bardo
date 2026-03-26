@@ -35,63 +35,38 @@ describe("cli login token store", () => {
 		expect(result.reason).toBe("expired");
 	});
 
-	test("persists one-time token claims through Upstash NX semantics", async () => {
-		const fetchImpl = mock(
-			async (input: RequestInfo | URL, init?: RequestInit) => {
-				expect(String(input)).toContain("https://staging.upstash.io/set/");
-				expect(String(input)).toContain("/NX/EX/300");
-				expect(init?.headers).toEqual({
-					authorization: "Bearer upstash-token",
-				});
-				return new Response(JSON.stringify({ result: "OK" }), {
-					status: 200,
-					headers: { "content-type": "application/json" },
-				});
-			},
-		);
+	test("persists one-time token claims through the website session store", async () => {
+		const controlPlane = {
+			consumeCliLoginToken: mock(async () => ({ ok: true as const })),
+		};
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
-			env: {
-				NODE_ENV: "development",
-				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
-				UPSTASH_REDIS_REST_URL: "https://staging.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-staging",
-			},
-			fetchImpl,
+			store: controlPlane,
 		});
 
 		const result = await store.consume({
-			token: "cli_token_upstash",
+			token: "cli_token_control_plane",
 			expiresAtISO: "2026-03-03T00:05:00.000Z",
 		});
 
 		expect(result.ok).toBe(true);
-		expect(fetchImpl).toHaveBeenCalledTimes(1);
+		expect(controlPlane.consumeCliLoginToken).toHaveBeenCalledTimes(1);
 	});
 
-	test("rejects replays when Upstash returns a failed NX write", async () => {
-		const fetchImpl = mock(
-			async () =>
-				new Response(JSON.stringify({ result: null }), {
-					status: 200,
-					headers: { "content-type": "application/json" },
-				}),
-		);
+	test("rejects replays when the website session store marks a token as already used", async () => {
+		const controlPlane = {
+			consumeCliLoginToken: mock(async () => ({
+				ok: false as const,
+				reason: "already_used" as const,
+			})),
+		};
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
-			env: {
-				NODE_ENV: "development",
-				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
-				UPSTASH_REDIS_REST_URL: "https://staging.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-staging",
-			},
-			fetchImpl,
+			store: controlPlane,
 		});
 
 		const result = await store.consume({
-			token: "cli_token_upstash_replay",
+			token: "cli_token_control_plane_replay",
 			expiresAtISO: "2026-03-03T00:05:00.000Z",
 		});
 
@@ -99,19 +74,14 @@ describe("cli login token store", () => {
 		expect(result.reason).toBe("already_used");
 	});
 
-	test("rejects non-production Upstash configs that do not target bardo-staging", async () => {
+	test("surfaces an availability error when the website session store is required but missing", async () => {
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
 			env: {
-				NODE_ENV: "development",
+				NODE_ENV: "production",
 				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
-				UPSTASH_REDIS_REST_URL: "https://production.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-production",
 			},
-			fetchImpl: mock(async () => {
-				throw new Error("fetch should not run");
-			}),
+			store: null,
 		});
 
 		await expect(
@@ -119,23 +89,22 @@ describe("cli login token store", () => {
 				token: "cli_token_wrong_db",
 				expiresAtISO: "2026-03-03T00:05:00.000Z",
 			}),
-		).rejects.toThrow("bardo-staging");
+		).rejects.toThrow("website login replay store");
 	});
 
-	test("falls back to memory replay protection when Upstash is unreachable in development", async () => {
-		const fetchImpl = mock(async () => {
-			throw new Error("fetch failed");
-		});
+	test("falls back to memory replay protection when the website session store is unreachable in development", async () => {
+		const controlPlane = {
+			consumeCliLoginToken: mock(async () => {
+				throw new Error("fetch failed");
+			}),
+		};
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
 			env: {
 				NODE_ENV: "development",
 				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "true",
-				UPSTASH_REDIS_REST_URL: "https://staging.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-staging",
 			},
-			fetchImpl,
+			store: controlPlane,
 		});
 
 		const first = await store.consume({
@@ -149,6 +118,6 @@ describe("cli login token store", () => {
 
 		expect(first).toEqual({ ok: true });
 		expect(second).toEqual({ ok: false, reason: "already_used" });
-		expect(fetchImpl).toHaveBeenCalledTimes(2);
+		expect(controlPlane.consumeCliLoginToken).toHaveBeenCalledTimes(2);
 	});
 });

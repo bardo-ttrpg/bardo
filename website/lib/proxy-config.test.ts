@@ -1,33 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import {
-	API_PROXY_MATCHER,
-	PAGE_PROXY_MATCHER,
-	PAGE_PROXY_MATCHER_SOURCE,
+	shouldRunClerkForPagePathname,
 	shouldUseClerkOnlyProxyPathname,
 } from "./proxy-config";
 
-describe("proxy config", () => {
-	test("excludes api and Next static assets from the page proxy matcher", () => {
-		expect(PAGE_PROXY_MATCHER_SOURCE).toContain("api");
-		expect(PAGE_PROXY_MATCHER_SOURCE).toContain("_next/static");
-		expect(PAGE_PROXY_MATCHER_SOURCE).toContain("_next/image");
-		expect(PAGE_PROXY_MATCHER_SOURCE).toContain("favicon.ico");
-	});
-
-	test("skips router prefetch requests", () => {
-		expect(PAGE_PROXY_MATCHER.missing).toEqual([
-			{ type: "header", key: "next-router-prefetch" },
-			{ type: "header", key: "purpose", value: "prefetch" },
-		]);
-	});
-
-	test("keeps api and trpc routes inside the Clerk middleware matcher", () => {
-		expect(API_PROXY_MATCHER).toBe("/(api|trpc)(.*)");
-	});
-
-	test("uses the Clerk-only fast path for api and trpc routes", () => {
-		expect(shouldUseClerkOnlyProxyPathname("/api/billing")).toBe(true);
-		expect(shouldUseClerkOnlyProxyPathname("/trpc/health")).toBe(true);
+describe("shouldUseClerkOnlyProxyPathname", () => {
+	test("keeps API and trpc requests on the clerk-only proxy path", () => {
+		expect(shouldUseClerkOnlyProxyPathname("/api")).toBe(true);
+		expect(shouldUseClerkOnlyProxyPathname("/api/connect/runtime-status")).toBe(
+			true,
+		);
+		expect(shouldUseClerkOnlyProxyPathname("/trpc")).toBe(true);
+		expect(shouldUseClerkOnlyProxyPathname("/trpc/example")).toBe(true);
 		expect(shouldUseClerkOnlyProxyPathname("/pricing")).toBe(false);
+	});
+});
+
+describe("shouldRunClerkForPagePathname", () => {
+	test("runs Clerk on auth-aware routes only", () => {
+		expect(shouldRunClerkForPagePathname("/dashboard")).toBe(true);
+		expect(shouldRunClerkForPagePathname("/dashboard/connect/bridge/abc")).toBe(
+			true,
+		);
+		expect(shouldRunClerkForPagePathname("/pricing")).toBe(false);
+		expect(shouldRunClerkForPagePathname("/sign-in")).toBe(true);
+		expect(shouldRunClerkForPagePathname("/sign-up")).toBe(true);
+		expect(shouldRunClerkForPagePathname("/")).toBe(false);
+		expect(shouldRunClerkForPagePathname("/docs/install")).toBe(false);
+		expect(shouldRunClerkForPagePathname("/legal/privacy")).toBe(false);
 	});
 });

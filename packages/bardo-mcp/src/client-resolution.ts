@@ -42,7 +42,11 @@ export async function detectWorkspaceClient(
 	}
 
 	if (detected.length === 1) {
-		return detected[0];
+		const [client] = detected;
+		if (!client) {
+			throw new Error("Detected client is missing.");
+		}
+		return client;
 	}
 
 	if (detected.length > 1) {

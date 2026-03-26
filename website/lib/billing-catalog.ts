@@ -1,18 +1,16 @@
 import type { BillingInterval } from "./user-billing";
 
-export type PaidPlanTier = "solo" | "solo_plus";
+export type PaidPlanTier = "solo";
 export type CheckoutPlanTier = PaidPlanTier;
 
-export const YEARLY_SAVINGS_UP_TO_PERCENT = 27;
+export const YEARLY_SAVINGS_UP_TO_PERCENT = 25;
 
 const BASE_MONTHLY_CENTS: Record<CheckoutPlanTier, number> = {
 	solo: 1_499,
-	solo_plus: 2_499,
 };
 
 const BASE_YEARLY_CENTS: Record<CheckoutPlanTier, number> = {
 	solo: 13_499,
-	solo_plus: 22_499,
 };
 
 export function displayPriceCents(

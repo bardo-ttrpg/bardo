@@ -1,4 +1,0 @@
-version: 1
-display_name: Railway Deploy
-short_description: Prepare and validate Railway deployments.
-default_prompt: Inspect the repo deployment shape and Railway target environment, verify the required service settings and variables, apply only the necessary deployment changes, and confirm deployment readiness.

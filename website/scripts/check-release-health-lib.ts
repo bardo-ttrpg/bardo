@@ -1,21 +1,8 @@
-import { resolveShouldUploadSentryArtifacts } from "../lib/next-config-policy";
-import { resolveSentryRelease } from "../lib/sentry-server-config";
-
 type CheckReleaseHealthResult = {
 	skipped: boolean;
 	errors: string[];
 	warnings: string[];
 	release: string | undefined;
-};
-
-type VerifySentryAuthArgs = {
-	authToken: string;
-	org: string;
-	project: string;
-};
-
-type CheckReleaseHealthDeps = {
-	verifySentryAuth?: (args: VerifySentryAuthArgs) => Promise<void>;
 };
 
 function normalize(value: string | undefined): string | undefined {
@@ -26,7 +13,13 @@ function normalize(value: string | undefined): string | undefined {
 function isReleaseHealthEnforced(
 	env: Record<string, string | undefined>,
 ): boolean {
-	return resolveShouldUploadSentryArtifacts(env);
+	const vercelEnv = normalize(env.VERCEL_ENV)?.toLowerCase();
+	return (
+		env.CI === "true" ||
+		vercelEnv === "preview" ||
+		vercelEnv === "production" ||
+		env.BARDO_ENFORCE_RELEASE_HEALTH === "true"
+	);
 }
 
 function requireValue(
@@ -42,9 +35,20 @@ function requireValue(
 	return normalized;
 }
 
+function resolveReleaseIdentifier(
+	env: Record<string, string | undefined>,
+): string | undefined {
+	return (
+		normalize(env.BARDO_RC_SHA) ??
+		normalize(env.VERCEL_GIT_COMMIT_SHA) ??
+		normalize(env.GITHUB_SHA) ??
+		normalize(env.SOURCE_VERSION) ??
+		normalize(env.COMMIT_SHA)
+	);
+}
+
 export async function checkReleaseHealth(
 	env: Record<string, string | undefined>,
-	deps: CheckReleaseHealthDeps = {},
 ): Promise<CheckReleaseHealthResult> {
 	if (!isReleaseHealthEnforced(env)) {
 		return {
@@ -58,48 +62,18 @@ export async function checkReleaseHealth(
 	const errors: string[] = [];
 	const warnings: string[] = [];
 
-	requireValue(env.SENTRY_DSN, "SENTRY_DSN", errors);
-	requireValue(env.NEXT_PUBLIC_SENTRY_DSN, "NEXT_PUBLIC_SENTRY_DSN", errors);
-	requireValue(env.SENTRY_ENVIRONMENT, "SENTRY_ENVIRONMENT", errors);
 	requireValue(
-		env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
-		"NEXT_PUBLIC_SENTRY_ENVIRONMENT",
+		env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+		"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
 		errors,
 	);
+	requireValue(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY", errors);
+	requireValue(env.BARDO_MCP_BASE_URL, "BARDO_MCP_BASE_URL", errors);
+	requireValue(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
 
-	const release = resolveSentryRelease(env);
+	const release = resolveReleaseIdentifier(env);
 	if (!release) {
-		errors.push("SENTRY_RELEASE is missing");
-	}
-
-	const org = requireValue(env.SENTRY_ORG, "SENTRY_ORG", errors);
-	const project = requireValue(env.SENTRY_PROJECT, "SENTRY_PROJECT", errors);
-	const authToken = requireValue(
-		env.SENTRY_AUTH_TOKEN,
-		"SENTRY_AUTH_TOKEN",
-		errors,
-	);
-
-	if (
-		errors.length === 0 &&
-		deps.verifySentryAuth &&
-		authToken &&
-		org &&
-		project
-	) {
-		try {
-			await deps.verifySentryAuth({
-				authToken,
-				org,
-				project,
-			});
-		} catch (error) {
-			errors.push(
-				`Sentry auth verification failed: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			);
-		}
+		errors.push("BARDO_RC_SHA or deployment commit SHA is missing");
 	}
 
 	return {

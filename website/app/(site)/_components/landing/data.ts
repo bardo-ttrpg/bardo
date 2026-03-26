@@ -24,9 +24,9 @@ export const tickerItems = [
 	"Codex CLI",
 	"Gemini CLI",
 	"Any TTRPG System",
-	"Local-first",
+	"Remote MCP",
 	"Persistent State",
-	"Markdown-First",
+	"Bridge Approval",
 	"Continuity Reports",
 	"MCP Protocol",
 ] as const;
@@ -45,8 +45,8 @@ export const agents = [
 export const features: readonly LandingFeature[] = [
 	{
 		icon: Database,
-		label: "Persistent State",
-		desc: "Canon lives in local markdown and canonical events that survive restarts, context resets, and model swaps.",
+		label: "Local Campaign Truth",
+		desc: "Canon lives in your local workspace files, not in a cloud campaign store controlled by the product.",
 	},
 	{
 		icon: Layers,
@@ -60,34 +60,34 @@ export const features: readonly LandingFeature[] = [
 	},
 	{
 		icon: RefreshCw,
-		label: "Automatic World Tracking",
-		desc: "NPCs, factions, unresolved threads, and location state refresh automatically after meaningful play without asking for a prep step.",
+		label: "Remote Premium Guardrails",
+		desc: "The hosted MCP handles auth, billing, metering, orchestration, and continuity checks while the bridge keeps local file access on your machine.",
 	},
 	{
 		icon: PlayCircle,
-		label: "Resumable Sessions",
-		desc: "Pick up a campaign from any MCP-capable client by reading the workspace, not by rebuilding memory from scratch.",
+		label: "Client-Agnostic Access",
+		desc: "Connect Codex, Claude Code, VS Code, OpenCode, and similar MCP-capable clients through the same local bridge flow.",
 	},
 	{
 		icon: FileText,
-		label: "Local Docs Included",
-		desc: "Run `bardo init` and get canonical files, generated continuity reports, and local docs in `bardo/docs/` right inside the workspace.",
+		label: "Readable Canon Surface",
+		desc: "Your AI agent and your table can inspect projections, events, and report markdown directly from the workspace without hidden cloud state.",
 	},
 ] as const;
 
 export const workflow = [
 	{
 		n: "01",
-		text: "Install Bardo and connect it to your agent via MCP config",
+		text: "Install the local Bardo bridge and sign in on the website",
 	},
-	{ n: "02", text: "Run `bardo init` in your campaign workspace folder" },
+	{ n: "02", text: "Connect your preferred MCP client through the bridge" },
 	{
 		n: "03",
-		text: "Your agent reads projections/current-state.md, events/canonical.ndjson, and logs/*.md to load context",
+		text: "Approve the bridge session in the browser and point it at your campaign workspace",
 	},
 	{
 		n: "04",
-		text: "Play sessions that auto-persist state and regenerate continuity reports automatically",
+		text: "Use the full remote Bardo toolset to read local canon, return guarded results, and apply validated local writes",
 	},
 ] as const;
 
@@ -101,12 +101,12 @@ export const withoutBardoItems = [
 ] as const;
 
 export const withBardoItems = [
-	"World state auto-loads on every session init",
-	"State persists to markdown files — survives any reset",
+	"One subscription unlocks the whole Bardo MCP experience",
+	"Your campaign workspace stays local and readable",
 	"Canon, inference, and suggestion stay clearly separated",
-	"NPCs, factions, and threads update after every action",
-	"Any MCP-capable agent can resume your campaign",
-	"The workspace stays readable even as the campaign grows",
+	"Remote tools apply guardrails before they touch local state",
+	"Any MCP-capable agent can use the same bridge flow",
+	"The product stays small without cloud campaign storage",
 ] as const;
 
 export const terminalTools = [
@@ -127,8 +127,8 @@ export const terminalTools = [
 		desc: "Generate the player-safe version of current knowledge",
 	},
 	{
-		tool: "last_session_diff",
-		desc: "Explain what changed since the recent canonical window",
+		tool: "timeline_diff",
+		desc: "Explain what changed across the recent canonical window",
 	},
 ] as const;
 
@@ -163,7 +163,7 @@ export const bardoWorkspace: FileTreeRoot = {
 					id: "credits-doc",
 					name: "credits-and-billing.md",
 					type: "file",
-					note: "flat credit model",
+					note: "one subscription, one clear billing model",
 				},
 			],
 		},

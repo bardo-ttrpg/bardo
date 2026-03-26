@@ -32,9 +32,13 @@ describe("ensureWorkspaceLocalDocs", () => {
 
 			expect(quickstart).toContain("projections/current-state.md");
 			expect(quickstart).toContain("events/canonical.ndjson");
-			expect(reports).toContain("resource://reports/world-state-overview");
-			expect(reports).toContain("last_session_diff");
+			expect(quickstart).toContain("approve the bridge in your browser");
+			expect(reports).toContain("logs/timeline-diff.md");
+			expect(reports).toContain("timeline_diff");
+			expect(reports).not.toContain("last_session_diff");
+			expect(reports).not.toContain("faction-pressure");
 			expect(credits).toContain("1 accepted MCP tool call = 1 credit");
+			expect(credits).not.toContain("MCP resources");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}

@@ -87,55 +87,44 @@ export function validateStagingEnv(
 	);
 	requireExact(
 		normalize(env.BARDO_GUIDED_SETUP_ENABLED),
-		"false",
+		"true",
 		"BARDO_GUIDED_SETUP_ENABLED",
 		errors,
 	);
 	requireExact(
+		normalize(env.BARDO_SETUP_CONTRACT_V2_REQUIRED),
+		"true",
+		"BARDO_SETUP_CONTRACT_V2_REQUIRED",
+		errors,
+	);
+	requireExact(
 		normalize(env.BARDO_MCP_TRANSPORT_MODE),
-		"stateful",
+		"stateless",
 		"BARDO_MCP_TRANSPORT_MODE",
 		errors,
 	);
-
 	requireExact(
-		normalize(env.BARDO_SENTRY_ENABLED),
+		normalize(env.BARDO_MCP_ENABLE_JSON_RESPONSE),
 		"true",
-		"BARDO_SENTRY_ENABLED",
+		"BARDO_MCP_ENABLE_JSON_RESPONSE",
 		errors,
 	);
-	if (!normalize(env.SENTRY_DSN)) {
-		errors.push("SENTRY_DSN is missing");
-	}
 	requireExact(
-		normalize(env.SENTRY_ENVIRONMENT),
-		"staging",
-		"SENTRY_ENVIRONMENT",
+		normalize(env.BARDO_RATE_LIMIT_FAIL_CLOSED),
+		"true",
+		"BARDO_RATE_LIMIT_FAIL_CLOSED",
 		errors,
 	);
-	if (!normalize(env.SENTRY_RELEASE)) {
-		errors.push("SENTRY_RELEASE is missing");
-	}
+	requireExact(
+		normalize(env.BARDO_ALLOW_QUERY_API_KEY),
+		"false",
+		"BARDO_ALLOW_QUERY_API_KEY",
+		errors,
+	);
 
 	if (normalize(env.BARDO_API_KEYS_JSON)) {
 		warnings.push(
 			"BARDO_API_KEYS_JSON is set; hosted auth staging should normally rely on introspection instead.",
-		);
-	}
-
-	const upstashUrl = normalize(env.UPSTASH_REDIS_REST_URL);
-	const upstashToken = normalize(env.UPSTASH_REDIS_REST_TOKEN);
-	if (upstashUrl || upstashToken) {
-		if (!upstashUrl || !upstashToken) {
-			errors.push(
-				"UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must both be set when either is configured.",
-			);
-		}
-	} else if (
-		normalize(env.BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK) !== "true"
-	) {
-		errors.push(
-			"BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK must be true in staging when Upstash is not configured.",
 		);
 	}
 

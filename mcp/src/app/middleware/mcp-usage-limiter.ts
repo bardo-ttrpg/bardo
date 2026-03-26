@@ -1,21 +1,15 @@
-import { Redis } from "@upstash/redis";
-import {
-	applySpanAttributes,
-	buildUsageLimitSpanAttributes,
-	captureSentryException,
-	logSentryMessage,
-	withUsageLimitSpan,
-} from "../../telemetry";
-
-type MeteredPlan = "free" | "solo" | "solo_plus";
+type MeteredPlan = "free" | "solo";
 
 export type McpUsageIdentity = {
 	subjectId: string | null;
 	keyId: string | null;
 	plan: string | null;
 	mcpPeriodLimit: number | null;
+	tokenIdentifier?: string | null;
 	providerId?: string | null;
 	modelId?: string | null;
+	toolName?: string | null;
+	idempotencyKey?: string | null;
 	units?: number;
 };
 
@@ -30,23 +24,47 @@ export type McpUsageConsumeResult = {
 	usedThisPeriod: number | null;
 	remaining: number | null;
 	period: string | null;
-	backend: "none" | "memory" | "upstash";
+	backend: "none" | "memory" | "website";
 };
 
 type McpUsageLimiterOptions = {
 	nowMs?: () => number;
 	env?: Record<string, string | undefined>;
-	redis?: Pick<Redis, "incr" | "incrby" | "expire" | "set">;
-};
-
-type UpstashConfig = {
-	url: string;
-	token: string;
+	controlPlane?: {
+		readKeyUsage?(args: { keyId: string; periodStartMs: number }): Promise<{
+			total: number;
+			thisPeriod: number;
+			lastUsedAt: number | null;
+			lastUsedProviderId: string | null;
+			lastUsedModelId: string | null;
+			backend: "none" | "website";
+		}>;
+		consumeAcceptedToolCalls(args: {
+			clerkUserId: string;
+			tokenIdentifier?: string | null;
+			keyId: string;
+			plan: MeteredPlan;
+			mcpPeriodLimit: number;
+			idempotencyKey: string;
+			toolName?: string | null;
+			providerId?: string | null;
+			modelId?: string | null;
+			units: number;
+		}): Promise<{
+			allowed: boolean;
+			limit: number;
+			usedThisPeriod: number;
+			remaining: number;
+			period: string;
+			backend: "memory" | "website";
+		}>;
+	} | null;
 };
 
 const CLEANUP_INTERVAL = 256;
 
 export type McpUsageLimiter = {
+	check(identity: McpUsageIdentity): Promise<McpUsageConsumeResult>;
 	consume(identity: McpUsageIdentity): Promise<McpUsageConsumeResult>;
 	reset(): void;
 };
@@ -73,15 +91,6 @@ export function pruneUsageLimiterCaches(args: {
 			args.blockedCache.delete(cacheKey);
 		}
 	}
-}
-
-function readUpstashConfig(
-	env: Record<string, string | undefined>,
-): UpstashConfig | null {
-	const url = env.UPSTASH_REDIS_REST_URL?.trim();
-	const token = env.UPSTASH_REDIS_REST_TOKEN?.trim();
-	if (!url || !token) return null;
-	return { url, token };
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -121,38 +130,10 @@ function normalizeUnits(value: number | undefined): number {
 }
 
 function normalizePlan(value: string | null): MeteredPlan | null {
-	if (value === "free" || value === "solo" || value === "solo_plus") {
+	if (value === "free" || value === "solo") {
 		return value;
 	}
 	return null;
-}
-
-function userMonthKey(subjectId: string, period: string): string {
-	return `bardo:usage:mcp:user:${subjectId}:month:${period}`;
-}
-
-function userTotalKey(subjectId: string): string {
-	return `bardo:usage:mcp:user:${subjectId}:total`;
-}
-
-function keyMonthKey(keyId: string, period: string): string {
-	return `bardo:usage:mcp:key:${keyId}:month:${period}`;
-}
-
-function keyTotalKey(keyId: string): string {
-	return `bardo:usage:mcp:key:${keyId}:total`;
-}
-
-function keyLastUsedAtKey(keyId: string): string {
-	return `bardo:usage:mcp:key:${keyId}:last_used_at`;
-}
-
-function keyLastProviderKey(keyId: string): string {
-	return `bardo:usage:mcp:key:${keyId}:last_provider_id`;
-}
-
-function keyLastModelKey(keyId: string): string {
-	return `bardo:usage:mcp:key:${keyId}:last_model_id`;
 }
 
 function emptyResult(): McpUsageConsumeResult {
@@ -170,35 +151,33 @@ function clampRemaining(limit: number, used: number): number {
 	return Math.max(0, limit - used);
 }
 
+function blockedResult(args: {
+	limit: number;
+	period: string;
+	backend: "none" | "memory" | "website";
+}): McpUsageConsumeResult {
+	return {
+		allowed: false,
+		limit: args.limit,
+		usedThisPeriod: args.limit,
+		remaining: 0,
+		period: args.period,
+		backend: args.backend,
+	};
+}
+
 export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 	const now = options.nowMs ?? (() => Date.now());
 	const env = options.env ?? process.env;
-	const upstash = readUpstashConfig(env);
 	const allowMemoryFallback = parseBoolean(
 		env.BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK,
 		env.NODE_ENV !== "production",
-	);
-	const writeTotals = parseBoolean(env.BARDO_MCP_USAGE_WRITE_TOTALS, false);
-	const writeLastUsed = parseBoolean(
-		env.BARDO_MCP_USAGE_WRITE_LAST_USED,
-		false,
-	);
-	const writeModelMetadata = parseBoolean(
-		env.BARDO_MCP_USAGE_WRITE_MODEL_METADATA,
-		false,
 	);
 	const blockedCacheTtlMs = parsePositiveInteger(
 		env.BARDO_MCP_USAGE_BLOCK_CACHE_MS,
 		30_000,
 	);
-	const redis =
-		options.redis ??
-		(upstash
-			? new Redis({
-					url: upstash.url,
-					token: upstash.token,
-				})
-			: null);
+	const controlPlane = options.controlPlane ?? null;
 
 	const userMemory = new Map<string, MemoryCounter>();
 	const keyMemory = new Map<string, MemoryCounter>();
@@ -217,96 +196,6 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 			period,
 			nowMs: nowMsValue,
 		});
-	}
-
-	async function consumeUpstash(
-		identity: {
-			subjectId: string;
-			keyId: string;
-			providerId?: string | null;
-			modelId?: string | null;
-		},
-		limit: number,
-		period: string,
-		nowMsValue: number,
-		units: number,
-	): Promise<McpUsageConsumeResult | null> {
-		if (!redis) return null;
-		const redisClient = redis;
-
-		async function incrementCounter(key: string, by: number): Promise<number> {
-			if (by === 1) {
-				return await redisClient.incr(key);
-			}
-			return await redisClient.incrby(key, by);
-		}
-
-		try {
-			const subjectId = identity.subjectId;
-			const keyId = identity.keyId;
-			const userPeriodKey = userMonthKey(subjectId, period);
-			const userPeriodCounter = await incrementCounter(userPeriodKey, units);
-			if (userPeriodCounter <= units) {
-				await redisClient.expire(userPeriodKey, 60 * 60 * 24 * 400);
-			}
-
-			const used = Math.floor(userPeriodCounter);
-			if (used > limit) {
-				return {
-					allowed: false,
-					limit,
-					usedThisPeriod: used,
-					remaining: clampRemaining(limit, used),
-					period,
-					backend: "upstash",
-				};
-			}
-
-			const keyPeriodKey = keyMonthKey(keyId, period);
-			const keyPeriodCounter = await incrementCounter(keyPeriodKey, units);
-			if (keyPeriodCounter <= units) {
-				await redisClient.expire(keyPeriodKey, 60 * 60 * 24 * 400);
-			}
-			const sideWrites: Promise<unknown>[] = [];
-			if (writeTotals) {
-				sideWrites.push(incrementCounter(userTotalKey(subjectId), units));
-				sideWrites.push(incrementCounter(keyTotalKey(keyId), units));
-			}
-			if (writeLastUsed) {
-				sideWrites.push(
-					redisClient.set(keyLastUsedAtKey(keyId), String(nowMsValue)),
-				);
-			}
-			if (writeModelMetadata && identity.providerId) {
-				sideWrites.push(
-					redisClient.set(keyLastProviderKey(keyId), identity.providerId),
-				);
-			}
-			if (writeModelMetadata && identity.modelId) {
-				sideWrites.push(
-					redisClient.set(keyLastModelKey(keyId), identity.modelId),
-				);
-			}
-			if (sideWrites.length > 0) {
-				await Promise.all(sideWrites);
-			}
-
-			return {
-				allowed: true,
-				limit,
-				usedThisPeriod: used,
-				remaining: clampRemaining(limit, used),
-				period,
-				backend: "upstash",
-			};
-		} catch (error) {
-			captureSentryException(error);
-			logSentryMessage("error", "mcp.usage_limiter.upstash_error", {
-				"bardo.service": "mcp",
-				"bardo.usage.backend": "upstash",
-			});
-			return null;
-		}
 	}
 
 	function consumeMemory(
@@ -352,107 +241,179 @@ export function createMcpUsageLimiter(options: McpUsageLimiterOptions = {}) {
 		};
 	}
 
+	function peekMemory(
+		identity: { subjectId: string; keyId: string },
+		limit: number,
+		period: string,
+		units: number,
+	): McpUsageConsumeResult {
+		const currentUser = userMemory.get(identity.subjectId);
+		const usedThisPeriod =
+			currentUser && currentUser.period === period ? currentUser.used : 0;
+		const nextUsed = usedThisPeriod + units;
+		return {
+			allowed: nextUsed <= limit,
+			limit,
+			usedThisPeriod,
+			remaining: clampRemaining(limit, usedThisPeriod),
+			period,
+			backend: "memory",
+		};
+	}
+
 	return {
-		async consume(identity: McpUsageIdentity): Promise<McpUsageConsumeResult> {
-			return await withUsageLimitSpan(async (span) => {
-				const subjectId = identity.subjectId?.trim() || null;
-				const keyId = identity.keyId?.trim() || null;
-				const plan = normalizePlan(identity.plan);
-				const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
-				const units = normalizeUnits(identity.units);
+		async check(identity: McpUsageIdentity): Promise<McpUsageConsumeResult> {
+			const subjectId = identity.subjectId?.trim() || null;
+			const keyId = identity.keyId?.trim() || null;
+			const plan = normalizePlan(identity.plan);
+			const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
+			const units = normalizeUnits(identity.units);
 
-				function annotate(
-					result: McpUsageConsumeResult,
-					blockCacheHit: boolean,
-				): McpUsageConsumeResult {
-					applySpanAttributes(
-						span,
-						buildUsageLimitSpanAttributes({
-							plan,
-							backend: result.backend,
-							limitPresent: limit !== null,
-							allowed: result.allowed,
-							period: result.period,
-							blockCacheHit,
-							writeTotalsEnabled: writeTotals,
-							writeLastUsedEnabled: writeLastUsed,
-							writeModelMetadataEnabled: writeModelMetadata,
-						}),
-					);
-					return result;
-				}
+			if (!subjectId || !keyId || !plan || !limit) {
+				return emptyResult();
+			}
 
-				if (!subjectId || !keyId || !plan || !limit) {
-					return annotate(emptyResult(), false);
-				}
-
-				const nowMsValue = now();
-				const period = normalizePeriod(nowMsValue);
-				maybePruneCaches(period, nowMsValue);
-				const blockedKey = `${subjectId}:${period}`;
-				const blockedUntil = blockedCache.get(blockedKey);
-				if (blockedUntil && blockedUntil > nowMsValue) {
-					return annotate(
-						{
-							allowed: false,
-							limit,
-							usedThisPeriod: limit,
-							remaining: 0,
-							period,
-							backend: redis ? "upstash" : "memory",
-						},
-						true,
-					);
-				}
-				const upstashResult = await consumeUpstash(
-					{
-						subjectId,
-						keyId,
-						providerId: identity.providerId ?? null,
-						modelId: identity.modelId ?? null,
-					},
+			const nowMsValue = now();
+			const period = normalizePeriod(nowMsValue);
+			maybePruneCaches(period, nowMsValue);
+			const blockedKey = `${subjectId}:${period}`;
+			const blockedUntil = blockedCache.get(blockedKey);
+			if (blockedUntil && blockedUntil > nowMsValue) {
+				return blockedResult({
 					limit,
 					period,
-					nowMsValue,
-					units,
-				);
-				if (upstashResult) {
-					if (!upstashResult.allowed) {
+					backend: allowMemoryFallback ? "memory" : "none",
+				});
+			}
+
+			if (controlPlane?.readKeyUsage) {
+				try {
+					const snapshot = await controlPlane.readKeyUsage({
+						keyId,
+						periodStartMs: Date.UTC(
+							new Date(nowMsValue).getUTCFullYear(),
+							new Date(nowMsValue).getUTCMonth(),
+							1,
+							0,
+							0,
+							0,
+							0,
+						),
+					});
+					const nextUsed = snapshot.thisPeriod + units;
+					const result: McpUsageConsumeResult = {
+						allowed: nextUsed <= limit,
+						limit,
+						usedThisPeriod: snapshot.thisPeriod,
+						remaining: clampRemaining(limit, snapshot.thisPeriod),
+						period,
+						backend: snapshot.backend,
+					};
+					if (!result.allowed) {
 						blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
 					} else {
 						blockedCache.delete(blockedKey);
 					}
-					return annotate(upstashResult, false);
-				}
-
-				if (!allowMemoryFallback) {
-					blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
-					return annotate(
-						{
-							allowed: false,
+					return result;
+				} catch {
+					if (!allowMemoryFallback) {
+						blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+						return blockedResult({
 							limit,
-							usedThisPeriod: limit,
-							remaining: 0,
 							period,
-							backend: "upstash",
-						},
-						false,
-					);
+							backend: "none",
+						});
+					}
 				}
-
-				const result = consumeMemory(
-					{ subjectId, keyId },
+			} else if (!allowMemoryFallback) {
+				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+				return blockedResult({
 					limit,
 					period,
-					units,
-				);
-				if (!result.allowed) {
-					blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
-				} else {
-					blockedCache.delete(blockedKey);
+					backend: "none",
+				});
+			}
+
+			const result = peekMemory({ subjectId, keyId }, limit, period, units);
+			if (!result.allowed) {
+				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+			} else {
+				blockedCache.delete(blockedKey);
+			}
+			return result;
+		},
+		async consume(identity: McpUsageIdentity): Promise<McpUsageConsumeResult> {
+			const subjectId = identity.subjectId?.trim() || null;
+			const keyId = identity.keyId?.trim() || null;
+			const plan = normalizePlan(identity.plan);
+			const limit = normalizePositiveLimit(identity.mcpPeriodLimit);
+			const units = normalizeUnits(identity.units);
+
+			if (!subjectId || !keyId || !plan || !limit) {
+				return emptyResult();
+			}
+
+			const nowMsValue = now();
+			const period = normalizePeriod(nowMsValue);
+			maybePruneCaches(period, nowMsValue);
+			const blockedKey = `${subjectId}:${period}`;
+			const blockedUntil = blockedCache.get(blockedKey);
+			if (blockedUntil && blockedUntil > nowMsValue) {
+				return blockedResult({
+					limit,
+					period,
+					backend: allowMemoryFallback ? "memory" : "none",
+				});
+			}
+
+			if ((!controlPlane || !identity.idempotencyKey) && !allowMemoryFallback) {
+				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+				return blockedResult({
+					limit,
+					period,
+					backend: "none",
+				});
+			}
+
+			if (controlPlane && identity.idempotencyKey) {
+				try {
+					const result = await controlPlane.consumeAcceptedToolCalls({
+						clerkUserId: subjectId,
+						tokenIdentifier: identity.tokenIdentifier ?? null,
+						keyId,
+						plan,
+						mcpPeriodLimit: limit,
+						idempotencyKey: identity.idempotencyKey,
+						toolName: identity.toolName ?? null,
+						providerId: identity.providerId ?? null,
+						modelId: identity.modelId ?? null,
+						units,
+					});
+					if (!result.allowed) {
+						blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+					} else {
+						blockedCache.delete(blockedKey);
+					}
+					return result;
+				} catch {
+					if (!allowMemoryFallback) {
+						blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+						return blockedResult({
+							limit,
+							period,
+							backend: "none",
+						});
+					}
 				}
-				return annotate(result, false);
-			});
+			}
+
+			const result = consumeMemory({ subjectId, keyId }, limit, period, units);
+			if (!result.allowed) {
+				blockedCache.set(blockedKey, nowMsValue + blockedCacheTtlMs);
+			} else {
+				blockedCache.delete(blockedKey);
+			}
+			return result;
 		},
 		reset(): void {
 			userMemory.clear();

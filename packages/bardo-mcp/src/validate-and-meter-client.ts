@@ -160,12 +160,13 @@ async function postValidateRequest(args: {
 export function createValidateAndMeterClient(args: {
 	apiKey: string;
 	workspaceId: string;
-	controlPlaneUrl: string;
+	websiteMeteringUrl: string;
 	cachePath?: string;
 	pendingPath?: string;
 	cacheTtlMs?: number;
 	nowMs?: () => number;
 	fetchImpl?: FetchLike;
+	env?: Record<string, string | undefined>;
 }) {
 	const cachePath =
 		args.cachePath ?? path.join(os.homedir(), ".bardo", "auth-cache.json");
@@ -176,6 +177,8 @@ export function createValidateAndMeterClient(args: {
 	const now = args.nowMs ?? (() => Date.now());
 	const fetchImpl = args.fetchImpl ?? fetch;
 	const keyHash = sha256(args.apiKey);
+	const env = args.env ?? process.env;
+	const allowCachedGrace = env.NODE_ENV !== "production";
 
 	async function submitPendingIfAny(nowMsValue: number): Promise<void> {
 		const entries = await loadPendingUsageEntries({ pendingPath });
@@ -189,7 +192,7 @@ export function createValidateAndMeterClient(args: {
 		});
 		const response = await postValidateRequest({
 			fetchImpl,
-			url: args.controlPlaneUrl,
+			url: args.websiteMeteringUrl,
 			apiKey: args.apiKey,
 			nowMs: nowMsValue,
 			body: {
@@ -237,7 +240,7 @@ export function createValidateAndMeterClient(args: {
 
 				const response = await postValidateRequest({
 					fetchImpl,
-					url: args.controlPlaneUrl,
+					url: args.websiteMeteringUrl,
 					apiKey: args.apiKey,
 					nowMs: nowMsValue,
 					body: {
@@ -293,7 +296,11 @@ export function createValidateAndMeterClient(args: {
 				if (isExplicitDenyError(error)) {
 					throw error;
 				}
-				if (cached && isFreshCache(cached, nowMsValue, keyHash)) {
+				if (
+					allowCachedGrace &&
+					cached &&
+					isFreshCache(cached, nowMsValue, keyHash)
+				) {
 					if (cached.quota_remaining < 1) {
 						throw new Error("quota_exceeded");
 					}

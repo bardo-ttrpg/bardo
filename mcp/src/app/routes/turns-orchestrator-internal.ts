@@ -109,6 +109,7 @@ export async function callMcpJsonRpc({
 	const headers = new Headers({
 		accept: "application/json, text/event-stream",
 		"content-type": "application/json",
+		"x-bardo-setup-contract-version": "2.0",
 	});
 
 	if (auth.apiKey) {

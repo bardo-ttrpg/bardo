@@ -58,7 +58,7 @@ function parseBooleanFlag(
 }
 
 function isStrictSetupContractEnforced(): boolean {
-	return parseBooleanFlag(Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED, false);
+	return parseBooleanFlag(Bun.env.BARDO_SETUP_CONTRACT_V2_REQUIRED, true);
 }
 
 function buildSetupContractRequiredResponse(toolName: string): Response {
@@ -70,7 +70,11 @@ function buildSetupContractRequiredResponse(toolName: string): Response {
 }
 
 function requiresSetupContractV2(toolName: string): boolean {
-	return toolName === "init" || toolName === "player_action";
+	return (
+		toolName === "init" ||
+		toolName === "player_action" ||
+		toolName === "scene_turn"
+	);
 }
 
 function hasSetupContractV2Header(request: Request): boolean {

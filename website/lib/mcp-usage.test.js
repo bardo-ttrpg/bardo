@@ -12,32 +12,24 @@ describe("listPeriodMonthBuckets", () => {
 });
 
 describe("createMcpUsageReader", () => {
-	test("returns usage snapshot from upstash counters", async () => {
-		const calls = [];
-		const fetchMock = async (input, init) => {
-			calls.push({ input: String(input), init });
-			const url = String(input);
-			if (url.includes("/get/bardo%3Ausage%3Amcp%3Auser%3Auser_1%3Atotal")) {
-				return new Response(JSON.stringify({ result: "42" }), { status: 200 });
-			}
-			if (
-				url.includes(
-					"/get/bardo%3Ausage%3Amcp%3Auser%3Auser_1%3Amonth%3A2026-02",
-				)
-			) {
-				return new Response(JSON.stringify({ result: "12" }), { status: 200 });
-			}
-			return new Response(JSON.stringify({ result: null }), { status: 200 });
+	test("returns usage snapshot from an injected reader", async () => {
+		const controlPlane = {
+			readUserUsage: async () => ({
+				total: 42,
+				thisPeriod: 12,
+				backend: "none",
+			}),
+			readKeyUsage: async () => ({
+				total: 0,
+				thisPeriod: 0,
+				lastUsedAt: null,
+				lastUsedProviderId: null,
+				lastUsedModelId: null,
+				backend: "none",
+			}),
 		};
-
 		const reader = createMcpUsageReader({
-			env: {
-				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "token",
-				BARDO_MCP_USAGE_READ_TOTALS: "true",
-			},
-			fetchImpl: fetchMock,
-			nowMs: () => Date.UTC(2026, 1, 27),
+			controlPlane,
 		});
 
 		const usage = await reader.readUserUsage({
@@ -47,32 +39,12 @@ describe("createMcpUsageReader", () => {
 
 		expect(usage.total).toBe(42);
 		expect(usage.thisPeriod).toBe(12);
-		expect(calls.length).toBeGreaterThanOrEqual(2);
+		expect(usage.backend).toBe("none");
 	});
 
-	test("defaults total to period usage when total reads are disabled", async () => {
-		const calls = [];
-		const fetchMock = async (input, init) => {
-			calls.push({ input: String(input), init });
-			const url = String(input);
-			if (
-				url.includes(
-					"/get/bardo%3Ausage%3Amcp%3Auser%3Auser_2%3Amonth%3A2026-02",
-				)
-			) {
-				return new Response(JSON.stringify({ result: "7" }), { status: 200 });
-			}
-			return new Response(JSON.stringify({ result: null }), { status: 200 });
-		};
-
+	test("returns a zeroed snapshot when the control plane is unavailable", async () => {
 		const reader = createMcpUsageReader({
-			env: {
-				UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "token",
-				BARDO_MCP_USAGE_READ_TOTALS: "false",
-			},
-			fetchImpl: fetchMock,
-			nowMs: () => Date.UTC(2026, 1, 27),
+			controlPlane: null,
 		});
 
 		const usage = await reader.readUserUsage({
@@ -80,8 +52,8 @@ describe("createMcpUsageReader", () => {
 			periodStartMs: Date.UTC(2026, 1, 1),
 		});
 
-		expect(usage.total).toBe(7);
-		expect(usage.thisPeriod).toBe(7);
-		expect(calls.some((call) => call.input.includes("%3Atotal"))).toBe(false);
+		expect(usage.total).toBe(0);
+		expect(usage.thisPeriod).toBe(0);
+		expect(usage.backend).toBe("none");
 	});
 });

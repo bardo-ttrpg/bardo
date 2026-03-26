@@ -3,11 +3,29 @@ import {
 	dailyUserVerificationLimitForPlan,
 } from "./api-keys";
 import type { PlanTier } from "./user-billing";
+import { createWebsiteBackendClient } from "./website-backend";
 
 type DailyVerificationBudgetLimiterOptions = {
 	nowMs?: () => number;
 	env?: Record<string, string | undefined>;
-	fetchImpl?: typeof fetch;
+	websiteBackend?: {
+		consumeRateLimitWindow(args: {
+			scope: string;
+			counterKey: string;
+			limit: number;
+			windowMs: number;
+			nowMs?: number;
+		}): Promise<DailyVerificationConsumeResult>;
+	} | null;
+	controlPlane?: {
+		consumeRateLimitWindow(args: {
+			scope: string;
+			counterKey: string;
+			limit: number;
+			windowMs: number;
+			nowMs?: number;
+		}): Promise<DailyVerificationConsumeResult>;
+	} | null;
 };
 
 type SubjectPlanCacheOptions = {
@@ -27,11 +45,6 @@ type PlanCacheEntry<TValue> = {
 
 type VerificationCounterScope = "user" | "key";
 
-type UpstashConfig = {
-	url: string;
-	token: string;
-};
-
 const CLEANUP_INTERVAL = 256;
 
 export type DailyVerificationConsumeResult = {
@@ -39,7 +52,9 @@ export type DailyVerificationConsumeResult = {
 	limit: number;
 	used: number;
 	remaining: number;
-	backend: "memory" | "upstash";
+	backend: "memory" | "website";
+	retryAfterSeconds?: number;
+	resetEpochSeconds?: number;
 };
 
 export function pruneDailyVerificationCaches(args: {
@@ -104,23 +119,6 @@ function parsePositiveInteger(
 	return Math.floor(parsed);
 }
 
-function readUpstashConfig(
-	env: Record<string, string | undefined>,
-): UpstashConfig | null {
-	const url = env.UPSTASH_REDIS_REST_URL?.trim();
-	const token = env.UPSTASH_REDIS_REST_TOKEN?.trim();
-	if (!url || !token) return null;
-	return { url: url.replace(/\/+$/, ""), token };
-}
-
-function counterKey(
-	scope: VerificationCounterScope,
-	id: string,
-	day: string,
-): string {
-	return `bardo:verify:${scope}:${id}:${day}`;
-}
-
 function limitForScope(
 	scope: VerificationCounterScope,
 	plan: PlanTier,
@@ -162,91 +160,33 @@ function memoryConsume(
 	};
 }
 
-async function upstashIncrement(
-	key: string,
-	config: UpstashConfig,
-	fetchImpl: typeof fetch,
-	timeoutMs: number,
-): Promise<number | null> {
-	const endpoint = `${config.url}/incr/${encodeURIComponent(key)}`;
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
-	try {
-		const response = await fetchImpl(endpoint, {
-			method: "POST",
-			headers: {
-				authorization: `Bearer ${config.token}`,
-			},
-			signal: controller.signal,
-		});
-		if (!response.ok) {
-			return null;
-		}
-		const payload = (await response.json()) as { result?: unknown };
-		if (
-			typeof payload.result !== "number" ||
-			!Number.isFinite(payload.result)
-		) {
-			return null;
-		}
-		return Math.floor(payload.result);
-	} catch {
-		return null;
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
-async function upstashEnsureExpiry(
-	key: string,
-	config: UpstashConfig,
-	fetchImpl: typeof fetch,
-	timeoutMs: number,
-): Promise<boolean> {
-	const endpoint = `${config.url}/expire/${encodeURIComponent(key)}/86400`;
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
-	try {
-		const response = await fetchImpl(endpoint, {
-			method: "POST",
-			headers: {
-				authorization: `Bearer ${config.token}`,
-			},
-			signal: controller.signal,
-		});
-		return response.ok;
-	} catch {
-		// Ignore expiry failures; the caller will retry on later requests until
-		// this key has a confirmed TTL for the current process lifetime.
-		return false;
-	} finally {
-		clearTimeout(timeout);
-	}
-}
-
 export function createDailyVerificationBudgetLimiter(
 	options: DailyVerificationBudgetLimiterOptions = {},
 ) {
 	const usageByCounter = new Map<string, UsageCounter>();
 	const now = options.nowMs ?? (() => Date.now());
 	const env = options.env ?? process.env;
-	const fetchImpl = options.fetchImpl ?? fetch;
-	const upstash = readUpstashConfig(env);
+	const websiteBackend =
+		options.websiteBackend !== undefined
+			? options.websiteBackend
+			: options.controlPlane === undefined
+				? (() => {
+						try {
+							return createWebsiteBackendClient(env);
+						} catch {
+							return null;
+						}
+					})()
+				: options.controlPlane;
 	const allowMemoryFallback = parseBoolean(
 		env.BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK,
 		env.NODE_ENV !== "production",
-	);
-	const upstashTimeoutMs = parsePositiveInteger(
-		env.BARDO_UPSTASH_TIMEOUT_MS,
-		1200,
 	);
 	const blockedCacheMs = parsePositiveInteger(
 		env.BARDO_VERIFY_BLOCK_CACHE_MS,
 		30_000,
 	);
 	const blockedCache = new Map<string, number>();
-	const ttlConfirmedKeys = new Set<string>();
-	let ttlConfirmedDay: string | null = null;
 	let consumeCount = 0;
 
 	function maybePruneCaches(currentDay: string, nowMs: number): void {
@@ -270,11 +210,6 @@ export function createDailyVerificationBudgetLimiter(
 		const limit = limitForScope(scope, plan, env);
 		const nowMs = now();
 		const day = dayKey(nowMs);
-		ttlConfirmedDay = rotateConfirmedKeyWindow({
-			confirmedKeys: ttlConfirmedKeys,
-			activeDay: ttlConfirmedDay,
-			currentDay: day,
-		});
 		maybePruneCaches(day, nowMs);
 		const safeId = id.trim() || "unknown";
 		const blockedKey = `${scope}:${safeId}:${day}`;
@@ -285,56 +220,40 @@ export function createDailyVerificationBudgetLimiter(
 				limit,
 				used: limit,
 				remaining: 0,
-				backend: upstash ? "upstash" : "memory",
+				backend: "memory",
 			};
 		}
-		if (!upstash) {
-			return memoryConsume(usageByCounter, `${scope}:${safeId}`, day, limit);
-		}
 
-		const key = counterKey(scope, safeId, day);
-		const used = await upstashIncrement(
-			key,
-			upstash,
-			fetchImpl,
-			upstashTimeoutMs,
-		);
-		if (used !== null) {
-			if (!ttlConfirmedKeys.has(key)) {
-				const expiryConfirmed = await upstashEnsureExpiry(
-					key,
-					upstash,
-					fetchImpl,
-					upstashTimeoutMs,
-				);
-				if (expiryConfirmed) {
-					ttlConfirmedKeys.add(key);
+		if (websiteBackend) {
+			try {
+				const result = await websiteBackend.consumeRateLimitWindow({
+					scope: `verify:${scope}`,
+					counterKey: safeId,
+					limit,
+					windowMs: 86_400_000,
+					nowMs,
+				});
+				return {
+					allowed: result.allowed,
+					limit,
+					used: limit - (result.remaining ?? 0),
+					remaining: result.remaining ?? 0,
+					backend: result.backend ?? "website",
+					retryAfterSeconds: result.retryAfterSeconds,
+					resetEpochSeconds: result.resetEpochSeconds,
+				};
+			} catch {
+				if (!allowMemoryFallback) {
+					blockedCache.set(blockedKey, nowMs + blockedCacheMs);
+					return {
+						allowed: false,
+						limit,
+						used: limit,
+						remaining: 0,
+						backend: "memory",
+					};
 				}
 			}
-			const result: DailyVerificationConsumeResult = {
-				allowed: used <= limit,
-				limit,
-				used,
-				remaining: Math.max(0, limit - used),
-				backend: "upstash",
-			};
-			if (!result.allowed) {
-				blockedCache.set(blockedKey, nowMs + blockedCacheMs);
-			} else {
-				blockedCache.delete(blockedKey);
-			}
-			return result;
-		}
-
-		if (!allowMemoryFallback) {
-			blockedCache.set(blockedKey, nowMs + blockedCacheMs);
-			return {
-				allowed: false,
-				limit,
-				used: limit,
-				remaining: 0,
-				backend: "upstash",
-			};
 		}
 
 		const memoryResult = memoryConsume(

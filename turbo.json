@@ -6,45 +6,105 @@
 		"bun.lock",
 		"turbo.json",
 		"tsconfig.base.json",
-		"biome.json",
-		".env*",
-		"website/.env*",
-		"mcp/.env*"
+		"biome.json"
 	],
 	"tasks": {
 		"dev": {
 			"cache": false,
-			"persistent": true
+			"persistent": true,
+			"interruptible": true
 		},
 		"build": {
 			"dependsOn": ["^build"],
-			"outputs": []
-		},
-		"website#build": {
-			"outputs": [".next/**", "!.next/cache/**"],
-			"env": ["NEXT_PUBLIC_*", "CLERK_*", "BARDO_*", "SENTRY_*", "UPSTASH_*"]
-		},
-		"mcp#build": {
-			"outputs": []
+			"outputs": ["dist/**"]
 		},
 		"lint": {
 			"dependsOn": ["^lint"],
+			"outputs": []
+		},
+		"format": {
+			"cache": false,
 			"outputs": []
 		},
 		"typecheck": {
 			"dependsOn": ["^typecheck"],
 			"outputs": []
 		},
+		"typecheck:unused-report": {
+			"dependsOn": ["^typecheck:unused-report"],
+			"outputs": []
+		},
 		"test": {
 			"dependsOn": ["^test"],
+			"outputs": []
+		},
+		"test:connect-gates": {
+			"outputs": []
+		},
+		"test:e2e": {
+			"cache": false,
+			"outputs": []
+		},
+		"test:e2e:headed": {
+			"cache": false,
+			"outputs": []
+		},
+		"test:e2e:auth": {
+			"cache": false,
+			"outputs": []
+		},
+		"test:e2e:auth:headed": {
+			"cache": false,
 			"outputs": []
 		},
 		"test:ga-gates": {
 			"dependsOn": ["^test:ga-gates"],
 			"outputs": []
 		},
+		"test:soak-gates": {
+			"dependsOn": ["^test:soak-gates"],
+			"outputs": []
+		},
+		"test:mechanics-edge-gates": {
+			"dependsOn": ["^test:mechanics-edge-gates"],
+			"outputs": []
+		},
 		"test:perf-gates": {
 			"dependsOn": ["^test:perf-gates"],
+			"outputs": []
+		},
+		"test:runtime-smoke": {
+			"dependsOn": ["^test:runtime-smoke"],
+			"outputs": []
+		},
+		"validate:env": {
+			"outputs": []
+		},
+		"validate:development-env": {
+			"outputs": []
+		},
+		"validate:deploy-env": {
+			"outputs": []
+		},
+		"validate:staging-env": {
+			"outputs": []
+		},
+		"validate:e2e-auth-env": {
+			"outputs": []
+		},
+		"check:release-health": {
+			"outputs": []
+		},
+		"check:react-doctor": {
+			"outputs": []
+		},
+		"build:analyze": {
+			"outputs": ["dist/**"]
+		},
+		"bundle:audit": {
+			"outputs": []
+		},
+		"ga:readiness": {
 			"outputs": []
 		},
 		"check": {

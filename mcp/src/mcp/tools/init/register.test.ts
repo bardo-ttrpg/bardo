@@ -66,6 +66,30 @@ function createAuth(campaignBasePath: string): AuthContext {
 	};
 }
 
+const COMPLETE_BOOTSTRAP_ANSWERS = {
+	purpose: "Run a grounded fantasy campaign.",
+	userProfile: "Solo GM playtest.",
+	agentProfile: "Act as a careful and vivid GM runtime.",
+	workingPreferences: "Keep responses concise and actionable.",
+	boundaries: "Avoid graphic gore.",
+	successCriteria: "Respect canon and provide useful scene framing.",
+	values: "Curiosity and continuity.",
+} as const;
+
+const COMPLETE_SETUP_ANSWERS = {
+	ttrpgSystem: "D20",
+	diceRoller: "bardo",
+	theme: "Classic Fantasy",
+	campaignPremise:
+		"Protect Thornwick while unraveling the pressure building around its frontier trade routes.",
+	openingSituation:
+		"The party arrives in Thornwick at dusk with the tavern packed and trouble already simmering.",
+	partyRoster:
+		"One cautious wanderer starts in town and needs the opening scene anchored on Thornwick.",
+	sourceAdaptationNotes:
+		"Use inspirations conservatively and prefer original local canon over direct lifts.",
+} as const;
+
 function captureHandlers(args: { auth: AuthContext }): {
 	init: InitHandler;
 	contextQuery: ContextQueryHandler;
@@ -102,20 +126,8 @@ describe("init tool", () => {
 		const { init, contextQuery } = captureHandlers({ auth: createAuth(root) });
 
 		const result = await init({
-			bootstrapAnswers: {
-				purpose: "Run a grounded fantasy campaign.",
-				userProfile: "Solo GM playtest.",
-				agentProfile: "Act as a careful and vivid GM runtime.",
-				workingPreferences: "Keep responses concise and actionable.",
-				boundaries: "Avoid graphic gore.",
-				successCriteria: "Respect canon and provide useful scene framing.",
-				values: "Curiosity and continuity.",
-			},
-			setupAnswers: {
-				ttrpgSystem: "D20",
-				diceRoller: "bardo",
-				theme: "Classic Fantasy",
-			},
+			bootstrapAnswers: COMPLETE_BOOTSTRAP_ANSWERS,
+			setupAnswers: COMPLETE_SETUP_ANSWERS,
 			diceRoller: "bardo",
 			theme: "Classic Fantasy",
 			startingScene:
@@ -171,20 +183,8 @@ describe("init tool", () => {
 		expect(first.structuredContent.setupComplete).toBe(false);
 
 		const second = await init({
-			bootstrapAnswers: {
-				purpose: "Run a grounded fantasy campaign.",
-				userProfile: "Solo GM playtest.",
-				agentProfile: "Act as a careful and vivid GM runtime.",
-				workingPreferences: "Keep responses concise and actionable.",
-				boundaries: "Avoid graphic gore.",
-				successCriteria: "Respect canon and provide useful scene framing.",
-				values: "Curiosity and continuity.",
-			},
-			setupAnswers: {
-				ttrpgSystem: "D20",
-				diceRoller: "bardo",
-				theme: "Classic Fantasy",
-			},
+			bootstrapAnswers: COMPLETE_BOOTSTRAP_ANSWERS,
+			setupAnswers: COMPLETE_SETUP_ANSWERS,
 		});
 
 		expect(second.isError).toBe(false);
@@ -261,20 +261,8 @@ describe("init tool", () => {
 			const { init } = captureHandlers({ auth: createAuth(root) });
 
 			const result = await init({
-				bootstrapAnswers: {
-					purpose: "Run a grounded fantasy campaign.",
-					userProfile: "Solo GM playtest.",
-					agentProfile: "Act as a careful and vivid GM runtime.",
-					workingPreferences: "Keep responses concise and actionable.",
-					boundaries: "Avoid graphic gore.",
-					successCriteria: "Respect canon and provide useful scene framing.",
-					values: "Curiosity and continuity.",
-				},
-				setupAnswers: {
-					ttrpgSystem: "D20",
-					diceRoller: "bardo",
-					theme: "Classic Fantasy",
-				},
+				bootstrapAnswers: COMPLETE_BOOTSTRAP_ANSWERS,
+				setupAnswers: COMPLETE_SETUP_ANSWERS,
 				diceRoller: "bardo",
 				theme: "Classic Fantasy",
 				startingScene:

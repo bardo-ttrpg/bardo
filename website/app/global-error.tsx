@@ -1,6 +1,5 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -11,7 +10,7 @@ export default function GlobalError({
 	reset: () => void;
 }) {
 	useEffect(() => {
-		Sentry.captureException(error);
+		console.error("[website] global render error", error);
 	}, [error]);
 
 	return (
@@ -26,8 +25,8 @@ export default function GlobalError({
 							Something went wrong
 						</h1>
 						<p className="mt-3 text-sm text-muted-foreground">
-							A render failure reached the app root. The error was sent to
-							Sentry.
+							A render failure reached the app root. Check Vercel logs for the
+							server-side details.
 						</p>
 						<button
 							type="button"

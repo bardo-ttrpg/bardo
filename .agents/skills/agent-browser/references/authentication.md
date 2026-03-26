@@ -9,7 +9,7 @@ Login flows, session persistence, OAuth, 2FA, and authenticated browsing.
 - [Basic Login Flow](#basic-login-flow)
 - [Saving Authentication State](#saving-authentication-state)
 - [Restoring Authentication](#restoring-authentication)
-- [OAuth / SSO Flows](#oauth--sso-flows)
+- [OAuth / SSO Flows](#oauth-sso-flows)
 - [Two-Factor Authentication](#two-factor-authentication)
 - [HTTP Basic Auth](#http-basic-auth)
 - [Cookie-Based Auth](#cookie-based-auth)

@@ -1,0 +1,77 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"dev": {
+			"with": ["mcp#dev"],
+			"cache": false,
+			"persistent": true,
+			"interruptible": true
+		},
+		"build": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["$TURBO_EXTENDS$", ".next/**", "!.next/cache/**"],
+			"env": ["NEXT_PUBLIC_*", "CLERK_*", "BARDO_*"]
+		},
+		"build:analyze": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["$TURBO_EXTENDS$", ".next/**", "!.next/cache/**"],
+			"env": [
+				"ANALYZE",
+				"NEXT_BUILD_ANALYZE_ARGS",
+				"NEXT_PUBLIC_*",
+				"CLERK_*",
+				"BARDO_*"
+			]
+		},
+		"test:e2e": {
+			"cache": false,
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["playwright-report/**", "test-results/**"]
+		},
+		"test:e2e:headed": {
+			"cache": false,
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["playwright-report/**", "test-results/**"]
+		},
+		"test:e2e:auth": {
+			"cache": false,
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["playwright-report/**", "test-results/**"]
+		},
+		"test:e2e:auth:headed": {
+			"cache": false,
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["playwright-report/**", "test-results/**"]
+		},
+		"validate:deploy-env": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": []
+		},
+		"validate:development-env": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": []
+		},
+		"validate:staging-env": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": []
+		},
+		"validate:e2e-auth-env": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": []
+		},
+		"check:release-health": {
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": []
+		},
+		"check:react-doctor": {
+			"outputs": []
+		},
+		"bundle:audit": {
+			"dependsOn": ["build:analyze"],
+			"outputs": []
+		},
+		"typecheck:unused-report": {
+			"outputs": []
+		}
+	}
+}

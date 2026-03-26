@@ -6,7 +6,7 @@ import path from "node:path";
 import { createValidateAndMeterClient } from "./validate-and-meter-client";
 
 describe("validate-and-meter client", () => {
-	test("uses live control-plane response and updates local cache", async () => {
+	test("uses the live website response and updates local cache", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-meter-client-"));
 		const cachePath = path.join(root, "auth-cache.json");
 		const pendingPath = path.join(root, "auth-cache-pending.ndjson");
@@ -15,7 +15,7 @@ describe("validate-and-meter client", () => {
 			const client = createValidateAndMeterClient({
 				apiKey: "bardo_sk_test",
 				workspaceId: "/tmp/workspace",
-				controlPlaneUrl: "https://example.com/api/v1/validate-and-meter",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
 				cachePath,
 				pendingPath,
 				fetchImpl: async () =>
@@ -74,7 +74,7 @@ describe("validate-and-meter client", () => {
 			const client = createValidateAndMeterClient({
 				apiKey: "bardo_sk_test",
 				workspaceId: "/tmp/workspace",
-				controlPlaneUrl: "https://example.com/api/v1/validate-and-meter",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
 				cachePath,
 				pendingPath,
 				nowMs: () => now + 1_000,
@@ -98,7 +98,60 @@ describe("validate-and-meter client", () => {
 		}
 	});
 
-	test("does not grant cached grace for explicit deny responses from the control plane", async () => {
+	test("fails closed on network errors in production even when a fresh cache exists", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-meter-client-"));
+		const cachePath = path.join(root, "auth-cache.json");
+		const pendingPath = path.join(root, "auth-cache-pending.ndjson");
+		const now = Date.now();
+		try {
+			await writeFile(
+				cachePath,
+				JSON.stringify(
+					{
+						key_hash: createHash("sha256")
+							.update("bardo_sk_test", "utf8")
+							.digest("hex"),
+						validated_at: now,
+						ttl_ms: 3_600_000,
+						plan: "solo",
+						quota_remaining: 9,
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const client = createValidateAndMeterClient({
+				apiKey: "bardo_sk_test",
+				workspaceId: "/tmp/workspace",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
+				cachePath,
+				pendingPath,
+				nowMs: () => now + 1_000,
+				env: {
+					NODE_ENV: "production",
+				},
+				fetchImpl: async () => {
+					throw new Error("network down");
+				},
+			});
+
+			await expect(
+				client.validateAndMeter({
+					tool: "bardo_workspace_status",
+					action: "invoke",
+				}),
+			).rejects.toThrow("validate_and_meter_unavailable");
+			await expect(readFile(pendingPath, "utf8")).rejects.toThrow();
+			const cache = await readFile(cachePath, "utf8");
+			expect(cache).toContain('"quota_remaining": 9');
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	test("does not grant cached grace for explicit deny responses from the website", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-meter-client-"));
 		const cachePath = path.join(root, "auth-cache.json");
 		const pendingPath = path.join(root, "auth-cache-pending.ndjson");
@@ -126,7 +179,7 @@ describe("validate-and-meter client", () => {
 			const client = createValidateAndMeterClient({
 				apiKey: "bardo_sk_test",
 				workspaceId: "/tmp/workspace",
-				controlPlaneUrl: "https://example.com/api/v1/validate-and-meter",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
 				cachePath,
 				pendingPath,
 				nowMs: () => now + 1_000,
@@ -178,7 +231,7 @@ describe("validate-and-meter client", () => {
 			const client = createValidateAndMeterClient({
 				apiKey: "bardo_sk_test",
 				workspaceId: "/tmp/workspace",
-				controlPlaneUrl: "https://example.com/api/v1/validate-and-meter",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
 				cachePath,
 				pendingPath,
 				fetchImpl: async (_input, init) => {
@@ -239,7 +292,7 @@ describe("validate-and-meter client", () => {
 			const client = createValidateAndMeterClient({
 				apiKey: "bardo_sk_test",
 				workspaceId: "/tmp/workspace",
-				controlPlaneUrl: "https://example.com/api/v1/validate-and-meter",
+				websiteMeteringUrl: "https://example.com/api/v1/validate-and-meter",
 				cachePath,
 				pendingPath,
 				fetchImpl: async (_input, init) => {

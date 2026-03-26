@@ -290,7 +290,7 @@ describe("runGuidedSetupFlow", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
-	test("completes setup and returns pending action after required answers", async () => {
+	test("continues into campaign premise after the base rules questions", async () => {
 		const root = await makeTempRoot("bardo-setup-complete-");
 		const campaignRoot = root;
 		const bardoRoot = resolveBardoRoot(campaignRoot);
@@ -351,9 +351,91 @@ describe("runGuidedSetupFlow", () => {
 			},
 		});
 
+		expect(completed.status).toBe("needs_input");
+		expect(completed.questionKey).toBe("campaignPremise");
+		expect(completed.question).toContain("What is the campaign premise?");
+		expect(completed.setupPrompt?.questionKey).toBe("campaignPremise");
+
+		await rm(root, { recursive: true, force: true });
+	});
+
+	test("persists richer campaign setup answers alongside the required setup batch", async () => {
+		const root = await makeTempRoot("bardo-setup-rich-answers-");
+		const campaignRoot = root;
+		const bardoRoot = resolveBardoRoot(campaignRoot);
+		const paths = resolveInitPaths(bardoRoot);
+		await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
+		await mkdir(path.join(bardoRoot, "state"), { recursive: true });
+		await writeFile(
+			path.join(bardoRoot, "_settings/settings.md"),
+			renderMarkdown(
+				{ title: "Settings", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/current.md"),
+			renderMarkdown(
+				{ title: "State", description: "test" },
+				JSON.stringify({}, null, 2),
+			),
+			"utf8",
+		);
+		await writeFile(
+			path.join(bardoRoot, "state/history.md"),
+			renderMarkdown({ title: "History", description: "test" }, ""),
+			"utf8",
+		);
+		await markBootstrapComplete(bardoRoot);
+
+		const first = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:00.000Z",
+			incomingAction: "I begin the campaign",
+		});
+
+		const completed = await runGuidedSetupFlow({
+			campaignBasePath: campaignRoot,
+			nowIso: "2026-02-22T00:00:01.000Z",
+			expectedRevision: first.revision,
+			setupAnswers: {
+				ttrpgSystem: "D20",
+				diceRoller: "player",
+				theme: "Fantasy",
+				campaignPremise: "Escaped prisoners trying to clear their names.",
+				openingSituation:
+					"The party emerges from a ruined chapel and must choose where to run first.",
+				partyRoster:
+					"Kvothe, human bard; Esperanza, elf paladin and Kvothe's wife.",
+				sourceAdaptationNotes:
+					"Adapt literary inspirations conservatively and avoid copying canon wholesale.",
+			},
+		});
+
 		expect(completed.status).toBe("complete");
-		expect(completed.actionToExecute).toBe("I enter the tavern");
+		expect(completed.actionToExecute).toBe("I begin the campaign");
 		expect(completed.pendingAction).toBeNull();
+		expect(completed.answers.campaignPremise).toContain("Escaped prisoners");
+		expect(completed.answers.openingSituation).toContain("ruined chapel");
+		expect(completed.answers.partyRoster).toContain("Kvothe");
+		expect(completed.answers.sourceAdaptationNotes).toContain("conservatively");
+
+		const settingsRaw = await readFile(paths.settingsPath, "utf8");
+		const settings = parseJsonObject(parseMarkdown(settingsRaw).content) as {
+			setup?: {
+				campaignPremise?: string;
+				openingSituation?: string;
+				partyRoster?: string;
+				sourceAdaptationNotes?: string;
+			};
+		};
+		expect(settings.setup?.campaignPremise).toContain("Escaped prisoners");
+		expect(settings.setup?.openingSituation).toContain("ruined chapel");
+		expect(settings.setup?.partyRoster).toContain("Esperanza");
+		expect(settings.setup?.sourceAdaptationNotes).toContain(
+			"avoid copying canon",
+		);
 
 		await rm(root, { recursive: true, force: true });
 	});

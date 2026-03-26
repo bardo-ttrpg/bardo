@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
+import { createPublicMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "AI Use Policy",
 	description:
-		"AI output limitations, user responsibility, and reliability expectations.",
-};
+		"AI output limitations, user responsibility, and reliability expectations for Bardo.",
+	path: "/legal/ai-policy",
+});
 
-const updatedAt = "February 19, 2026";
+const updatedAt = "March 12, 2026";
 
 export default function AiPolicyPage() {
 	return (
@@ -29,7 +30,8 @@ export default function AiPolicyPage() {
 					<p>
 						Outputs generated through Bardo may be inaccurate, incomplete,
 						inconsistent, or outdated. Treat outputs as assistive drafts, not as
-						verified facts.
+						verified facts, unless the claim is grounded in canon you have
+						confirmed.
 					</p>
 				</section>
 
@@ -40,7 +42,8 @@ export default function AiPolicyPage() {
 					<p>
 						You are responsible for reviewing and validating all outputs before
 						use. You remain fully responsible for operational, legal, financial,
-						and safety impacts of decisions made using AI-generated content.
+						and safety impacts of decisions made using AI-generated content,
+						including anything written back into your campaign workspace.
 					</p>
 				</section>
 
@@ -68,7 +71,19 @@ export default function AiPolicyPage() {
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						5. Transparency and claims
+						5. Canon, inference, and suggestion
+					</h2>
+					<p>
+						Bardo is designed to keep canon, inference, and suggestion separate.
+						You should treat canon as table-approved truth, inference as
+						interpreted state, and suggestion as optional creative output until
+						you confirm it.
+					</p>
+				</section>
+
+				<section>
+					<h2 className="mb-2 text-base font-semibold text-foreground">
+						6. Transparency and claims
 					</h2>
 					<p>
 						Any claims you make to third parties based on AI outputs should be
@@ -79,7 +94,7 @@ export default function AiPolicyPage() {
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						6. Reference guidance
+						7. Reference guidance
 					</h2>
 					<ul className="space-y-2">
 						<li>

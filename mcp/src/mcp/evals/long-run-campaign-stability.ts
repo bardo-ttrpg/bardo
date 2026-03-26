@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { readCanonicalEvents } from "../../domain/events/store";
@@ -6,9 +6,15 @@ import {
 	evaluateReplayInvariants,
 	evaluateTurnInvariants,
 } from "../../domain/invariants/campaign-invariants";
-import { parseMarkdown } from "../../domain/markdown/markdown";
-import { deriveCurrentStateFromEvents } from "../../domain/projections/current-state";
-import { resolvePathInsideRoot } from "../../infra/filesystem/filesystem";
+import { parseMarkdown, renderMarkdown } from "../../domain/markdown/markdown";
+import {
+	deriveCurrentStateFromEvents,
+	regenerateCurrentStateProjection,
+} from "../../domain/projections/current-state";
+import {
+	resolvePathInsideRoot,
+	writeTextAtomic,
+} from "../../infra/filesystem/filesystem";
 import {
 	renderPrometheusMetrics,
 	resetTelemetryForTests,
@@ -105,6 +111,47 @@ async function readProjectionState(
 	);
 	const raw = await readFile(projectionPath, "utf8");
 	return JSON.parse(parseMarkdown(raw).content) as Record<string, unknown>;
+}
+
+async function injectUnsupportedMechanicsRuleset(
+	bardoRoot: string,
+): Promise<void> {
+	const projectionPath = resolvePathInsideRoot(
+		bardoRoot,
+		"projections/current-state.md",
+	);
+	const legacyStatePath = resolvePathInsideRoot(bardoRoot, "state/current.md");
+	const projectionRaw = await readFile(projectionPath, "utf8");
+	const projectionParsed = parseMarkdown(projectionRaw);
+	const projectionState = JSON.parse(projectionParsed.content) as Record<
+		string,
+		unknown
+	>;
+	projectionState.mechanicsContext = {
+		...(typeof projectionState.mechanicsContext === "object" &&
+		projectionState.mechanicsContext !== null
+			? (projectionState.mechanicsContext as Record<string, unknown>)
+			: {}),
+		ruleset: "unknown_ruleset",
+	};
+	await writeTextAtomic(
+		projectionPath,
+		renderMarkdown(
+			projectionParsed.frontmatter,
+			JSON.stringify(projectionState, null, 2),
+		),
+	);
+	await writeFile(
+		legacyStatePath,
+		renderMarkdown(
+			{
+				title: "Campaign State",
+				description: "Current campaign state and memory snapshot",
+			},
+			JSON.stringify(projectionState, null, 2),
+		),
+		"utf8",
+	);
 }
 
 function expectedEventTypesForAction(action: string): string[] {
@@ -210,7 +257,7 @@ export async function runLongRunCampaignStabilityEval(args: {
 				});
 				failedAttempts += 1;
 				retryFailedAttempt = true;
-				Bun.env.BARDO_DEFAULT_RULESET = "unknown_ruleset";
+				await injectUnsupportedMechanicsRuleset(bardoRoot);
 				const failedResult = await runPlayerAction({
 					auth,
 					action: "I attack the retry-injection sentinel",
@@ -231,7 +278,11 @@ export async function runLongRunCampaignStabilityEval(args: {
 				if (retryFailedAttemptEventDelta !== 0) {
 					invariantFailures.partialCanonicalStateAfterRetryFailure += 1;
 				}
-				Bun.env.BARDO_DEFAULT_RULESET = previousRuleset ?? "d20_v1";
+				await regenerateCurrentStateProjection({
+					bardoRoot,
+					regenerateReports: false,
+					force: true,
+				});
 			}
 
 			const result = await runPlayerAction({

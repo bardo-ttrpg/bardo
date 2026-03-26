@@ -21,9 +21,11 @@ async function createTempDir(prefix: string): Promise<string> {
 }
 
 describe("bardo runtime smoke gate", () => {
-	test("connect, doctor, clients list, and bootstrap succeed from a clean workspace", async () => {
+	test("bridge-authenticated connect, doctor, clients list, and bootstrap succeed from a clean workspace", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const loginStdout = createWriter();
+		const loginStderr = createWriter();
 		const connectStdout = createWriter();
 		const connectStderr = createWriter();
 		const doctorStdout = createWriter();
@@ -32,20 +34,69 @@ describe("bardo runtime smoke gate", () => {
 		const clientsStderr = createWriter();
 
 		try {
+			const loginExitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: loginStdout,
+				stderr: loginStderr,
+				env: {
+					BARDO_LOGIN_START_URL:
+						"https://app.bardo.ai/api/connect/bridge-session/start",
+				},
+				sleep: async () => {},
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
+						return new Response(
+							JSON.stringify({
+								sessionId: "bridge_session_123",
+								userCode: "ABCD-1234",
+								verificationUrl:
+									"https://app.bardo.ai/dashboard/connect/bridge/bridge_session_123",
+								pollUrl:
+									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123",
+								intervalMs: 1,
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					if (
+						url ===
+						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123"
+					) {
+						return new Response(
+							JSON.stringify({
+								status: "approved",
+								accessToken: "bardo_bridge_access_smoke",
+								refreshToken: "bardo_bridge_refresh_smoke",
+								expiresAt: "2099-03-03T00:10:00.000Z",
+								mcpBaseUrl: "https://mcp.bardo.ai",
+								statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+								refreshUrl:
+									"https://app.bardo.ai/api/connect/bridge-session/refresh",
+								accountLabel: "Smoke User",
+								plan: "solo",
+								serverName: "bardo",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(loginExitCode).toBe(0);
+			expect(loginStderr.read()).toBe("");
+			expect(loginStdout.read()).toContain("/dashboard/connect/bridge/");
+
 			const connectExitCode = await runCli(
-				[
-					"connect",
-					"--client",
-					"codex",
-					"--api-key",
-					"bardo_live_smoke",
-					"--url",
-					"https://mcp.bardo.ai/mcp",
-					"--status-url",
-					"https://app.bardo.ai/api/connect/runtime-status",
-					"--ruleset",
-					"shadowdark",
-				],
+				["connect", "--client", "codex", "--ruleset", "shadowdark"],
 				{
 					cwd: workspaceRoot,
 					homeDir,
@@ -73,7 +124,7 @@ describe("bardo runtime smoke gate", () => {
 					}
 					if (url === "https://app.bardo.ai/api/connect/runtime-status") {
 						const auth = new Headers(init?.headers).get("authorization");
-						expect(auth).toBe("Bearer bardo_live_smoke");
+						expect(auth).toBe("Bearer bardo_bridge_access_smoke");
 						return new Response(
 							JSON.stringify({
 								valid: true,
@@ -130,7 +181,7 @@ describe("bardo runtime smoke gate", () => {
 			).resolves.toContain("[mcp_servers.bardo]");
 			await expect(
 				readFile(path.join(workspaceRoot, "bardo/docs/quickstart.md"), "utf8"),
-			).resolves.toContain("docs/how-to-read-your-world-state.md");
+			).resolves.toContain("approve the bridge in your browser");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

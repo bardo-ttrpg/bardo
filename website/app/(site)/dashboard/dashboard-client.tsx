@@ -1,33 +1,45 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
-import {
-	copySecret,
-	createKey,
-	generateCliLoginCommand,
-	getDashboardViewModel,
-	loadDashboardData,
-	loadKeys,
-	refreshSnippet,
-	revokeKey,
-	rotateKey,
-} from "./dashboard-controller";
-import {
-	CLIENT_OPTIONS,
-	type ConnectionClient,
-	createDashboardState,
-	type DashboardData,
-	type DashboardKey,
-	dashboardReducer,
-	getDashboardClientLabel,
-	getDashboardClientMetadata,
-} from "./dashboard-state";
+import { listConnectionClientAdapters } from "@bardo/mcp/client-adapters";
+import Link from "next/link";
+import { startTransition, useEffect, useState } from "react";
 import { DashboardSignOutButton } from "./signout-button";
 
+type BillingState = {
+	plan: string;
+	creditsTotal: number;
+	creditsUsed: number;
+	creditsRemaining: number;
+	periodStart: number;
+	mcpCallsTotal: number;
+	mcpCallsThisPeriod: number;
+	subscriptionStatus: string;
+	subscriptionId: string | null;
+	billingInterval: "month" | "year" | null;
+	currentPeriodEnd: number | null;
+	cancelAtPeriodEnd: boolean;
+};
+
+type DashboardData = {
+	billing: BillingState | null;
+	accessPolicy: {
+		subscribed: boolean;
+		mcpPeriodLimit: number;
+	};
+};
+
 function formatDate(value: number | null | undefined): string {
-	if (!value) return "Never";
+	if (!value) return "Not scheduled";
 	return new Date(value).toLocaleString();
 }
+
+function isPaidPlan(plan: string | null | undefined): boolean {
+	return plan === "solo";
+}
+
+const SUPPORTED_CLIENT_LABELS = listConnectionClientAdapters()
+	.filter((client) => client.supportsLocal)
+	.map((client) => client.label);
 
 export function BillingPlanCard({
 	billingLoading,
@@ -35,11 +47,11 @@ export function BillingPlanCard({
 	mcpPeriodLimit,
 }: {
 	billingLoading: boolean;
-	billing: DashboardData["billing"];
+	billing: BillingState | null;
 	mcpPeriodLimit: number;
 }) {
 	return (
-		<div className="border border-border p-6 lg:col-span-1">
+		<div className="border border-border p-6">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 				Plan & Usage
 			</p>
@@ -48,7 +60,14 @@ export function BillingPlanCard({
 			) : billing ? (
 				<div className="space-y-3">
 					<p className="text-sm">
-						Plan: <strong className="uppercase">{billing.plan}</strong>
+						Access:{" "}
+						<strong className="uppercase">
+							{billing.plan === "solo" ? "subscribed" : billing.plan}
+						</strong>
+					</p>
+					<p className="text-sm">
+						Status:{" "}
+						<strong className="uppercase">{billing.subscriptionStatus}</strong>
 					</p>
 					<p className="text-sm">
 						MCP calls this period:{" "}
@@ -71,495 +90,168 @@ export function BillingPlanCard({
 				</div>
 			) : (
 				<p className="text-sm text-muted-foreground">
-					No billing profile found yet.
+					No subscription found yet.
 				</p>
 			)}
 		</div>
 	);
 }
 
-function CreateApiKeyCard({
-	name,
-	onNameChange,
-	onCreateKey,
-	busyId,
-	activeCount,
-	keyPolicy,
-	mutationError,
-}: {
-	name: string;
-	onNameChange: (value: string) => void;
-	onCreateKey: () => void;
-	busyId: string | null;
-	activeCount: number;
-	keyPolicy: DashboardData["keyPolicy"];
-	mutationError: string | null;
-}) {
+function ConnectBridgeCard({ billing }: { billing: BillingState | null }) {
+	const paid = isPaidPlan(billing?.plan);
+
 	return (
-		<div className="border border-border p-6 lg:col-span-2">
+		<div className="border border-border p-6">
 			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				API Keys
+				Connect Your Bridge
 			</p>
-			<div className="grid gap-3 sm:grid-cols-1">
-				<input
-					value={name}
-					onChange={(event) => onNameChange(event.target.value)}
-					placeholder="Key name"
-					className="border border-border bg-background px-3 py-2 text-sm"
-				/>
-			</div>
-			<button
-				type="button"
-				onClick={onCreateKey}
-				disabled={busyId !== null}
-				className="mt-4 border border-foreground px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background disabled:opacity-60"
-			>
-				{busyId === "create" ? "Creating..." : "Create key"}
-			</button>
-			<p className="mt-3 text-xs text-muted-foreground">
-				Keys are shown once on create/rotate. Store them securely.
+			<p className="text-sm text-foreground">
+				Bardo V1 keeps your campaign workspace local. Your AI client talks to a
+				thin local bridge, and the bridge proxies Bardo MCP tools to the hosted
+				server after browser approval.
 			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Use one key per app or environment for easier rotation.
+			<ol className="mt-4 space-y-2 text-sm text-muted-foreground">
+				<li>1. Subscribe with Clerk Billing.</li>
+				<li>2. Follow the client setup guide.</li>
+				<li>3. Approve the bridge session in your browser.</li>
+				<li>4. Use Bardo tools against your local workspace.</li>
+			</ol>
+			<p className="mt-4 text-sm">
+				{paid
+					? "This account is eligible to approve new bridge sessions."
+					: "An active subscription is required before a bridge session can be approved."}
 			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Active keys: {activeCount} / {keyPolicy.maxAllowed}
-			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Daily verifications (account): up to{" "}
-				{keyPolicy.dailyUserVerificationLimit.toLocaleString()} / day
-			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Daily verifications (per key): up to{" "}
-				{keyPolicy.dailyKeyVerificationLimit.toLocaleString()} / day
-			</p>
-			{mutationError ? (
-				<p className="mt-2 text-xs text-destructive">{mutationError}</p>
-			) : null}
-		</div>
-	);
-}
-
-export function ApiKeysTable({
-	keysLoading,
-	keys,
-	keysHasMore,
-	busyId,
-	onRotateKey,
-	onRevokeKey,
-	onLoadMore,
-}: {
-	keysLoading: boolean;
-	keys: DashboardKey[];
-	keysHasMore: boolean;
-	busyId: string | null;
-	onRotateKey: (
-		keyId: string,
-		keyName: string,
-		keyWorkspacePath: string | null,
-	) => void;
-	onRevokeKey: (keyId: string, keyName: string) => void;
-	onLoadMore: () => void;
-}) {
-	return (
-		<div className="mt-6 border border-border">
-			<div className="border-b border-border px-6 py-4">
-				<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-					Your API Keys
-				</p>
-			</div>
-			<div className="overflow-x-auto">
-				<table className="w-full min-w-[680px]">
-					<thead>
-						<tr className="border-b border-border text-left text-xs text-muted-foreground">
-							<th className="px-6 py-3 font-medium">Name</th>
-							<th className="px-6 py-3 font-medium">Status</th>
-							<th className="px-6 py-3 font-medium">MCP period</th>
-							<th className="px-6 py-3 font-medium">MCP total</th>
-							<th className="px-6 py-3 font-medium">Last used</th>
-							<th className="px-6 py-3 font-medium">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{keysLoading ? (
-							<tr>
-								<td
-									className="px-6 py-6 text-sm text-muted-foreground"
-									colSpan={6}
-								>
-									Loading keys…
-								</td>
-							</tr>
-						) : keys.length === 0 ? (
-							<tr>
-								<td
-									className="px-6 py-6 text-sm text-muted-foreground"
-									colSpan={6}
-								>
-									No keys yet. Create your first API key above.
-								</td>
-							</tr>
-						) : (
-							keys.map((key) => (
-								<tr key={key.id} className="border-b border-border text-sm">
-									<td className="px-6 py-3">{key.name}</td>
-									<td className="px-6 py-3 uppercase">{key.status}</td>
-									<td className="px-6 py-3 font-mono text-xs">
-										{key.callsThisPeriod.toLocaleString()}
-									</td>
-									<td className="px-6 py-3 font-mono text-xs">
-										{key.callsTotal.toLocaleString()}
-									</td>
-									<td className="px-6 py-3 text-xs text-muted-foreground">
-										{formatDate(key.lastUsedAt)}
-									</td>
-									<td className="px-6 py-3">
-										<div className="flex flex-wrap gap-2">
-											<button
-												type="button"
-												onClick={() =>
-													onRotateKey(key.id, key.name, key.workspacePath)
-												}
-												disabled={busyId !== null || key.status === "revoked"}
-												className="border border-border px-2 py-1 text-xs disabled:opacity-50"
-											>
-												{busyId === key.id ? "..." : "Rotate"}
-											</button>
-											<button
-												type="button"
-												onClick={() => onRevokeKey(key.id, key.name)}
-												disabled={busyId !== null}
-												className="border border-destructive px-2 py-1 text-xs text-destructive disabled:opacity-50"
-											>
-												Delete
-											</button>
-										</div>
-									</td>
-								</tr>
-							))
-						)}
-					</tbody>
-				</table>
-			</div>
-			{!keysLoading && keysHasMore ? (
-				<div className="border-t border-border px-6 py-4">
-					<button
-						type="button"
-						onClick={onLoadMore}
-						className="border border-border px-3 py-2 font-mono text-[11px] uppercase tracking-widest"
-					>
-						Load more keys
-					</button>
-				</div>
-			) : null}
-		</div>
-	);
-}
-
-export function ConnectionSnippetPanel({
-	connectionClient,
-	onClientChange,
-	onGenerateSnippet,
-	onGenerateCliLoginCommand,
-	activeCount,
-	maxAllowedKeys,
-	lastSecret,
-	lastSecretLabel,
-	snippet,
-	snippetLoading,
-	cliLoginCommand,
-	cliLoginLoading,
-	copied,
-	onCopy,
-}: {
-	connectionClient: ConnectionClient;
-	onClientChange: (value: ConnectionClient) => void;
-	onGenerateSnippet: () => void;
-	onGenerateCliLoginCommand: () => void;
-	activeCount: number;
-	maxAllowedKeys: number;
-	lastSecret: string | null;
-	lastSecretLabel: string | null;
-	snippet: string;
-	snippetLoading: boolean;
-	cliLoginCommand: string;
-	cliLoginLoading: boolean;
-	copied: boolean;
-	onCopy: () => void;
-}) {
-	const selectedClient = getDashboardClientMetadata(connectionClient);
-	const selectedClientLabel = getDashboardClientLabel(connectionClient);
-	const connectCommand = `bardo connect --client ${connectionClient} --mode local`;
-	const canGenerateCliLogin = activeCount < maxAllowedKeys;
-
-	return (
-		<div className="mt-6 border border-border p-6">
-			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Quick Connect
-			</p>
-			<p className="mb-3 text-xs text-muted-foreground">
-				Select your app, generate a one-time CLI login command, then paste the
-				connection snippet if your app needs manual config.
-			</p>
-			<div className="flex flex-wrap gap-3">
-				<select
-					value={connectionClient}
-					onChange={(event) =>
-						onClientChange(event.target.value as ConnectionClient)
-					}
-					className="border border-border bg-background px-3 py-2 text-sm"
+			<div className="mt-6 flex flex-wrap gap-3">
+				<Link
+					href="/docs/connect-client"
+					className="border border-foreground px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 				>
-					{CLIENT_OPTIONS.map((client) => (
-						<option key={client} value={client}>
-							{getDashboardClientLabel(client)}
-						</option>
-					))}
-				</select>
-				<button
-					type="button"
-					onClick={onGenerateSnippet}
-					disabled={!lastSecret || snippetLoading}
-					className="border border-foreground px-3 py-2 text-xs uppercase disabled:opacity-60"
+					Open Setup Guide
+				</Link>
+				<Link
+					href="/pricing"
+					className="border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
 				>
-					{snippetLoading ? "Generating..." : "Generate snippet"}
-				</button>
-				<button
-					type="button"
-					onClick={onGenerateCliLoginCommand}
-					disabled={!canGenerateCliLogin || cliLoginLoading}
-					className="border border-border px-3 py-2 text-xs uppercase disabled:opacity-60"
-				>
-					{cliLoginLoading ? "Generating..." : "Generate CLI Login"}
-				</button>
-			</div>
-			<div className="mt-4 rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-				<p>
-					App: <strong className="font-medium">{selectedClientLabel}</strong>
-				</p>
-				<p>
-					Mode: <strong className="font-medium uppercase">local</strong>
-				</p>
-				<p>
-					Config file:{" "}
-					<strong className="font-medium">
-						{selectedClient.defaultConfigPath ?? "app-specific"}
-					</strong>
-				</p>
-				<ol className="mt-2 list-decimal space-y-1 pl-4">
-					<li>Click `Generate CLI Login`.</li>
-					<li>Run that command in your terminal.</li>
-					<li>Run this connect command:</li>
-				</ol>
-				<pre className="mt-2 overflow-x-auto border border-border bg-background p-2 font-mono text-xs text-foreground">
-					{connectCommand}
-				</pre>
-				<p className="mt-2">
-					If your app needs manual config, click `Generate snippet` and paste it
-					into the config file above.
-				</p>
-				{!canGenerateCliLogin ? (
-					<p className="mt-2 text-[11px] text-muted-foreground">
-						Free up a key slot first. Rotate or delete an existing key, then
-						generate the CLI login command.
-					</p>
-				) : null}
-			</div>
-
-			<div className="mt-4 space-y-3">
-				{lastSecret ? (
-					<>
-						<p className="text-xs text-muted-foreground">
-							{lastSecretLabel ? `${lastSecretLabel}. ` : ""}
-							This secret is shown once.
-						</p>
-						<div className="flex items-center gap-2">
-							<pre className="flex-1 overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
-								{lastSecret}
-							</pre>
-							<button
-								type="button"
-								onClick={onCopy}
-								className="shrink-0 border border-border px-2 py-1 font-mono text-xs"
-							>
-								{copied ? "Copied!" : "Copy"}
-							</button>
-						</div>
-						{snippet ? (
-							<pre className="overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
-								{snippet}
-							</pre>
-						) : null}
-					</>
-				) : (
-					<p className="text-xs text-muted-foreground">
-						Create or rotate a key to generate a copy-ready snippet with that
-						key.
-					</p>
-				)}
-				{cliLoginCommand ? (
-					<div className="space-y-2">
-						<p className="text-xs text-muted-foreground">
-							CLI login command for `bardo mcp serve` onboarding:
-						</p>
-						<pre className="overflow-x-auto border border-border bg-muted/20 p-3 font-mono text-xs">
-							{cliLoginCommand}
-						</pre>
-					</div>
-				) : null}
+					Manage Plan
+				</Link>
 			</div>
 		</div>
 	);
 }
 
 export function DashboardClient() {
-	const [state, dispatch] = useReducer(
-		dashboardReducer,
-		undefined,
-		createDashboardState,
+	const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+		null,
 	);
-	const { billing, keyPolicy, activeCount } = getDashboardViewModel(state);
+	const [billingLoading, setBillingLoading] = useState(true);
 
 	useEffect(() => {
-		void loadDashboardData({ dispatch });
-		void loadKeys({ dispatch });
+		const controller = new AbortController();
+
+		void (async () => {
+			try {
+				const response = await fetch("/api/billing", {
+					cache: "no-store",
+					signal: controller.signal,
+				});
+				if (!response.ok) {
+					return;
+				}
+				const payload = (await response.json()) as DashboardData;
+				startTransition(() => {
+					setDashboardData(payload);
+				});
+			} catch {
+				// Keep the dashboard usable even when the billing request fails.
+			} finally {
+				startTransition(() => {
+					setBillingLoading(false);
+				});
+			}
+		})();
+
+		return () => controller.abort();
 	}, []);
 
-	async function refreshCurrentSnippet(secret: string) {
-		await refreshSnippet({
-			dispatch,
-			connectionClient: state.connectionClient,
-			connectionMode: state.connectionMode,
-			secret,
-		});
-	}
-
-	async function reloadKeys() {
-		await loadKeys({ dispatch });
-	}
-
-	async function loadMoreKeys() {
-		if (state.keysLoading || state.keysNextOffset === null) {
-			return;
-		}
-		await loadKeys({
-			dispatch,
-			offset: state.keysNextOffset,
-			append: true,
-		});
-	}
-
-	async function onCreateKey() {
-		await createKey({
-			state,
-			activeCount,
-			keyPolicy,
-			dispatch,
-			loadKeys: reloadKeys,
-			refreshSnippet: refreshCurrentSnippet,
-		});
-	}
-
-	async function onRevokeKey(keyId: string, keyName: string) {
-		await revokeKey({
-			keyId,
-			keyName,
-			dispatch,
-			loadKeys: reloadKeys,
-		});
-	}
-
-	async function onRotateKey(
-		keyId: string,
-		keyName: string,
-		keyWorkspacePath: string | null,
-	) {
-		await rotateKey({
-			keyId,
-			keyName,
-			keyWorkspacePath,
-			dispatch,
-			loadKeys: reloadKeys,
-			refreshSnippet: refreshCurrentSnippet,
-		});
-	}
-
-	async function onCopySecret() {
-		await copySecret({
-			secret: state.lastSecret,
-			dispatch,
-		});
-	}
-
-	async function onGenerateCliLogin() {
-		await generateCliLoginCommand({ activeCount, keyPolicy, dispatch });
-	}
+	const billing = dashboardData?.billing ?? null;
+	const mcpPeriodLimit = dashboardData?.accessPolicy.mcpPeriodLimit ?? 0;
 
 	return (
-		<div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-			<div className="mb-8 flex items-center justify-between">
-				<div>
-					<p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						/ API Keys + Usage
+		<div className="mx-auto max-w-6xl px-6 py-16">
+			<div className="flex flex-col gap-6 border border-border p-6 lg:flex-row lg:items-end lg:justify-between">
+				<div className="space-y-3">
+					<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+						Account Dashboard
 					</p>
-					<h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+					<h1 className="text-3xl font-semibold tracking-tight text-foreground">
+						Remote MCP access for your local campaign workspace
+					</h1>
+					<p className="max-w-3xl text-sm text-muted-foreground">
+						Use this account to subscribe, connect a supported AI client, and
+						approve bridge sessions. Bardo keeps campaign files local and runs
+						the AI GM and world-simulation layer remotely.
+					</p>
 				</div>
-				<DashboardSignOutButton />
+				<div className="flex items-center gap-3">
+					<Link
+						href="/docs/connect-client"
+						className="border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+					>
+						Client Setup
+					</Link>
+					<DashboardSignOutButton />
+				</div>
 			</div>
 
-			<div className="grid gap-6 lg:grid-cols-3">
+			<div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+				<ConnectBridgeCard billing={billing} />
 				<BillingPlanCard
-					billingLoading={state.billingLoading}
+					billingLoading={billingLoading}
 					billing={billing}
-					mcpPeriodLimit={keyPolicy.mcpPeriodLimit}
-				/>
-				<CreateApiKeyCard
-					name={state.name}
-					onNameChange={(name) => dispatch({ type: "name_changed", name })}
-					onCreateKey={() => void onCreateKey()}
-					busyId={state.busyId}
-					activeCount={activeCount}
-					keyPolicy={keyPolicy}
-					mutationError={state.mutationError}
+					mcpPeriodLimit={mcpPeriodLimit}
 				/>
 			</div>
 
-			<ApiKeysTable
-				keysLoading={state.keysLoading}
-				keys={state.keys}
-				keysHasMore={state.keysHasMore}
-				busyId={state.busyId}
-				onRotateKey={(keyId, keyName, keyWorkspacePath) =>
-					void onRotateKey(keyId, keyName, keyWorkspacePath)
-				}
-				onRevokeKey={(keyId, keyName) => void onRevokeKey(keyId, keyName)}
-				onLoadMore={() => void loadMoreKeys()}
-			/>
+			<div className="mt-6 grid gap-6 lg:grid-cols-2">
+				<div className="border border-border p-6">
+					<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+						Supported Clients
+					</p>
+					<p className="text-sm text-muted-foreground">
+						The V1 bridge is designed for common MCP-capable clients. The happy
+						path is the same across them: install the local bridge, select your
+						workspace, approve in the browser, then use Bardo tools.
+					</p>
+					<div className="mt-4 flex flex-wrap gap-2">
+						{SUPPORTED_CLIENT_LABELS.map((label) => (
+							<span
+								key={label}
+								className="border border-border px-3 py-1 text-xs text-muted-foreground"
+							>
+								{label}
+							</span>
+						))}
+					</div>
+				</div>
 
-			<ConnectionSnippetPanel
-				connectionClient={state.connectionClient}
-				onClientChange={(connectionClient) =>
-					dispatch({
-						type: "connection_client_changed",
-						connectionClient,
-					})
-				}
-				onGenerateSnippet={() =>
-					state.lastSecret
-						? void refreshCurrentSnippet(state.lastSecret)
-						: undefined
-				}
-				onGenerateCliLoginCommand={() => void onGenerateCliLogin()}
-				activeCount={activeCount}
-				maxAllowedKeys={keyPolicy.maxAllowed}
-				lastSecret={state.lastSecret}
-				lastSecretLabel={state.lastSecretLabel}
-				snippet={state.snippet}
-				snippetLoading={state.snippetLoading}
-				cliLoginCommand={state.cliLoginCommand}
-				cliLoginLoading={state.cliLoginLoading}
-				copied={state.copied}
-				onCopy={onCopySecret}
-			/>
+				<div className="border border-border p-6">
+					<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+						V1 Boundary
+					</p>
+					<div className="space-y-2 text-sm text-muted-foreground">
+						<p>Website: signup, billing, docs, and bridge approval.</p>
+						<p>Local bridge: workspace root selection and local file I/O.</p>
+						<p>
+							Remote MCP: subscription checks, guardrails, tool execution, and
+							metering.
+						</p>
+						<p>
+							AI client: connects only to the local bridge in the canonical
+							flow.
+						</p>
+					</div>
+				</div>
+			</div>
 		</div>
 	);
 }

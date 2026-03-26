@@ -14,7 +14,7 @@ import {
 	resetTelemetryForTests,
 } from "../../../telemetry";
 import type { AuthContext } from "../../../types/contracts";
-import { registerWorldSyncTool } from "./register";
+import { registerWorldSyncTool, runWorldSync } from "./register";
 import type { WorldSyncOutput } from "./schemas";
 
 type ToolResult<T> = Promise<{
@@ -35,6 +35,7 @@ type WorldSyncHandler = (args: {
 			| "role_placeholder";
 		confidence: "high" | "medium" | "low";
 		metadata?: Record<string, unknown>;
+		persisted?: boolean;
 	}>;
 }) => ToolResult<WorldSyncOutput>;
 
@@ -214,6 +215,42 @@ describe("world_sync tool", () => {
 		await rm(root, { recursive: true, force: true });
 	});
 
+	test("dry run previews world sync discoveries without mutating canon or files", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-world-sync-dry-run-"),
+		);
+		const bardoRoot = path.join(root, "bardo");
+
+		const result = await runWorldSync({
+			auth: createAuth(root),
+			transcript: 'welcome to River Market. "I am Mira."',
+			currentLocationHint: "River Market",
+			dryRun: true,
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.persistedDiscoveries.length).toBeGreaterThan(0);
+		expect(result.currentLocationAfter).toBe("river-market");
+
+		const events = await readCanonicalEvents({ bardoRoot });
+		expect(events).toEqual([]);
+		expect(
+			await readTextIfExists(path.join(bardoRoot, "state/current.md")),
+		).toBeNull();
+		expect(
+			await readTextIfExists(
+				path.join(bardoRoot, "projections/current-state.md"),
+			),
+		).toBeNull();
+		expect(
+			await readTextIfExists(
+				path.join(bardoRoot, "world/locations/river-market.md"),
+			),
+		).toBeNull();
+
+		await rm(root, { recursive: true, force: true });
+	});
+
 	test("accepts structured discoveries and uses them as the primary sync source", async () => {
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-world-sync-structured-"),
@@ -265,8 +302,14 @@ describe("world_sync tool", () => {
 		expect(syncEvent?.data.extractedNpcNames).toEqual(["Garrick"]);
 		expect(syncEvent?.data.persistedDiscoveries).toBeArray();
 		expect(
-			(syncEvent?.data.persistedDiscoveries as Array<{ kind: string }>).some(
-				(discovery) => discovery.kind === "thread",
+			(
+				syncEvent?.data.persistedDiscoveries as Array<{
+					kind: string;
+					persisted?: boolean;
+				}>
+			).some(
+				(discovery) =>
+					discovery.kind === "thread" && discovery.persisted === false,
 			),
 		).toBe(true);
 
@@ -303,11 +346,13 @@ describe("world_sync tool", () => {
 				syncEvent?.data.persistedDiscoveries as Array<{
 					kind: string;
 					id: string;
+					persisted?: boolean;
 				}>
 			).some(
 				(discovery) =>
 					discovery.kind === "thread" &&
-					discovery.id === "thornwick-disappearances",
+					discovery.id === "thornwick-disappearances" &&
+					discovery.persisted === false,
 			),
 		).toBe(true);
 
@@ -327,9 +372,7 @@ describe("world_sync tool", () => {
 		expect(projectionState.locations["twilight-forest"]?.name).toBe(
 			"Twilight Forest",
 		);
-		expect(projectionState.threads["thornwick-disappearances"]?.title).toBe(
-			"Thornwick disappearances",
-		);
+		expect(projectionState.threads["thornwick-disappearances"]).toBeUndefined();
 
 		await rm(root, { recursive: true, force: true });
 	});
@@ -350,6 +393,7 @@ describe("world_sync tool", () => {
 					displayName: "Tavern at Starting Area",
 					discoveryMode: "implicitly_present",
 					confidence: "high",
+					persisted: true,
 				},
 				{
 					kind: "npc",
@@ -357,6 +401,7 @@ describe("world_sync tool", () => {
 					displayName: "Unknown Barkeep",
 					discoveryMode: "role_placeholder",
 					confidence: "medium",
+					persisted: true,
 					metadata: {
 						role: "barkeep",
 						locationId: "loc_tavern_starting-area",
@@ -417,6 +462,7 @@ describe("world_sync tool", () => {
 					displayName: "Tavern at Thornwick",
 					discoveryMode: "implicitly_present",
 					confidence: "high",
+					persisted: true,
 				},
 				{
 					kind: "npc",
@@ -424,6 +470,7 @@ describe("world_sync tool", () => {
 					displayName: "Unknown Barkeep",
 					discoveryMode: "role_placeholder",
 					confidence: "medium",
+					persisted: true,
 					metadata: {
 						role: "barkeep",
 						locationId: "loc_tavern_thornwick",

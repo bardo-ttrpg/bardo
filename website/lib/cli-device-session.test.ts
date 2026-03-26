@@ -2,55 +2,39 @@ import { describe, expect, mock, test } from "bun:test";
 import { createCliDeviceSessionService } from "./cli-device-session";
 
 describe("cli device session service", () => {
-	test("persists pending, approval, and one-time consumption through Upstash semantics", async () => {
-		const redis = new Map<string, string>();
-		const fetchImpl = mock(async (input: RequestInfo | URL) => {
-			const url = new URL(String(input));
-			const segments = url.pathname.split("/").filter(Boolean);
-			const [command, ...parts] = segments;
-
-			if (command === "set") {
-				const key = decodeURIComponent(parts[0] ?? "");
-				const value = decodeURIComponent(parts[1] ?? "");
-				const mode = parts[2];
-				const ttlMode = parts[3];
-				const ttlValue = Number(parts[4]);
-				expect(ttlMode).toBe("EX");
-				expect(ttlValue).toBeGreaterThan(0);
-				if (mode === "NX" && redis.has(key)) {
-					return Response.json({ result: null });
-				}
-				if (mode === "XX" && !redis.has(key)) {
-					return Response.json({ result: null });
-				}
-				redis.set(key, value);
-				return Response.json({ result: "OK" });
-			}
-
-			if (command === "get") {
-				const key = decodeURIComponent(parts[0] ?? "");
-				return Response.json({ result: redis.get(key) ?? null });
-			}
-
-			if (command === "del") {
-				const key = decodeURIComponent(parts[0] ?? "");
-				redis.delete(key);
-				return Response.json({ result: 1 });
-			}
-
-			throw new Error(`Unexpected Upstash command: ${url.pathname}`);
-		});
+	test("persists pending, approval, and one-time consumption through the website session ledger", async () => {
+		const session = {
+			sessionId: "session_123",
+			pollSecret: "poll_secret_123",
+			userCode: "ABCD-1234",
+			expiresAtISO: "2026-03-03T00:10:00.000Z",
+			intervalMs: 3000,
+		};
+		const store = {
+			startSession: mock(async () => session),
+			pollSession: mock(async ({ attempt }: { attempt: number }) =>
+				attempt === 1
+					? { status: "pending" as const, intervalMs: session.intervalMs }
+					: attempt === 2
+						? {
+								status: "approved" as const,
+								payload: {
+									apiKey: "bardo_live_test",
+									mcpUrl: "https://mcp.bardo.ai/mcp",
+									statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+									serverName: "bardo",
+									issuedAtISO: "2026-03-03T00:00:00.000Z",
+									expiresAtISO: "2026-03-03T00:10:00.000Z",
+								},
+							}
+						: { status: "consumed" as const },
+			),
+			approveSession: mock(async () => ({ ok: true as const })),
+		};
 
 		const service = createCliDeviceSessionService({
 			now: () => new Date("2026-03-03T00:00:00.000Z"),
-			env: {
-				NODE_ENV: "development",
-				BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
-				UPSTASH_REDIS_REST_URL: "https://staging.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-staging",
-			},
-			fetchImpl,
+			store,
 		});
 
 		const started = await service.start();
@@ -92,25 +76,22 @@ describe("cli device session service", () => {
 			pollSecret: started.pollSecret,
 		});
 		expect(replayPoll).toEqual({ status: "consumed" });
-		expect(fetchImpl).toHaveBeenCalled();
+		expect(store.startSession).toHaveBeenCalledTimes(1);
+		expect(store.approveSession).toHaveBeenCalledTimes(1);
 	});
 
-	test("rejects non-production Upstash configs that do not target bardo-staging", async () => {
+	test("surfaces durable-store availability failures when no backing store is configured", async () => {
 		const service = createCliDeviceSessionService({
 			now: () => new Date("2026-03-03T00:00:00.000Z"),
 			env: {
-				NODE_ENV: "development",
-				BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
-				UPSTASH_REDIS_REST_URL: "https://production.upstash.io",
-				UPSTASH_REDIS_REST_TOKEN: "upstash-token",
-				UPSTASH_REDIS_DATABASE_NAME: "bardo-production",
+				NODE_ENV: "production",
 			},
-			fetchImpl: mock(async () => {
-				throw new Error("fetch should not run");
-			}),
+			store: null,
 		});
 
-		await expect(service.start()).rejects.toThrow("bardo-staging");
+		await expect(service.start()).rejects.toThrow(
+			"website device session store",
+		);
 	});
 
 	test("does not rely on Math.random when generating the user approval code", async () => {

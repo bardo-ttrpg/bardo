@@ -74,12 +74,13 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 
 function resolveTransportMode(
 	env: Record<string, string | undefined>,
+	isProduction: boolean,
 ): McpTransportMode {
 	const raw = env.BARDO_MCP_TRANSPORT_MODE?.trim().toLowerCase();
 	if (raw === "stateful" || raw === "stateless") {
 		return raw;
 	}
-	return "stateful";
+	return isProduction ? "stateless" : "stateful";
 }
 
 function resolveMcpJsonResponse(
@@ -96,7 +97,7 @@ export function resolveSecurityPolicy(
 	env: Record<string, string | undefined>,
 ): SecurityPolicy {
 	const isProduction = env.NODE_ENV === "production";
-	const transportMode = resolveTransportMode(env);
+	const transportMode = resolveTransportMode(env, isProduction);
 	return {
 		authMode: resolveAuthMode(env, isProduction),
 		allowQueryApiKey: resolveQueryApiKeyPolicy(env, isProduction),

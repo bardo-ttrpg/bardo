@@ -3,16 +3,9 @@ import { checkReleaseHealth } from "./check-release-health-lib";
 
 describe("checkReleaseHealth", () => {
 	test("skips local ad-hoc runs by default", async () => {
-		const result = await checkReleaseHealth(
-			{
-				NODE_ENV: "development",
-			},
-			{
-				verifySentryAuth: async () => {
-					throw new Error("should not run");
-				},
-			},
-		);
+		const result = await checkReleaseHealth({
+			NODE_ENV: "development",
+		});
 
 		expect(result).toEqual({
 			skipped: true,
@@ -22,81 +15,34 @@ describe("checkReleaseHealth", () => {
 		});
 	});
 
-	test("requires release metadata and sentry configuration when enforced", async () => {
-		const result = await checkReleaseHealth(
-			{
-				BARDO_ENFORCE_SENTRY_RELEASE_HEALTH: "true",
-				SENTRY_DSN: "https://server@example.ingest.sentry.io/1",
-			},
-			{
-				verifySentryAuth: async () => {
-					throw new Error("should not run");
-				},
-			},
-		);
+	test("requires release metadata when enforced", async () => {
+		const result = await checkReleaseHealth({
+			BARDO_ENFORCE_RELEASE_HEALTH: "true",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",
+		});
 
 		expect(result.skipped).toBe(false);
 		expect(result.release).toBeUndefined();
-		expect(result.errors).toContain("NEXT_PUBLIC_SENTRY_DSN is missing");
-		expect(result.errors).toContain("SENTRY_ENVIRONMENT is missing");
+		expect(result.errors).toContain("CLERK_SECRET_KEY is missing");
+		expect(result.errors).toContain("BARDO_MCP_BASE_URL is missing");
+		expect(result.errors).toContain("NEXT_PUBLIC_APP_URL is missing");
 		expect(result.errors).toContain(
-			"NEXT_PUBLIC_SENTRY_ENVIRONMENT is missing",
+			"BARDO_RC_SHA or deployment commit SHA is missing",
 		);
-		expect(result.errors).toContain("SENTRY_RELEASE is missing");
-		expect(result.errors).toContain("SENTRY_ORG is missing");
-		expect(result.errors).toContain("SENTRY_PROJECT is missing");
-		expect(result.errors).toContain("SENTRY_AUTH_TOKEN is missing");
 	});
 
-	test("uses release fallback sources and verifies sentry auth in release contexts", async () => {
-		const calls: string[] = [];
-		const result = await checkReleaseHealth(
-			{
-				CI: "true",
-				SENTRY_DSN: "https://server@example.ingest.sentry.io/1",
-				NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/1",
-				SENTRY_ENVIRONMENT: "preview",
-				NEXT_PUBLIC_SENTRY_ENVIRONMENT: "preview",
-				VERCEL_GIT_COMMIT_SHA: "abc123",
-				SENTRY_ORG: "bardo-1k",
-				SENTRY_PROJECT: "bardo-website",
-				SENTRY_AUTH_TOKEN: "token",
-			},
-			{
-				verifySentryAuth: async (args) => {
-					calls.push(`${args.org}/${args.project}/${args.authToken}`);
-				},
-			},
-		);
+	test("uses release fallback sources in enforced release contexts", async () => {
+		const result = await checkReleaseHealth({
+			CI: "true",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			BARDO_MCP_BASE_URL: "https://mcp.bardo.ai",
+			NEXT_PUBLIC_APP_URL: "https://app.bardo.ai",
+			VERCEL_GIT_COMMIT_SHA: "abc123",
+		});
 
 		expect(result.skipped).toBe(false);
 		expect(result.errors).toEqual([]);
 		expect(result.release).toBe("abc123");
-		expect(calls).toEqual(["bardo-1k/bardo-website/token"]);
-	});
-
-	test("surfaces sentry auth verification failures", async () => {
-		const result = await checkReleaseHealth(
-			{
-				VERCEL_ENV: "preview",
-				SENTRY_DSN: "https://server@example.ingest.sentry.io/1",
-				NEXT_PUBLIC_SENTRY_DSN: "https://browser@example.ingest.sentry.io/1",
-				SENTRY_ENVIRONMENT: "staging",
-				NEXT_PUBLIC_SENTRY_ENVIRONMENT: "staging",
-				SENTRY_RELEASE: "sha-123",
-				SENTRY_ORG: "bardo-1k",
-				SENTRY_PROJECT: "bardo-website",
-				SENTRY_AUTH_TOKEN: "token",
-			},
-			{
-				verifySentryAuth: async () => {
-					throw new Error("Invalid token");
-				},
-			},
-		);
-
-		expect(result.errors).toContain(
-			"Sentry auth verification failed: Invalid token",
-		);
 	});
 });

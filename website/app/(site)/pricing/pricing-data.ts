@@ -1,7 +1,7 @@
 import type { CheckoutPlanTier } from "@/lib/billing-catalog";
 
 type PricingTier = {
-	key: "free" | CheckoutPlanTier;
+	key: CheckoutPlanTier;
 	name: string;
 	credits: number;
 	highlighted: boolean;
@@ -13,52 +13,21 @@ type PricingTier = {
 
 export const pricingTiers: readonly PricingTier[] = [
 	{
-		key: "free",
-		name: "Free",
-		credits: 100,
-		highlighted: false,
-		cta: "Get started",
-		ctaHref: "/sign-up",
-		features: [
-			"1 active campaign",
-			"100 MCP calls / month",
-			"Canon-backed report tools",
-			"Markdown-first workspace",
-			"Community support",
-		],
-	},
-	{
 		key: "solo",
 		checkoutPlan: "solo",
-		name: "Solo",
+		name: "Bardo",
 		credits: 25_000,
 		highlighted: true,
-		cta: "Start Solo",
+		cta: "Subscribe",
 		ctaHref: "/sign-up",
 		features: [
-			"Unlimited campaigns",
+			"Paid remote MCP access",
+			"Connect any supported MCP client",
+			"All Bardo GM and world-simulation tools included",
+			"Your campaign workspace stays local",
 			"25,000 MCP calls / month",
-			"Full continuity workflows",
-			"Hosted account + billing",
-			"World-state reports",
-			"Clerk billing management",
-		],
-	},
-	{
-		key: "solo_plus",
-		checkoutPlan: "solo_plus",
-		name: "Solo Plus",
-		credits: 50_000,
-		highlighted: false,
-		cta: "Go Solo Plus",
-		ctaHref: "/sign-up",
-		features: [
-			"Unlimited campaigns",
-			"50,000 MCP calls / month",
-			"Full continuity workflows",
-			"Hosted account + billing",
-			"Priority support",
-			"Earlier workflow access",
+			"Browser-approved local bridge flow",
+			"Clerk billing and customer portal",
 		],
 	},
 ] as const;

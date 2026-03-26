@@ -48,6 +48,7 @@ C:\\Users\\*\\AppData\\Local\\lighthouse.*/
 customers/
 website/.bun-tmp/
 website/.bun-install/
+website/.tmp-*
 .env
 .codex/
 .vercel

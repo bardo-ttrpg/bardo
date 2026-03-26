@@ -6,7 +6,7 @@ export type AuthContext = {
 	campaignBasePath: string;
 	subjectId?: string | null;
 	keyId?: string | null;
-	plan?: "free" | "solo" | "solo_plus" | null;
+	plan?: "free" | "solo" | null;
 	mcpPeriodLimit?: number | null;
 };
 
@@ -15,7 +15,7 @@ export type Session = {
 	campaignBasePath: string;
 	subjectId?: string | null;
 	keyId?: string | null;
-	plan?: "free" | "solo" | "solo_plus" | null;
+	plan?: "free" | "solo" | null;
 	mcpPeriodLimit?: number | null;
 	server: McpServer;
 	transport: WebStandardStreamableHTTPServerTransport;

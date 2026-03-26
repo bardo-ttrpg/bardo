@@ -21,8 +21,6 @@ describe("tool plan contract", () => {
 		["free", "free", true],
 		["solo", "free", true],
 		["solo", "solo", true],
-		["solo", "solo_plus", false],
-		["solo_plus", "solo", true],
 		[null, "solo", false],
 	] satisfies Array<
 		[PlanTier | null, PlanTier, boolean]

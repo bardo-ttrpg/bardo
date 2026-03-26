@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	createRateLimiter,
-	InMemoryRateLimiter,
-	UpstashRateLimiter,
-} from "./rate-limiter";
+import { createRateLimiter, InMemoryRateLimiter } from "./rate-limiter";
 
 describe("InMemoryRateLimiter", () => {
 	test("allows requests within the configured window limit", () => {
@@ -42,46 +38,8 @@ describe("InMemoryRateLimiter", () => {
 	});
 });
 
-describe("UpstashRateLimiter", () => {
-	test("returns a best-effort allow decision when Redis fails and failClosed=false", async () => {
-		const limiter = new UpstashRateLimiter({
-			windowMs: 1000,
-			maxRequests: 10,
-			failClosed: false,
-			limiterClient: {
-				limit: async () => {
-					throw new Error("network");
-				},
-			},
-		});
-
-		const result = await limiter.consume("k1", 0);
-		expect(result.allowed).toBe(true);
-		expect(result.retryAfterMs).toBe(0);
-	});
-
-	test("blocks when Redis fails and failClosed=true", async () => {
-		const limiter = new UpstashRateLimiter({
-			windowMs: 2000,
-			maxRequests: 5,
-			failClosed: true,
-			limiterClient: {
-				limit: async () => {
-					throw new Error("network");
-				},
-			},
-		});
-
-		const result = await limiter.consume("k1", 100);
-		expect(result.allowed).toBe(false);
-		expect(result.retryAfterMs).toBe(2000);
-		expect(result.limit).toBe(5);
-		expect(result.remaining).toBe(0);
-	});
-});
-
 describe("createRateLimiter", () => {
-	test("uses in-memory limiter when Upstash env vars are missing", () => {
+	test("uses the in-memory limiter", () => {
 		const limiter = createRateLimiter(
 			{
 				windowMs: 1000,

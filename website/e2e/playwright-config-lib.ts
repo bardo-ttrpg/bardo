@@ -29,6 +29,20 @@ export function resolvePlaywrightExtraHttpHeaders(
 	};
 }
 
+export function shouldStartPlaywrightWebServer(baseURL: string): boolean {
+	const { hostname, protocol } = new URL(baseURL);
+	if (protocol !== "http:" && protocol !== "https:") {
+		return true;
+	}
+
+	return (
+		hostname === "localhost" ||
+		hostname === "127.0.0.1" ||
+		hostname === "::1" ||
+		hostname === "[::1]"
+	);
+}
+
 export function resolvePlaywrightLocalAppUrl(
 	host: string,
 	port: number,

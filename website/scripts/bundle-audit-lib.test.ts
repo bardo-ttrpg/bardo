@@ -35,6 +35,24 @@ describe("auditBundleArtifacts", () => {
 		]);
 	});
 
+	test("warns instead of failing when analyzer artifacts are missing but client chunks exist", () => {
+		const result = auditBundleArtifacts({
+			analyzeArtifacts: [],
+			clientChunks: [
+				{
+					path: "static/chunks/app-home.js",
+					bytes: 10_000,
+					contents: "console.log('marketing route');",
+				},
+			],
+		});
+
+		expect(result.errors).toEqual([]);
+		expect(result.warnings).toEqual([
+			"Next bundle analyzer artifacts were missing, so the audit used generated client chunks only.",
+		]);
+	});
+
 	test("fails if client chunks contain the MCP package", () => {
 		const result = auditBundleArtifacts({
 			analyzeArtifacts: ["client.html"],

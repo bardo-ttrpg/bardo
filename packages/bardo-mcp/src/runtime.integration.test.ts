@@ -138,10 +138,9 @@ afterEach(async () => {
 });
 
 describe("bardo mcp serve integration", () => {
-	test("serves only local workspace tools and keeps remote proxy path unreachable", async () => {
+	test("hides bridge-local workspace tools from normal client sessions by default", async () => {
 		const cwdWorkspace = await createTempDir("bardo-cwd-");
 		const clientWorkspace = await createTempDir("bardo-root-");
-		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
 		const remote = await makeRemoteServer();
 		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
@@ -183,6 +182,64 @@ describe("bardo mcp serve integration", () => {
 
 		try {
 			await client.connect(transport);
+			const tools = await client.listTools();
+			expect(
+				tools.tools.some((tool) => tool.name === "bardo_workspace_bootstrap"),
+			).toBe(false);
+			expect(
+				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
+			).toBe(true);
+		} finally {
+			await client.close();
+		}
+	});
+
+	test("serves local workspace tools only behind the diagnostic escape hatch and still proxies remote tools", async () => {
+		const cwdWorkspace = await createTempDir("bardo-cwd-");
+		const clientWorkspace = await createTempDir("bardo-root-");
+		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
+		const remote = await makeRemoteServer();
+		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
+
+		const client = new Client(
+			{
+				name: "integration-client",
+				version: "1.0.0",
+			},
+			{
+				capabilities: {
+					roots: {
+						listChanged: true,
+					},
+				},
+			},
+		);
+		client.setRequestHandler(ListRootsRequestSchema, async () => ({
+			roots: [{ uri: pathToFileURL(clientWorkspace).toString(), name: "game" }],
+		}));
+
+		const transport = new StdioClientTransport({
+			command: "bun",
+			args: [
+				cliEntry,
+				"mcp",
+				"serve",
+				"--api-key",
+				"test-key",
+				"--url",
+				remote.url,
+			],
+			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+				BARDO_EXPOSE_BRIDGE_LOCAL_TOOLS: "true",
+			},
+			stderr: "pipe",
+		});
+
+		try {
+			await client.connect(transport);
 
 			const tools = await client.listTools();
 			expect(
@@ -190,7 +247,7 @@ describe("bardo mcp serve integration", () => {
 			).toBe(true);
 			expect(
 				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
-			).toBe(false);
+			).toBe(true);
 
 			const bootstrap = await client.callTool({
 				name: "bardo_workspace_bootstrap",
@@ -227,12 +284,13 @@ describe("bardo mcp serve integration", () => {
 					message: "hello",
 				},
 			});
-			expect(remoteEcho.isError).toBe(true);
+			expect(remoteEcho.isError).toBeFalsy();
 			expect(remoteEcho.structuredContent).toMatchObject({
-				success: false,
-				reason: "REMOTE_PROXY_DISABLED",
+				message: "hello",
+				workspaceRoot: clientWorkspace,
 			});
-			expect(remote.getLastWorkspaceRoot()).toBeNull();
+			expect(JSON.stringify(remoteEcho.content)).toContain("remote:hello");
+			expect(remote.getLastWorkspaceRoot()).toBe(clientWorkspace);
 		} finally {
 			await client.close();
 		}
@@ -293,6 +351,7 @@ describe("bardo mcp serve integration", () => {
 			env: {
 				...process.env,
 				BARDO_REMOTE_PROXY_ENABLED: "true",
+				BARDO_EXPOSE_BRIDGE_LOCAL_TOOLS: "true",
 			},
 			stderr: "pipe",
 		});
@@ -374,6 +433,7 @@ describe("bardo mcp serve integration", () => {
 			env: {
 				...process.env,
 				BARDO_REMOTE_PROXY_ENABLED: "true",
+				BARDO_EXPOSE_BRIDGE_LOCAL_TOOLS: "true",
 			},
 			stderr: "pipe",
 		});

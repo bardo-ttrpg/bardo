@@ -49,7 +49,6 @@ function installFetchMock(
 	calls: RecordedCall[],
 	options?: {
 		toolPayloads?: Record<string, Record<string, unknown>>;
-		resourcePayloadByUri?: Record<string, unknown>;
 	},
 ): void {
 	globalThis.fetch = (async (
@@ -102,55 +101,6 @@ function installFetchMock(
 			});
 		}
 
-		if (body.method === "prompts/get") {
-			return jsonRpcResponse({
-				jsonrpc: "2.0",
-				id: body.id ?? 1,
-				result: {
-					description: "resolve action prompt",
-					messages: [
-						{
-							role: "user",
-							content: { type: "text", text: "resolve action workflow" },
-						},
-					],
-				},
-			});
-		}
-
-		if (body.method === "resources/read") {
-			const params =
-				typeof body.params === "object" && body.params !== null
-					? (body.params as Record<string, unknown>)
-					: {};
-			const uri = typeof params.uri === "string" ? params.uri : "";
-			const payloadByUri: Record<string, unknown> = {
-				"resource://campaign/current-summary": {
-					currentLocation: "river-market",
-					stateSource: "projection",
-				},
-				"resource://scene/current": {
-					currentLocationId: "river-market",
-				},
-				"resource://events/recent-digest": {
-					returnedEvents: 2,
-				},
-				...(options?.resourcePayloadByUri ?? {}),
-			};
-			return jsonRpcResponse({
-				jsonrpc: "2.0",
-				id: body.id ?? 1,
-				result: {
-					contents: [
-						{
-							uri,
-							text: JSON.stringify(payloadByUri[uri] ?? {}),
-						},
-					],
-				},
-			});
-		}
-
 		if (body.method === "tools/call") {
 			const params =
 				typeof body.params === "object" && body.params !== null
@@ -172,18 +122,127 @@ function installFetchMock(
 					jsonrpc: "2.0",
 					id: body.id ?? 1,
 					result: {
-						structuredContent: { matches: [] },
+						structuredContent: {
+							success: true,
+							results: [],
+							factsFound: [],
+							constraints: [],
+							unknowns: [],
+							confidence: {
+								overall: "low",
+								grounding: "underspecified",
+							},
+							recommendedNextSteps: [],
+							riskFlags: [],
+							writePlan: {
+								status: "none",
+								shouldWrite: false,
+								targets: [],
+							},
+							provenance: [],
+						},
 					},
 				});
 			}
-			if (name === "player_action") {
+			if (name === "scene_turn") {
 				return jsonRpcResponse({
 					jsonrpc: "2.0",
 					id: body.id ?? 1,
 					result: {
 						structuredContent: {
 							success: true,
+							message: "Scene resolved.",
 							requiresSetup: false,
+							setupStatus: "complete",
+							setupQuestionKey: null,
+							setupQuestion: null,
+							setupWarnings: [],
+							pendingAction: null,
+							gmPacket: {
+								sceneFrame: {
+									locationId: "river-market",
+									locationName: "River Market",
+									summary: "A tense bazaar at dusk.",
+									activeSituation: "The square watches the player closely.",
+									exits: ["north", "south"],
+									sensoryCues: ["river-mist"],
+									unresolvedQuestions: [],
+								},
+								resolution: {
+									intent: "general",
+									fiction: "The action lands cleanly.",
+									mechanicsSummary: "No additional mechanics needed.",
+									outcome: "success",
+								},
+								narrativeBeats: ["The moment advances."],
+								npcReactions: [],
+								discoveries: [],
+								consequences: {
+									timeAdvancedMinutes: 5,
+									worldTimeAfterISO: "2026-03-20T00:05:00.000Z",
+									locationAfter: "river-market",
+									clocksAdvanced: [],
+									threadsActivated: [],
+								},
+								followUps: ["Describe the immediate consequence."],
+								safetyNotes: [],
+								renderingHints: {
+									tone: "grounded",
+									pacing: "steady",
+									revealLevel: "minimal",
+									rulesTransparency: "explicit",
+								},
+							},
+							actionResult: {
+								locationAfter: "river-market",
+							},
+							consistency: {
+								success: true,
+								errorCount: 0,
+							},
+							factsFound: [],
+							constraints: [],
+							unknowns: [],
+							confidence: {
+								overall: "high",
+								grounding: "grounded_enough",
+							},
+							recommendedNextSteps: [],
+							riskFlags: [],
+							writePlan: {
+								status: "already_applied",
+								shouldWrite: true,
+								targets: [],
+							},
+							provenance: [],
+						},
+					},
+				});
+			}
+			if (name === "world_sync") {
+				return jsonRpcResponse({
+					jsonrpc: "2.0",
+					id: body.id ?? 1,
+					result: {
+						structuredContent: {
+							success: true,
+							message: "World sync complete.",
+							rootPath: "/tmp/bardo-tests/bardo",
+							statePath: "/tmp/bardo-tests/bardo/state/current.md",
+							historyPath: "/tmp/bardo-tests/bardo/state/history.md",
+							extractedLocationNames: ["Bell Plaza"],
+							extractedNpcNames: ["Mira"],
+							createdLocationIds: [],
+							createdNpcIds: [],
+							existingLocationIds: ["bell-plaza"],
+							existingNpcIds: ["mira"],
+							currentLocationAfter: "river-market",
+							persistedDiscoveries: [],
+							optionalSystems: {
+								clockTracking: true,
+								npcGoals: true,
+								factionReputation: false,
+							},
 						},
 					},
 				});
@@ -193,16 +252,90 @@ function installFetchMock(
 					jsonrpc: "2.0",
 					id: body.id ?? 1,
 					result: {
-						structuredContent: { success: true },
+						structuredContent: {
+							success: true,
+							message: "Tick applied.",
+							rootPath: "/tmp/bardo-tests/bardo",
+							mode: "turn",
+							tickCount: 1,
+							dryRun: false,
+							idempotentReplay: false,
+							statePath: "/tmp/bardo-tests/bardo/state/current.md",
+							historyPath: "/tmp/bardo-tests/bardo/state/history.md",
+							filesTouched: ["/tmp/bardo-tests/bardo/events/canonical.ndjson"],
+							entitiesUpdated: 0,
+							factionsUpdated: 0,
+							eventsCreated: 1,
+							stateVersion: "v1",
+							worldTimeBeforeISO: "2026-03-20T00:05:00.000Z",
+							worldTimeAfterISO: "2026-03-20T00:06:00.000Z",
+						},
 					},
 				});
 			}
-			if (name === "consistency_check") {
+			if (name === "world_state_overview") {
 				return jsonRpcResponse({
 					jsonrpc: "2.0",
 					id: body.id ?? 1,
 					result: {
-						structuredContent: { success: true, errorCount: 0 },
+						structuredContent: {
+							success: true,
+							reportType: "world_state_overview",
+							rootPath: "/tmp/bardo-tests/bardo",
+							filePath: "/tmp/bardo-tests/bardo/logs/world-state-overview.md",
+							rawMarkdown:
+								"# World State Overview\n\n## Canon\n- Current location: river-market",
+							factsFound: [
+								{
+									summary: "Current location: river-market",
+									source: "canonical",
+								},
+							],
+							constraints: [],
+							unknowns: [],
+							confidence: {
+								overall: "high",
+								grounding: "grounded_enough",
+							},
+							recommendedNextSteps: [],
+							riskFlags: [],
+							writePlan: {
+								status: "already_applied",
+								shouldWrite: true,
+								targets: [],
+							},
+							provenance: [],
+						},
+					},
+				});
+			}
+			if (name === "timeline_diff" || name === "player_knowledge_view") {
+				return jsonRpcResponse({
+					jsonrpc: "2.0",
+					id: body.id ?? 1,
+					result: {
+						structuredContent: {
+							success: true,
+							reportType: name,
+							rootPath: "/tmp/bardo-tests/bardo",
+							filePath: `/tmp/bardo-tests/bardo/logs/${name}.md`,
+							rawMarkdown: `# ${name}\n\n## Canon\n- Stable report payload`,
+							factsFound: [],
+							constraints: [],
+							unknowns: [],
+							confidence: {
+								overall: "medium",
+								grounding: "grounded_enough",
+							},
+							recommendedNextSteps: [],
+							riskFlags: [],
+							writePlan: {
+								status: "already_applied",
+								shouldWrite: true,
+								targets: [],
+							},
+							provenance: [],
+						},
 					},
 				});
 			}
@@ -249,7 +382,7 @@ function installInProcessMcpFetch(args: { auth: AuthContext }): void {
 }
 
 describe("handleResolveTurnRequest", () => {
-	test("uses prompts/resources workflow and does not call state_get", async () => {
+	test("uses the public six-tool workflow and does not call state_get", async () => {
 		const calls: RecordedCall[] = [];
 		installFetchMock(calls);
 
@@ -268,25 +401,35 @@ describe("handleResolveTurnRequest", () => {
 		const payload = (await response.json()) as {
 			success: boolean;
 			workflowPrompt: unknown;
-			state: { currentLocation?: string } | null;
-			resources: { campaignSummary?: { currentLocation?: string } } | null;
+			state: { reportType?: string } | null;
+			resources: {
+				worldStateOverview?: { reportType?: string };
+				timelineDiff?: { reportType?: string };
+			} | null;
 		};
 
 		expect(response.status).toBe(200);
 		expect(payload.success).toBe(true);
-		expect(payload.workflowPrompt).not.toBeNull();
-		expect(payload.state?.currentLocation).toBe("river-market");
-		expect(payload.resources?.campaignSummary?.currentLocation).toBe(
-			"river-market",
+		expect(payload.workflowPrompt).toBeNull();
+		expect(payload.state?.reportType).toBe("world_state_overview");
+		expect(payload.resources?.worldStateOverview?.reportType).toBe(
+			"world_state_overview",
 		);
+		expect(payload.resources?.timelineDiff?.reportType).toBe("timeline_diff");
 
 		const rpcCalls = calls
 			.filter((call) => call.method === "POST" && call.body !== null)
 			.map((call) => call.body as Record<string, unknown>);
-		expect(rpcCalls.some((body) => body.method === "prompts/get")).toBe(true);
 		expect(
-			rpcCalls.filter((body) => body.method === "resources/read").length,
-		).toBe(3);
+			rpcCalls.some((body) => {
+				if (body.method !== "tools/call") return false;
+				const params =
+					typeof body.params === "object" && body.params !== null
+						? (body.params as Record<string, unknown>)
+						: {};
+				return params.name === "scene_turn";
+			}),
+		).toBe(true);
 		expect(
 			rpcCalls.some((body) => {
 				if (body.method !== "tools/call") return false;
@@ -332,15 +475,86 @@ describe("handleResolveTurnRequest", () => {
 			.filter((call) => call.method === "POST" && call.body !== null)
 			.map((call) => call.body as Record<string, unknown>);
 		expect(
-			rpcCalls.filter((body) => body.method === "resources/read").length,
-		).toBe(0);
+			rpcCalls.some((body) => {
+				if (body.method !== "tools/call") return false;
+				const params =
+					typeof body.params === "object" && body.params !== null
+						? (body.params as Record<string, unknown>)
+						: {};
+				return (
+					params.name === "world_state_overview" ||
+					params.name === "timeline_diff" ||
+					params.name === "player_knowledge_view"
+				);
+			}),
+		).toBe(false);
 	});
 
-	test("fails fast when player_action returns success=false", async () => {
+	test("passes skipWorldSync=true to scene_turn when syncWorld is disabled", async () => {
+		const calls: RecordedCall[] = [];
+		installFetchMock(calls);
+
+		const request = new Request("http://localhost:3000/turns/resolve", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				action: "I watch the crowd without updating canon",
+				transcript: "A stranger whispers from the arcade.",
+				syncWorld: false,
+				autoTick: false,
+				includeState: false,
+			}),
+		});
+
+		const response = await handleResolveTurnRequest(
+			request,
+			createAuth(),
+			false,
+		);
+
+		expect(response.status).toBe(200);
+
+		const sceneTurnCall = calls
+			.filter(
+				(call) => call.method === "POST" && call.body?.method === "tools/call",
+			)
+			.map((call) => call.body as Record<string, unknown>)
+			.find((body) => {
+				const params =
+					typeof body.params === "object" && body.params !== null
+						? (body.params as Record<string, unknown>)
+						: {};
+				return params.name === "scene_turn";
+			});
+		const sceneTurnArgs =
+			sceneTurnCall &&
+			typeof sceneTurnCall.params === "object" &&
+			sceneTurnCall.params !== null
+				? (sceneTurnCall.params as Record<string, unknown>).arguments
+				: null;
+
+		expect(sceneTurnArgs).toMatchObject({
+			skipWorldSync: true,
+		});
+		expect(
+			calls.some((call) => {
+				if (call.method !== "POST" || call.body?.method !== "tools/call") {
+					return false;
+				}
+				const params =
+					typeof call.body.params === "object" && call.body.params !== null
+						? (call.body.params as Record<string, unknown>)
+						: {};
+				return params.name === "world_sync";
+			}),
+		).toBe(false);
+	});
+
+	test("fails fast when scene_turn returns success=false", async () => {
 		const calls: RecordedCall[] = [];
 		installFetchMock(calls, {
 			toolPayloads: {
-				player_action: {
+				scene_turn: {
 					success: false,
 					message: "STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED",
 				},
@@ -369,82 +583,8 @@ describe("handleResolveTurnRequest", () => {
 
 		expect(response.status).toBe(502);
 		expect(payload.success).toBe(false);
-		expect(payload.error).toContain("player_action failed");
+		expect(payload.error).toContain("scene_turn failed");
 		expect(payload.error).toContain("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED");
-	});
-
-	test("fails fast when world_sync returns success=false", async () => {
-		const calls: RecordedCall[] = [];
-		installFetchMock(calls, {
-			toolPayloads: {
-				world_sync: {
-					success: false,
-					message: "World sync policy violation",
-				},
-			},
-		});
-
-		const request = new Request("http://localhost:3000/turns/resolve", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
-				action: "I travel to the square.",
-				transcript: "The square appears.",
-				syncWorld: true,
-				autoTick: false,
-				includeState: false,
-			}),
-		});
-
-		const response = await handleResolveTurnRequest(
-			request,
-			createAuth(),
-			false,
-		);
-		const payload = (await response.json()) as {
-			success: boolean;
-			error: string;
-		};
-		expect(response.status).toBe(502);
-		expect(payload.success).toBe(false);
-		expect(payload.error).toContain("world_sync failed");
-		expect(payload.error).toContain("World sync policy violation");
-	});
-
-	test("fails fast when simulation_tick returns success=false", async () => {
-		const calls: RecordedCall[] = [];
-		installFetchMock(calls, {
-			toolPayloads: {
-				simulation_tick: {
-					success: false,
-					message: "Tick blocked by runtime policy",
-				},
-			},
-		});
-
-		const request = new Request("http://localhost:3000/turns/resolve", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
-				action: "I wait and observe.",
-				autoTick: true,
-				includeState: false,
-			}),
-		});
-
-		const response = await handleResolveTurnRequest(
-			request,
-			createAuth(),
-			false,
-		);
-		const payload = (await response.json()) as {
-			success: boolean;
-			error: string;
-		};
-		expect(response.status).toBe(502);
-		expect(payload.success).toBe(false);
-		expect(payload.error).toContain("simulation_tick failed");
-		expect(payload.error).toContain("Tick blocked by runtime policy");
 	});
 
 	test("auto-recovers strict canonical reads in in-process orchestrator flow when guided setup is disabled", async () => {
@@ -552,19 +692,31 @@ describe("handleResolveTurnRequest", () => {
 			);
 			const payload = (await response.json()) as {
 				success: boolean;
-				worldSync: { success?: boolean } | null;
-				tick: { success?: boolean } | null;
-				state: { stateSource?: string } | null;
-				resources: { campaignSummary?: { stateSource?: string } } | null;
+				worldSync: {
+					success?: boolean;
+				} | null;
+				tick: {
+					success?: boolean;
+					mode?: string;
+				} | null;
+				state: { reportType?: string } | null;
+				resources: {
+					worldStateOverview?: { reportType?: string };
+					playerKnowledge?: { reportType?: string };
+				} | null;
 			};
 
 			expect(response.status).toBe(200);
 			expect(payload.success).toBe(true);
 			expect(payload.worldSync?.success).toBe(true);
 			expect(payload.tick?.success).toBe(true);
-			expect(payload.state?.stateSource).toBe("projection");
-			expect(payload.resources?.campaignSummary?.stateSource).toBe(
-				"projection",
+			expect(payload.tick?.mode).toBe("turn");
+			expect(payload.state?.reportType).toBe("world_state_overview");
+			expect(payload.resources?.worldStateOverview?.reportType).toBe(
+				"world_state_overview",
+			);
+			expect(payload.resources?.playerKnowledge?.reportType).toBe(
+				"player_knowledge_view",
 			);
 		} finally {
 			if (previousStrict === undefined) {

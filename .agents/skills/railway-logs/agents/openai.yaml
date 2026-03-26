@@ -1,4 +1,0 @@
-version: 1
-display_name: Railway Logs
-short_description: Inspect Railway logs for deploy and runtime failures.
-default_prompt: Pull the relevant Railway logs for the affected project, environment, service, or deployment, identify the concrete failure signal, correlate it with local code or config, and summarize the next fix or verification step.

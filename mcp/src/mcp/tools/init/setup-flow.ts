@@ -26,7 +26,11 @@ import { type InitPaths, resolveInitPaths } from "./paths";
 import { readJsonMarkdown } from "./settings";
 import { buildSetupPrompt, type SetupPrompt } from "./setup-prompt";
 import {
+	CAMPAIGN_PREMISE_SETUP_QUESTION,
 	DICE_ROLLER_SETUP_QUESTION,
+	OPENING_SITUATION_SETUP_QUESTION,
+	PARTY_ROSTER_SETUP_QUESTION,
+	SOURCE_ADAPTATION_NOTES_SETUP_QUESTION,
 	SYSTEM_SETUP_QUESTION,
 	THEME_SETUP_QUESTION,
 } from "./setup-prompts";
@@ -70,11 +74,15 @@ type SetupState = {
 	answers: {
 		ttrpgSystem: string | null;
 		theme: string | null;
+		campaignPremise: string | null;
+		openingSituation: string | null;
+		partyRoster: string | null;
 		systemUrl: string | null;
 		sourceMaterialsStatus: SourceMaterialsStatus | null;
 		diceRoller: "player" | "bardo" | null;
 		playerCount: number | null;
 		sourcePolicy: SourcePolicy;
+		sourceAdaptationNotes: string | null;
 		additionalContext: string | null;
 		materialsConfirmation: string | null;
 	};
@@ -148,7 +156,15 @@ export type GuidedSetupFlowResult = {
 	answers: SetupState["answers"];
 };
 
-const REQUIRED_SETUP_KEYS = ["ttrpgSystem", "diceRoller", "theme"] as const;
+const REQUIRED_SETUP_KEYS = [
+	"ttrpgSystem",
+	"diceRoller",
+	"theme",
+	"campaignPremise",
+	"openingSituation",
+	"partyRoster",
+	"sourceAdaptationNotes",
+] as const;
 
 function defaultSetupState(): SetupState {
 	return {
@@ -158,11 +174,15 @@ function defaultSetupState(): SetupState {
 		answers: {
 			ttrpgSystem: null,
 			theme: null,
+			campaignPremise: null,
+			openingSituation: null,
+			partyRoster: null,
 			systemUrl: null,
 			sourceMaterialsStatus: null,
 			diceRoller: null,
 			playerCount: null,
 			sourcePolicy: "allow_conservative_skeleton",
+			sourceAdaptationNotes: null,
 			additionalContext: null,
 			materialsConfirmation: null,
 		},
@@ -267,11 +287,15 @@ function normalizeSetupState(raw: unknown): SetupState {
 		answers: {
 			ttrpgSystem: toTrimmedString(rawAnswers.ttrpgSystem),
 			theme: toTrimmedString(rawAnswers.theme),
+			campaignPremise: toTrimmedString(rawAnswers.campaignPremise),
+			openingSituation: toTrimmedString(rawAnswers.openingSituation),
+			partyRoster: toTrimmedString(rawAnswers.partyRoster),
 			systemUrl: toTrimmedString(rawAnswers.systemUrl),
 			sourceMaterialsStatus,
 			diceRoller,
 			playerCount: toNullablePositiveInteger(rawAnswers.playerCount),
 			sourcePolicy,
+			sourceAdaptationNotes: toTrimmedString(rawAnswers.sourceAdaptationNotes),
 			additionalContext: toTrimmedString(rawAnswers.additionalContext),
 			materialsConfirmation: toTrimmedString(rawAnswers.materialsConfirmation),
 		},
@@ -389,7 +413,7 @@ async function writeSetupState(
 			{
 				title: "Setup State",
 				description:
-					"Revisioned guided setup state used for conflict-safe onboarding.",
+					"Revisioned guided setup state used for conflict-safe campaign setup.",
 			},
 			JSON.stringify(state, null, 2),
 		),
@@ -890,11 +914,15 @@ async function persistSetupToSettings(
 		setup: {
 			ttrpgSystem: setupState.answers.ttrpgSystem,
 			theme: setupState.answers.theme,
+			campaignPremise: setupState.answers.campaignPremise,
+			openingSituation: setupState.answers.openingSituation,
+			partyRoster: setupState.answers.partyRoster,
 			systemUrl: setupState.answers.systemUrl,
 			sourceMaterialsStatus: setupState.answers.sourceMaterialsStatus,
 			diceRoller: setupState.answers.diceRoller,
 			playerCount: setupState.answers.playerCount,
 			sourcePolicy: setupState.answers.sourcePolicy,
+			sourceAdaptationNotes: setupState.answers.sourceAdaptationNotes,
 			additionalContext: setupState.answers.additionalContext,
 			materialsConfirmation: setupState.answers.materialsConfirmation,
 			warnings: setupState.warnings,
@@ -950,6 +978,24 @@ function mergeSetupAnswers(
 		next.answers.theme = theme;
 		changed = true;
 	}
+
+	const campaignPremise = toTrimmedString(answers.campaignPremise);
+	if (campaignPremise && campaignPremise !== state.answers.campaignPremise) {
+		next.answers.campaignPremise = campaignPremise;
+		changed = true;
+	}
+
+	const openingSituation = toTrimmedString(answers.openingSituation);
+	if (openingSituation && openingSituation !== state.answers.openingSituation) {
+		next.answers.openingSituation = openingSituation;
+		changed = true;
+	}
+
+	const partyRoster = toTrimmedString(answers.partyRoster);
+	if (partyRoster && partyRoster !== state.answers.partyRoster) {
+		next.answers.partyRoster = partyRoster;
+		changed = true;
+	}
 	const systemUrl = toTrimmedString(answers.systemUrl);
 	if (systemUrl && systemUrl !== state.answers.systemUrl) {
 		next.answers.systemUrl = systemUrl;
@@ -987,6 +1033,15 @@ function mergeSetupAnswers(
 		answers.sourcePolicy !== state.answers.sourcePolicy
 	) {
 		next.answers.sourcePolicy = answers.sourcePolicy;
+		changed = true;
+	}
+
+	const sourceAdaptationNotes = toTrimmedString(answers.sourceAdaptationNotes);
+	if (
+		sourceAdaptationNotes &&
+		sourceAdaptationNotes !== state.answers.sourceAdaptationNotes
+	) {
+		next.answers.sourceAdaptationNotes = sourceAdaptationNotes;
 		changed = true;
 	}
 	const additionalContext = toTrimmedString(answers.additionalContext);
@@ -1057,6 +1112,34 @@ function setupQuestionForState(
 		return {
 			key: "theme",
 			question: THEME_SETUP_QUESTION,
+		};
+	}
+
+	if (!state.answers.campaignPremise) {
+		return {
+			key: "campaignPremise",
+			question: CAMPAIGN_PREMISE_SETUP_QUESTION,
+		};
+	}
+
+	if (!state.answers.openingSituation) {
+		return {
+			key: "openingSituation",
+			question: OPENING_SITUATION_SETUP_QUESTION,
+		};
+	}
+
+	if (!state.answers.partyRoster) {
+		return {
+			key: "partyRoster",
+			question: PARTY_ROSTER_SETUP_QUESTION,
+		};
+	}
+
+	if (!state.answers.sourceAdaptationNotes) {
+		return {
+			key: "sourceAdaptationNotes",
+			question: SOURCE_ADAPTATION_NOTES_SETUP_QUESTION,
 		};
 	}
 

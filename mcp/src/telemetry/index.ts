@@ -1,16 +1,18 @@
 import { MetricsRegistry } from "./registry";
 
-export { logSentryMessage } from "./sentry";
+export {
+	captureTelemetryException,
+	logTelemetryMessage,
+} from "./runtime-log";
 export {
 	applySpanAttributes,
 	buildHostedAuthSpanAttributes,
 	buildRequestSpanAttributes,
 	buildUsageLimitSpanAttributes,
-	captureSentryException,
 	withHostedAuthSpan,
 	withRequestSpan,
 	withUsageLimitSpan,
-} from "./sentry-spans";
+} from "./span-helpers";
 
 const LATENCY_BUCKETS = [
 	5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000,

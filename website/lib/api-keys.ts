@@ -11,27 +11,22 @@ export function maxApiKeysForPlan(plan: PlanTier): number {
 			return 1;
 		case "solo":
 			return 5;
-		case "solo_plus":
-			return 10;
 	}
 }
 
 const DEFAULT_MCP_PERIOD_LIMIT: Record<PlanTier, number> = {
 	free: 100,
 	solo: 25_000,
-	solo_plus: 50_000,
 };
 
 const DEFAULT_DAILY_USER_VERIFICATION_LIMIT: Record<PlanTier, number> = {
 	free: 500,
 	solo: 7_500,
-	solo_plus: 13_000,
 };
 
 const DEFAULT_DAILY_KEY_VERIFICATION_LIMIT: Record<PlanTier, number> = {
 	free: 500,
 	solo: 2_000,
-	solo_plus: 3_000,
 };
 
 function readPositiveLimit(
@@ -65,11 +60,6 @@ export function dailyUserVerificationLimitForPlan(
 				env.BARDO_DAILY_USER_VERIFICATIONS_SOLO,
 				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.solo,
 			);
-		case "solo_plus":
-			return readPositiveLimit(
-				env.BARDO_DAILY_USER_VERIFICATIONS_SOLO_PLUS,
-				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.solo_plus,
-			);
 	}
 }
 
@@ -90,11 +80,6 @@ export function dailyKeyVerificationLimitForPlan(
 			return readPositiveLimit(
 				env.BARDO_DAILY_KEY_VERIFICATIONS_SOLO,
 				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.solo,
-			);
-		case "solo_plus":
-			return readPositiveLimit(
-				env.BARDO_DAILY_KEY_VERIFICATIONS_SOLO_PLUS,
-				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.solo_plus,
 			);
 	}
 }
@@ -117,11 +102,6 @@ export function mcpPeriodLimitForPlan(
 			return readPositiveLimit(
 				env.BARDO_MCP_PERIOD_LIMIT_SOLO,
 				DEFAULT_MCP_PERIOD_LIMIT.solo,
-			);
-		case "solo_plus":
-			return readPositiveLimit(
-				env.BARDO_MCP_PERIOD_LIMIT_SOLO_PLUS,
-				DEFAULT_MCP_PERIOD_LIMIT.solo_plus,
 			);
 	}
 }

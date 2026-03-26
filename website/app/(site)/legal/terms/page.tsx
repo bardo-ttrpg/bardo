@@ -1,12 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { createPublicMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "Terms of Service",
-	description: "Terms for using the Bardo website, MCP server, and API.",
-};
+	description:
+		"Terms for using the Bardo website, hosted MCP service, API routes, and local CLI.",
+	path: "/legal/terms",
+});
 
-const updatedAt = "February 19, 2026";
+const updatedAt = "March 12, 2026";
 
 export default function TermsPage() {
 	return (
@@ -27,8 +29,8 @@ export default function TermsPage() {
 						1. Agreement to terms
 					</h2>
 					<p>
-						By accessing or using Bardo (website, MCP server, and API), you
-						agree to these Terms, our{" "}
+						By accessing or using Bardo, including the website, hosted MCP
+						service, API routes, and local CLI, you agree to these Terms, our{" "}
 						<Link
 							href="/legal/privacy"
 							className="underline underline-offset-2"
@@ -52,8 +54,9 @@ export default function TermsPage() {
 					</h2>
 					<p>
 						You are responsible for all activity under your account, API keys,
-						and MCP clients. If you are under 18, a parent or legal guardian
-						must review and accept these Terms and is responsible for your use.
+						hosted usage, and connected MCP clients. If you are under 18, a
+						parent or legal guardian must review and accept these Terms and is
+						responsible for your use.
 					</p>
 				</section>
 
@@ -64,8 +67,9 @@ export default function TermsPage() {
 					<p>
 						You may not use Bardo to violate law, abuse systems, attempt
 						unauthorized access, or process data you are not authorized to
-						process. You are responsible for securing credentials and reviewing
-						all AI-generated output before acting on it.
+						process. You are responsible for securing credentials, controlling
+						access to local workspaces, and reviewing all AI-generated output
+						before acting on it.
 					</p>
 				</section>
 
@@ -75,9 +79,10 @@ export default function TermsPage() {
 					</h2>
 					<p>
 						Bardo can produce inaccurate, incomplete, or outdated output. AI
-						output is provided for assistance only and not as legal, medical,
-						financial, or safety-critical advice. You remain solely responsible
-						for final decisions and consequences.
+						output is provided for assistance only. Canon, inference, and
+						suggestion should be reviewed by the user, and Bardo is not legal,
+						medical, financial, or safety-critical advice. You remain solely
+						responsible for final decisions and consequences.
 					</p>
 				</section>
 
@@ -86,26 +91,41 @@ export default function TermsPage() {
 						5. Billing and refunds
 					</h2>
 					<p>
-						Paid plans are billed as shown at checkout. Unless required by
-						applicable law, payments are non-refundable and credits do not roll
-						over between billing periods. Any exception is at Bardo’s sole
-						discretion.
+						Paid plans are billed as shown at checkout through Clerk Billing.
+						Hosted plans grant monthly credits, and one accepted MCP tool call
+						consumes one credit. Unless required by applicable law, payments are
+						non-refundable and unused credits do not roll over between billing
+						periods.
 					</p>
 				</section>
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						6. Suspension and termination
+						6. Local files and hosted services
 					</h2>
 					<p>
-						We may suspend or terminate access for abuse, security risk, or
-						Terms violations. You may stop using Bardo at any time.
+						Bardo keeps campaign workspace files local by default. Files in your
+						workspace remain under your control on your machine unless you
+						explicitly upload or share them through a hosted feature. Hosted
+						account data, usage records, and billing metadata remain subject to
+						these Terms and our Privacy Policy.
 					</p>
 				</section>
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						7. Disclaimer and liability limits
+						7. Suspension and termination
+					</h2>
+					<p>
+						We may suspend or terminate access for abuse, security risk,
+						non-payment, or Terms violations. You may stop using Bardo at any
+						time.
+					</p>
+				</section>
+
+				<section>
+					<h2 className="mb-2 text-base font-semibold text-foreground">
+						8. Disclaimer and liability limits
 					</h2>
 					<p>
 						Bardo is provided “as is” and “as available” without warranties to
@@ -117,7 +137,7 @@ export default function TermsPage() {
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						8. Governing law
+						9. Governing law
 					</h2>
 					<p>
 						These Terms are governed by the laws of Puerto Rico and applicable
@@ -127,15 +147,15 @@ export default function TermsPage() {
 
 				<section>
 					<h2 className="mb-2 text-base font-semibold text-foreground">
-						9. Contact
+						10. Contact
 					</h2>
 					<p>
 						For legal requests, privacy requests, or notices, contact:{" "}
 						<a
-							href="mailto:legal@bardo.dev"
+							href="mailto:legal@bardo.gg"
 							className="underline underline-offset-2"
 						>
-							legal@bardo.dev
+							legal@bardo.gg
 						</a>
 						.
 					</p>

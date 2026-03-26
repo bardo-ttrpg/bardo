@@ -1,4 +1,0 @@
-version: 1
-display_name: Railway Debug
-short_description: Diagnose and fix Railway deployment and runtime issues.
-default_prompt: Inspect the relevant Railway project, service, deployment, variables, and logs, identify the concrete failure mode, apply the smallest defensible fix, and verify the result.

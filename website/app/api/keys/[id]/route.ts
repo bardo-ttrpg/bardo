@@ -1,1 +1,0 @@
-export { DELETE } from "./handlers";

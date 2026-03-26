@@ -2,24 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { createBillingGetHandler } from "./handlers";
 
 describe("GET /api/billing", () => {
-	test("returns live billing data with creditsUsed derived from real MCP usage", async () => {
+	test("returns Clerk-backed billing and credit data", async () => {
 		const handler = createBillingGetHandler({
-			resolveAuthState: async () => ({ userId: "user_123" }),
-			createClerkClient: async () => ({}) as never,
-			fetchLiveBilling: async () => ({
+			resolveUserId: async () => ({
+				userId: "user_123",
+			}),
+			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
 				plan: "solo" as const,
+				creditsTotal: 25_000,
+				creditsUsed: 12,
+				creditsRemaining: 24_988,
 				periodStart: 1,
+				mcpCallsTotal: 42,
+				mcpCallsThisPeriod: 12,
 				subscriptionStatus: "active" as const,
 				subscriptionId: "sub_123",
 				billingInterval: "month" as const,
 				currentPeriodEnd: 2,
 				cancelAtPeriodEnd: false,
-			}),
-			readUserUsage: async () => ({
-				total: 42,
-				thisPeriod: 12,
-				backend: "upstash" as const,
 			}),
 		});
 
@@ -40,33 +41,26 @@ describe("GET /api/billing", () => {
 		});
 		expect(body.billing.apiKeyCallsTotal).toBeUndefined();
 		expect(body.billing.apiKeyCallsThisPeriod).toBeUndefined();
+		expect(body.accessPolicy).toEqual({
+			subscribed: true,
+			mcpPeriodLimit: 25_000,
+		});
 	});
 
-	test("returns 503 when Clerk billing is unavailable", async () => {
+	test("returns 401 for anonymous requests", async () => {
 		const handler = createBillingGetHandler({
-			resolveAuthState: async () => ({ userId: "user_123" }),
-			createClerkClient: async () => ({}) as never,
-			fetchLiveBilling: async () => ({
-				billingUnavailable: true,
-				plan: "free" as const,
-				periodStart: 1,
-				subscriptionStatus: "canceled" as const,
-				subscriptionId: null,
-				billingInterval: null,
-				currentPeriodEnd: null,
-				cancelAtPeriodEnd: false,
+			resolveUserId: async () => ({
+				userId: null,
 			}),
-			readUserUsage: async () => ({
-				total: 0,
-				thisPeriod: 0,
-				backend: "none" as const,
-			}),
+			readBillingSnapshot: async () => {
+				throw new Error("should not read billing without a user id");
+			},
 		});
 
 		const response = await handler();
 		const body = await response.json();
 
-		expect(response.status).toBe(503);
-		expect(body.error).toContain("Billing service unavailable");
+		expect(response.status).toBe(401);
+		expect(body.error).toBe("Unauthorized");
 	});
 });

@@ -1,4 +1,4 @@
-export type PlanTier = "free" | "solo" | "solo_plus";
+export type PlanTier = "free" | "solo";
 type LegacyPlanTier = "free" | "pro" | "ultra";
 type PlanTierInput = PlanTier | LegacyPlanTier | undefined;
 export type BillingInterval = "month" | "year";
@@ -15,18 +15,15 @@ export type SubscriptionStatus =
 const PLAN_CREDITS: Record<PlanTier, number> = {
 	free: 100,
 	solo: 25_000,
-	solo_plus: 50_000,
 };
 
 export function migrateLegacyPlanTier(plan: PlanTierInput): PlanTier {
 	switch (plan) {
 		case "pro":
-			return "solo";
 		case "ultra":
-			return "solo_plus";
+			return "solo";
 		case "free":
 		case "solo":
-		case "solo_plus":
 			return plan;
 		default:
 			return "free";

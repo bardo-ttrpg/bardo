@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { createIntrospectionTelemetry } from "../../../../lib/introspection-telemetry";
 import { createIntrospectionVerifyCache } from "../../../../lib/introspection-verify-cache";
 import { createIntrospectPostHandler } from "./handlers";
@@ -13,6 +13,21 @@ function buildRequest(secret: string, apiKey: string): Request {
 		body: JSON.stringify({
 			apiKey,
 			requiredScope: "mcp",
+		}),
+	});
+}
+
+function buildBridgeRequest(secret: string, apiKey: string): Request {
+	return new Request("http://localhost:3001/api/auth/introspect-key", {
+		method: "POST",
+		headers: {
+			"content-type": "application/json",
+			"x-bardo-introspection-token": secret,
+		},
+		body: JSON.stringify({
+			apiKey,
+			requiredScope: "mcp",
+			workspaceRoot: "/tmp/campaign-alpha",
 		}),
 	});
 }
@@ -191,16 +206,16 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 				consumeUser: async (_subject, plan) => ({
 					allowed: true,
-					limit: plan === "solo_plus" ? 13_000 : 500,
+					limit: plan === "solo" ? 7_500 : 500,
 					used: 1,
-					remaining: 12_999,
+					remaining: 7_499,
 					backend: "memory",
 				}),
 				consumeKey: async (_keyId, plan) => ({
 					allowed: true,
-					limit: plan === "solo_plus" ? 3_000 : 500,
+					limit: plan === "solo" ? 2_000 : 500,
 					used: 1,
-					remaining: 2_999,
+					remaining: 1_999,
 					backend: "memory",
 				}),
 			},
@@ -212,18 +227,18 @@ describe("POST /api/auth/introspect-key", () => {
 			createClerkClient: async () => ({
 				apiKeys: {
 					verify: async () => ({
-						id: "key_solo_plus",
-						subject: "user_solo_plus",
-						claims: { workspacePath: "./customers/user_solo_plus" },
+						id: "key_solo",
+						subject: "user_solo",
+						claims: { workspacePath: "./customers/user_solo" },
 						scopes: ["mcp"],
 					}),
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "solo_plus",
+				plan: "solo",
 				billingUnavailable: false,
 			}),
-			mcpPeriodLimitResolver: () => 50_000,
+			mcpPeriodLimitResolver: () => 25_000,
 		});
 
 		const response = await handler(
@@ -233,11 +248,12 @@ describe("POST /api/auth/introspect-key", () => {
 
 		expect(response.status).toBe(200);
 		expect(body.valid).toBe(true);
-		expect(seenPreAuthPlan).toBe("solo_plus");
+		expect(seenPreAuthPlan).toBe("solo");
 	});
 
 	test("caches invalid verification errors and short-circuits repeat calls", async () => {
 		let verifyCalls = 0;
+		const logWarn = mock(() => {});
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
 		const cache = createIntrospectionVerifyCache({
 			validTtlMs: 60_000,
@@ -279,6 +295,16 @@ describe("POST /api/auth/introspect-key", () => {
 				billingUnavailable: false,
 			}),
 			mcpPeriodLimitResolver: () => 100,
+			tracing: {
+				withRequestSpan: async (_args, callback) =>
+					await callback({ setAttribute() {} }),
+				withClerkVerifySpan: async (callback) => await callback(),
+				withPlanLookupSpan: async (callback) => await callback(),
+				captureException: () => {},
+				logInfo: () => {},
+				logWarn,
+				logError: () => {},
+			},
 		});
 
 		const firstResponse = await handler(
@@ -295,6 +321,13 @@ describe("POST /api/auth/introspect-key", () => {
 			valid: false,
 			reason: "cached_invalid_api_key",
 		});
+		expect(logWarn).toHaveBeenCalledWith(
+			"bardo.auth_introspection.invalid_key",
+			expect.objectContaining({
+				"bardo.result": "invalid",
+				"bardo.introspection.pre_auth_backend": "memory",
+			}),
+		);
 		expect(verifyCalls).toBe(1);
 		expect(telemetry.snapshot()).toEqual({
 			cache_hit_valid: 0,
@@ -305,6 +338,77 @@ describe("POST /api/auth/introspect-key", () => {
 			budget_block_key: 0,
 			success: 0,
 		});
+	});
+
+	test("preserves website backend labels when invalid keys are rejected", async () => {
+		const logWarn = mock(() => {});
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 60_000,
+		});
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async () => ({
+					allowed: true,
+					limit: 500,
+					used: 1,
+					remaining: 499,
+					backend: "website",
+				}),
+				consumeUser: async () => {
+					throw new Error("consumeUser should not run for invalid key");
+				},
+				consumeKey: async () => {
+					throw new Error("consumeKey should not run for invalid key");
+				},
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						throw { status: 404 };
+					},
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
+			mcpPeriodLimitResolver: () => 100,
+			tracing: {
+				withRequestSpan: async (_args, callback) =>
+					await callback({ setAttribute() {} }),
+				withClerkVerifySpan: async (callback) => await callback(),
+				withPlanLookupSpan: async (callback) => await callback(),
+				captureException: () => {},
+				logInfo: () => {},
+				logWarn,
+				logError: () => {},
+			},
+		});
+
+		const response = await handler(
+			buildRequest("shared-secret", "ak_test_website_backend_invalid"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(false);
+		expect(logWarn).toHaveBeenCalledWith(
+			"bardo.auth_introspection.invalid_key",
+			expect.objectContaining({
+				"bardo.result": "invalid",
+				"bardo.introspection.pre_auth_backend": "website",
+				"http.status_code": 404,
+			}),
+		);
 	});
 
 	test("caches budget-denied keys and prevents repeated paid verification", async () => {
@@ -538,5 +642,73 @@ describe("POST /api/auth/introspect-key", () => {
 		expect(body.billingUnavailable).toBe(true);
 		expect(body.mcpPeriodLimit).toBe(100);
 		expect(seenPlans).toEqual(["free", "free"]);
+	});
+
+	test("accepts a bridge token and requires a local workspace root", async () => {
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 10_000,
+		});
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async () => {
+					throw new Error("bridge tokens should bypass pre-auth key budget");
+				},
+				consumeUser: async (_subject, plan) => ({
+					allowed: true,
+					limit: plan === "solo" ? 500 : 100,
+					used: 1,
+					remaining: 499,
+					backend: "memory",
+				}),
+				consumeKey: async () => ({
+					allowed: true,
+					limit: 500,
+					used: 1,
+					remaining: 499,
+					backend: "memory",
+				}),
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			decodeBridgeToken: async (token) => {
+				expect(token).toBe("bridge_access_token");
+				return {
+					sessionId: "bridge_session_123",
+					userId: "user_123",
+					plan: "solo",
+					accountLabel: "Armando",
+				};
+			},
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						throw new Error("should not verify Clerk API keys");
+					},
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: "solo",
+				billingUnavailable: false,
+			}),
+			mcpPeriodLimitResolver: () => 25_000,
+		});
+
+		const response = await handler(
+			buildBridgeRequest("shared-secret", "bridge_access_token"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(true);
+		expect(body.campaignBasePath).toBe("/tmp/campaign-alpha");
+		expect(body.keyId).toBe("bridge:bridge_session_123");
+		expect(body.plan).toBe("solo");
 	});
 });

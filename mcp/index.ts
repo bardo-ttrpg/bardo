@@ -5,22 +5,26 @@ import { LOOP_DETECTION_POLICY } from "./src/domain/config/loop-detection";
 import { SECURITY_POLICY } from "./src/domain/config/security";
 import { validateRuntimeConfiguration } from "./src/domain/config/strict-config";
 import { TOOL_POLICY_CONFIG } from "./src/domain/config/tool-policy";
-import { captureSentryException, logSentryMessage } from "./src/telemetry";
-import { initSentry } from "./src/telemetry/sentry";
-
-initSentry();
+import {
+	captureTelemetryException,
+	logTelemetryMessage,
+} from "./src/telemetry";
 
 process.on("unhandledRejection", (reason) => {
-	captureSentryException(reason);
-	logSentryMessage("error", "mcp.process.unhandled_rejection", {
+	captureTelemetryException(reason, {
+		"bardo.service": "mcp",
+	});
+	logTelemetryMessage("error", "mcp.process.unhandled_rejection", {
 		"bardo.service": "mcp",
 	});
 	console.error("Unhandled rejection:", reason);
 });
 
 process.on("uncaughtException", (error) => {
-	captureSentryException(error);
-	logSentryMessage("error", "mcp.process.uncaught_exception", {
+	captureTelemetryException(error, {
+		"bardo.service": "mcp",
+	});
+	logTelemetryMessage("error", "mcp.process.uncaught_exception", {
 		"bardo.service": "mcp",
 	});
 	console.error("Uncaught exception:", error);
@@ -33,8 +37,21 @@ validateRuntimeConfiguration({
 });
 
 const server = createHttpServer({ port: PORT });
+const remoteToolCount = 6;
 
-logSentryMessage("info", "mcp.startup.config", {
+function describeAuthStartup() {
+	if (SECURITY_POLICY.authMode !== "required") {
+		return "Authentication disabled for this local runtime.";
+	}
+
+	if (apiKeyMap.size > 0) {
+		return `Direct static credentials enabled (${apiKeyMap.size} credential(s) configured).`;
+	}
+
+	return "Hosted auth enabled; browser-approved bridge credentials are validated through the website.";
+}
+
+logTelemetryMessage("info", "mcp.startup.config", {
 	"bardo.service": "mcp",
 	"bardo.auth.mode": SECURITY_POLICY.authMode,
 	"bardo.transport_mode": SECURITY_POLICY.transportMode,
@@ -46,16 +63,12 @@ logSentryMessage("info", "mcp.startup.config", {
 console.log(
 	`MCP server listening at ${new URL("/mcp", server.url).toString()}`,
 );
+console.log(describeAuthStartup());
 console.log(
-	apiKeyMap.size > 0
-		? `API key auth enabled (${apiKeyMap.size} key(s) configured)`
-		: "API key auth disabled (BARDO_API_KEYS_JSON not configured or invalid)",
+	`Runtime policy: authMode=${SECURITY_POLICY.authMode}, transportMode=${SECURITY_POLICY.transportMode}, maxRequestBytes=${SECURITY_POLICY.maxRequestBytes}, rateLimit=${SECURITY_POLICY.rateLimitMaxRequests}/${SECURITY_POLICY.rateLimitWindowMs}ms, telemetry=${SECURITY_POLICY.telemetryEnabled}, metricsRequireAuth=${SECURITY_POLICY.metricsRequireAuth}`,
 );
 console.log(
-	`Security policy: authMode=${SECURITY_POLICY.authMode}, allowQueryApiKey=${SECURITY_POLICY.allowQueryApiKey}, sessionTtlMs=${SECURITY_POLICY.sessionTtlMs}, maxRequestBytes=${SECURITY_POLICY.maxRequestBytes}, telemetryEnabled=${SECURITY_POLICY.telemetryEnabled}, metricsRouteEnabled=${SECURITY_POLICY.metricsRouteEnabled}, metricsRequireAuth=${SECURITY_POLICY.metricsRequireAuth}, transportMode=${SECURITY_POLICY.transportMode}, mcpEnableJsonResponse=${SECURITY_POLICY.mcpEnableJsonResponse}`,
-);
-console.log(
-	`Tool policy: profile=${TOOL_POLICY_CONFIG.defaultProfile}, baseAllow=${TOOL_POLICY_CONFIG.baseAllowTokens.length}, baseDeny=${TOOL_POLICY_CONFIG.baseDenyTokens.length}, providerRules=${Object.keys(TOOL_POLICY_CONFIG.byProvider).length}`,
+	`Tool surface: profile=${TOOL_POLICY_CONFIG.defaultProfile}, remoteV1Tools=${remoteToolCount}, providerRules=${Object.keys(TOOL_POLICY_CONFIG.byProvider).length}`,
 );
 console.log(
 	`Loop protection: enabled=${LOOP_DETECTION_POLICY.enabled}, historySize=${LOOP_DETECTION_POLICY.historySize}, warning=${LOOP_DETECTION_POLICY.warningThreshold}, critical=${LOOP_DETECTION_POLICY.criticalThreshold}, breaker=${LOOP_DETECTION_POLICY.globalCircuitBreakerThreshold}`,

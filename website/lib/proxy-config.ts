@@ -19,3 +19,13 @@ export function shouldUseClerkOnlyProxyPathname(pathname: string): boolean {
 		pathname.startsWith("/trpc/")
 	);
 }
+
+export function shouldRunClerkForPagePathname(pathname: string): boolean {
+	return (
+		pathname.startsWith("/dashboard") ||
+		pathname === "/sign-in" ||
+		pathname.startsWith("/sign-in/") ||
+		pathname === "/sign-up" ||
+		pathname.startsWith("/sign-up/")
+	);
+}

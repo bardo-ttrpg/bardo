@@ -287,6 +287,19 @@ function defaultMechanicsRulesetId(): string {
 	return configured && configured.length > 0 ? configured : "d20_v1";
 }
 
+function resolveWorkspaceRulesetId(
+	preferredState: Awaited<ReturnType<typeof loadPreferredCurrentState>>,
+): string {
+	if (preferredState.source === "empty_default") {
+		return defaultMechanicsRulesetId();
+	}
+	const workspaceRuleset =
+		preferredState.chosen.state.mechanicsContext.ruleset?.trim() ?? "";
+	return workspaceRuleset.length > 0
+		? workspaceRuleset
+		: defaultMechanicsRulesetId();
+}
+
 const DISAPPEARANCE_PATTERN =
 	/\b(disappearance|disappear(?:ed|ance)?|missing person|missing people|went missing|vanished?|vanish)\b/i;
 
@@ -334,10 +347,12 @@ export async function runPlayerAction(args: {
 	idempotencyKey?: string;
 	guidedSetupEnabled?: boolean;
 	nowIso?: string;
+	dryRun?: boolean;
 }): Promise<PlayerActionOutput> {
 	const bardoRoot = resolveBardoRoot(args.auth.campaignBasePath);
 	const paths = resolvePlayerActionPaths(bardoRoot);
 	const nowIso = args.nowIso ?? new Date().toISOString();
+	const dryRun = args.dryRun ?? false;
 	const guidedSetupEnabled =
 		args.guidedSetupEnabled ?? resolveFeatureFlags(Bun.env).guidedSetupEnabled;
 	const createdNpcIds: string[] = [];
@@ -346,7 +361,7 @@ export async function runPlayerAction(args: {
 
 	try {
 		return await withKeyedLock(`workspace-mutation:${bardoRoot}`, async () => {
-			if (args.idempotencyKey) {
+			if (!dryRun && args.idempotencyKey) {
 				const replay = await getIdempotentResult({
 					bardoRoot,
 					key: args.idempotencyKey,
@@ -459,35 +474,37 @@ export async function runPlayerAction(args: {
 			if (runtimeViolations.length > 0) {
 				const blockedMessage =
 					summarizeRuntimePolicyViolations(runtimeViolations);
-				await appendCanonicalEvent({
-					bardoRoot,
-					event: {
-						id: `evt-player-action-policy-${actionEventBase}`,
-						type: "runtime_policy_blocked",
-						atISO: nowIso,
-						source: "player_action",
-						data: {
-							action: actionToRun,
-							runtimeViolations,
-							tableContract: {
-								tone: tableContract.tone,
-								boundaries: tableContract.boundaries,
-								pvp: tableContract.pvp,
-								retconPolicy: tableContract.retconPolicy,
-							},
-							authorityPolicy: {
-								mode: authorityPolicy.mode,
-								factIntroduction: authorityPolicy.factIntroduction,
-								ruleAdjudication: authorityPolicy.ruleAdjudication,
-								safetyVeto: authorityPolicy.safetyVeto,
-								allowRuleBypass: authorityPolicy.allowRuleBypass,
-								allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
-								allowPlayerCanonDeclarations:
-									authorityPolicy.allowPlayerCanonDeclarations,
+				if (!dryRun) {
+					await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: `evt-player-action-policy-${actionEventBase}`,
+							type: "runtime_policy_blocked",
+							atISO: nowIso,
+							source: "player_action",
+							data: {
+								action: actionToRun,
+								runtimeViolations,
+								tableContract: {
+									tone: tableContract.tone,
+									boundaries: tableContract.boundaries,
+									pvp: tableContract.pvp,
+									retconPolicy: tableContract.retconPolicy,
+								},
+								authorityPolicy: {
+									mode: authorityPolicy.mode,
+									factIntroduction: authorityPolicy.factIntroduction,
+									ruleAdjudication: authorityPolicy.ruleAdjudication,
+									safetyVeto: authorityPolicy.safetyVeto,
+									allowRuleBypass: authorityPolicy.allowRuleBypass,
+									allowUnilateralRetcon: authorityPolicy.allowUnilateralRetcon,
+									allowPlayerCanonDeclarations:
+										authorityPolicy.allowPlayerCanonDeclarations,
+								},
 							},
 						},
-					},
-				});
+					});
+				}
 				const output: PlayerActionOutput = {
 					success: false,
 					message: `Action blocked by runtime policy: ${blockedMessage}`,
@@ -533,7 +550,7 @@ export async function runPlayerAction(args: {
 					setupIntegrity: setup.integrity,
 					pendingAction: null,
 				};
-				if (args.idempotencyKey) {
+				if (!dryRun && args.idempotencyKey) {
 					await setIdempotentResult({
 						bardoRoot,
 						key: args.idempotencyKey,
@@ -546,7 +563,9 @@ export async function runPlayerAction(args: {
 			}
 
 			const knownLocations = await loadKnownLocations(bardoRoot);
-			await ensurePlayerActionDirectories(bardoRoot, paths);
+			if (!dryRun) {
+				await ensurePlayerActionDirectories(bardoRoot, paths);
+			}
 
 			let preferredState: Awaited<ReturnType<typeof loadPreferredCurrentState>>;
 			try {
@@ -560,6 +579,9 @@ export async function runPlayerAction(args: {
 					error instanceof Error &&
 					error.message.startsWith("STRICT_CANONICAL_LEGACY_FALLBACK_BLOCKED")
 				) {
+					if (dryRun) {
+						throw error;
+					}
 					await regenerateCurrentStateProjection({ bardoRoot });
 					preferredState = await loadPreferredCurrentState({
 						bardoRoot,
@@ -576,41 +598,152 @@ export async function runPlayerAction(args: {
 				ReturnType<typeof loadPreferredCurrentState>
 			>["chosen"]["state"];
 			const intent = parseIntent(actionToRun);
-			const mechanicsRuleset = defaultMechanicsRulesetId();
+			const mechanicsRuleset = resolveWorkspaceRulesetId(preferredState);
 			const mechanicsActionType = intentRequiresMechanics(intent, actionToRun)
 				? resolveMechanicsActionType(intent, mechanicsRuleset)
 				: null;
-			const mechanicsAdapter = mechanicsActionType
-				? resolveRulesetAdapter(mechanicsRuleset)
-				: null;
-			const canonicalEventIds: string[] = [];
-			const declaredEvent = await appendCanonicalEvent({
-				bardoRoot,
-				event: {
-					id: `evt-player-action-declared-${actionEventBase}`,
-					type: "player_action_declared",
-					atISO: nowIso,
-					source: "player_action",
-					data: {
-						action: actionToRun,
-					},
-				},
-			});
-			canonicalEventIds.push(declaredEvent.id);
-			const intentEvent = await appendCanonicalEvent({
-				bardoRoot,
-				event: {
-					id: `evt-player-action-intent-${actionEventBase}`,
-					type: "action_intent_validated",
-					atISO: nowIso,
-					source: "player_action",
-					data: {
-						action: actionToRun,
+			let mechanicsAdapter: ReturnType<typeof resolveRulesetAdapter> | null =
+				null;
+			if (mechanicsActionType) {
+				try {
+					mechanicsAdapter = resolveRulesetAdapter(mechanicsRuleset);
+				} catch (error) {
+					const detail =
+						error instanceof Error ? error.message : "Unsupported ruleset.";
+					return {
+						success: false,
+						message: `Failed to process player action: ${detail}`,
+						idempotentReplay: false,
+						rootPath: bardoRoot,
 						intent,
+						timeAdvancedMinutes: 0,
+						worldTimeBeforeISO: state.worldTimeISO,
+						worldTimeAfterISO: state.worldTimeISO,
+						locationBefore: state.currentLocation,
+						locationAfter: state.currentLocation,
+						createdNpcIds: [],
+						createdLocationIds: [],
+						gmPacket: defaultGmPacket(),
+						stateDelta: defaultStateDelta(),
+						discoveryCandidates: [],
+						canonicalEventIds: [],
+						confidence: {
+							narration: "low",
+							discoveries: "low",
+						},
+						completeness: {
+							gmPacket: false,
+							contextReady: true,
+						},
+						mechanics: {
+							...defaultMechanicsSummary(true),
+							ruleset: mechanicsRuleset,
+							actionType: mechanicsActionType,
+							unsupportedReason: detail,
+						},
+						historyEntry: "",
+						statePath: paths.statePath,
+						historyPath: paths.historyPath,
+						narrationGuardrails: [],
+						optionalSystems: { ...defaultOptionalSystems },
+						requiresSetup: false,
+						setupPrompt: null,
+						setupStatus: setup.status,
+						setupQuestionKey: null,
+						setupQuestion: null,
+						setupProgressAnswered: setup.progressAnswered,
+						setupProgressTotal: setup.progressTotal,
+						setupWarnings: setup.warnings,
+						setupEvidenceSummary: setup.evidenceSummary,
+						setupRevision: setup.revision,
+						setupConflict: setup.conflict,
+						setupIntegrity: setup.integrity,
+						pendingAction: null,
+					};
+				}
+			}
+			if (mechanicsActionType && !mechanicsAdapter) {
+				return {
+					success: false,
+					message: `Failed to process player action: no mechanics adapter is registered for required ruleset '${mechanicsRuleset}'.`,
+					idempotentReplay: false,
+					rootPath: bardoRoot,
+					intent,
+					timeAdvancedMinutes: 0,
+					worldTimeBeforeISO: state.worldTimeISO,
+					worldTimeAfterISO: state.worldTimeISO,
+					locationBefore: state.currentLocation,
+					locationAfter: state.currentLocation,
+					createdNpcIds: [],
+					createdLocationIds: [],
+					gmPacket: defaultGmPacket(),
+					stateDelta: defaultStateDelta(),
+					discoveryCandidates: [],
+					canonicalEventIds: [],
+					confidence: {
+						narration: "low",
+						discoveries: "low",
 					},
-				},
-			});
-			canonicalEventIds.push(intentEvent.id);
+					completeness: {
+						gmPacket: false,
+						contextReady: true,
+					},
+					mechanics: {
+						...defaultMechanicsSummary(true),
+						ruleset: mechanicsRuleset,
+						actionType: mechanicsActionType,
+						unsupportedReason: `No adapter is registered for '${mechanicsRuleset}'.`,
+					},
+					historyEntry: "",
+					statePath: paths.statePath,
+					historyPath: paths.historyPath,
+					narrationGuardrails: [],
+					optionalSystems: { ...defaultOptionalSystems },
+					requiresSetup: false,
+					setupPrompt: null,
+					setupStatus: setup.status,
+					setupQuestionKey: null,
+					setupQuestion: null,
+					setupProgressAnswered: setup.progressAnswered,
+					setupProgressTotal: setup.progressTotal,
+					setupWarnings: setup.warnings,
+					setupEvidenceSummary: setup.evidenceSummary,
+					setupRevision: setup.revision,
+					setupConflict: setup.conflict,
+					setupIntegrity: setup.integrity,
+					pendingAction: null,
+				};
+			}
+			const canonicalEventIds: string[] = [];
+			if (!dryRun) {
+				const declaredEvent = await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-declared-${actionEventBase}`,
+						type: "player_action_declared",
+						atISO: nowIso,
+						source: "player_action",
+						data: {
+							action: actionToRun,
+						},
+					},
+				});
+				canonicalEventIds.push(declaredEvent.id);
+				const intentEvent = await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-intent-${actionEventBase}`,
+						type: "action_intent_validated",
+						atISO: nowIso,
+						source: "player_action",
+						data: {
+							action: actionToRun,
+							intent,
+						},
+					},
+				});
+				canonicalEventIds.push(intentEvent.id);
+			}
 			const locationBefore = state.currentLocation;
 			const targetLocationText = extractTargetLocation(actionToRun);
 			const disappearanceInvestigation =
@@ -705,7 +838,7 @@ export async function runPlayerAction(args: {
 					);
 				}
 
-				if (optionalSystems.worldGeneration) {
+				if (!dryRun && optionalSystems.worldGeneration) {
 					const ensuredLocation = await ensureLocationFile({
 						bardoRoot,
 						locationSlug: targetSlug,
@@ -732,7 +865,7 @@ export async function runPlayerAction(args: {
 				discoveryCandidates = semanticScene.discoveries.filter(
 					(discovery) => discovery.kind !== "npc" || optionalSystems.npcs,
 				);
-				if (optionalSystems.worldGeneration) {
+				if (!dryRun && optionalSystems.worldGeneration) {
 					await ensureLocationFile({
 						bardoRoot,
 						locationSlug: semanticScene.locationId,
@@ -766,7 +899,7 @@ export async function runPlayerAction(args: {
 					activeClues: [],
 					occupantIds: [],
 				};
-				if (optionalSystems.worldGeneration) {
+				if (!dryRun && optionalSystems.worldGeneration) {
 					const ensuredLocation = await ensureLocationFile({
 						bardoRoot,
 						locationSlug: generatedSlug,
@@ -794,11 +927,16 @@ export async function runPlayerAction(args: {
 				const toCreate = Math.max(0, desiredMinimum - existingAtLocation);
 				for (let i = 0; i < toCreate; i += 1) {
 					state.counters.unknownNpc += 1;
-					const npc = await createUnknownNpc({
-						bardoRoot,
-						npcIndex: state.counters.unknownNpc,
-						locationSlug: locationAfter,
-					});
+					const npc = dryRun
+						? {
+								id: `unknown_npc_${String(state.counters.unknownNpc).padStart(2, "0")}`,
+								path: "",
+							}
+						: await createUnknownNpc({
+								bardoRoot,
+								npcIndex: state.counters.unknownNpc,
+								locationSlug: locationAfter,
+							});
 					locationRecord.npcIds.push(npc.id);
 					createdNpcIds.push(npc.id);
 				}
@@ -901,7 +1039,7 @@ export async function runPlayerAction(args: {
 					validationErrors: [],
 				};
 
-				if (resolution.rolls.length > 0) {
+				if (!dryRun && resolution.rolls.length > 0) {
 					const diceEvent = await appendCanonicalEvent({
 						bardoRoot,
 						event: {
@@ -926,31 +1064,33 @@ export async function runPlayerAction(args: {
 					});
 					canonicalEventIds.push(diceEvent.id);
 				}
-				const mechanicsEvent = await appendCanonicalEvent({
-					bardoRoot,
-					event: {
-						id: `evt-player-action-mechanics-${actionEventBase}`,
-						type: "mechanics_resolved",
-						atISO: worldTimeAfterISO,
-						source: "player_action",
-						data: {
-							ruleset: mechanicsAdapter.id,
-							action: actionToRun,
-							intent,
-							actionType: resolution.actionType,
-							targetDifficulty: resolution.targetDifficulty,
-							modifier: resolution.modifier,
-							advantage: resolution.advantage,
-							rawRoll: resolution.rawRoll,
-							total: resolution.total,
-							outcome: resolution.outcome,
-							margin: resolution.margin,
-							resolutionMode: resolution.resolutionMode,
-							trace: resolution.trace,
+				if (!dryRun) {
+					const mechanicsEvent = await appendCanonicalEvent({
+						bardoRoot,
+						event: {
+							id: `evt-player-action-mechanics-${actionEventBase}`,
+							type: "mechanics_resolved",
+							atISO: worldTimeAfterISO,
+							source: "player_action",
+							data: {
+								ruleset: mechanicsAdapter.id,
+								action: actionToRun,
+								intent,
+								actionType: resolution.actionType,
+								targetDifficulty: resolution.targetDifficulty,
+								modifier: resolution.modifier,
+								advantage: resolution.advantage,
+								rawRoll: resolution.rawRoll,
+								total: resolution.total,
+								outcome: resolution.outcome,
+								margin: resolution.margin,
+								resolutionMode: resolution.resolutionMode,
+								trace: resolution.trace,
+							},
 						},
-					},
-				});
-				canonicalEventIds.push(mechanicsEvent.id);
+					});
+					canonicalEventIds.push(mechanicsEvent.id);
+				}
 			}
 
 			const historyEntry = buildHistoryEntry({
@@ -980,33 +1120,36 @@ export async function runPlayerAction(args: {
 				discoveries: discoveryCandidates,
 				state,
 			});
-			const resolvedEvent = await appendCanonicalEvent({
-				bardoRoot,
-				event: {
-					id: `evt-player-action-${actionEventBase}`,
-					type: "player_action_resolved",
-					atISO: worldTimeAfterISO,
-					source: "player_action",
-					data: {
-						action: actionToRun,
-						intent,
-						worldTimeBeforeISO,
-						worldTimeAfterISO,
-						locationBefore,
-						locationAfter,
-						createdNpcIds,
-						createdLocationIds,
-						mechanics,
-						discoveries: discoveryCandidates,
-						stateAfter: state,
+			if (!dryRun) {
+				const resolvedEvent = await appendCanonicalEvent({
+					bardoRoot,
+					event: {
+						id: `evt-player-action-${actionEventBase}`,
+						type: "player_action_resolved",
+						atISO: worldTimeAfterISO,
+						source: "player_action",
+						data: {
+							action: actionToRun,
+							intent,
+							worldTimeBeforeISO,
+							worldTimeAfterISO,
+							locationBefore,
+							locationAfter,
+							createdNpcIds,
+							createdLocationIds,
+							mechanics,
+							discoveries: discoveryCandidates,
+							stateAfter: state,
+						},
 					},
-				},
-			});
-			canonicalEventIds.push(resolvedEvent.id);
-			await regenerateProjectionsForEventTypes({
-				bardoRoot,
-				eventTypes: ["player_action_resolved"],
-			});
+				});
+				canonicalEventIds.push(resolvedEvent.id);
+				await regenerateProjectionsForEventTypes({
+					bardoRoot,
+					eventTypes: ["player_action_resolved"],
+					regenerateReports: false,
+				});
+			}
 			const stateDelta: StateDelta = {
 				worldTimeBeforeISO,
 				worldTimeAfterISO,
@@ -1072,7 +1215,7 @@ export async function runPlayerAction(args: {
 				pendingAction: null,
 			};
 
-			if (args.idempotencyKey) {
+			if (!dryRun && args.idempotencyKey) {
 				await setIdempotentResult({
 					bardoRoot,
 					key: args.idempotencyKey,

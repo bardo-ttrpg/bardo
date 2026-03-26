@@ -1,11 +1,18 @@
-import type { Metadata } from "next";
+import { createPublicMetadata } from "@/lib/site-metadata";
 import DocsShell from "../_components/docs-shell";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "How Bardo Stores Campaign Truth",
 	description:
-		"Understand the canonical event log, current-state projection, and generated reports.",
-};
+		"Understand Bardo's canonical event log, current-state projection, readable continuity reports, and canon vs inference model.",
+	path: "/docs/campaign-truth",
+	keywords: [
+		"campaign continuity",
+		"canonical markdown files",
+		"TTRPG world state",
+		"AI GM memory",
+	],
+});
 
 export default function CampaignTruthDocsPage() {
 	return (
@@ -13,6 +20,7 @@ export default function CampaignTruthDocsPage() {
 			eyebrow="Campaign Truth"
 			title="How Bardo Stores Campaign Truth"
 			lede="Bardo does not hide your campaign inside a black box. Canon stays in local files you can read, edit, diff, and version-control."
+			currentPath="/docs/campaign-truth"
 		>
 			<section>
 				<h2 className="mb-3 text-lg font-semibold text-foreground">
@@ -36,6 +44,11 @@ export default function CampaignTruthDocsPage() {
 					<li>
 						<code className="font-mono text-xs">logs/*.md</code> contains
 						readable continuity reports.
+					</li>
+					<li>
+						<code className="font-mono text-xs">logs/timeline-diff.md</code> and{" "}
+						the <code className="font-mono text-xs">timeline_diff</code> tool
+						cover the recent-change workflow.
 					</li>
 				</ul>
 			</section>

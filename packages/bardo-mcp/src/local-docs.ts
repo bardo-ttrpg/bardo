@@ -28,11 +28,9 @@ function renderMarkdown(
 	description: string,
 	body: string,
 ): string {
-	return (
-		`---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(
-			description,
-		)}\n---\n\n${body}`.trimEnd() + "\n"
-	);
+	return `${`---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(
+		description,
+	)}\n---\n\n${body}`.trimEnd()}\n`;
 }
 
 function pathBullet(relativePath: string, note: string): string {
@@ -50,17 +48,17 @@ function buildDocContent(args: {
 		case "quickstart":
 			return renderMarkdown(
 				"Bardo Quickstart",
-				"Start a local-first Bardo campaign workspace and read the important files fast.",
+				"Connect the local workspace bridge and read the important files fast.",
 				[
 					"# Bardo Quickstart",
 					"",
-					"Bardo treats the local workspace as the source of truth. Your agent can help, but the table owns canon and the files stay readable.",
+					"Bardo keeps your campaign files in the local workspace. The remote MCP provides subscription-gated guardrails and tool execution, but the workspace remains the source of truth.",
 					"",
 					"## Start here",
 					"",
-					"- Install the CLI with the command from `bardo.gg`.",
-					"- Run `bardo login` if you are using a hosted key.",
-					"- Run `bardo init` from your campaign workspace root.",
+					"- Install the Bardo bridge with the command from `https://www.bardo.gg/install`.",
+					"- Run `bardo login` and approve the bridge in your browser.",
+					"- Run `bardo init` from your campaign workspace root if the workspace is not bootstrapped yet.",
 					"- Run `bardo connect --client codex` or your preferred client.",
 					"- Read the files below before asking the agent to continue play.",
 					"",
@@ -134,7 +132,7 @@ function buildDocContent(args: {
 				[
 					"# Workspace Reports",
 					"",
-					"These reports are regenerated automatically when projections refresh after meaningful world-state changes.",
+					"These reports are regenerated automatically after remote Bardo tools return validated write plans for the local workspace.",
 					"",
 					pathBullet(
 						"logs/world-state-overview.md",
@@ -149,28 +147,15 @@ function buildDocContent(args: {
 						"Shows what changed since the recent canonical window.",
 					),
 					pathBullet(
-						"logs/faction-pressure.md",
-						"Summarizes faction tension and pressure.",
-					),
-					pathBullet(
-						"logs/npc-state-delta.md",
-						"Explains who changed and what evidence backs it.",
-					),
-					pathBullet(
 						"logs/player-knowledge.md",
 						"Player-safe view that keeps GM-only inference separate.",
-					),
-					pathBullet(
-						"logs/canon-vs-inference.md",
-						"Explicit separation of fact, inference, and suggestion.",
 					),
 					"",
 					"## MCP access",
 					"",
 					"- Read these files directly in the workspace.",
-					"- Or ask your MCP client for the matching report resource, such as `resource://reports/world-state-overview` or `resource://reports/last-session-diff`.",
 					"- Or call the matching report tool when you want a forced refresh.",
-					"- For the clearest recent-change workflow, call `last_session_diff` or read `resource://reports/last-session-diff`.",
+					"- For the clearest recent-change workflow, call `timeline_diff` or read `logs/timeline-diff.md`.",
 				].join("\n"),
 			);
 		case "codex":
@@ -211,7 +196,7 @@ function buildDocContent(args: {
 					"## Recommended workflow",
 					"",
 					"- Read `projections/current-state.md` first.",
-					"- Use report resources for quick continuity checks.",
+					"- Use the generated report files in `logs/` for quick continuity checks.",
 					"- Only promote new lasting facts into canon through canonical tool flows.",
 				].join("\n"),
 			);
@@ -230,12 +215,12 @@ function buildDocContent(args: {
 					"## The agent forgot something important",
 					"",
 					"- Read `events/canonical.ndjson` and `logs/continuity-audit.md`.",
-					"- Regenerate or re-read the report resources before continuing play.",
+					"- Regenerate or re-read the report files before continuing play.",
 					"",
 					"## Credits do not look right",
 					"",
 					"- Only accepted MCP `tools/call` requests consume credits.",
-					"- Resource reads, prompts, init/bootstrap, and dashboard browsing do not consume credits.",
+					"- Bridge sign-in, auth checks, and dashboard browsing do not consume credits.",
 				].join("\n"),
 			);
 		case "credits":
@@ -249,18 +234,17 @@ function buildDocContent(args: {
 					"",
 					"- `1 accepted MCP tool call = 1 credit`",
 					"",
-					"## What is free",
+					"## What is not billed",
 					"",
 					"- `initialize`",
-					"- MCP resources",
-					"- MCP prompts",
+					"- bridge sign-in and browser approval",
 					"- auth and dashboard activity",
 					"- website browsing",
 					"",
 					"## What is billed",
 					"",
 					"- accepted MCP `tools/call` requests only",
-					"- a high-level tool like `scene_turn` still costs exactly one credit",
+					"- a high-level Bardo tool like `scene_turn` still costs exactly one credit",
 					"- if a tool is accepted and later fails, the credit is still consumed",
 					"",
 					"## Where to check it",

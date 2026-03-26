@@ -8,14 +8,13 @@ import {
 test("planCreditsFor returns expected quotas for supported plans", () => {
 	expect(planCreditsFor("free")).toBe(100);
 	expect(planCreditsFor("solo")).toBe(25_000);
-	expect(planCreditsFor("solo_plus")).toBe(50_000);
 });
 
 test("migrateLegacyPlanTier maps old plan names", () => {
 	expect(migrateLegacyPlanTier(undefined)).toBe("free");
 	expect(migrateLegacyPlanTier("free")).toBe("free");
 	expect(migrateLegacyPlanTier("pro")).toBe("solo");
-	expect(migrateLegacyPlanTier("ultra")).toBe("solo_plus");
+	expect(migrateLegacyPlanTier("ultra")).toBe("solo");
 });
 
 test("resolveBillingState falls back to free-tier defaults for legacy users", () => {

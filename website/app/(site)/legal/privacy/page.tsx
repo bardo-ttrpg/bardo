@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
+import { createPublicMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "Privacy Policy",
 	description:
 		"Data collection, purpose, retention, and sharing policy for Bardo.",
-};
+	path: "/legal/privacy",
+});
 
-const updatedAt = "February 19, 2026";
+const updatedAt = "March 12, 2026";
 
 export default function PrivacyPage() {
 	return (
@@ -29,8 +30,10 @@ export default function PrivacyPage() {
 					<p>
 						We collect account and auth metadata (for example email address,
 						user identifier, profile image URL), service telemetry (for example
-						MCP call counts and timestamps), and content you submit through the
-						website, API, and MCP tools.
+						MCP call counts and timestamps), billing metadata, and content you
+						submit through the website, API, and MCP tools. Local workspace
+						files created by the CLI stay on your machine unless you choose to
+						upload or share them through a hosted feature.
 					</p>
 				</section>
 
@@ -66,10 +69,10 @@ export default function PrivacyPage() {
 						auditing, and legal obligations. You may request account deletion at
 						any time by contacting{" "}
 						<a
-							href="mailto:privacy@bardo.dev"
+							href="mailto:privacy@bardo.gg"
 							className="underline underline-offset-2"
 						>
-							privacy@bardo.dev
+							privacy@bardo.gg
 						</a>
 						.
 					</p>

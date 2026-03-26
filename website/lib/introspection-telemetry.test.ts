@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { createIntrospectionTelemetry } from "./introspection-telemetry";
 
 describe("createIntrospectionTelemetry", () => {
-	test("emits a structured Sentry log snapshot on the configured cadence", () => {
+	test("emits a structured telemetry snapshot on the configured cadence", () => {
 		const info = mock(() => {});
 		const telemetry = createIntrospectionTelemetry({
 			logEnabled: true,

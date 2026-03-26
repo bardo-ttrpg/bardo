@@ -41,9 +41,15 @@ export function auditBundleArtifacts(
 	const warnings: string[] = [];
 
 	if (input.analyzeArtifacts.length === 0) {
-		errors.push(
-			"Missing Next bundle analyzer artifacts. Run the audit through an ANALYZE=true build.",
-		);
+		if (input.clientChunks.length === 0) {
+			errors.push(
+				"Missing Next bundle analyzer artifacts. Run the audit through an ANALYZE=true build.",
+			);
+		} else {
+			warnings.push(
+				"Next bundle analyzer artifacts were missing, so the audit used generated client chunks only.",
+			);
+		}
 	}
 
 	for (const chunk of input.clientChunks) {

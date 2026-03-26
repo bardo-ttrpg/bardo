@@ -9,6 +9,20 @@ function normalize(value: string | undefined): string | undefined {
 	return trimmed ? trimmed : undefined;
 }
 
+function requireFalse(
+	value: string | undefined,
+	label: string,
+	errors: string[],
+) {
+	const normalized = normalize(value);
+	if (!normalized) {
+		return;
+	}
+	if (normalized !== "false") {
+		errors.push(`${label} must be false in production`);
+	}
+}
+
 function requirePrefix(
 	value: string | undefined,
 	prefix: string,
@@ -64,41 +78,33 @@ export function validateDeployEnv(
 		errors,
 	);
 
-	if (!normalize(env.BARDO_CLI_LOGIN_SECRET)) {
-		errors.push("BARDO_CLI_LOGIN_SECRET is missing");
+	if (!normalize(env.BARDO_BRIDGE_LOGIN_SECRET)) {
+		errors.push("BARDO_BRIDGE_LOGIN_SECRET is missing");
 	}
-
-	const upstashUrl =
-		normalize(env.BARDO_CLI_DEVICE_SESSION_UPSTASH_REDIS_REST_URL) ||
-		normalize(env.UPSTASH_REDIS_REST_URL);
-	const upstashToken =
-		normalize(env.BARDO_CLI_DEVICE_SESSION_UPSTASH_REDIS_REST_TOKEN) ||
-		normalize(env.UPSTASH_REDIS_REST_TOKEN);
-	const upstashDatabase =
-		normalize(env.BARDO_CLI_DEVICE_SESSION_UPSTASH_DATABASE_NAME) ||
-		normalize(env.UPSTASH_REDIS_DATABASE_NAME);
-
-	if (!upstashUrl || !upstashToken) {
-		errors.push(
-			"Production CLI device sessions require Upstash REST URL and token.",
-		);
+	if (!normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
+		errors.push("BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing");
 	}
-	if (upstashDatabase !== "bardo-production") {
-		errors.push(
-			"Production CLI device sessions must use the bardo-production Upstash database.",
-		);
-	}
+	requireFalse(
+		env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK,
+		"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK",
+		errors,
+	);
+	requireFalse(
+		env.BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK,
+		"BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK",
+		errors,
+	);
+	requireFalse(
+		env.BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK,
+		"BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK",
+		errors,
+	);
 	if (
-		normalize(env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK) === "true"
+		normalize(env.BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE) === "true" &&
+		!normalize(env.BARDO_WORKSPACE_ROOT_ALLOWLIST)
 	) {
 		errors.push(
-			"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK must be false in production.",
-		);
-	}
-
-	if (!normalize(env.SENTRY_DSN)) {
-		warnings.push(
-			"SENTRY_DSN is missing; production connect-flow failures will have reduced observability.",
+			"BARDO_WORKSPACE_ROOT_ALLOWLIST is required when BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE=true in production",
 		);
 	}
 

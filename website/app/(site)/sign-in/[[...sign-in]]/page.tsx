@@ -1,9 +1,8 @@
 import { SignIn } from "@clerk/nextjs";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
+import { createPrivateMetadata } from "@/lib/site-metadata";
 
-export const metadata = {
-	title: "Sign in",
-};
+export const metadata = createPrivateMetadata("Sign In");
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
@@ -37,7 +36,7 @@ export default function SignInPage() {
 				path="/sign-in"
 				routing="path"
 				signUpUrl="/sign-up"
-				forceRedirectUrl="/dashboard"
+				fallbackRedirectUrl="/dashboard"
 			/>
 		</div>
 	);

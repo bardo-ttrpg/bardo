@@ -1,3 +1,5 @@
+export const WEBSITE_REACHABLE_STATUSES = [200, 301, 302, 307, 308] as const;
+
 export function appendVercelProtectionBypass(
 	url: string,
 	bypassSecret: string,

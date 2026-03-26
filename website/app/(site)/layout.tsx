@@ -1,12 +1,10 @@
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import SiteNavLink from "@/components/site-nav-link";
 import ThemeToggle from "@/components/theme-toggle";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
-import { resolveOptionalUserId } from "@/lib/clerk-route-auth";
-import AuthUserButton from "./auth-user-button";
+import { SiteAuthControls, SiteDashboardHeaderLink } from "./site-auth-chrome";
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
@@ -16,11 +14,13 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 const PRIMARY_NAV_LINKS = [
 	{ href: "/docs/install", label: "Docs" },
 	{ href: "/pricing", label: "Pricing" },
+	{ href: "/docs/campaign-truth", label: "Campaign Truth" },
 	{ href: "/legal", label: "Legal" },
 ] as const;
 
 const FOOTER_PRODUCT_LINKS = [
 	{ label: "Docs", href: "/docs/install" },
+	{ label: "Campaign Truth", href: "/docs/campaign-truth" },
 	{ label: "Pricing", href: "/pricing" },
 	{ label: "Legal", href: "/legal" },
 	{ label: "Sign up", href: "/sign-up" },
@@ -42,48 +42,16 @@ function NavLink({ href, label }: { href: string; label: string }) {
 	return <SiteNavLink href={href} label={label} className={navLinkClass} />;
 }
 
-function AuthCtaLinks() {
-	return (
-		<>
-			<SiteNavLink href="/sign-in" label="Log in" className={navLinkClass} />
-			<SiteNavLink
-				href="/sign-up"
-				label="Sign up ↗"
-				className="border border-foreground/30 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-			/>
-		</>
-	);
-}
-
-function AuthControls({ isSignedIn }: { isSignedIn: boolean }) {
-	if (!IS_CLERK_CONFIGURED || !isSignedIn) {
-		return <AuthCtaLinks />;
-	}
-
-	return <AuthUserButton />;
-}
-
-function DashboardHeaderLink({ isSignedIn }: { isSignedIn: boolean }) {
-	if (!IS_CLERK_CONFIGURED || !isSignedIn) {
-		return null;
-	}
-
-	return <NavLink href="/dashboard" label="DASHBOARD" />;
-}
-
-export default async function SiteLayout({
-	children,
-}: {
-	children: ReactNode;
-}) {
-	const userId = IS_CLERK_CONFIGURED
-		? await resolveOptionalUserId("/(site)/layout", { authFn: auth })
-		: null;
-	const isSignedIn = Boolean(userId);
-
+export default function SiteLayout({ children }: { children: ReactNode }) {
 	const body = (
 		<div className="min-h-screen text-foreground">
-			<header className="sticky top-0 z-50 border-b border-border bg-background">
+			<div className="border-b border-border/80 bg-card/50 px-4 py-2 text-center sm:px-6">
+				<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+					Local-First AI GM • System-Agnostic • 1 Accepted MCP Tool Call = 1
+					Credit
+				</p>
+			</div>
+			<header className="sticky top-0 z-50 border-b border-border bg-background/88 backdrop-blur">
 				<div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6">
 					<SiteNavLink
 						href="/"
@@ -98,11 +66,11 @@ export default async function SiteLayout({
 						{PRIMARY_NAV_LINKS.map((link) => (
 							<NavLink key={link.href} href={link.href} label={link.label} />
 						))}
-						<DashboardHeaderLink isSignedIn={isSignedIn} />
+						<SiteDashboardHeaderLink enabled={IS_CLERK_CONFIGURED} />
 					</nav>
 
 					<div className="flex items-center gap-3">
-						<AuthControls isSignedIn={isSignedIn} />
+						<SiteAuthControls enabled={IS_CLERK_CONFIGURED} />
 						<ThemeToggle />
 					</div>
 				</div>
@@ -119,7 +87,7 @@ export default async function SiteLayout({
 								label={link.label}
 							/>
 						))}
-						<DashboardHeaderLink isSignedIn={isSignedIn} />
+						<SiteDashboardHeaderLink enabled={IS_CLERK_CONFIGURED} />
 					</nav>
 				</div>
 			</header>
@@ -189,17 +157,18 @@ export default async function SiteLayout({
 								prefetch={false}
 								className="inline-block border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
 							>
-								View pricing ↗
+								View Pricing ↗
 							</Link>
 						</div>
 					</div>
 
 					<div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-8">
 						<span className="font-mono text-[11px] text-muted-foreground">
-							© {new Date().getFullYear()} Bardo — MCP-driven TTRPG operations
+							© {new Date().getFullYear()} Bardo — paid remote MCP for tabletop
+							campaign continuity
 						</span>
 						<span className="font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/70">
-							MCP · TTRPG · MARKDOWN · WORLDS · SESSION · STATE
+							MCP · TTRPG · MARKDOWN · CANON · CONTINUITY · STATE
 						</span>
 					</div>
 				</div>

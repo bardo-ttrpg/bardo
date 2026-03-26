@@ -1,29 +1,36 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { createPublicMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata = createPublicMetadata({
 	title: "Legal",
 	description: "Terms, privacy, and AI use policy for Bardo.",
-};
+	path: "/legal",
+	keywords: [
+		"Bardo legal",
+		"AI use policy",
+		"privacy policy",
+		"terms of service",
+	],
+});
 
 const pages = [
 	{
 		title: "Terms of Service",
 		href: "/legal/terms",
 		description:
-			"Account terms, acceptable use, billing/no-refund policy, and governing law.",
+			"Account terms, acceptable use, monthly-credit billing, and service responsibilities.",
 	},
 	{
 		title: "Privacy Policy",
 		href: "/legal/privacy",
 		description:
-			"What data we collect, why we collect it, retention, and sharing controls.",
+			"What data the hosted website and MCP service collect, and what stays local in your workspace.",
 	},
 	{
 		title: "AI Use Policy",
 		href: "/legal/ai-policy",
 		description:
-			"AI output limitations, user responsibility, and safety expectations.",
+			"How Bardo treats canon, inference, user review, and AI-output limitations.",
 	},
 ] as const;
 
@@ -37,8 +44,9 @@ export default function LegalIndexPage() {
 				Policies and terms
 			</h1>
 			<p className="mb-10 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-				These pages describe how Bardo handles accounts, API/MCP usage, data,
-				and AI-output limits.
+				These pages describe how Bardo handles the website, hosted MCP service,
+				local bridge, local workspace files, monthly credits, and AI-output
+				limits.
 			</p>
 
 			<div className="grid gap-4">

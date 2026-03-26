@@ -2,8 +2,8 @@ import path from "node:path";
 import {
 	applySpanAttributes,
 	buildHostedAuthSpanAttributes,
-	captureSentryException,
-	logSentryMessage,
+	captureTelemetryException,
+	logTelemetryMessage,
 	withHostedAuthSpan,
 } from "../../telemetry";
 import type { AuthContext } from "../../types/contracts";
@@ -43,7 +43,7 @@ type HostedIntrospectionResponse =
 			campaignBasePath: string;
 			subjectId?: string;
 			keyId?: string;
-			plan?: "free" | "solo" | "solo_plus";
+			plan?: "free" | "solo";
 			mcpPeriodLimit?: number;
 	  }
 	| {
@@ -113,11 +113,7 @@ function parseHostedIntrospectionPayload(
 			? record.keyId.trim()
 			: null;
 	const plan =
-		record.plan === "free" ||
-		record.plan === "solo" ||
-		record.plan === "solo_plus"
-			? record.plan
-			: null;
+		record.plan === "free" || record.plan === "solo" ? record.plan : null;
 	const mcpPeriodLimit =
 		typeof record.mcpPeriodLimit === "number" &&
 		Number.isFinite(record.mcpPeriodLimit) &&
@@ -218,7 +214,7 @@ export function createHostedIntrospectionApiKeyValidator(
 					});
 					httpOk = response.ok;
 					if (!response.ok) {
-						logSentryMessage("warn", "mcp.hosted_auth.invalid_response", {
+						logTelemetryMessage("warn", "mcp.hosted_auth.invalid_response", {
 							"bardo.service": "mcp",
 							"bardo.auth.provider": "hosted",
 							"bardo.auth.required_scope": requiredScope,
@@ -244,9 +240,12 @@ export function createHostedIntrospectionApiKeyValidator(
 				} catch (error) {
 					timedOut = error instanceof Error && error.name === "AbortError";
 					if (!timedOut) {
-						captureSentryException(error);
+						captureTelemetryException(error, {
+							"bardo.service": "mcp",
+							"bardo.auth.provider": "hosted",
+						});
 					}
-					logSentryMessage(
+					logTelemetryMessage(
 						timedOut ? "warn" : "error",
 						"mcp.hosted_auth.fetch_failed",
 						{

@@ -26,4 +26,20 @@ describe("Clerk provider placement", () => {
 		expect(rootLayoutSource).toContain("<Analytics");
 		expect(rootLayoutSource).toContain("<SpeedInsights");
 	});
+
+	test("defines canonical, social, and robots metadata at the root layout", () => {
+		expect(rootLayoutSource).toContain("metadataBase");
+		expect(rootLayoutSource).toContain("openGraph");
+		expect(rootLayoutSource).toContain("twitter");
+		expect(rootLayoutSource).toContain("robots");
+		expect(rootLayoutSource).toContain("alternates");
+	});
+
+	test("keeps the background atmospheric without the old grid overlay", () => {
+		expect(rootLayoutSource).not.toContain("[background-image:linear-gradient");
+	});
+
+	test("declares smooth-scroll behavior for Next.js route transitions", () => {
+		expect(rootLayoutSource).toContain('data-scroll-behavior="smooth"');
+	});
 });

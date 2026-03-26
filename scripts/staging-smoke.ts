@@ -1,6 +1,7 @@
 import {
 	createVercelProtectionHeaders,
 	parseJsonOrSseJson,
+	WEBSITE_REACHABLE_STATUSES,
 } from "./staging-smoke-lib";
 
 type CheckResult = {
@@ -35,7 +36,7 @@ function readRequiredEnv(name: string): string {
 	return value;
 }
 
-function readOptionalEnv(name: string, fallback: string): string {
+function readOptionalEnv(name: string, fallback = ""): string {
 	return Bun.env[name]?.trim() || fallback;
 }
 
@@ -71,10 +72,9 @@ async function expectStatus(args: {
 }): Promise<CheckResult> {
 	try {
 		const response = await fetchWithTimeout(args.url, args.init ?? {});
-		const ok = args.expectedStatuses.includes(response.status);
 		return {
 			name: args.name,
-			ok,
+			ok: args.expectedStatuses.includes(response.status),
 			details: `${response.status} ${response.statusText}`,
 		};
 	} catch (error) {
@@ -86,15 +86,33 @@ async function expectStatus(args: {
 	}
 }
 
+async function fetchJson<T>(args: {
+	url: string;
+	init?: RequestInit;
+	timeoutMs?: number;
+}): Promise<{ response: Response; json: T }> {
+	const response = await fetchWithTimeout(
+		args.url,
+		args.init ?? {},
+		args.timeoutMs,
+	);
+	const body = await response.text();
+	return {
+		response,
+		json: parseJsonOrSseJson<T>(body),
+	};
+}
+
 async function postJson<T>(args: {
 	url: string;
 	body: unknown;
 	headers?: Record<string, string>;
 	timeoutMs?: number;
 }): Promise<{ response: Response; json: T }> {
-	const response = await fetchWithTimeout(
-		args.url,
-		{
+	return fetchJson<T>({
+		url: args.url,
+		timeoutMs: args.timeoutMs,
+		init: {
 			method: "POST",
 			headers: {
 				"content-type": "application/json",
@@ -103,10 +121,7 @@ async function postJson<T>(args: {
 			},
 			body: JSON.stringify(args.body),
 		},
-		args.timeoutMs,
-	);
-	const json = parseJsonOrSseJson<T>(await response.text());
-	return { response, json };
+	});
 }
 
 function assertJsonRpcSuccess<T>(
@@ -115,23 +130,177 @@ function assertJsonRpcSuccess<T>(
 	return "result" in payload;
 }
 
-function hasStructuredReportMarkdown(value: unknown, heading: string): boolean {
+function authHeaders(
+	token: string,
+	extra: Record<string, string> = {},
+): Record<string, string> {
+	return {
+		authorization: `Bearer ${token}`,
+		...extra,
+	};
+}
+
+function formatCheck(check: CheckResult): string {
+	const label = check.skipped ? "SKIP" : check.ok ? "PASS" : "FAIL";
+	return `${label} ${check.name}: ${check.details}`;
+}
+
+async function startAndApproveBridgeSession(args: {
+	websiteUrl: string;
+	protectionHeaders: Record<string, string>;
+	authCookie: string;
+}): Promise<{
+	sessionId: string;
+	pollUrl: string;
+	accessToken: string;
+	refreshToken: string;
+	statusUrl: string;
+	plan: string;
+}> {
+	const started = await postJson<{
+		sessionId?: string;
+		pollUrl?: string;
+		error?: string;
+	}>({
+		url: new URL(
+			"/api/connect/bridge-session/start",
+			args.websiteUrl,
+		).toString(),
+		headers: args.protectionHeaders,
+		body: {},
+	});
+
+	if (!started.response.ok) {
+		throw new Error(started.json.error ?? "Failed to start bridge session.");
+	}
+
+	const sessionId = started.json.sessionId?.trim();
+	const pollUrl = started.json.pollUrl?.trim();
+	if (!sessionId || !pollUrl) {
+		throw new Error("Bridge session start returned an invalid payload.");
+	}
+
+	const approved = await postJson<{ ok?: boolean; error?: string }>({
+		url: new URL(
+			"/api/connect/bridge-session/approve",
+			args.websiteUrl,
+		).toString(),
+		headers: {
+			...args.protectionHeaders,
+			cookie: args.authCookie,
+		},
+		body: { sessionId },
+	});
+	if (!approved.response.ok || approved.json.ok !== true) {
+		throw new Error(approved.json.error ?? "Failed to approve bridge session.");
+	}
+
+	for (let attempt = 0; attempt < 10; attempt += 1) {
+		const polled = await fetchJson<{
+			status?: string;
+			accessToken?: string;
+			refreshToken?: string;
+			statusUrl?: string;
+			plan?: string;
+			error?: string;
+		}>({
+			url: pollUrl,
+			init: {
+				headers: args.protectionHeaders,
+			},
+		});
+		if (!polled.response.ok) {
+			throw new Error(polled.json.error ?? "Bridge session poll failed.");
+		}
+		if (polled.json.status === "pending") {
+			await Bun.sleep(750);
+			continue;
+		}
+		if (
+			polled.json.status === "approved" &&
+			typeof polled.json.accessToken === "string" &&
+			typeof polled.json.refreshToken === "string" &&
+			typeof polled.json.statusUrl === "string"
+		) {
+			return {
+				sessionId,
+				pollUrl,
+				accessToken: polled.json.accessToken,
+				refreshToken: polled.json.refreshToken,
+				statusUrl: polled.json.statusUrl,
+				plan: typeof polled.json.plan === "string" ? polled.json.plan : "free",
+			};
+		}
+		throw new Error(
+			polled.json.error ?? "Bridge session poll returned an invalid payload.",
+		);
+	}
+
+	throw new Error("Bridge session poll did not reach approved state.");
+}
+
+async function expectUnpaidBridgeDenial(args: {
+	websiteUrl: string;
+	protectionHeaders: Record<string, string>;
+	authCookie: string;
+}): Promise<CheckResult> {
+	const started = await postJson<{
+		sessionId?: string;
+		error?: string;
+	}>({
+		url: new URL(
+			"/api/connect/bridge-session/start",
+			args.websiteUrl,
+		).toString(),
+		headers: args.protectionHeaders,
+		body: {},
+	});
+
+	if (!started.response.ok || typeof started.json.sessionId !== "string") {
+		return {
+			name: "bridge-session unpaid denial",
+			ok: false,
+			details:
+				started.json.error ?? `start failed with ${started.response.status}`,
+		};
+	}
+
+	const approval = await postJson<{ error?: string }>({
+		url: new URL(
+			"/api/connect/bridge-session/approve",
+			args.websiteUrl,
+		).toString(),
+		headers: {
+			...args.protectionHeaders,
+			cookie: args.authCookie,
+		},
+		body: { sessionId: started.json.sessionId },
+	});
+
+	return {
+		name: "bridge-session unpaid denial",
+		ok:
+			approval.response.status === 403 &&
+			approval.json.error ===
+				"An active paid plan is required before a bridge can connect to Bardo.",
+		details: `${approval.response.status} ${approval.json.error ?? "missing error"}`,
+	};
+}
+
+function hasReportMarkdown(value: unknown, heading: string): boolean {
 	if (!value || typeof value !== "object") {
 		return false;
 	}
-
 	const candidate = value as {
 		rawMarkdown?: unknown;
 		content?: Array<{ text?: unknown }>;
 	};
-
 	if (
 		typeof candidate.rawMarkdown === "string" &&
 		candidate.rawMarkdown.includes(heading)
 	) {
 		return true;
 	}
-
 	const contentText = candidate.content
 		?.map((entry) => (typeof entry.text === "string" ? entry.text : ""))
 		.join("\n");
@@ -141,60 +310,174 @@ function hasStructuredReportMarkdown(value: unknown, heading: string): boolean {
 async function main() {
 	const websiteUrl = readRequiredEnv("STAGING_WEBSITE_URL");
 	const mcpUrl = readRequiredEnv("STAGING_MCP_URL");
-	const apiKey = readRequiredEnv("STAGING_API_KEY");
-	const introspectionToken = readRequiredEnv("STAGING_INTROSPECTION_TOKEN");
-	const authCookie = Bun.env.STAGING_AUTH_COOKIE?.trim() || "";
-	const connectClient = readOptionalEnv("STAGING_CONNECT_CLIENT", "codex");
-	const connectMode = readOptionalEnv("STAGING_CONNECT_MODE", "remote");
-	const mcpServerName = readOptionalEnv("STAGING_MCP_SERVER_NAME", "bardo");
-	const websiteProtectionBypassSecret = readOptionalEnv(
-		"STAGING_VERCEL_PROTECTION_BYPASS_SECRET",
-		"",
-	);
-	const websiteProtectionHeaders = createVercelProtectionHeaders(
-		websiteProtectionBypassSecret,
+	const authCookie = readOptionalEnv("STAGING_AUTH_COOKIE");
+	const unpaidAuthCookie = readOptionalEnv("STAGING_UNPAID_AUTH_COOKIE");
+	const bridgeAccessToken =
+		readOptionalEnv("STAGING_BRIDGE_ACCESS_TOKEN") ||
+		readOptionalEnv("STAGING_API_KEY");
+	const protectionHeaders = createVercelProtectionHeaders(
+		readOptionalEnv("STAGING_VERCEL_PROTECTION_BYPASS_SECRET"),
 	);
 
 	const checks: CheckResult[] = [];
 
+	for (const [name, pathname] of [
+		["website root", "/"],
+		["website pricing", "/pricing"],
+		["website legal", "/legal"],
+		["website docs index", "/docs"],
+		["website docs install", "/docs/install"],
+		["website docs connect", "/docs/connect-client"],
+	] as const) {
+		checks.push(
+			await expectStatus({
+				name,
+				url: new URL(pathname, websiteUrl).toString(),
+				init: { headers: protectionHeaders },
+				expectedStatuses: [...WEBSITE_REACHABLE_STATUSES],
+			}),
+		);
+	}
+
 	checks.push(
 		await expectStatus({
-			name: "website root",
-			url: websiteUrl,
+			name: "dashboard signed-out redirect",
+			url: new URL("/dashboard", websiteUrl).toString(),
 			init: {
-				headers: websiteProtectionHeaders,
+				headers: protectionHeaders,
+				redirect: "manual",
 			},
-			expectedStatuses: [200, 301, 302, 307, 308],
+			expectedStatuses: [307, 308],
 		}),
 	);
 
-	const healthResult = await expectStatus({
-		name: "mcp health",
-		url: buildHealthUrl(mcpUrl),
-		expectedStatuses: [200],
-	});
-	checks.push(healthResult);
-
-	const introspection = await postJson<{ valid?: boolean }>({
-		url: new URL("/api/auth/introspect-key", websiteUrl).toString(),
-		headers: {
-			...websiteProtectionHeaders,
-			"x-bardo-introspection-token": introspectionToken,
-		},
-		body: {
-			apiKey,
-			requiredScope: "mcp",
-		},
-	});
-	checks.push({
-		name: "website introspection",
-		ok: introspection.response.ok && introspection.json.valid === true,
-		details: `${introspection.response.status} valid=${String(introspection.json.valid)}`,
-	});
-
 	checks.push(
 		await expectStatus({
-			name: "mcp initialize without key",
+			name: "mcp health",
+			url: buildHealthUrl(mcpUrl),
+			expectedStatuses: [200],
+		}),
+	);
+
+	let approvedBridge: {
+		sessionId: string;
+		pollUrl: string;
+		accessToken: string;
+		refreshToken: string;
+		statusUrl: string;
+		plan: string;
+	} | null = null;
+
+	if (authCookie) {
+		const dashboard = await expectStatus({
+			name: "dashboard signed-in render",
+			url: new URL("/dashboard", websiteUrl).toString(),
+			init: {
+				headers: {
+					...protectionHeaders,
+					cookie: authCookie,
+				},
+			},
+			expectedStatuses: [200],
+		});
+		checks.push(dashboard);
+
+		const billing = await fetchJson<{
+			billing?: {
+				plan?: string;
+				billingUnavailable?: boolean;
+			};
+			error?: string;
+		}>({
+			url: new URL("/api/billing", websiteUrl).toString(),
+			init: {
+				headers: {
+					...protectionHeaders,
+					cookie: authCookie,
+				},
+			},
+		});
+		checks.push({
+			name: "website billing paid user",
+			ok:
+				billing.response.ok &&
+				billing.json.billing?.billingUnavailable === false &&
+				billing.json.billing?.plan !== "free",
+			details: `${billing.response.status} plan=${billing.json.billing?.plan ?? "missing"}`,
+		});
+
+		try {
+			approvedBridge = await startAndApproveBridgeSession({
+				websiteUrl,
+				protectionHeaders,
+				authCookie,
+			});
+			checks.push({
+				name: "bridge-session approve",
+				ok: true,
+				details: `plan=${approvedBridge.plan} session=${approvedBridge.sessionId}`,
+			});
+		} catch (error) {
+			checks.push({
+				name: "bridge-session approve",
+				ok: false,
+				details: error instanceof Error ? error.message : String(error),
+			});
+		}
+	} else {
+		checks.push({
+			name: "dashboard signed-in render",
+			ok: true,
+			skipped: true,
+			details:
+				"Set STAGING_AUTH_COOKIE to validate paid user dashboard and bridge approval.",
+		});
+		checks.push({
+			name: "website billing paid user",
+			ok: true,
+			skipped: true,
+			details:
+				"Set STAGING_AUTH_COOKIE to validate Clerk billing for a paid user.",
+		});
+		checks.push({
+			name: "bridge-session approve",
+			ok: true,
+			skipped: true,
+			details:
+				"Set STAGING_AUTH_COOKIE to validate the browser-approved bridge flow.",
+		});
+	}
+
+	if (unpaidAuthCookie) {
+		checks.push(
+			await expectUnpaidBridgeDenial({
+				websiteUrl,
+				protectionHeaders,
+				authCookie: unpaidAuthCookie,
+			}),
+		);
+	} else {
+		checks.push({
+			name: "bridge-session unpaid denial",
+			ok: true,
+			skipped: true,
+			details:
+				"Set STAGING_UNPAID_AUTH_COOKIE to validate the unpaid rejection path.",
+		});
+	}
+
+	const activeAccessToken = approvedBridge?.accessToken || bridgeAccessToken;
+	if (!activeAccessToken) {
+		checks.push({
+			name: "protected MCP flow",
+			ok: true,
+			skipped: true,
+			details:
+				"Set STAGING_AUTH_COOKIE or STAGING_BRIDGE_ACCESS_TOKEN to validate authenticated MCP requests.",
+		});
+	} else {
+		const initializeWithoutAuth = await expectStatus({
+			name: "mcp initialize without credential",
 			url: mcpUrl,
 			init: {
 				method: "POST",
@@ -214,19 +497,18 @@ async function main() {
 				}),
 			},
 			expectedStatuses: [401],
-		}),
-	);
+		});
+		checks.push(initializeWithoutAuth);
 
-	checks.push(
-		await expectStatus({
-			name: "mcp initialize invalid key",
+		const initializeInvalid = await expectStatus({
+			name: "mcp initialize invalid credential",
 			url: mcpUrl,
 			init: {
 				method: "POST",
 				headers: {
 					"content-type": "application/json",
 					accept: "application/json, text/event-stream",
-					"x-api-key": "invalid-staging-key",
+					authorization: "Bearer invalid-staging-token",
 				},
 				body: JSON.stringify({
 					jsonrpc: "2.0",
@@ -239,611 +521,177 @@ async function main() {
 					},
 				}),
 			},
-			expectedStatuses: [403],
-		}),
-	);
-
-	const initialize = await postJson<
-		JsonRpcResponse<{
-			protocolVersion: string;
-		}>
-	>({
-		url: mcpUrl,
-		headers: {
-			"x-api-key": apiKey,
-		},
-		body: {
-			jsonrpc: "2.0",
-			id: 3,
-			method: "initialize",
-			params: {
-				protocolVersion: "2025-06-18",
-				capabilities: {},
-				clientInfo: { name: "staging-smoke", version: "1.0.0" },
-			},
-		},
-	});
-
-	const mcpSessionId = initialize.response.headers.get("mcp-session-id");
-	checks.push({
-		name: "mcp initialize valid key",
-		ok:
-			initialize.response.ok &&
-			assertJsonRpcSuccess(initialize.json) &&
-			initialize.json.result.protocolVersion === "2025-06-18" &&
-			Boolean(mcpSessionId),
-		details: `${initialize.response.status} session=${mcpSessionId ?? "missing"}`,
-	});
-
-	const sessionHeaders = {
-		"x-api-key": apiKey,
-		"mcp-session-id": mcpSessionId ?? "",
-	};
-
-	const toolsList = await postJson<
-		JsonRpcResponse<{ tools: Array<{ name: string }> }>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 4,
-			method: "tools/list",
-			params: {},
-		},
-	});
-
-	const toolNames =
-		toolsList.response.ok && assertJsonRpcSuccess(toolsList.json)
-			? toolsList.json.result.tools.map((tool) => tool.name)
-			: [];
-	checks.push({
-		name: "mcp tools/list",
-		ok:
-			toolsList.response.ok &&
-			toolNames.includes("init") &&
-			toolNames.includes("context_query") &&
-			toolNames.includes("scene_turn") &&
-			toolNames.includes("player_action") &&
-			!toolNames.includes("campaign_turn") &&
-			!toolNames.includes("verify_narration"),
-		details: toolNames.join(", "),
-	});
-
-	const promptsList = await postJson<
-		JsonRpcResponse<{ prompts: Array<{ name: string }> }>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 5,
-			method: "prompts/list",
-			params: {},
-		},
-	});
-	const promptNames =
-		promptsList.response.ok && assertJsonRpcSuccess(promptsList.json)
-			? promptsList.json.result.prompts.map((prompt) => prompt.name)
-			: [];
-	checks.push({
-		name: "mcp prompts/list",
-		ok:
-			promptsList.response.ok &&
-			promptNames.includes("run_scene_turn") &&
-			promptNames.includes("generate_session_recap"),
-		details: promptNames.join(", "),
-	});
-
-	const reportResource = await postJson<
-		JsonRpcResponse<{ contents?: Array<{ text?: string }> }>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 51,
-			method: "resources/read",
-			params: {
-				uri: "resource://reports/world-state-overview",
-			},
-		},
-	});
-	const reportResourceMarkdown =
-		reportResource.response.ok && assertJsonRpcSuccess(reportResource.json)
-			? (reportResource.json.result.contents?.[0]?.text ?? "")
-			: "";
-	checks.push({
-		name: "mcp report resource",
-		ok:
-			reportResource.response.ok &&
-			reportResourceMarkdown.includes("# World State Overview") &&
-			reportResourceMarkdown.includes("events/canonical.ndjson"),
-		details: reportResourceMarkdown.slice(0, 120),
-	});
-
-	const lastSessionResource = await postJson<
-		JsonRpcResponse<{ contents?: Array<{ text?: string }> }>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 52,
-			method: "resources/read",
-			params: {
-				uri: "resource://reports/last-session-diff",
-			},
-		},
-	});
-	const lastSessionResourceMarkdown =
-		lastSessionResource.response.ok &&
-		assertJsonRpcSuccess(lastSessionResource.json)
-			? (lastSessionResource.json.result.contents?.[0]?.text ?? "")
-			: "";
-	checks.push({
-		name: "mcp last-session resource",
-		ok:
-			lastSessionResource.response.ok &&
-			lastSessionResourceMarkdown.includes("# Timeline Diff") &&
-			lastSessionResourceMarkdown.includes("Evidence references:"),
-		details: lastSessionResourceMarkdown.slice(0, 120),
-	});
-
-	const reportTool = await postJson<
-		JsonRpcResponse<{
-			structuredContent?: { success?: boolean; rawMarkdown?: string };
-		}>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 53,
-			method: "tools/call",
-			params: {
-				name: "world_state_overview",
-				arguments: {},
-			},
-		},
-	});
-	const reportToolContent =
-		reportTool.response.ok && assertJsonRpcSuccess(reportTool.json)
-			? reportTool.json.result.structuredContent
-			: undefined;
-	checks.push({
-		name: "mcp report tool",
-		ok:
-			reportTool.response.ok &&
-			reportToolContent?.success === true &&
-			hasStructuredReportMarkdown(reportToolContent, "# World State Overview"),
-		details: JSON.stringify(
-			reportToolContent ?? "missing structured content",
-		).slice(0, 120),
-	});
-
-	const lastSessionTool = await postJson<
-		JsonRpcResponse<{
-			structuredContent?: { success?: boolean; rawMarkdown?: string };
-		}>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 54,
-			method: "tools/call",
-			params: {
-				name: "last_session_diff",
-				arguments: {},
-			},
-		},
-	});
-	const lastSessionToolContent =
-		lastSessionTool.response.ok && assertJsonRpcSuccess(lastSessionTool.json)
-			? lastSessionTool.json.result.structuredContent
-			: undefined;
-	checks.push({
-		name: "mcp last-session tool",
-		ok:
-			lastSessionTool.response.ok &&
-			lastSessionToolContent?.success === true &&
-			hasStructuredReportMarkdown(lastSessionToolContent, "# Timeline Diff"),
-		details: JSON.stringify(
-			lastSessionToolContent ?? "missing structured content",
-		).slice(0, 120),
-	});
-
-	const sceneTurn = await postJson<
-		JsonRpcResponse<{
-			structuredContent?: {
-				success?: boolean;
-				message?: string;
-				gmPacket?: {
-					narrativeBeats?: string[];
-					discoveries?: Array<{ persisted?: boolean }>;
-				};
-				consistency?: {
-					success?: boolean;
-					errorCount?: number;
-				};
-			};
-		}>
-	>({
-		url: mcpUrl,
-		headers: sessionHeaders,
-		body: {
-			jsonrpc: "2.0",
-			id: 6,
-			method: "tools/call",
-			params: {
-				name: "scene_turn",
-				arguments: {
-					action: "I listen to the tavern for gossip.",
-					idempotencyKey: "staging-smoke-scene-turn",
-				},
-			},
-		},
-	});
-	const sceneTurnContent =
-		sceneTurn.response.ok && assertJsonRpcSuccess(sceneTurn.json)
-			? sceneTurn.json.result.structuredContent
-			: undefined;
-	checks.push({
-		name: "scene_turn gameplay",
-		ok:
-			sceneTurn.response.ok &&
-			sceneTurnContent?.success === true &&
-			(sceneTurnContent.gmPacket?.narrativeBeats?.length ?? 0) > 0 &&
-			sceneTurnContent.consistency?.success === true &&
-			(sceneTurnContent.consistency?.errorCount ?? 1) === 0,
-		details:
-			sceneTurnContent?.message ??
-			(sceneTurn.response.ok ? "missing structured content" : "request failed"),
-	});
-
-	const runtimeStatus = await fetchWithTimeout(
-		new URL("/api/connect/runtime-status", websiteUrl).toString(),
-		{
-			headers: {
-				...websiteProtectionHeaders,
-				BARDO_API_KEY: apiKey,
-			},
-		},
-	);
-	const runtimeStatusJson = (await runtimeStatus.json()) as { valid?: boolean };
-	checks.push({
-		name: "website runtime-status",
-		ok: runtimeStatus.ok && runtimeStatusJson.valid === true,
-		details: `${runtimeStatus.status} valid=${String(runtimeStatusJson.valid)}`,
-	});
-
-	const snippets = await postJson<{ baseUrl?: string; snippet?: string }>({
-		url: new URL("/api/connect/snippets", websiteUrl).toString(),
-		headers: websiteProtectionHeaders,
-		body: {
-			client: connectClient,
-			mode: connectMode,
-			apiKey,
-			serverName: mcpServerName,
-		},
-	});
-	const expectedSnippetBaseUrl = new URL("/mcp", mcpUrl).toString();
-	checks.push({
-		name: "website connect snippets",
-		ok:
-			snippets.response.ok &&
-			snippets.json.baseUrl === expectedSnippetBaseUrl &&
-			typeof snippets.json.snippet === "string" &&
-			snippets.json.snippet.length > 0,
-		details: `${snippets.response.status} baseUrl=${snippets.json.baseUrl ?? "missing"}`,
-	});
-
-	const cliSessionStart = await postJson<
-		| {
-				sessionId?: string;
-				pollUrl?: string;
-				verificationUrl?: string;
-				intervalMs?: number;
-		  }
-		| { error?: string }
-	>({
-		url: new URL("/api/connect/cli-session/start", websiteUrl).toString(),
-		headers: websiteProtectionHeaders,
-		body: {},
-	});
-	const pollUrl =
-		typeof cliSessionStart.json.pollUrl === "string"
-			? cliSessionStart.json.pollUrl
-			: "";
-	const cliSessionId =
-		typeof cliSessionStart.json.sessionId === "string"
-			? cliSessionStart.json.sessionId
-			: "";
-	checks.push({
-		name: "website cli-session start",
-		ok:
-			cliSessionStart.response.ok &&
-			pollUrl.length > 0 &&
-			cliSessionId.length > 0 &&
-			typeof cliSessionStart.json.verificationUrl === "string" &&
-			typeof cliSessionStart.json.intervalMs === "number",
-		details: `${cliSessionStart.response.status} session=${cliSessionId || "missing"}`,
-	});
-
-	if (pollUrl) {
-		const pendingPoll = await fetchWithTimeout(pollUrl, {
-			headers: websiteProtectionHeaders,
+			expectedStatuses: [401, 403],
 		});
-		const pendingPollJson = (await pendingPoll.json()) as {
-			status?: string;
-			intervalMs?: number;
-		};
-		checks.push({
-			name: "website cli-session poll pending",
-			ok:
-				pendingPoll.ok &&
-				pendingPollJson.status === "pending" &&
-				typeof pendingPollJson.intervalMs === "number",
-			details: `${pendingPoll.status} status=${pendingPollJson.status ?? "missing"}`,
-		});
-	}
+		checks.push(initializeInvalid);
 
-	if (!authCookie) {
-		checks.push({
-			name: "website authenticated smoke flows",
-			ok: true,
-			skipped: true,
-			details:
-				"set STAGING_AUTH_COOKIE to enable dashboard key lifecycle and protected CLI smoke checks",
-		});
-	} else {
-		const authHeaders = {
-			...websiteProtectionHeaders,
-			cookie: authCookie,
-		};
-
-		const authKeys = await fetchWithTimeout(
-			new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
-			{
-				headers: authHeaders,
-			},
-		);
-		const authKeysJson = (await authKeys.json()) as {
-			keys?: Array<{ id?: string }>;
-			page?: { hasMore?: boolean; nextOffset?: number | null };
-		};
-		checks.push({
-			name: "website authenticated keys list",
-			ok:
-				authKeys.ok &&
-				Array.isArray(authKeysJson.keys) &&
-				typeof authKeysJson.page?.hasMore === "boolean" &&
-				"nextOffset" in (authKeysJson.page ?? {}),
-			details: `${authKeys.status} keys=${String(authKeysJson.keys?.length ?? 0)}`,
-		});
-
-		const existingKeyId = authKeysJson.keys?.[0]?.id?.trim() || "";
-		if (existingKeyId) {
-			const keySlotRecovery = await fetchWithTimeout(
-				new URL(`/api/keys/${existingKeyId}`, websiteUrl).toString(),
-				{
-					method: "DELETE",
-					headers: authHeaders,
-				},
-			);
-			const keySlotRecoveryJson = (await keySlotRecovery.json()) as {
-				revoked?: boolean;
-				error?: string;
-			};
-			checks.push({
-				name: "website authenticated key-slot recovery",
-				ok: keySlotRecovery.ok && keySlotRecoveryJson.revoked === true,
-				details: `${keySlotRecovery.status} revoked=${String(keySlotRecoveryJson.revoked)}`,
-			});
-		}
-
-		const keyName = `staging-smoke-${Date.now()}`;
-		const createdKey = await postJson<{
-			key?: { id?: string; name?: string };
-			secret?: string;
-			error?: string;
-		}>({
-			url: new URL("/api/keys", websiteUrl).toString(),
-			headers: authHeaders,
+		const initialize = await postJson<
+			JsonRpcResponse<{
+				protocolVersion: string;
+			}>
+		>({
+			url: mcpUrl,
+			headers: authHeaders(activeAccessToken),
 			body: {
-				name: keyName,
-				scopes: ["mcp"],
+				jsonrpc: "2.0",
+				id: 3,
+				method: "initialize",
+				params: {
+					protocolVersion: "2025-06-18",
+					capabilities: {},
+					clientInfo: { name: "staging-smoke", version: "1.0.0" },
+				},
 			},
 		});
-		const createdKeyId = createdKey.json.key?.id?.trim() || "";
-		const createdKeySecret = createdKey.json.secret?.trim() || "";
+		const mcpSessionId = initialize.response.headers.get("mcp-session-id");
 		checks.push({
-			name: "website authenticated key create",
+			name: "mcp initialize valid credential",
 			ok:
-				createdKey.response.ok &&
-				createdKeyId.length > 0 &&
-				createdKeySecret.length > 0 &&
-				createdKey.json.key?.name === keyName,
-			details: `${createdKey.response.status} key=${createdKeyId || "missing"}`,
+				initialize.response.ok &&
+				assertJsonRpcSuccess(initialize.json) &&
+				initialize.json.result.protocolVersion === "2025-06-18" &&
+				Boolean(mcpSessionId),
+			details: `${initialize.response.status} session=${mcpSessionId ?? "missing"}`,
 		});
 
-		if (createdKeyId) {
-			const deleteResponse = await fetchWithTimeout(
-				new URL(`/api/keys/${createdKeyId}`, websiteUrl).toString(),
-				{
-					method: "DELETE",
-					headers: authHeaders,
-				},
-			);
-			const deleteJson = (await deleteResponse.json()) as {
-				revoked?: boolean;
-				error?: string;
-			};
-			checks.push({
-				name: "website authenticated key delete",
-				ok: deleteResponse.ok && deleteJson.revoked === true,
-				details: `${deleteResponse.status} revoked=${String(deleteJson.revoked)}`,
-			});
-		}
+		const sessionHeaders = authHeaders(activeAccessToken, {
+			"mcp-session-id": mcpSessionId ?? "",
+		});
 
-		if (cliSessionId) {
-			const approval = await postJson<{ ok?: boolean; error?: string }>({
-				url: new URL("/api/connect/cli-session/approve", websiteUrl).toString(),
-				headers: authHeaders,
-				body: {
-					sessionId: cliSessionId,
-				},
-			});
-			checks.push({
-				name: "website cli-session approve",
-				ok: approval.response.ok && approval.json.ok === true,
-				details: `${approval.response.status} ok=${String(approval.json.ok)}`,
-			});
+		const toolsList = await postJson<
+			JsonRpcResponse<{ tools: Array<{ name: string }> }>
+		>({
+			url: mcpUrl,
+			headers: sessionHeaders,
+			body: {
+				jsonrpc: "2.0",
+				id: 4,
+				method: "tools/list",
+				params: {},
+			},
+		});
+		const toolNames =
+			toolsList.response.ok && assertJsonRpcSuccess(toolsList.json)
+				? toolsList.json.result.tools.map((tool) => tool.name).sort()
+				: [];
+		checks.push({
+			name: "mcp tools/list",
+			ok:
+				toolsList.response.ok &&
+				toolNames.join(",") ===
+					[
+						"context_query",
+						"continuity_audit",
+						"player_knowledge_view",
+						"scene_turn",
+						"timeline_diff",
+						"world_state_overview",
+					]
+						.sort()
+						.join(","),
+			details: toolNames.join(", "),
+		});
 
-			if (pollUrl) {
-				const approvedPoll = await fetchWithTimeout(pollUrl, {
-					headers: websiteProtectionHeaders,
-				});
-				const approvedPollJson = (await approvedPoll.json()) as {
-					status?: string;
-					apiKey?: string;
-					statusUrl?: string;
-				};
-				checks.push({
-					name: "website cli-session poll approved",
-					ok:
-						approvedPoll.ok &&
-						approvedPollJson.status === "approved" &&
-						typeof approvedPollJson.apiKey === "string" &&
-						typeof approvedPollJson.statusUrl === "string",
-					details: `${approvedPoll.status} status=${approvedPollJson.status ?? "missing"}`,
-				});
-
-				if (approvedPollJson.apiKey && approvedPollJson.statusUrl) {
-					const approvedRuntimeStatus = await fetchWithTimeout(
-						approvedPollJson.statusUrl,
-						{
-							headers: {
-								...websiteProtectionHeaders,
-								BARDO_API_KEY: approvedPollJson.apiKey,
-							},
-						},
-					);
-					const approvedRuntimeStatusJson =
-						(await approvedRuntimeStatus.json()) as {
-							valid?: boolean;
-						};
-					checks.push({
-						name: "website runtime-status via approved device-session key",
-						ok:
-							approvedRuntimeStatus.ok &&
-							approvedRuntimeStatusJson.valid === true,
-						details: `${approvedRuntimeStatus.status} valid=${String(approvedRuntimeStatusJson.valid)}`,
-					});
-
-					const approvedKeyList = await fetchWithTimeout(
-						new URL("/api/keys?limit=20&offset=0", websiteUrl).toString(),
-						{
-							headers: authHeaders,
-						},
-					);
-					const approvedKeyListJson = (await approvedKeyList.json()) as {
-						keys?: Array<{ id?: string }>;
-					};
-					const approvedKeyId = approvedKeyListJson.keys?.[0]?.id?.trim() || "";
-					if (approvedKeyId) {
-						const releaseApprovedKey = await fetchWithTimeout(
-							new URL(`/api/keys/${approvedKeyId}`, websiteUrl).toString(),
-							{
-								method: "DELETE",
-								headers: authHeaders,
-							},
-						);
-						const releaseApprovedKeyJson =
-							(await releaseApprovedKey.json()) as {
-								revoked?: boolean;
-								error?: string;
-							};
-						checks.push({
-							name: "website cli-session key cleanup",
-							ok:
-								releaseApprovedKey.ok &&
-								releaseApprovedKeyJson.revoked === true,
-							details: `${releaseApprovedKey.status} revoked=${String(releaseApprovedKeyJson.revoked)}`,
-						});
-					}
-				}
-			}
-		}
-
-		const cliToken = await postJson<{
-			loginToken?: string;
-			exchangeUrl?: string;
+		const runtimeStatus = await fetchJson<{
+			valid?: boolean;
+			plan?: string;
 			error?: string;
 		}>({
-			url: new URL("/api/connect/cli-token", websiteUrl).toString(),
-			headers: authHeaders,
-			body: {},
+			url:
+				approvedBridge?.statusUrl ??
+				new URL("/api/connect/runtime-status", websiteUrl).toString(),
+			init: {
+				headers: authHeaders(activeAccessToken, protectionHeaders),
+			},
 		});
 		checks.push({
-			name: "website cli-token issue",
-			ok:
-				cliToken.response.ok &&
-				typeof cliToken.json.loginToken === "string" &&
-				typeof cliToken.json.exchangeUrl === "string",
-			details: `${cliToken.response.status} exchange=${cliToken.json.exchangeUrl ?? "missing"}`,
+			name: "website runtime-status",
+			ok: runtimeStatus.response.ok && runtimeStatus.json.valid === true,
+			details: `${runtimeStatus.response.status} plan=${runtimeStatus.json.plan ?? "missing"}`,
 		});
 
-		if (cliToken.json.loginToken && cliToken.json.exchangeUrl) {
-			const cliExchange = await postJson<{
-				apiKey?: string;
-				statusUrl?: string;
-				error?: string;
-			}>({
-				url: cliToken.json.exchangeUrl,
-				headers: websiteProtectionHeaders,
-				body: {
-					token: cliToken.json.loginToken,
+		const reportTool = await postJson<
+			JsonRpcResponse<{
+				structuredContent?: {
+					success?: boolean;
+					rawMarkdown?: string;
+				};
+			}>
+		>({
+			url: mcpUrl,
+			headers: sessionHeaders,
+			body: {
+				jsonrpc: "2.0",
+				id: 5,
+				method: "tools/call",
+				params: {
+					name: "world_state_overview",
+					arguments: {},
 				},
-			});
-			checks.push({
-				name: "website cli-exchange",
-				ok:
-					cliExchange.response.ok &&
-					typeof cliExchange.json.apiKey === "string" &&
-					typeof cliExchange.json.statusUrl === "string",
-				details: `${cliExchange.response.status} statusUrl=${cliExchange.json.statusUrl ?? "missing"}`,
-			});
+			},
+		});
+		const reportContent =
+			reportTool.response.ok && assertJsonRpcSuccess(reportTool.json)
+				? reportTool.json.result.structuredContent
+				: undefined;
+		checks.push({
+			name: "world_state_overview tool",
+			ok:
+				reportTool.response.ok &&
+				reportContent?.success === true &&
+				hasReportMarkdown(reportContent, "# World State Overview"),
+			details: JSON.stringify(
+				reportContent ?? "missing structured content",
+			).slice(0, 160),
+		});
 
-			if (cliExchange.json.apiKey && cliExchange.json.statusUrl) {
-				const exchangedRuntimeStatus = await fetchWithTimeout(
-					cliExchange.json.statusUrl,
-					{
-						headers: {
-							...websiteProtectionHeaders,
-							BARDO_API_KEY: cliExchange.json.apiKey,
-						},
-					},
-				);
-				const exchangedRuntimeStatusJson =
-					(await exchangedRuntimeStatus.json()) as {
-						valid?: boolean;
+		const sceneTurn = await postJson<
+			JsonRpcResponse<{
+				structuredContent?: {
+					success?: boolean;
+					message?: string;
+					gmPacket?: {
+						narrativeBeats?: string[];
 					};
-				checks.push({
-					name: "website runtime-status via exchanged cli-token key",
-					ok:
-						exchangedRuntimeStatus.ok &&
-						exchangedRuntimeStatusJson.valid === true,
-					details: `${exchangedRuntimeStatus.status} valid=${String(exchangedRuntimeStatusJson.valid)}`,
-				});
-			}
-		}
+				};
+			}>
+		>({
+			url: mcpUrl,
+			headers: sessionHeaders,
+			body: {
+				jsonrpc: "2.0",
+				id: 6,
+				method: "tools/call",
+				params: {
+					name: "scene_turn",
+					arguments: {
+						action:
+							"I gather the most important recent facts before framing the next scene.",
+						idempotencyKey: `staging-smoke-scene-turn-${Date.now()}`,
+					},
+				},
+			},
+		});
+		const sceneTurnContent =
+			sceneTurn.response.ok && assertJsonRpcSuccess(sceneTurn.json)
+				? sceneTurn.json.result.structuredContent
+				: undefined;
+		checks.push({
+			name: "scene_turn tool",
+			ok:
+				sceneTurn.response.ok &&
+				sceneTurnContent?.success === true &&
+				(sceneTurnContent.gmPacket?.narrativeBeats?.length ?? 0) > 0,
+			details:
+				sceneTurnContent?.message ??
+				(sceneTurn.response.ok
+					? "missing structured content"
+					: "request failed"),
+		});
 	}
 
 	for (const check of checks) {
-		const statusLabel = check.skipped ? "SKIP" : check.ok ? "PASS" : "FAIL";
-		console.log(`${statusLabel} ${check.name}: ${check.details}`);
+		console.log(formatCheck(check));
 	}
 
 	const failed = checks.filter((check) => !check.ok && !check.skipped);

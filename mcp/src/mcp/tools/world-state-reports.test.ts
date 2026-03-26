@@ -23,17 +23,46 @@ type ReportHandler = (args: {
 	filePath: string;
 	rootPath: string;
 	rawMarkdown: string;
+	factsFound: Array<{
+		summary: string;
+		source: string;
+	}>;
+	constraints: string[];
+	unknowns: string[];
+	confidence: {
+		overall: string;
+		grounding: string;
+	};
+	mustAskUser: boolean;
+	inferencePolicy: string;
+	commitRecommended: boolean;
+	safeToProceed: boolean;
+	driftSeverity: string;
+	recommendedFollowUpTools: string[];
+	recommendedReadTargets: string[];
+	verificationChecks: Array<{
+		name: string;
+		status: string;
+		reason: string;
+	}>;
+	recommendedNextSteps: Array<{
+		action: string;
+	}>;
+	riskFlags: Array<{
+		flag: string;
+	}>;
+	writePlan: {
+		status: string;
+		shouldWrite: boolean;
+		targets: Array<{ path: string }>;
+	};
 }>;
 
 type ReportToolName =
 	| "world_state_overview"
 	| "continuity_audit"
-	| "last_session_diff"
 	| "timeline_diff"
-	| "faction_pressure_report"
-	| "npc_state_delta"
-	| "player_knowledge_view"
-	| "canon_vs_inference_report";
+	| "player_knowledge_view";
 
 function createAuth(campaignBasePath: string): AuthContext {
 	return {
@@ -84,11 +113,7 @@ describe("world-state report tools", () => {
 		const handlers = captureHandlers({ auth: createAuth(root) });
 
 		expect(Object.keys(handlers).sort()).toEqual([
-			"canon_vs_inference_report",
 			"continuity_audit",
-			"faction_pressure_report",
-			"last_session_diff",
-			"npc_state_delta",
 			"player_knowledge_view",
 			"timeline_diff",
 			"world_state_overview",
@@ -107,6 +132,33 @@ describe("world-state report tools", () => {
 		expect(worldState.structuredContent.rawMarkdown).toContain(
 			"evt-report-tool-1",
 		);
+		expect(worldState.structuredContent.factsFound.length).toBeGreaterThan(0);
+		expect(worldState.structuredContent.constraints.length).toBeGreaterThan(0);
+		expect(worldState.structuredContent.mustAskUser).toBe(false);
+		expect(worldState.structuredContent.inferencePolicy).toBe("safe_inference");
+		expect(worldState.structuredContent.commitRecommended).toBe(false);
+		expect(worldState.structuredContent.safeToProceed).toBe(true);
+		expect(worldState.structuredContent.driftSeverity).toBe("low");
+		expect(worldState.structuredContent.recommendedFollowUpTools).toContain(
+			"scene_turn",
+		);
+		expect(worldState.structuredContent.recommendedReadTargets).toContain(
+			"events/canonical.ndjson",
+		);
+		expect(worldState.structuredContent.verificationChecks).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					name: "report_evidence_coverage",
+				}),
+			]),
+		);
+		expect(worldState.structuredContent.writePlan.status).toBe(
+			"already_applied",
+		);
+		expect(worldState.structuredContent.writePlan.shouldWrite).toBe(true);
+		expect(worldState.structuredContent.writePlan.targets[0]?.path).toBe(
+			worldState.structuredContent.filePath,
+		);
 
 		const continuity = await handlers.continuity_audit({});
 		expect(continuity.isError).toBe(false);
@@ -116,6 +168,10 @@ describe("world-state report tools", () => {
 		);
 		expect(continuity.structuredContent.rawMarkdown).toContain(
 			"NPCs without recent direct evidence",
+		);
+		expect(continuity.structuredContent.riskFlags.length).toBeGreaterThan(0);
+		expect(continuity.structuredContent.driftSeverity).toMatch(
+			/low|medium|high/,
 		);
 
 		const playerKnowledge = await handlers.player_knowledge_view({
@@ -128,6 +184,13 @@ describe("world-state report tools", () => {
 		expect(playerKnowledge.structuredContent.rawMarkdown).toContain(
 			"Player-safe",
 		);
+		expect(playerKnowledge.structuredContent.constraints).toContain(
+			"Keep GM-only knowledge out of player-facing narration while using this report.",
+		);
+		expect(playerKnowledge.structuredContent.safeToProceed).toBe(true);
+		expect(
+			playerKnowledge.structuredContent.recommendedFollowUpTools,
+		).toContain("scene_turn");
 
 		const timelineDiff = await handlers.timeline_diff({ sinceSequence: 1 });
 		expect(timelineDiff.isError).toBe(false);
@@ -138,17 +201,12 @@ describe("world-state report tools", () => {
 		expect(timelineDiff.structuredContent.rawMarkdown).toContain(
 			"Evidence references:",
 		);
-
-		const lastSessionDiff = await handlers.last_session_diff({});
-		expect(lastSessionDiff.isError).toBe(false);
-		expect(lastSessionDiff.structuredContent.reportType).toBe("timeline_diff");
-		expect(lastSessionDiff.structuredContent.rawMarkdown).toContain(
-			"Timeline Diff",
+		expect(timelineDiff.structuredContent.confidence.grounding).toMatch(
+			/grounded_enough|partially_grounded|underspecified/,
 		);
-
-		const npcDelta = await handlers.npc_state_delta({});
-		expect(npcDelta.isError).toBe(false);
-		expect(npcDelta.structuredContent.rawMarkdown).toContain("dock-clerk");
+		expect(
+			timelineDiff.structuredContent.recommendedReadTargets.length,
+		).toBeGreaterThan(0);
 
 		const fileRaw = await readFile(
 			worldState.structuredContent.filePath,
@@ -242,6 +300,13 @@ describe("world-state report tools", () => {
 		expect(worldState.structuredContent.rawMarkdown).toContain("river-market");
 		expect(worldState.structuredContent.rawMarkdown).not.toContain(
 			"stale-village",
+		);
+		expect(worldState.structuredContent.verificationChecks).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					name: "report_evidence_coverage",
+				}),
+			]),
 		);
 
 		await rm(root, { recursive: true, force: true });

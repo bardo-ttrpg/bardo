@@ -76,7 +76,119 @@ describe("bardo runtime", () => {
 		}
 	});
 
-	test("login derives a runtime status URL from the configured control plane when saving an API key", async () => {
+	test("login honors BARDO_API_KEY in headless environments", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		let fetchCalled = false;
+
+		try {
+			const exitCode = await runCli(
+				["login", "--url", "https://example.com/mcp"],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+					env: {
+						BARDO_API_KEY: "bardo_live_env_headless",
+					},
+					fetch: async () => {
+						fetchCalled = true;
+						throw new Error("Interactive login should not run");
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(fetchCalled).toBe(false);
+
+			const saved = JSON.parse(
+				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			) as {
+				version: number;
+				apiKey: string;
+				url: string;
+			};
+
+			expect(saved).toMatchObject({
+				version: 1,
+				apiKey: "bardo_live_env_headless",
+				url: "https://example.com/mcp",
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login with --api-key drops stale bridge refresh credentials from an existing v2 config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const configPath = path.join(homeDir, ".config/bardo/config.json");
+
+		try {
+			await mkdir(path.dirname(configPath), { recursive: true });
+			await writeFile(
+				configPath,
+				JSON.stringify(
+					{
+						version: 2,
+						accessToken: "bridge-access-token",
+						refreshToken: "stale-refresh-token",
+						expiresAtISO: "2026-03-21T00:00:00.000Z",
+						url: "https://old.example.com/mcp",
+						statusUrl: "https://old.example.com/api/connect/runtime-status",
+						refreshUrl:
+							"https://old.example.com/api/connect/bridge-session/refresh",
+						accountLabel: "Old Account",
+						plan: "solo",
+						updatedAtISO: "2026-03-20T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				[
+					"login",
+					"--api-key",
+					"manual-static-key",
+					"--url",
+					"https://example.com/mcp",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				},
+			);
+
+			expect(exitCode).toBe(0);
+
+			const saved = JSON.parse(await readFile(configPath, "utf8")) as Record<
+				string,
+				unknown
+			>;
+			expect(saved).toMatchObject({
+				version: 1,
+				apiKey: "manual-static-key",
+				url: "https://example.com/mcp",
+			});
+			expect(saved.refreshToken).toBeUndefined();
+			expect(saved.expiresAtISO).toBeUndefined();
+			expect(saved.refreshUrl).toBeUndefined();
+			expect(saved.accountLabel).toBeUndefined();
+			expect(saved.plan).toBeUndefined();
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login derives a runtime status URL from the configured website service when saving an API key", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 
@@ -96,7 +208,7 @@ describe("bardo runtime", () => {
 					stderr: createWriter(),
 					env: {
 						BARDO_LOGIN_START_URL:
-							"https://staging.bardo.ai/api/connect/cli-session/start",
+							"https://staging.bardo.ai/api/connect/bridge-session/start",
 					},
 				},
 			);
@@ -167,74 +279,6 @@ describe("bardo runtime", () => {
 		}
 	});
 
-	test("login exchanges a website-issued token for runtime credentials", async () => {
-		const homeDir = await createTempDir("bardo-home-");
-		const workspaceRoot = await createTempDir("bardo-workspace-");
-		const stdout = createWriter();
-
-		try {
-			const exitCode = await runCli(
-				[
-					"login",
-					"--token",
-					"cli_login_token",
-					"--exchange-url",
-					"https://app.bardo.ai/api/connect/cli-exchange",
-				],
-				{
-					cwd: workspaceRoot,
-					homeDir,
-					stdout,
-					stderr: createWriter(),
-					fetch: async (input, init) => {
-						expect(String(input)).toBe(
-							"https://app.bardo.ai/api/connect/cli-exchange",
-						);
-						expect(init?.method).toBe("POST");
-						expect(init?.body).toBe(
-							JSON.stringify({ token: "cli_login_token" }),
-						);
-						return new Response(
-							JSON.stringify({
-								apiKey: "bardo_live_exchange",
-								mcpUrl: "https://mcp.bardo.ai/mcp",
-								statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
-								serverName: "bardo",
-								expiresAtISO: "2026-03-03T00:15:00.000Z",
-							}),
-							{
-								status: 200,
-								headers: { "content-type": "application/json" },
-							},
-						);
-					},
-				},
-			);
-
-			expect(exitCode).toBe(0);
-			expect(stdout.read()).toContain("Saved Bardo credentials");
-
-			const saved = JSON.parse(
-				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
-			) as {
-				apiKey: string;
-				url: string;
-				serverName?: string;
-				statusUrl?: string;
-			};
-
-			expect(saved.apiKey).toBe("bardo_live_exchange");
-			expect(saved.url).toBe("https://mcp.bardo.ai/mcp");
-			expect(saved.serverName).toBe("bardo");
-			expect(saved.statusUrl).toBe(
-				"https://app.bardo.ai/api/connect/runtime-status",
-			);
-		} finally {
-			await rm(homeDir, { recursive: true, force: true });
-			await rm(workspaceRoot, { recursive: true, force: true });
-		}
-	});
-
 	test("login can start a browser approval flow and poll until credentials are ready", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -250,21 +294,21 @@ describe("bardo runtime", () => {
 				stderr,
 				env: {
 					BARDO_LOGIN_START_URL:
-						"https://app.bardo.ai/api/connect/cli-session/start",
+						"https://app.bardo.ai/api/connect/bridge-session/start",
 				},
 				sleep: async () => {},
 				fetch: async (input, init) => {
 					const url = String(input);
-					if (url === "https://app.bardo.ai/api/connect/cli-session/start") {
+					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
 						expect(init?.method).toBe("POST");
 						return new Response(
 							JSON.stringify({
 								sessionId: "cli_session_123",
 								userCode: "ABCD-1234",
 								verificationUrl:
-									"https://app.bardo.ai/dashboard/connect/cli/cli_session_123",
+									"https://app.bardo.ai/dashboard/connect/bridge/cli_session_123",
 								pollUrl:
-									"https://app.bardo.ai/api/connect/cli-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
+									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
 								intervalMs: 1,
 								expiresAtISO: "2099-03-03T00:10:00.000Z",
 							}),
@@ -276,7 +320,7 @@ describe("bardo runtime", () => {
 					}
 					if (
 						url ===
-						"https://app.bardo.ai/api/connect/cli-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123"
+						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123"
 					) {
 						pollCount += 1;
 						if (pollCount === 1) {
@@ -294,9 +338,238 @@ describe("bardo runtime", () => {
 						return new Response(
 							JSON.stringify({
 								status: "approved",
-								apiKey: "bardo_live_device_flow",
-								mcpUrl: "https://mcp.bardo.ai/mcp",
+								accessToken: "bardo_bridge_access_device_flow",
+								refreshToken: "bardo_bridge_refresh_device_flow",
+								expiresAt: "2099-03-03T00:10:00.000Z",
+								mcpBaseUrl: "https://mcp.bardo.ai",
 								statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+								refreshUrl:
+									"https://app.bardo.ai/api/connect/bridge-session/refresh",
+								accountLabel: "Armando",
+								plan: "solo",
+								serverName: "bardo",
+								issuedAtISO: "2099-03-03T00:00:00.000Z",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain(
+				"https://app.bardo.ai/dashboard/connect/bridge/cli_session_123",
+			);
+			expect(stdout.read()).toContain("ABCD-1234");
+
+			const saved = JSON.parse(
+				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			) as {
+				version: number;
+				accessToken: string;
+				refreshToken: string;
+				expiresAtISO: string;
+				url: string;
+				statusUrl?: string;
+				refreshUrl?: string;
+				accountLabel?: string;
+				plan?: string;
+			};
+			expect(saved.version).toBe(2);
+			expect(saved.accessToken).toBe("bardo_bridge_access_device_flow");
+			expect(saved.refreshToken).toBe("bardo_bridge_refresh_device_flow");
+			expect(saved.expiresAtISO).toBe("2099-03-03T00:10:00.000Z");
+			expect(saved.url).toBe("https://mcp.bardo.ai/mcp");
+			expect(saved.statusUrl).toBe(
+				"https://app.bardo.ai/api/connect/runtime-status",
+			);
+			expect(saved.refreshUrl).toBe(
+				"https://app.bardo.ai/api/connect/bridge-session/refresh",
+			);
+			expect(saved.accountLabel).toBe("Armando");
+			expect(saved.plan).toBe("solo");
+			expect(pollCount).toBe(2);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login preserves the CLI start-url loopback host for saved bridge status endpoints", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+				env: {
+					BARDO_LOGIN_START_URL:
+						"http://127.0.0.1:3001/api/connect/bridge-session/start",
+				},
+				sleep: async () => {},
+				fetch: async (input) => {
+					const url = String(input);
+					if (
+						url === "http://127.0.0.1:3001/api/connect/bridge-session/start"
+					) {
+						return new Response(
+							JSON.stringify({
+								sessionId: "cli_session_loopback",
+								userCode: "LPBK-1234",
+								verificationUrl:
+									"http://127.0.0.1:3001/dashboard/connect/bridge/cli_session_loopback",
+								pollUrl:
+									"http://127.0.0.1:3001/api/connect/bridge-session/poll?sessionId=cli_session_loopback&pollSecret=poll_secret_loopback",
+								intervalMs: 1,
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					if (
+						url ===
+						"http://127.0.0.1:3001/api/connect/bridge-session/poll?sessionId=cli_session_loopback&pollSecret=poll_secret_loopback"
+					) {
+						return new Response(
+							JSON.stringify({
+								status: "approved",
+								accessToken: "loopback_access_token",
+								refreshToken: "loopback_refresh_token",
+								expiresAt: "2099-03-03T00:10:00.000Z",
+								mcpBaseUrl: "http://127.0.0.1:3000",
+								statusUrl: "http://localhost:3001/api/connect/runtime-status",
+								refreshUrl:
+									"http://localhost:3001/api/connect/bridge-session/refresh",
+								accountLabel: "Armando",
+								plan: "solo",
+								serverName: "bardo",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			const saved = JSON.parse(
+				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			) as {
+				url: string;
+				statusUrl?: string;
+				refreshUrl?: string;
+			};
+
+			expect(saved.url).toBe("http://127.0.0.1:3000/mcp");
+			expect(saved.statusUrl).toBe(
+				"http://127.0.0.1:3001/api/connect/runtime-status",
+			);
+			expect(saved.refreshUrl).toBe(
+				"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login surfaces an actionable error when the website runtime status service is unreachable", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				env: {
+					BARDO_LOGIN_START_URL:
+						"http://127.0.0.1:3001/api/connect/bridge-session/start",
+				},
+				fetch: async () => {
+					throw new TypeError("fetch failed");
+				},
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stdout.read()).toBe("");
+			expect(stderr.read()).toContain(
+				"Could not reach the Bardo website runtime status service",
+			);
+			expect(stderr.read()).toContain(
+				"http://127.0.0.1:3001/api/connect/bridge-session/start",
+			);
+			expect(stderr.read()).toContain("bun run dev:website");
+			expect(stderr.read()).toContain("bardo login --api-key");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login accepts a legacy approved payload during browser approval", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				env: {
+					BARDO_LOGIN_START_URL:
+						"https://app.bardo.ai/api/connect/bridge-session/start",
+				},
+				sleep: async () => {},
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
+						return new Response(
+							JSON.stringify({
+								sessionId: "cli_session_legacy",
+								userCode: "LEGC-Y123",
+								verificationUrl:
+									"https://app.bardo.ai/dashboard/connect/bridge/cli_session_legacy",
+								pollUrl:
+									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy",
+								intervalMs: 1,
+								expiresAtISO: "2099-03-03T00:10:00.000Z",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					if (
+						url ===
+						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy"
+					) {
+						return new Response(
+							JSON.stringify({
+								status: "approved",
+								apiKey: "legacy_bridge_token",
+								mcpUrl: "http://127.0.0.1:3100/mcp",
+								statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
 								serverName: "bardo",
 								issuedAtISO: "2099-03-03T00:00:00.000Z",
 								expiresAtISO: "2099-03-03T00:10:00.000Z",
@@ -312,62 +585,23 @@ describe("bardo runtime", () => {
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stderr.read()).toBe("");
-			expect(stdout.read()).toContain(
-				"https://app.bardo.ai/dashboard/connect/cli/cli_session_123",
-			);
-			expect(stdout.read()).toContain("ABCD-1234");
-
 			const saved = JSON.parse(
 				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
 			) as {
-				apiKey: string;
-				url: string;
+				version: number;
+				apiKey?: string;
+				url?: string;
 				statusUrl?: string;
+				serverName?: string;
 			};
-			expect(saved.apiKey).toBe("bardo_live_device_flow");
-			expect(saved.url).toBe("https://mcp.bardo.ai/mcp");
+
+			expect(saved.version).toBe(1);
+			expect(saved.apiKey).toBe("legacy_bridge_token");
+			expect(saved.url).toBe("http://127.0.0.1:3100/mcp");
 			expect(saved.statusUrl).toBe(
-				"https://app.bardo.ai/api/connect/runtime-status",
+				"http://127.0.0.1:3001/api/connect/runtime-status",
 			);
-			expect(pollCount).toBe(2);
-		} finally {
-			await rm(homeDir, { recursive: true, force: true });
-			await rm(workspaceRoot, { recursive: true, force: true });
-		}
-	});
-
-	test("login surfaces an actionable error when the website control plane is unreachable", async () => {
-		const homeDir = await createTempDir("bardo-home-");
-		const workspaceRoot = await createTempDir("bardo-workspace-");
-		const stdout = createWriter();
-		const stderr = createWriter();
-
-		try {
-			const exitCode = await runCli(["login"], {
-				cwd: workspaceRoot,
-				homeDir,
-				stdout,
-				stderr,
-				env: {
-					BARDO_LOGIN_START_URL:
-						"http://127.0.0.1:3001/api/connect/cli-session/start",
-				},
-				fetch: async () => {
-					throw new TypeError("fetch failed");
-				},
-			});
-
-			expect(exitCode).toBe(1);
-			expect(stdout.read()).toBe("");
-			expect(stderr.read()).toContain(
-				"Could not reach the Bardo website control plane",
-			);
-			expect(stderr.read()).toContain(
-				"http://127.0.0.1:3001/api/connect/cli-session/start",
-			);
-			expect(stderr.read()).toContain("bun run dev:website");
-			expect(stderr.read()).toContain("bardo login --api-key");
+			expect(saved.serverName).toBe("bardo");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -463,6 +697,9 @@ describe("bardo runtime", () => {
 			await expect(
 				readFile(path.join(bardoRoot, "state/current.md"), "utf8"),
 			).resolves.toContain("{}");
+			await expect(
+				readFile(path.join(bardoRoot, "projections/current-state.md"), "utf8"),
+			).resolves.toContain("Current State Projection");
 			await expect(
 				readFile(path.join(bardoRoot, "docs/quickstart.md"), "utf8"),
 			).resolves.toContain("projections/current-state.md");
@@ -731,7 +968,87 @@ describe("bardo runtime", () => {
 		}
 	});
 
-	test("doctor reports control-plane reachability even before login is configured", async () => {
+	test("doctor prefers the saved config status URL over the default website fallback", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "local-bridge-token",
+						url: "http://127.0.0.1:3100/mcp",
+						statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
+						updatedAtISO: "2026-03-17T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const calls: string[] = [];
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async (input) => {
+					const url = String(input);
+					calls.push(url);
+					if (url === "http://127.0.0.1:3100/health") {
+						return new Response(JSON.stringify({ ok: true }), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						});
+					}
+					if (url === "http://127.0.0.1:3001/api/connect/runtime-status") {
+						return new Response(
+							JSON.stringify({
+								valid: true,
+								subjectId: "user_local",
+								keyId: "bridge:local",
+								scopes: ["mcp"],
+								workspacePath: null,
+								plan: "solo",
+								mcpPeriodLimit: 25000,
+								billingUnavailable: false,
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				auth: { statusUrl: string | null };
+				account: { ok: boolean; statusUrl: string | null };
+			};
+			expect(payload.auth.statusUrl).toBe(
+				"http://127.0.0.1:3001/api/connect/runtime-status",
+			);
+			expect(payload.account.ok).toBe(true);
+			expect(payload.account.statusUrl).toBe(
+				"http://127.0.0.1:3001/api/connect/runtime-status",
+			);
+			expect(calls).not.toContain(
+				"https://app.bardo.ai/api/connect/runtime-status",
+			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor reports website reachability even before login is configured", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 		const stdout = createWriter();
@@ -768,7 +1085,7 @@ describe("bardo runtime", () => {
 			expect(exitCode).toBe(1);
 			const payload = JSON.parse(stdout.read()) as {
 				connectivity: {
-					controlPlane: {
+					websiteBackend: {
 						url: string | null;
 						reachable: boolean;
 						status: number | null;
@@ -778,7 +1095,7 @@ describe("bardo runtime", () => {
 				account: { fetched: boolean; error: string | null };
 			};
 
-			expect(payload.connectivity.controlPlane).toEqual({
+			expect(payload.connectivity.websiteBackend).toEqual({
 				url: "http://127.0.0.1:3001/api/connect/runtime-status",
 				reachable: true,
 				status: 401,
@@ -786,6 +1103,67 @@ describe("bardo runtime", () => {
 			});
 			expect(payload.account.fetched).toBe(false);
 			expect(payload.account.error).toBe("Missing API key.");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor times out stale network probes instead of hanging indefinitely", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "test-key",
+						url: "https://stale.example.com/mcp",
+						statusUrl: "https://stale.example.com/api/connect/runtime-status",
+						updatedAtISO: "2026-03-19T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const neverResolvingFetch: typeof fetch = async (_input, init) =>
+				new Promise<Response>((_, reject) => {
+					init?.signal?.addEventListener("abort", () => {
+						reject(new DOMException("Aborted", "AbortError"));
+					});
+				});
+
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				env: {
+					BARDO_DOCTOR_TIMEOUT_MS: "100",
+				},
+				fetch: neverResolvingFetch,
+			});
+
+			expect(exitCode).toBe(1);
+			const payload = JSON.parse(stdout.read()) as {
+				connectivity: {
+					health: { ok: boolean; error: string | null };
+					websiteBackend: { reachable: boolean; error: string | null };
+				};
+				account: { ok: boolean; error: string | null };
+			};
+
+			expect(payload.connectivity.health.ok).toBe(false);
+			expect(payload.connectivity.health.error).toContain("timed out");
+			expect(payload.connectivity.websiteBackend.reachable).toBe(false);
+			expect(payload.connectivity.websiteBackend.error).toContain("timed out");
+			expect(payload.account.ok).toBe(false);
+			expect(payload.account.error).toContain("timed out");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -1369,7 +1747,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					return new Response(
 						JSON.stringify({
 							valid: true,
-							plan: "solo_plus",
+							plan: "solo",
 						}),
 						{
 							status: 200,
@@ -1384,9 +1762,289 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				apiKey: "test-key",
 				url: "https://mcp.bardo.ai/mcp",
 				workspaceRoot,
-				plan: "solo_plus",
+				plan: "solo",
 			});
 			expect(stderr.read()).toBe("");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("mcp serve refreshes expired bridge credentials before starting the local broker", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						version: 2,
+						accessToken: "expired-access-token",
+						refreshToken: "refresh-token",
+						expiresAtISO: "2026-03-03T00:00:00.000Z",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "http://localhost:3001/api/connect/runtime-status",
+						refreshUrl:
+							"http://localhost:3001/api/connect/bridge-session/refresh",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			let received:
+				| {
+						apiKey: string;
+						url: string;
+						workspaceRoot: string;
+						plan?: string | null;
+				  }
+				| undefined;
+			const exitCode = await runCli(["mcp", "serve"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stderr,
+				stdout: createWriter(),
+				now: () => new Date("2026-03-03T00:20:00.000Z"),
+				startBridge: async (options) => {
+					received = options as typeof received;
+				},
+				fetch: async (input, init) => {
+					if (
+						String(input) ===
+						"http://127.0.0.1:3001/api/connect/bridge-session/refresh"
+					) {
+						expect(await new Response(init?.body).text()).toContain(
+							"refresh-token",
+						);
+						return new Response(
+							JSON.stringify({
+								accessToken: "refreshed-access-token",
+								refreshToken: "refreshed-refresh-token",
+								expiresAt: "2026-03-03T01:00:00.000Z",
+								mcpBaseUrl: "http://localhost:3000",
+								statusUrl: "http://localhost:3001/api/connect/runtime-status",
+								refreshUrl:
+									"http://localhost:3001/api/connect/bridge-session/refresh",
+								plan: "solo",
+								accountLabel: "Armando",
+								serverName: "bardo",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+
+					expect(String(input)).toBe(
+						"http://127.0.0.1:3001/api/connect/runtime-status",
+					);
+					expect(new Headers(init?.headers).get("authorization")).toBe(
+						"Bearer refreshed-access-token",
+					);
+					return new Response(
+						JSON.stringify({
+							valid: true,
+							plan: "solo",
+						}),
+						{
+							status: 200,
+							headers: { "content-type": "application/json" },
+						},
+					);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(received).toEqual({
+				apiKey: "refreshed-access-token",
+				url: "http://127.0.0.1:3000/mcp",
+				workspaceRoot,
+				plan: "solo",
+			});
+			const saved = JSON.parse(
+				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
+			) as {
+				accessToken: string;
+				refreshToken: string;
+				url: string;
+			};
+			expect(saved.accessToken).toBe("refreshed-access-token");
+			expect(saved.refreshToken).toBe("refreshed-refresh-token");
+			expect(saved.url).toBe("http://127.0.0.1:3000/mcp");
+			expect(stderr.read()).toBe("");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("mcp serve prefers refreshed bridge config over stale shell credentials", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						version: 2,
+						accessToken: "expired-config-access-token",
+						refreshToken: "refresh-token",
+						expiresAtISO: "2026-03-03T00:00:00.000Z",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
+						refreshUrl:
+							"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			let received:
+				| {
+						apiKey: string;
+						url: string;
+						workspaceRoot: string;
+						plan?: string | null;
+				  }
+				| undefined;
+			const exitCode = await runCli(["mcp", "serve"], {
+				cwd: workspaceRoot,
+				homeDir,
+				env: {
+					BARDO_ACCESS_TOKEN: "stale-shell-token",
+					BARDO_MCP_URL: "http://127.0.0.1:3999/mcp",
+					BARDO_RUNTIME_STATUS_URL:
+						"http://127.0.0.1:3999/api/connect/runtime-status",
+				},
+				stderr,
+				stdout: createWriter(),
+				now: () => new Date("2026-03-03T00:20:00.000Z"),
+				startBridge: async (options) => {
+					received = options as typeof received;
+				},
+				fetch: async (input, init) => {
+					if (
+						String(input) ===
+						"http://127.0.0.1:3001/api/connect/bridge-session/refresh"
+					) {
+						expect(await new Response(init?.body).text()).toContain(
+							"refresh-token",
+						);
+						return new Response(
+							JSON.stringify({
+								accessToken: "refreshed-config-token",
+								refreshToken: "refreshed-refresh-token",
+								expiresAt: "2026-03-03T01:00:00.000Z",
+								mcpBaseUrl: "http://127.0.0.1:3000",
+								statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
+								refreshUrl:
+									"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+								plan: "solo",
+								accountLabel: "Armando",
+								serverName: "bardo",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+
+					expect(String(input)).toBe(
+						"http://127.0.0.1:3001/api/connect/runtime-status",
+					);
+					expect(new Headers(init?.headers).get("authorization")).toBe(
+						"Bearer refreshed-config-token",
+					);
+					return new Response(
+						JSON.stringify({
+							valid: true,
+							plan: "solo",
+						}),
+						{
+							status: 200,
+							headers: { "content-type": "application/json" },
+						},
+					);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(received).toEqual({
+				apiKey: "refreshed-config-token",
+				url: "http://127.0.0.1:3000/mcp",
+				workspaceRoot,
+				plan: "solo",
+			});
+			expect(stderr.read()).toBe("");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("mcp serve fails fast when bridge refresh times out for an expired session", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stderr = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						version: 2,
+						accessToken: "expired-access-token",
+						refreshToken: "refresh-token",
+						expiresAtISO: "2026-03-03T00:00:00.000Z",
+						url: "http://127.0.0.1:3000/mcp",
+						refreshUrl:
+							"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["mcp", "serve"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stderr,
+				stdout: createWriter(),
+				env: {
+					BARDO_BRIDGE_REFRESH_TIMEOUT_MS: "100",
+				},
+				now: () => new Date("2026-03-03T00:20:00.000Z"),
+				startBridge: async () => {
+					throw new Error("startBridge should not run after refresh timeout");
+				},
+				fetch: async (_input, init) =>
+					await new Promise<Response>((_resolve, reject) => {
+						init?.signal?.addEventListener("abort", () => {
+							reject(new DOMException("Aborted", "AbortError"));
+						});
+					}),
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderr.read()).toContain("Bridge session refresh failed:");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -1594,7 +2252,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				mcpServers: Record<string, { command: string; args: string[] }>;
 			};
 			expect(config.mcpServers.existing.command).toBe("uvx");
-			expect(config.mcpServers.bardo.command).toBe("bunx");
+			expect(config.mcpServers.bardo.command).toBe("bardo");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -2008,21 +2666,102 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				>;
 			};
 			expect(clientConfig.mcpServers["campaign-gm"]).toEqual({
-				command: "bunx",
+				command: "bardo",
 				args: [
-					"--bun",
-					"--package",
-					"@bardo/mcp",
-					"bardo",
 					"mcp",
 					"serve",
-					"--api-key",
-					"bardo_live_env_only",
 					"--url",
 					"https://mcp-env.bardo.ai/mcp",
 					"--workspace-root",
 					".",
 				],
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect preserves a bridge-session config when only metadata overrides change", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+		const configPath = path.join(homeDir, ".config/bardo/config.json");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				configPath,
+				JSON.stringify(
+					{
+						version: 2,
+						accessToken: "bridge-access-token",
+						refreshToken: "bridge-refresh-token",
+						expiresAtISO: "2026-03-21T00:00:00.000Z",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
+						refreshUrl:
+							"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+						serverName: "bardo",
+						accountLabel: "Armando",
+						plan: "solo",
+						updatedAtISO: "2026-03-20T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"kiro",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--status-url",
+					"http://127.0.0.1:3001/api/connect/runtime-status",
+					"--server-name",
+					"campaign-gm",
+					"--skip-init",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Connected Bardo to Kiro");
+
+			const saved = JSON.parse(await readFile(configPath, "utf8")) as {
+				version: number;
+				accessToken: string;
+				refreshToken: string;
+				expiresAtISO: string;
+				url: string;
+				statusUrl?: string;
+				refreshUrl?: string;
+				serverName?: string;
+				accountLabel?: string;
+				plan?: string;
+			};
+			expect(saved).toMatchObject({
+				version: 2,
+				accessToken: "bridge-access-token",
+				refreshToken: "bridge-refresh-token",
+				expiresAtISO: "2026-03-21T00:00:00.000Z",
+				url: "http://127.0.0.1:3000/mcp",
+				statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
+				refreshUrl: "http://127.0.0.1:3001/api/connect/bridge-session/refresh",
+				serverName: "campaign-gm",
+				accountLabel: "Armando",
+				plan: "solo",
 			});
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -2169,8 +2908,9 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				mcpServers: Record<string, { command: string; args: string[] }>;
 			};
 			expect(config.mcpServers.existing.command).toBe("uvx");
-			expect(config.mcpServers.bardo.command).toBe("bunx");
+			expect(config.mcpServers.bardo.command).toBe("bardo");
 			expect(config.mcpServers.bardo.args).toContain("--workspace-root");
+			expect(config.mcpServers.bardo.args).not.toContain("--api-key");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -2246,15 +2986,9 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(config.mcp.bardo).toEqual({
 				type: "local",
 				command: [
-					"bunx",
-					"--bun",
-					"--package",
-					"@bardo/mcp",
 					"bardo",
 					"mcp",
 					"serve",
-					"--api-key",
-					"bardo_live_saved",
 					"--url",
 					"https://mcp.bardo.ai/mcp",
 					"--workspace-root",
@@ -2262,6 +2996,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				],
 				enabled: true,
 			});
+			expect(config.mcp.bardo.command).not.toContain("--api-key");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

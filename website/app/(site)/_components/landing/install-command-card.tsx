@@ -51,7 +51,7 @@ export default function InstallCommandCard() {
 	return (
 		<div className="mb-8 border border-border bg-background/50 p-4">
 			<p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				/ Install Bardo CLI
+				/ Install the local bridge
 			</p>
 			<div className="mb-3 flex flex-wrap gap-2">
 				{INSTALL_TAB_OPTIONS.map((tab) => (
@@ -74,8 +74,8 @@ export default function InstallCommandCard() {
 				{command}
 			</pre>
 			<p className="mt-2 text-xs text-muted-foreground">
-				After install, run `bardo login`, then `bardo connect`, then `bardo
-				init` in your campaign folder. Local docs appear in `bardo/docs/`.
+				After install, run `bardo connect`, approve the bridge session in your
+				browser, and point the bridge at your local campaign workspace.
 			</p>
 		</div>
 	);

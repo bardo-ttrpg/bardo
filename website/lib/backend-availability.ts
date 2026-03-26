@@ -1,7 +1,7 @@
 export type BackendFailureCode =
-	| "upstash_unavailable"
 	| "clerk_unavailable"
-	| "billing_unavailable";
+	| "billing_unavailable"
+	| "website_backend_unavailable";
 
 export class BackendAvailabilityError extends Error {
 	code: BackendFailureCode;

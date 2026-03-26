@@ -11,59 +11,45 @@ export type PolicyCoverageEntry = {
 // This inventory is intentionally explicit so CI can fail if coverage drifts.
 export const POLICY_COVERAGE: readonly PolicyCoverageEntry[] = [
 	{
-		pathId: "player_action",
+		pathId: "scene_turn",
 		kind: "tool",
 		status: "guarded",
 		rationale:
-			"Evaluates table-contract/authority policy and emits runtime_policy_blocked on violations.",
+			"Primary public GM tool. It can advance canon-backed state and must stay inside runtime guardrails.",
 	},
 	{
-		pathId: "world_sync",
-		kind: "tool",
-		status: "guarded",
-		rationale:
-			"Evaluates transcript content against table-contract/authority policy before canonical mutation.",
-	},
-	{
-		pathId: "simulation_tick",
-		kind: "tool",
-		status: "guarded",
-		rationale:
-			"Evaluates autonomous progression intent against policy before canonical mutation.",
-	},
-	{
-		pathId: "append_event",
-		kind: "tool",
-		status: "guarded",
-		rationale:
-			"Evaluates event text/action context against policy before appending canonical events.",
-	},
-	{
-		pathId: "apply_domain_transition",
-		kind: "tool",
-		status: "guarded",
-		rationale:
-			"Evaluates transition reason against policy before appending canonical domain transitions.",
-	},
-	{
-		pathId: "roll_dice",
+		pathId: "context_query",
 		kind: "tool",
 		status: "exempt",
 		rationale:
-			"Deterministic mechanics primitive without freeform narrative/world-fact assertions.",
+			"Read-only retrieval tool; it shapes decisions but does not mutate canon.",
 	},
 	{
-		pathId: "resolve_mechanics",
+		pathId: "world_state_overview",
 		kind: "tool",
 		status: "exempt",
 		rationale:
-			"Deterministic rules resolution primitive; no narrative fact introduction.",
+			"Derived report refresh. It summarizes current canon without introducing new facts on its own.",
 	},
 	{
-		pathId: "migrate_legacy_state",
+		pathId: "continuity_audit",
 		kind: "tool",
-		status: "profile_blocked",
+		status: "exempt",
 		rationale:
-			"Administrative migration path; excluded from gameplay profile and intended for controlled ops runs.",
+			"Derived audit report. It highlights drift and contradictions but does not create canon directly.",
+	},
+	{
+		pathId: "timeline_diff",
+		kind: "tool",
+		status: "exempt",
+		rationale:
+			"Derived change report. It reads canonical history and emits a summary only.",
+	},
+	{
+		pathId: "player_knowledge_view",
+		kind: "tool",
+		status: "exempt",
+		rationale:
+			"Player-safe derived report. It is read-only and should not be policy-blocked as a mutation path.",
 	},
 ] as const;

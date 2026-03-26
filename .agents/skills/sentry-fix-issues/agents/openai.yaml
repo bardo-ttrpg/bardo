@@ -1,4 +1,0 @@
-version: 1
-display_name: Sentry Fix Issues
-short_description: Debug and fix production issues using Sentry data.
-default_prompt: Investigate the relevant Sentry issue, trace, release, or event stream, identify the root cause, make the smallest defensible fix, run targeted verification, and summarize remaining risk.

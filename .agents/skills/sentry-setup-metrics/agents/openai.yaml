@@ -1,4 +1,0 @@
-version: 1
-display_name: Sentry Setup Metrics
-short_description: Add Sentry-backed custom metrics.
-default_prompt: Instrument the relevant flow with a small, operationally useful set of Sentry metrics, keep dimensions low-cardinality, run targeted verification, and explain how to use the metrics after deployment.

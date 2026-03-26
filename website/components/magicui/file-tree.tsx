@@ -34,6 +34,8 @@ function FileNode({ node, depth }: { node: FileTreeNode; depth: number }) {
 		<button
 			type="button"
 			onClick={() => setSelectedId(isSelected ? null : node.id)}
+			aria-pressed={isSelected}
+			aria-label={`Inspect ${node.name}`}
 			className={cn(
 				"flex w-full items-center gap-2 px-2 py-[5px] text-left transition-colors hover:bg-foreground/5",
 				isSelected && "bg-foreground/10",
@@ -84,6 +86,8 @@ function FolderNode({
 			<button
 				type="button"
 				onClick={() => setOpen(!open)}
+				aria-expanded={open}
+				aria-label={`${open ? "Collapse" : "Expand"} ${node.name}`}
 				className="flex w-full items-center gap-2 px-2 py-[5px] transition-colors hover:bg-foreground/5"
 				style={{ paddingLeft: `${depth * 14 + 8}px` }}
 			>

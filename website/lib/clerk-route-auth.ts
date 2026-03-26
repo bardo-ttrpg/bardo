@@ -1,5 +1,4 @@
 import { auth } from "@clerk/nextjs/server";
-import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 
 const CLERK_MIDDLEWARE_DETECTION_FRAGMENT =
@@ -12,6 +11,12 @@ type LoggerLike = {
 		message: string,
 		attributes?: Record<string, string | number | boolean>,
 	): void;
+};
+
+const defaultLogger: LoggerLike = {
+	warn(message, attributes) {
+		console.warn(message, attributes ?? {});
+	},
 };
 
 export function isClerkMiddlewareDetectionError(error: unknown): boolean {
@@ -29,7 +34,7 @@ export async function resolveRouteUserId(
 	} = {},
 ): Promise<{ userId: string | null; response?: Response }> {
 	const authFn = options.authFn ?? auth;
-	const logger = options.logger ?? (Sentry.logger as LoggerLike | undefined);
+	const logger = options.logger ?? defaultLogger;
 
 	try {
 		const { userId } = await authFn();

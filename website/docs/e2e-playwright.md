@@ -27,13 +27,13 @@
 ## Project layout
 - `chromium` runs public and signed-out coverage.
 - `setup` creates the Clerk auth state.
-- `chromium-auth` runs the signed-in dashboard and CLI approval flows.
+- `chromium-auth` runs the signed-in dashboard and bridge approval flows.
 
 ## Current coverage
 - public landing, pricing, and legal routes
 - signed-out `/dashboard` redirect into Clerk auth
-- signed-in dashboard billing/key lifecycle/snippet/CLI-login flow
-- signed-in CLI device-session approval page
+- signed-in dashboard billing, bridge-session, and runtime-status flows
+- signed-in bridge approval page
 
 ## MCP + Skills workflow
 - Installed Codex skills:

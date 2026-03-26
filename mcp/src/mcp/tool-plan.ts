@@ -1,13 +1,12 @@
 import { makeToolResult } from "./tool-result";
 
-export type PlanTier = "free" | "solo" | "solo_plus";
+export type PlanTier = "free" | "solo";
 
 export const MIN_PLAN_ANNOTATION_KEY = "x-bardo-min-plan";
 
 const PLAN_ORDER: Record<PlanTier, number> = {
 	free: 0,
 	solo: 1,
-	solo_plus: 2,
 };
 
 export function annotateWithMinPlan(

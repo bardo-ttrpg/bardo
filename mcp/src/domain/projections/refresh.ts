@@ -50,6 +50,7 @@ export function projectionIdsForEventTypes(
 export async function regenerateProjectionsForEventTypes(args: {
 	bardoRoot: string;
 	eventTypes: readonly string[];
+	regenerateReports?: boolean;
 }): Promise<
 	Array<{
 		projectionId: ProjectionId;
@@ -68,6 +69,7 @@ export async function regenerateProjectionsForEventTypes(args: {
 		if (projectionId === "current_state") {
 			const projection = await regenerateCurrentStateProjection({
 				bardoRoot: args.bardoRoot,
+				regenerateReports: args.regenerateReports,
 			});
 			refreshed.push({
 				projectionId,

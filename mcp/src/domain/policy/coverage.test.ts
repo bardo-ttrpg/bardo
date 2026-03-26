@@ -15,7 +15,7 @@ describe("policy coverage inventory", () => {
 			expect(ids.has(entry.pathId)).toBe(false);
 			ids.add(entry.pathId);
 		}
-		expect(POLICY_COVERAGE.length).toBeGreaterThanOrEqual(8);
+		expect(POLICY_COVERAGE.length).toBeGreaterThanOrEqual(6);
 	});
 
 	test("keeps profile_blocked entries unavailable in gameplay profile", () => {

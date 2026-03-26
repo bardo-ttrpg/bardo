@@ -1,7 +1,8 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { mcpPeriodLimitForPlan } from "../../../../lib/api-keys";
-import { fetchLiveBillingSnapshotFromClerk } from "../../../../lib/clerk-live-billing";
+import { createBillingAdminClient } from "../../../../lib/billing-admin";
+import { decodeBridgeAccessToken } from "../../../../lib/bridge-session-auth";
 import {
 	type ConnectTelemetry,
 	getDefaultConnectTelemetry,
@@ -36,6 +37,12 @@ type RuntimeStatusDeps = {
 		resetEpochSeconds?: number;
 	}>;
 	createClerkClient: () => Promise<ClerkLikeClient>;
+	decodeBridgeToken: (token: string) => Promise<{
+		sessionId: string;
+		userId: string;
+		plan: PlanTier;
+		accountLabel: string;
+	} | null>;
 	resolvePlanForSubject: (
 		clerk: ClerkLikeClient,
 		subject: string,
@@ -116,14 +123,24 @@ const defaultDeps: RuntimeStatusDeps = {
 		getDefaultRuntimeStatusRateLimiter().consume(request),
 	createClerkClient: async () =>
 		(await clerkClient()) as unknown as ClerkLikeClient,
-	resolvePlanForSubject: async (clerk, subject) => {
-		const live = await fetchLiveBillingSnapshotFromClerk(
-			clerk as never,
-			subject,
-		);
-		return live.billingUnavailable
+	decodeBridgeToken: async (token) => {
+		const decoded = await decodeBridgeAccessToken({ token }).catch(() => null);
+		if (!decoded) {
+			return null;
+		}
+		return {
+			sessionId: decoded.sessionId,
+			userId: decoded.userId,
+			plan: decoded.plan,
+			accountLabel: decoded.accountLabel,
+		};
+	},
+	resolvePlanForSubject: async (_clerk, subject) => {
+		const billing =
+			await createBillingAdminClient().readBillingSnapshot(subject);
+		return billing.billingUnavailable
 			? { plan: null, billingUnavailable: true }
-			: { plan: live.plan, billingUnavailable: false };
+			: { plan: billing.plan, billingUnavailable: false };
 	},
 	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
 	telemetry: getDefaultConnectTelemetry(),
@@ -138,7 +155,10 @@ export function createRuntimeStatusGetHandler(
 		const apiKey = readApiKey(request);
 		if (!apiKey) {
 			return NextResponse.json(
-				{ error: "Missing API key. Send Authorization: Bearer <key>." },
+				{
+					error:
+						"Missing bridge credential. Send Authorization: Bearer <access-token>.",
+				},
 				{ status: 401 },
 			);
 		}
@@ -153,6 +173,35 @@ export function createRuntimeStatusGetHandler(
 					},
 					{ status: 429 },
 				);
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+
+			const bridgeToken = await deps.decodeBridgeToken(apiKey);
+			if (bridgeToken) {
+				const clerk = await deps.createClerkClient();
+				const { plan, billingUnavailable } = await deps.resolvePlanForSubject(
+					clerk,
+					bridgeToken.userId,
+				);
+				if (!plan || billingUnavailable || plan === "free") {
+					deps.telemetry.increment("runtime_status_invalid");
+					return NextResponse.json(
+						{ error: "Bridge session no longer has an active subscription." },
+						{ status: 403 },
+					);
+				}
+				deps.telemetry.increment("runtime_status_success");
+				const response = NextResponse.json({
+					valid: true,
+					subjectId: bridgeToken.userId,
+					keyId: `bridge:${bridgeToken.sessionId}`,
+					scopes: ["mcp"],
+					workspacePath: null,
+					plan,
+					mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+					billingUnavailable: false,
+				});
 				applyRateLimitHeaders(response.headers, budget);
 				return response;
 			}
@@ -189,7 +238,7 @@ export function createRuntimeStatusGetHandler(
 			if (status === 401 || status === 403) {
 				deps.telemetry.increment("runtime_status_invalid");
 				return NextResponse.json(
-					{ error: "Invalid API key." },
+					{ error: "Invalid bridge credential." },
 					{ status: status ?? 401 },
 				);
 			}

@@ -10,18 +10,19 @@ import {
 	type DailyVerificationConsumeResult,
 } from "@/lib/api-key-verification-policy";
 import { mcpPeriodLimitForPlan } from "@/lib/api-keys";
-import { fetchLiveBillingSnapshotFromClerk } from "@/lib/clerk-live-billing";
+import { createBillingAdminClient } from "@/lib/billing-admin";
+import { decodeBridgeAccessToken } from "@/lib/bridge-session-auth";
 import {
 	createIntrospectionTelemetry,
 	type IntrospectionTelemetry,
 } from "@/lib/introspection-telemetry";
-import { createIntrospectionVerifyCache } from "@/lib/introspection-verify-cache";
 import {
 	applySpanAttributes,
 	buildIntrospectionSpanAttributes,
 	createIntrospectionTracing,
 	type IntrospectionTracing,
-} from "@/lib/sentry-introspection";
+} from "@/lib/introspection-tracing";
+import { createIntrospectionVerifyCache } from "@/lib/introspection-verify-cache";
 import type { PlanTier } from "@/lib/user-billing";
 
 export const runtime = "nodejs";
@@ -85,6 +86,12 @@ type IntrospectionDeps = {
 	introspectionVerifyCache: ReturnType<typeof createIntrospectionVerifyCache>;
 	telemetry: IntrospectionTelemetry;
 	createClerkClient: () => Promise<ClerkLikeClient>;
+	decodeBridgeToken: (token: string) => Promise<{
+		sessionId: string;
+		userId: string;
+		plan: PlanTier;
+		accountLabel: string;
+	} | null>;
 	resolvePlanForSubject: (
 		clerk: ClerkLikeClient,
 		subject: string,
@@ -200,14 +207,24 @@ const defaultDeps: IntrospectionDeps = {
 	telemetry: introspectionTelemetry,
 	createClerkClient: async () =>
 		(await clerkClient()) as unknown as ClerkLikeClient,
-	resolvePlanForSubject: async (clerk, subject) => {
-		const live = await fetchLiveBillingSnapshotFromClerk(
-			clerk as never,
-			subject,
-		);
-		return live.billingUnavailable
+	decodeBridgeToken: async (token) => {
+		const decoded = await decodeBridgeAccessToken({ token }).catch(() => null);
+		if (!decoded) {
+			return null;
+		}
+		return {
+			sessionId: decoded.sessionId,
+			userId: decoded.userId,
+			plan: decoded.plan,
+			accountLabel: decoded.accountLabel,
+		};
+	},
+	resolvePlanForSubject: async (_clerk, subject) => {
+		const billing =
+			await createBillingAdminClient().readBillingSnapshot(subject);
+		return billing.billingUnavailable
 			? { plan: null, billingUnavailable: true }
-			: { plan: live.plan, billingUnavailable: false };
+			: { plan: billing.plan, billingUnavailable: false };
 	},
 	mcpPeriodLimitResolver: (plan) => mcpPeriodLimitForPlan(plan),
 	tracing: introspectionTracing,
@@ -247,9 +264,9 @@ export function createIntrospectPostHandler(
 							| "unauthorized"
 							| "error";
 						cachedVerification: boolean;
-						preAuthBackend?: "memory" | "upstash" | null;
-						userBudgetBackend?: "memory" | "upstash" | null;
-						keyBudgetBackend?: "memory" | "upstash" | null;
+						preAuthBackend?: "memory" | "website" | null;
+						userBudgetBackend?: "memory" | "website" | null;
+						keyBudgetBackend?: "memory" | "website" | null;
 						plan?: PlanTier | null;
 					},
 				): NextResponse {
@@ -295,6 +312,11 @@ export function createIntrospectPostHandler(
 				workspaceOverrideRequested =
 					typeof body.workspaceRoot === "string" &&
 					body.workspaceRoot.trim().length > 0;
+				const bridgeWorkspaceRoot =
+					typeof body.workspaceRoot === "string" &&
+					body.workspaceRoot.trim().length > 0
+						? body.workspaceRoot.trim()
+						: null;
 				requestedWorkspaceRoot = resolveRequestedWorkspaceRoot({
 					rawWorkspaceRoot: body.workspaceRoot,
 					allowOverrideEnv: deps.allowWorkspaceRootOverrideEnv,
@@ -311,6 +333,115 @@ export function createIntrospectPostHandler(
 					);
 				}
 				const apiKeySecret = secret;
+				const bridgeToken = await deps.decodeBridgeToken(apiKeySecret);
+				if (bridgeToken) {
+					if (!bridgeWorkspaceRoot) {
+						return finalize(
+							NextResponse.json({ valid: false }, { status: 200 }),
+							{
+								result: "invalid",
+								cachedVerification: false,
+							},
+						);
+					}
+
+					const clerk = await deps.createClerkClient();
+					const resolvedPlan = await deps.resolvePlanForSubject(
+						clerk,
+						bridgeToken.userId,
+					);
+					const plan = resolvedPlan.plan ?? "free";
+					if (resolvedPlan.billingUnavailable || plan === "free") {
+						return finalize(
+							NextResponse.json({ valid: false }, { status: 200 }),
+							{
+								result: "invalid",
+								cachedVerification: false,
+								plan,
+							},
+						);
+					}
+
+					const userUsage = await deps.verificationLimiter.consumeUser(
+						bridgeToken.userId,
+						plan,
+					);
+					if (!userUsage.allowed) {
+						deps.telemetry.increment("budget_block_user");
+						return finalize(
+							NextResponse.json(
+								{
+									valid: false,
+									reason: "daily_user_verification_limit_reached",
+									verification: {
+										user: userUsage,
+										key: null,
+									},
+								},
+								{ status: 200 },
+							),
+							{
+								result: "blocked",
+								cachedVerification: false,
+								userBudgetBackend: userUsage.backend,
+								plan,
+							},
+						);
+					}
+
+					const keyUsage = await deps.verificationLimiter.consumeKey(
+						`bridge:${bridgeToken.sessionId}`,
+						plan,
+					);
+					if (!keyUsage.allowed) {
+						deps.telemetry.increment("budget_block_key");
+						return finalize(
+							NextResponse.json(
+								{
+									valid: false,
+									reason: "daily_key_verification_limit_reached",
+									verification: {
+										user: userUsage,
+										key: keyUsage,
+									},
+								},
+								{ status: 200 },
+							),
+							{
+								result: "blocked",
+								cachedVerification: false,
+								userBudgetBackend: userUsage.backend,
+								keyBudgetBackend: keyUsage.backend,
+								plan,
+							},
+						);
+					}
+
+					deps.telemetry.increment("success");
+					return finalize(
+						NextResponse.json({
+							valid: true,
+							campaignBasePath: bridgeWorkspaceRoot,
+							keyPrefix: `bridge:${bridgeToken.sessionId}`.slice(0, 15),
+							subjectId: bridgeToken.userId,
+							keyId: `bridge:${bridgeToken.sessionId}`,
+							plan,
+							billingUnavailable: false,
+							mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+							verification: {
+								user: userUsage,
+								key: keyUsage,
+							},
+						}),
+						{
+							result: "success",
+							cachedVerification: false,
+							userBudgetBackend: userUsage.backend,
+							keyBudgetBackend: keyUsage.backend,
+							plan,
+						},
+					);
+				}
 
 				const cachedVerification =
 					deps.introspectionVerifyCache.get(apiKeySecret);
@@ -383,7 +514,7 @@ export function createIntrospectPostHandler(
 				const preliminaryKeyUsage =
 					await deps.verificationLimiter.consumePreAuthKey(
 						await hashApiKeySecret(apiKeySecret),
-						"solo_plus",
+						"solo",
 					);
 				if (!preliminaryKeyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");

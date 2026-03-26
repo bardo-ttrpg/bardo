@@ -25,38 +25,17 @@ export function resolveAllowedDevOrigins(
 	);
 }
 
-export function resolveShouldUploadSentryArtifacts(
-	env: Record<string, string | undefined>,
-): boolean {
-	if (parseBoolean(env.BARDO_ENFORCE_SENTRY_RELEASE_HEALTH) === true) {
-		return true;
-	}
-
-	if (parseBoolean(env.CI) === true) {
-		return true;
-	}
-
-	const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase();
-	return vercelEnv === "preview" || vercelEnv === "production";
-}
-
-export function resolveSentryBuildSilence(
-	env: Record<string, string | undefined>,
-): boolean {
-	const explicit = parseBoolean(env.BARDO_SENTRY_BUILD_SILENT);
-	if (explicit !== null) {
-		return explicit;
-	}
-
-	return !resolveShouldUploadSentryArtifacts(env);
-}
-
 function isProductionDeployment(
 	env: Record<string, string | undefined>,
 ): boolean {
+	const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
+	if (nodeEnv === "development") {
+		return false;
+	}
+
 	return (
 		env.VERCEL_ENV?.trim().toLowerCase() === "production" ||
-		env.NODE_ENV?.trim().toLowerCase() === "production"
+		nodeEnv === "production"
 	);
 }
 
@@ -68,10 +47,13 @@ export function resolveSecurityHeaders(
 		env.BARDO_CSP_ALLOW_UNSAFE_INLINE_SCRIPTS,
 	);
 	const scriptSrc = isProduction
-		? allowUnsafeInlineScripts === false
-			? "script-src 'self' https:"
-			: "script-src 'self' 'unsafe-inline' https:"
+		? allowUnsafeInlineScripts === true
+			? "script-src 'self' 'unsafe-inline' https:"
+			: "script-src 'self' https:"
 		: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
+	const connectSrc = isProduction
+		? "connect-src 'self' https:"
+		: "connect-src 'self' http: https: ws: wss:";
 	const cspParts = [
 		"default-src 'self'",
 		"base-uri 'self'",
@@ -81,9 +63,12 @@ export function resolveSecurityHeaders(
 		"font-src 'self' data: https:",
 		"style-src 'self' 'unsafe-inline' https:",
 		scriptSrc,
-		"connect-src 'self' https:",
+		connectSrc,
 		"frame-src 'self' https:",
 	];
+	if (!isProduction) {
+		cspParts.push("worker-src 'self' blob:");
+	}
 	if (isProduction) {
 		cspParts.push("upgrade-insecure-requests");
 	}

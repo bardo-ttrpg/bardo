@@ -15,11 +15,15 @@ export const setupAnswersSchema = z
 	.object({
 		ttrpgSystem: z.string().trim().min(2).max(160).optional(),
 		theme: z.string().trim().min(2).max(120).optional(),
+		campaignPremise: z.string().trim().min(3).max(2_000).optional(),
+		openingSituation: z.string().trim().min(3).max(4_000).optional(),
+		partyRoster: z.string().trim().min(3).max(4_000).optional(),
 		systemUrl: z.string().trim().max(2_000).optional(),
 		sourceMaterialsStatus: sourceMaterialsStatusSchema.optional(),
 		diceRoller: z.enum(["player", "bardo"]).optional(),
 		playerCount: z.number().int().min(1).max(20).optional(),
 		sourcePolicy: sourcePolicySchema.optional(),
+		sourceAdaptationNotes: z.string().trim().max(4_000).optional(),
 		additionalContext: z.string().trim().max(4_000).optional(),
 		materialsConfirmation: z.string().trim().max(4_000).optional(),
 	})

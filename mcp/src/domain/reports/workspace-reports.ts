@@ -28,50 +28,39 @@ type ReportOptions = {
 export const WORLD_STATE_REPORTS = {
 	world_state_overview: {
 		path: "logs/world-state-overview.md",
-		resourceUri: "resource://reports/world-state-overview",
 		title: "World State Overview",
 	},
 	continuity_audit: {
 		path: "logs/continuity-audit.md",
-		resourceUri: "resource://reports/continuity-audit",
 		title: "Continuity Audit",
 	},
 	timeline_diff: {
 		path: "logs/timeline-diff.md",
-		resourceUri: "resource://reports/timeline-diff",
 		title: "Timeline Diff",
 	},
 	faction_pressure_report: {
 		path: "logs/faction-pressure.md",
-		resourceUri: "resource://reports/faction-pressure",
 		title: "Faction Pressure",
 	},
 	npc_state_delta: {
 		path: "logs/npc-state-delta.md",
-		resourceUri: "resource://reports/npc-state-delta",
 		title: "NPC State Delta",
 	},
 	player_knowledge_view: {
 		path: "logs/player-knowledge.md",
-		resourceUri: "resource://reports/player-knowledge",
 		title: "Player Knowledge",
 	},
 	canon_vs_inference_report: {
 		path: "logs/canon-vs-inference.md",
-		resourceUri: "resource://reports/canon-vs-inference",
 		title: "Canon Vs Inference",
 	},
 } as const satisfies Record<
 	WorldStateReportId,
-	{ path: string; resourceUri: string; title: string }
+	{ path: string; title: string }
 >;
 
 function reportPath(reportId: WorldStateReportId): string {
 	return WORLD_STATE_REPORTS[reportId].path;
-}
-
-function reportResourceUri(reportId: WorldStateReportId): string {
-	return WORLD_STATE_REPORTS[reportId].resourceUri;
 }
 
 function bulletList(
@@ -483,7 +472,7 @@ async function writeReport(args: {
 			title: WORLD_STATE_REPORTS[args.reportId].title,
 			description: "Derived world-state workspace report",
 			generated_at_iso: new Date().toISOString(),
-			report_uri: reportResourceUri(args.reportId),
+			report_tool: args.reportId,
 		},
 		renderReport(args),
 	);

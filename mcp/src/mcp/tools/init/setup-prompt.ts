@@ -23,7 +23,11 @@ export type SetupPromptQuestionKey =
 	| "values"
 	| "ttrpgSystem"
 	| "diceRoller"
-	| "theme";
+	| "theme"
+	| "campaignPremise"
+	| "openingSituation"
+	| "partyRoster"
+	| "sourceAdaptationNotes";
 
 export type SetupPrompt = {
 	version: "2.0";
@@ -140,6 +144,11 @@ export function buildSetupPrompt(args: {
 				},
 			};
 		}
+		case "campaignPremise":
+		case "openingSituation":
+		case "partyRoster":
+		case "sourceAdaptationNotes":
+			return freeTextPrompt(args.questionKey, args.prompt);
 		default:
 			return null;
 	}

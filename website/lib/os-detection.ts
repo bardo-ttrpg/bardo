@@ -6,15 +6,15 @@ export const INSTALL_COMMANDS: Record<
 > = {
 	macos: {
 		label: "macOS",
-		command: "curl -fsSL https://bardo.gg | sh",
+		command: "curl -fsSL https://www.bardo.gg/install | sh",
 	},
 	linux: {
 		label: "Linux",
-		command: "curl -fsSL https://bardo.gg | sh",
+		command: "curl -fsSL https://www.bardo.gg/install | sh",
 	},
 	windows: {
 		label: "Windows",
-		command: "irm https://bardo.gg/install.ps1 | iex",
+		command: "irm https://www.bardo.gg/install.ps1 | iex",
 	},
 };
 

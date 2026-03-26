@@ -42,8 +42,8 @@ describe("detectInstallOs", () => {
 
 describe("INSTALL_COMMANDS", () => {
 	test("defines commands for macos linux and windows", () => {
-		expect(INSTALL_COMMANDS.macos.command).toContain("bardo.gg");
-		expect(INSTALL_COMMANDS.linux.command).toContain("bardo.gg");
+		expect(INSTALL_COMMANDS.macos.command).toContain("www.bardo.gg/install");
+		expect(INSTALL_COMMANDS.linux.command).toContain("www.bardo.gg/install");
 		expect(INSTALL_COMMANDS.windows.command).toContain("install.ps1");
 	});
 });

@@ -1,4 +1,0 @@
-version: 1
-display_name: Greptile MCP Review
-short_description: Run Greptile MCP code-review and fix loops.
-default_prompt: Run a Greptile MCP review on the current branch, fix high-priority findings, rerun checks, and summarize remaining risks.

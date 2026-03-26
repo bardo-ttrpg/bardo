@@ -31,7 +31,7 @@ describe("GET /api/connect/runtime-status", () => {
 		expect(response.headers.get("x-ratelimit-reset")).toBe("1800000030");
 	});
 
-	test("returns the plan, scopes, and workspace path for a valid API key", async () => {
+	test("returns the plan, scopes, and workspace path for a valid direct credential", async () => {
 		const handler = createRuntimeStatusGetHandler({
 			consumeBudget: async () => ({
 				allowed: true,
@@ -93,7 +93,64 @@ describe("GET /api/connect/runtime-status", () => {
 		});
 	});
 
-	test("rejects requests without an API key", async () => {
+	test("accepts a bridge access token and rechecks paid plan access", async () => {
+		const handler = createRuntimeStatusGetHandler({
+			consumeBudget: async () => ({
+				allowed: true,
+				retryAfterSeconds: 60,
+				limit: 120,
+				remaining: 119,
+				resetEpochSeconds: 1_800_000_000,
+			}),
+			decodeBridgeToken: async (token) => {
+				expect(token).toBe("bridge_access_token");
+				return {
+					sessionId: "bridge_session_123",
+					userId: "user_123",
+					plan: "solo",
+					accountLabel: "Armando",
+				};
+			},
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						throw new Error("should not verify Clerk API keys");
+					},
+				},
+			}),
+			resolvePlanForSubject: async (_clerk, subject) => {
+				expect(subject).toBe("user_123");
+				return {
+					plan: "solo",
+					billingUnavailable: false,
+				};
+			},
+			mcpPeriodLimitResolver: () => 25_000,
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/runtime-status", {
+				headers: {
+					authorization: "Bearer bridge_access_token",
+				},
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body).toEqual({
+			valid: true,
+			subjectId: "user_123",
+			keyId: "bridge:bridge_session_123",
+			scopes: ["mcp"],
+			workspacePath: null,
+			plan: "solo",
+			mcpPeriodLimit: 25_000,
+			billingUnavailable: false,
+		});
+	});
+
+	test("rejects requests without a bridge credential", async () => {
 		const handler = createRuntimeStatusGetHandler();
 
 		const response = await handler(
@@ -102,7 +159,7 @@ describe("GET /api/connect/runtime-status", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(401);
-		expect(body.error).toContain("API key");
+		expect(body.error).toContain("bridge credential");
 	});
 
 	test("records runtime status success and invalid-key outcomes in connect telemetry", async () => {
