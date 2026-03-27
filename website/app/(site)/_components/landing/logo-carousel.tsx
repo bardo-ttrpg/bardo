@@ -1,16 +1,16 @@
 "use client";
 
 const logos = [
-	{ name: "Miro", text: "miro" },
-	{ name: "Rakuten", text: "Rakuten" },
-	{ name: "Duolingo", text: "duolingo" },
-	{ name: "WHOOP", text: "WHOOP" },
-	{ name: "Vanta", text: "Vanta" },
-	{ name: "Cisco", text: "CISCO" },
-	{ name: "Virgin Atlantic", text: "virgin atlantic" },
-	{ name: "Harvey", text: "Harvey" },
-	{ name: "Sierra", text: "Sierra" },
-	{ name: "Ramp", text: "Ramp" },
+	{ name: "Claude Code", text: "Claude Code" },
+	{ name: "Cursor", text: "Cursor" },
+	{ name: "OpenCode", text: "OpenCode" },
+	{ name: "Codex CLI", text: "Codex CLI" },
+	{ name: "Cline", text: "Cline" },
+	{ name: "Local Bridge", text: "Local Bridge" },
+	{ name: "Remote MCP", text: "Remote MCP" },
+	{ name: "Campaign Truth", text: "Campaign Truth" },
+	{ name: "Markdown Canon", text: "Markdown Canon" },
+	{ name: "Bridge Approval", text: "Bridge Approval" },
 ];
 
 const logoLoops = ["first", "second", "third"] as const;

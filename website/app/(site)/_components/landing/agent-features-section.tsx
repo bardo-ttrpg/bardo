@@ -7,21 +7,21 @@ export default function AgentFeaturesSection() {
 	return (
 		<section className="py-24">
 			<h2 className="mb-20 text-center text-4xl font-semibold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-				The best way to build with agents
+				What Bardo changes in practice
 			</h2>
 
 			<FeatureBlock
-				title="Built to drive real engineering work"
-				description="From routine pull requests to your hardest problems, Codex reliably completes tasks end to end, like building features, complex refactors, migrations, and more, powered by OpenAI's frontier coding models."
+				title="Keep canon local while the agent keeps moving"
+				description="Bardo lets the website handle auth, approval, and billing while your campaign files stay in the workspace you already trust."
 				alignment="left"
 			>
 				<EngineeringDemoMockup />
 			</FeatureBlock>
 
 			<FeatureBlock
-				title="Built to drive real engineering work"
-				description="From routine pull requests to your hardest problems, Codex reliably completes tasks end to end, like building features, complex refactors, migrations, and more, powered by OpenAI's frontier coding models."
-				alignment="left"
+				title="Review the run before anything writes"
+				description="Every bridge session is readable. You can see which files are being inspected, which canon is being updated, and why the write path is safe."
+				alignment="right"
 			>
 				<EngineeringDemoMockup />
 			</FeatureBlock>
@@ -96,19 +96,19 @@ function EngineeringDemoMockup() {
 			<div className="relative p-6">
 				<div className="mb-4 flex justify-end">
 					<div className="rounded-lg bg-secondary px-4 py-2.5 text-sm text-foreground">
-						Hey Codex, implement dark mode
+						Refresh the campaign truth before session 18.
 					</div>
 				</div>
 
 				<div className="space-y-3 text-sm text-muted-foreground">
 					<p className="leading-relaxed">
 						{
-							"I'll trace the existing theme entry points, add a proper light/dark theme model, persist the user preference, and apply the "
+							"I'll read the latest canonical events, reconcile the current state projection, and stage only the files that need a continuity update inside "
 						}
 						<code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">
-							dark
+							./campaign
 						</code>
-						{" class early so we avoid a flash on load."}
+						{" so the workspace stays auditable."}
 					</p>
 
 					<div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -120,14 +120,18 @@ function EngineeringDemoMockup() {
 						<div className="flex items-center justify-between rounded border border-border bg-secondary/50 px-3 py-2">
 							<div className="flex items-center gap-2">
 								<span className="text-muted-foreground">Edited</span>
-								<span className="font-mono text-foreground">theme.ts</span>
+								<span className="font-mono text-foreground">
+									projections/current-state.md
+								</span>
 							</div>
 							<span className="text-muted-foreground">&#10003;</span>
 						</div>
 						<div className="flex items-center justify-between rounded border border-border bg-secondary/50 px-3 py-2">
 							<div className="flex items-center gap-2">
 								<span className="text-muted-foreground">Editing</span>
-								<span className="font-mono text-foreground">main.tsx</span>
+								<span className="font-mono text-foreground">
+									events/canonical.ndjson
+								</span>
 							</div>
 							<span className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
 						</div>
@@ -137,13 +141,13 @@ function EngineeringDemoMockup() {
 				<div className="mt-6 flex items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3">
 					<input
 						type="text"
-						placeholder="Ask Codex anything"
+						placeholder="Ask Bardo to reconcile your canon"
 						className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 						disabled
 					/>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<span>+</span>
-						<span>GPT-5.4</span>
+						<span>Remote MCP</span>
 					</div>
 				</div>
 			</div>

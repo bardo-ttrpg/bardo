@@ -61,24 +61,24 @@ function FullIdeMockup() {
 					<SidebarItem label="Skills" />
 
 					<div className="mb-2 mt-6 px-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						Threads
+						Campaigns
 					</div>
 
-					<SidebarGroup title="Codex">
-						<SidebarItem label="Create Codex app CTA" time="4h" active />
-						<SidebarItem label="Implement dark mode" time="8h" />
+					<SidebarGroup title="Iron Duchy">
+						<SidebarItem label="Refresh campaign truth" time="4m" active />
+						<SidebarItem label="Prepare player recap" time="8m" />
 					</SidebarGroup>
 
-					<SidebarGroup title="ChatGPT">
-						<SidebarItem label="Voice mode shortcuts" time="2h" />
+					<SidebarGroup title="Midnight Hollows">
+						<SidebarItem label="Audit continuity drift" time="2m" />
 					</SidebarGroup>
 
-					<SidebarGroup title="Sora">
-						<SidebarItem label="Persist prompt presets" time="5h" />
+					<SidebarGroup title="Rules">
+						<SidebarItem label="Validate spell interactions" time="5m" />
 					</SidebarGroup>
 
-					<SidebarGroup title="Atlas">
-						<SidebarItem label="Add Status filter facet" time="3h" />
+					<SidebarGroup title="Bridge Sessions">
+						<SidebarItem label="Approve local write plan" time="3m" />
 					</SidebarGroup>
 				</div>
 			</div>
@@ -87,11 +87,11 @@ function FullIdeMockup() {
 				<div className="flex items-center justify-between border-b border-border px-4 py-3 md:px-6">
 					<div className="flex items-center gap-3">
 						<span className="text-sm font-medium text-foreground">
-							Create Codex app CTA
+							Refresh campaign truth
 						</span>
 						<span className="flex items-center gap-1.5 text-sm text-muted-foreground">
 							<span className="text-foreground/30">&#9632;</span>
-							openai/codex
+							./campaign
 						</span>
 					</div>
 					<div className="flex items-center gap-2">
@@ -114,15 +114,15 @@ function FullIdeMockup() {
 				<div className="flex-1 overflow-auto p-4 md:p-6">
 					<div className="mb-6 flex justify-end">
 						<div className="max-w-md rounded-lg bg-secondary px-4 py-3 text-sm text-foreground">
-							Create a compelling launch hero for the new Codex app on
-							openai.com/codex
+							Reconcile the latest turn and update only the files needed for the
+							next session.
 						</div>
 					</div>
 
 					<div className="mb-6">
 						<p className="mb-4 text-sm leading-relaxed text-muted-foreground">
 							{
-								"I'll update the hero copy to clearly communicate what Codex app does, add outcome-focused bullets, and ensure the CTAs align with launch goals."
+								"I'll read the canonical event log, compare it against the current projection, and prepare a minimal write plan for approval before changing local canon."
 							}
 						</p>
 
@@ -132,15 +132,17 @@ function FullIdeMockup() {
 						</div>
 
 						<div className="space-y-2">
-							<FileAction file="hero.tsx" status="done" />
-							<FileAction file="build.py" status="reading" />
-							<FileAction file="build.py" status="done" />
+							<FileAction file="events/canonical.ndjson" status="done" />
+							<FileAction
+								file="projections/current-state.md"
+								status="reading"
+							/>
+							<FileAction file="logs/continuity-audit.md" status="done" />
 						</div>
 
 						<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-							Updated the launch hero to emphasize real developer outcomes (repo
-							understanding, safe execution, PR delivery), and aligned the CTAs
-							with launch intent.
+							Prepared a readable continuity update with the world-state drift
+							called out before any write moves back through the bridge.
 						</p>
 					</div>
 				</div>
@@ -149,13 +151,13 @@ function FullIdeMockup() {
 					<div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3">
 						<input
 							type="text"
-							placeholder="Ask Codex anything"
+							placeholder="Ask Bardo to sync your campaign"
 							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 							disabled
 						/>
 						<div className="flex items-center gap-2">
 							<span className="text-muted-foreground">+</span>
-							<span className="text-xs text-muted-foreground">GPT-5.4</span>
+							<span className="text-xs text-muted-foreground">Remote MCP</span>
 							<span className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-background">
 								&#8593;
 							</span>
@@ -181,7 +183,7 @@ function FullIdeMockup() {
 					<div className="mb-6">
 						<div className="mb-3 flex items-center justify-between">
 							<span className="font-mono text-sm text-foreground">
-								src/hero.tsx
+								projections/current-state.md
 							</span>
 							<div className="flex items-center gap-2">
 								<span className="font-mono text-xs text-foreground/50">+8</span>
@@ -193,28 +195,16 @@ function FullIdeMockup() {
 
 						<div className="space-y-0.5 overflow-hidden rounded border border-border bg-card font-mono text-[11px]">
 							<CodeLine text="export const hero = {" />
-							<CodeLine text='  eyebrow: "New",' added />
-							<CodeLine text='  title: "Codex",' added />
-							<CodeLine text='  subtitle: "AI for developers",' added />
-							<CodeLine text='  eyebrow: "Introducing",' added />
-							<CodeLine text='  title: "Codex app",' added />
-							<CodeLine text='  subtitle: "Your AI pair programmer",' added />
-							<CodeLine text='  primaryCta: "Get started",' added />
-							<CodeLine text='  secondaryCta: "Download the CLI",' added />
+							<CodeLine text='  scene: "Harbor negotiations",' added />
+							<CodeLine text='  status: "canon refreshed",' added />
+							<CodeLine text='  nextRisk: "missing witness statement",' added />
+							<CodeLine text='  playerFacingRecap: "ready",' added />
 							<CodeLine text="};" />
 							<CodeLine text="" />
-							<CodeLine text="export const heroBullets = [" />
-							<CodeLine text='  "Write code faster",' added />
-							<CodeLine text='  "Understand any repo",' added />
-							<CodeLine text='  "Understands your repo in seconds",' added />
-							<CodeLine
-								text='  "Executes commands safely in a sandbox",'
-								added
-							/>
-							<CodeLine
-								text='  "Turns issues into reviewed, production-ready PRs",'
-								added
-							/>
+							<CodeLine text="export const pendingWrites = [" />
+							<CodeLine text='  "events/canonical.ndjson",' added />
+							<CodeLine text='  "projections/current-state.md",' added />
+							<CodeLine text='  "logs/continuity-audit.md",' added />
 							<CodeLine text="];" />
 						</div>
 					</div>
@@ -222,7 +212,7 @@ function FullIdeMockup() {
 					<div>
 						<div className="mb-3 flex items-center justify-between">
 							<span className="font-mono text-sm text-foreground">
-								tools/build.py
+								logs/continuity-audit.md
 							</span>
 							<div className="flex items-center gap-2">
 								<span className="font-mono text-xs text-foreground/50">+1</span>
@@ -233,12 +223,17 @@ function FullIdeMockup() {
 						</div>
 
 						<div className="space-y-0.5 overflow-hidden rounded border border-border bg-card font-mono text-[11px]">
-							<CodeLine text="def build():" />
-							<CodeLine text='    print("building")' removed />
-							<CodeLine text='    print("building launch hero...")' added />
+							<CodeLine text="## Continuity Audit" />
+							<CodeLine text="- unresolved harbor witness timestamp" removed />
+							<CodeLine
+								text="+ timestamp reconciled with canonical turn 42"
+								added
+							/>
 							<CodeLine text="" />
-							<CodeLine text='if __name__ == "__main__":' />
-							<CodeLine text="    build()" />
+							<CodeLine
+								text="+ no player-facing contradictions detected"
+								added
+							/>
 						</div>
 					</div>
 				</div>

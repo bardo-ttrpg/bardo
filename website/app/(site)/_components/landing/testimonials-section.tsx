@@ -2,50 +2,32 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const testimonials = [
+const proofPoints = [
 	{
-		quote:
-			"At Wonderful, Codex CLI has completely replaced every other agentic harness for our core technology and architecture work requiring deep reasoning and understanding.",
-		name: "Daniel Sikorskiy",
-		title: "Chief Architect",
-		company: "Wonderful",
+		title: "Local canon stays local",
+		body: "Bardo is built around a local workspace. The remote layer meters and orchestrates, but the actual campaign files remain in your own directory.",
 	},
 	{
-		quote:
-			"At Harvey, Codex transformed how we build by cutting early iteration time by 30-50%, freeing engineers to focus on system design and high-leverage decisions.",
-		name: "Joey Wang",
-		title: "Mobile Lead",
-		company: "Harvey",
+		title: "Approval is part of the flow",
+		body: "Bridge sessions make the write path visible before local files change, so campaign updates stay reviewable instead of disappearing into a black box.",
 	},
 	{
-		quote:
-			"With Codex, we ship in a weekend what previously took a quarter. It's become our go-to for projects we wouldn't have otherwise been able to take on.",
-		name: "Tess Rosania",
-		title: "Software Engineer",
-		company: "Sierra",
+		title: "Readable files over hidden state",
+		body: "Events, projections, and audits live in Markdown and NDJSON so both humans and agents can inspect the same campaign truth.",
 	},
 	{
-		quote:
-			"The recent Codex releases have been a step change. Codex PR reviews catch bugs our team would have missed, and we ship with more confidence because of it. Now we're pulling the CLI and desktop app into more of our workflows—each release raises the bar.",
-		name: "Austin Ray",
-		title: "AI Dev X Team Lead",
-		company: "Ramp",
+		title: "Works with the clients you already use",
+		body: "The product is designed for MCP-capable clients, not a new editor lock-in. You keep your preferred surface and Bardo supplies the guarded tool layer.",
 	},
 	{
-		quote:
-			"Codex performed best in our backend Python code-review benchmark. It was the only one to catch tricky backward compatibility issues and consistently found the hard bugs that other bots missed.",
-		name: "Aaron Wang",
-		title: "Senior Software Engineer",
-		company: "Duolingo",
+		title: "Built for long-form continuity",
+		body: "The value is not one flashy generation. It is surviving session after session with enough structure to reconcile drift and preserve canon.",
 	},
 	{
-		quote:
-			"I needed to update another team's codebase for a release. Codex handled the refactor and test generation, delivering fully tested code I handed back fast—keeping the feature on schedule without added risk.",
-		name: "Tres Wong-Godfrey",
-		title: "Tech Lead",
-		company: "Cisco Meraki",
+		title: "Small surface, clear boundary",
+		body: "The website handles auth, billing, and approval. The bridge handles local access. The remote MCP stays focused on guarded orchestration.",
 	},
-];
+] as const;
 
 export default function TestimonialsSection() {
 	const ref = useRef<HTMLElement>(null);
@@ -78,14 +60,14 @@ export default function TestimonialsSection() {
 					transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
 				}}
 			>
-				What builders are saying
+				Why the product holds up
 			</h2>
 
 			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-				{testimonials.map((testimonial, index) => (
-					<TestimonialCard
-						key={testimonial.name}
-						testimonial={testimonial}
+				{proofPoints.map((proofPoint, index) => (
+					<ProofCard
+						key={proofPoint.title}
+						proofPoint={proofPoint}
 						delay={index * 0.1}
 						isVisible={isVisible}
 					/>
@@ -95,12 +77,12 @@ export default function TestimonialsSection() {
 	);
 }
 
-function TestimonialCard({
-	testimonial,
+function ProofCard({
+	proofPoint,
 	delay,
 	isVisible,
 }: {
-	testimonial: (typeof testimonials)[number];
+	proofPoint: (typeof proofPoints)[number];
 	delay: number;
 	isVisible: boolean;
 }) {
@@ -113,24 +95,19 @@ function TestimonialCard({
 				transition: `opacity 0.6s ease-out ${delay}s, transform 0.6s ease-out ${delay}s`,
 			}}
 		>
-			<div className="mb-6 h-12 w-12 overflow-hidden rounded-sm bg-secondary">
-				<div className="flex h-full w-full items-center justify-center text-lg font-medium text-muted-foreground">
-					{testimonial.name
-						.split(" ")
-						.map((name) => name[0])
-						.join("")}
+			<div className="mb-6 h-12 w-12 overflow-hidden rounded-sm border border-border bg-secondary">
+				<div className="flex h-full w-full items-center justify-center text-sm font-medium text-muted-foreground">
+					0{Math.floor(delay * 10) + 1}
 				</div>
 			</div>
 
-			<blockquote className="mb-6 text-sm leading-relaxed text-foreground">
-				&ldquo;{testimonial.quote}&rdquo;
-			</blockquote>
+			<h3 className="mb-4 text-xl font-medium text-foreground">
+				{proofPoint.title}
+			</h3>
 
-			<cite className="not-italic">
-				<span className="text-sm text-muted-foreground">
-					{testimonial.name}, {testimonial.title}, {testimonial.company}
-				</span>
-			</cite>
+			<p className="text-sm leading-relaxed text-muted-foreground">
+				{proofPoint.body}
+			</p>
 		</div>
 	);
 }

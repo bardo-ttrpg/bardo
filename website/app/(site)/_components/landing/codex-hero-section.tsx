@@ -78,21 +78,21 @@ function ProductDemoMockup() {
 						Threads
 					</div>
 
-					<SidebarGroup title="Codex">
-						<SidebarItem label="Create Codex app CTA" time="4h" active />
-						<SidebarItem label="Implement dark mode" time="8h" />
+					<SidebarGroup title="Iron Duchy">
+						<SidebarItem label="Refresh campaign truth" time="4m" active />
+						<SidebarItem label="Prepare next session" time="8m" />
 					</SidebarGroup>
 
-					<SidebarGroup title="ChatGPT">
-						<SidebarItem label="Voice mode shortcuts" time="2h" />
+					<SidebarGroup title="Midnight Hollows">
+						<SidebarItem label="Player recap draft" time="2m" />
 					</SidebarGroup>
 
-					<SidebarGroup title="Sora">
-						<SidebarItem label="Persist prompt presets" status="In progress" />
+					<SidebarGroup title="Bridge Sessions">
+						<SidebarItem label="Approve local write plan" status="Active" />
 					</SidebarGroup>
 
-					<SidebarGroup title="Atlas">
-						<SidebarItem label="Add Status filter facet" time="3h" dot />
+					<SidebarGroup title="Continuity">
+						<SidebarItem label="Audit unresolved drift" time="3m" dot />
 					</SidebarGroup>
 				</div>
 			</div>
@@ -101,9 +101,9 @@ function ProductDemoMockup() {
 				<div className="flex items-center justify-between border-b border-border px-4 py-3 md:px-6">
 					<div className="flex items-center gap-2">
 						<span className="text-sm font-medium text-foreground">
-							Create Codex app CTA
+							Refresh campaign truth
 						</span>
-						<span className="text-sm text-muted-foreground">openai/codex</span>
+						<span className="text-sm text-muted-foreground">./campaign</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<button
@@ -124,15 +124,15 @@ function ProductDemoMockup() {
 				<div className="flex-1 p-4 md:p-6">
 					<div className="mb-6 flex justify-end">
 						<div className="max-w-md rounded-lg bg-secondary px-4 py-3 text-sm text-foreground">
-							Create a compelling launch hero for the new Codex app on
-							openai.com/codex
+							Reconcile the latest turn, flag canon drift, and update the local
+							campaign files that should change.
 						</div>
 					</div>
 
 					<div className="mb-6">
 						<p className="mb-4 text-sm leading-relaxed text-muted-foreground">
 							{
-								"I'll update the hero copy to clearly communicate what Codex app does, add outcome-focused bullets, and ensure the CTAs align with launch goals."
+								"I'll read the canonical event log, review the current projection, and prepare a write plan that only touches the local files needed for continuity."
 							}
 						</p>
 						<div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -145,14 +145,18 @@ function ProductDemoMockup() {
 							<div className="flex items-center justify-between rounded border border-border bg-secondary/50 px-3 py-2 text-sm">
 								<div className="flex items-center gap-2">
 									<span className="text-muted-foreground">Edited</span>
-									<span className="font-mono text-foreground">hero.tsx</span>
+									<span className="font-mono text-foreground">
+										projections/current-state.md
+									</span>
 								</div>
 								<span className="text-muted-foreground">&#10003;</span>
 							</div>
 							<div className="flex items-center justify-between rounded border border-border bg-secondary/50 px-3 py-2 text-sm">
 								<div className="flex items-center gap-2">
 									<span className="text-muted-foreground">Edited</span>
-									<span className="font-mono text-foreground">build.py</span>
+									<span className="font-mono text-foreground">
+										logs/continuity-audit.md
+									</span>
 								</div>
 								<span className="text-muted-foreground">&#10003;</span>
 							</div>
@@ -164,13 +168,13 @@ function ProductDemoMockup() {
 					<div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3">
 						<input
 							type="text"
-							placeholder="Ask Codex anything"
+							placeholder="Ask Bardo to sync your canon"
 							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 							disabled
 						/>
 						<div className="flex items-center gap-2 text-xs text-muted-foreground">
 							<span>+</span>
-							<span>GPT-5.4</span>
+							<span>Remote MCP</span>
 						</div>
 					</div>
 				</div>
@@ -199,10 +203,10 @@ function ProductDemoMockup() {
 								{'  eyebrow: "New",'}
 							</div>
 							<div className="bg-foreground/5 text-foreground/70">
-								{'  title: "Codex",'}
+								{'  scene: "Harbor negotiations",'}
 							</div>
 							<div className="bg-foreground/5 text-foreground/70">
-								{'  subtitle: "AI for developers",'}
+								{'  status: "canon refreshed",'}
 							</div>
 							<div className="text-muted-foreground">{"}"}</div>
 						</div>
