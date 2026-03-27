@@ -2,15 +2,11 @@ import AmbientParticles from "@/components/ambient-particles";
 import StructuredData from "@/components/structured-data";
 import { displayPriceCents } from "@/lib/billing-catalog";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import ComparisonSection from "./_components/landing/comparison-section";
-import CompatibilitySection from "./_components/landing/compatibility-section";
-import CtaSection from "./_components/landing/cta-section";
-import HeroSection from "./_components/landing/hero-section";
-import ManifestoSection from "./_components/landing/manifesto-section";
-import TerminalDemoSection from "./_components/landing/terminal-demo-section";
-import VideoSection from "./_components/landing/video-section";
-import WorkspaceSection from "./_components/landing/workspace-section";
-import WorldMapSection from "./_components/landing/world-map-section";
+import AgentFeaturesSection from "./_components/landing/agent-features-section";
+import CodexHeroSection from "./_components/landing/codex-hero-section";
+import IdeDemoSection from "./_components/landing/ide-demo-section";
+import LogoCarousel from "./_components/landing/logo-carousel";
+import TestimonialsSection from "./_components/landing/testimonials-section";
 
 export const metadata = createPublicMetadata({
 	title:
@@ -62,17 +58,13 @@ export default function LandingPage() {
 		<div>
 			<StructuredData data={structuredData} />
 			<AmbientParticles />
-			<HeroSection wordmarkClassName="font-sans" />
+			<CodexHeroSection />
+			<LogoCarousel />
 			<div className="mx-auto max-w-7xl px-4 sm:px-6">
-				<ComparisonSection />
-				<WorkspaceSection />
-				<TerminalDemoSection />
-				<VideoSection />
-				<CompatibilitySection />
+				<AgentFeaturesSection />
+				<IdeDemoSection />
+				<TestimonialsSection />
 			</div>
-			<ManifestoSection />
-			<WorldMapSection />
-			<CtaSection />
 		</div>
 	);
 }

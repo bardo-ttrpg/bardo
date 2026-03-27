@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
@@ -12,28 +13,17 @@ const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 });
 
 const PRIMARY_NAV_LINKS = [
-	{ href: "/docs/install", label: "Docs" },
+	{ href: "/docs", label: "Docs" },
 	{ href: "/pricing", label: "Pricing" },
-	{ href: "/docs/campaign-truth", label: "Campaign Truth" },
-	{ href: "/legal", label: "Legal" },
 ] as const;
 
 const FOOTER_PRODUCT_LINKS = [
-	{ label: "Docs", href: "/docs/install" },
-	{ label: "Campaign Truth", href: "/docs/campaign-truth" },
+	{ label: "Docs", href: "/docs" },
 	{ label: "Pricing", href: "/pricing" },
-	{ label: "Legal", href: "/legal" },
 	{ label: "Sign up", href: "/sign-up" },
 ] as const;
 
 const FOOTER_AGENTS = ["Claude Code", "Cursor", "Cline", "OpenCode"] as const;
-
-const FOOTER_STACK = [
-	"Any TTRPG system",
-	"Markdown-first",
-	"System-agnostic",
-	"MCP protocol",
-] as const;
 
 const navLinkClass =
 	"font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground";
@@ -44,20 +34,27 @@ function NavLink({ href, label }: { href: string; label: string }) {
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
 	const body = (
-		<div className="min-h-screen text-foreground">
-			<div className="border-b border-border/80 bg-card/50 px-4 py-2 text-center sm:px-6">
-				<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-					Local-First AI GM • System-Agnostic • 1 Accepted MCP Tool Call = 1
-					Credit
-				</p>
-			</div>
-			<header className="sticky top-0 z-50 border-b border-border bg-background/88 backdrop-blur">
-				<div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6">
-					<SiteNavLink
+		<div className="min-h-screen text-foreground px-20">
+			<header className="sticky top-0 z-50 backdrop-blur py-2">
+				<div className="mx-auto flex h-11 items-center justify-between gap-8">
+					<Link
 						href="/"
-						label="Bardo"
-						className="font-mono text-sm font-bold uppercase tracking-[0.2em] text-foreground"
-					/>
+						prefetch={false}
+						aria-label="Bardo"
+						className="flex items-center"
+					>
+						<Image
+							src="/icon.svg"
+							alt="Bardo"
+							width={28}
+							height={28}
+							priority
+							style={{
+								animation: "fade-in-up 0.6s ease-out 0.1s forwards",
+								opacity: 0,
+							}}
+						/>
+					</Link>
 
 					<nav
 						aria-label="Primary"
@@ -99,7 +96,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 					<div className="grid grid-cols-2 border-b border-border sm:grid-cols-4">
 						<div className="border-r border-border px-6 py-10 sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-								Product
+								Pages
 							</p>
 							<ul className="space-y-3">
 								{FOOTER_PRODUCT_LINKS.map(({ label, href }) => (
@@ -134,18 +131,8 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 
 						<div className="border-r border-t border-border px-6 py-10 sm:border-t-0 sm:px-8">
 							<p className="mb-5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-								Stack
+								Blogs
 							</p>
-							<ul className="space-y-3">
-								{FOOTER_STACK.map((item) => (
-									<li
-										key={item}
-										className="font-mono text-xs text-muted-foreground"
-									>
-										{item}
-									</li>
-								))}
-							</ul>
 						</div>
 
 						<div className="border-t border-border px-6 py-10 sm:border-t-0 sm:px-8">
