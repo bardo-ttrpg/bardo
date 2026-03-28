@@ -4,10 +4,20 @@ import type { ReactNode } from "react";
 
 export default function CodexHeroSection() {
 	return (
-		<section className="relative overflow-hidden pb-24 pt-28">
+		<section className="relative overflow-hidden pb-20 pt-20 sm:pt-24">
 			<div className="mx-auto flex flex-col items-start">
+				<p
+					className="mb-5 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+					style={{
+						animation: "fade-in-up 0.6s ease-out 0.05s forwards",
+						opacity: 0,
+					}}
+				>
+					Remote MCP for tabletop continuity
+				</p>
+
 				<h1
-					className="mb-6 font-brand text-6xl font-semibold uppercase tracking-[-0.08em] sm:text-8xl md:text-[9rem]"
+					className="mb-5 font-brand text-6xl font-semibold uppercase tracking-[-0.08em] sm:text-8xl md:text-[9rem]"
 					style={{
 						animation: "fade-in-up 0.6s ease-out 0.1s forwards",
 						opacity: 0,
@@ -17,39 +27,41 @@ export default function CodexHeroSection() {
 				</h1>
 
 				<p
-					className="mb-8 max-w-3xl text-md md:text-2xl"
+					className="mb-8 max-w-2xl text-base leading-7 text-foreground sm:text-xl sm:leading-8 md:text-2xl"
 					style={{
 						animation: "fade-in-up 0.6s ease-out 0.2s forwards",
 						opacity: 0,
 					}}
 				>
-					The MCP for any tabletop role-playing game, <br />
-					Bardo is the new best way of building worlds with AI.
+					Run long-form campaigns with AI without giving up your local files,
+					readable canon, or the ability to review what changes.
 				</p>
 
 				<fieldset
 					aria-label="Install command"
-					className="inline-flex items-center gap-3 rounded-full border border-border bg-card/80 px-4 py-3 font-mono text-sm text-foreground shadow-2xl backdrop-blur"
+					className="inline-flex max-w-full items-center gap-3 overflow-x-auto rounded-full border border-border/80 bg-card/80 px-4 py-3 font-mono text-sm text-foreground shadow-2xl backdrop-blur"
 					style={{
-						animation: "fade-in-up 0.6s ease-out 0.2s forwards",
+						animation: "fade-in-up 0.6s ease-out 0.28s forwards",
 						opacity: 0,
 					}}
 				>
 					<span className="rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-[1px] text-muted-foreground">
 						curl
 					</span>
-					<code>curl -fsSL https://bardo.gg/install | sh</code>
+					<code className="whitespace-nowrap">
+						curl -fsSL https://bardo.gg/install | sh
+					</code>
 				</fieldset>
 			</div>
 
 			<div
-				className="mx-auto mt-14 max-w-6xl px-4 sm:px-6"
+				className="mx-auto mt-14 max-w-6xl"
 				style={{
 					animation: "fade-in-up 0.8s ease-out 0.4s forwards",
 					opacity: 0,
 				}}
 			>
-				<div className="overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+				<div className="overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-2xl">
 					<ProductDemoMockup />
 				</div>
 			</div>
@@ -59,7 +71,7 @@ export default function CodexHeroSection() {
 
 function ProductDemoMockup() {
 	return (
-		<div className="flex min-h-[500px] md:min-h-[600px]">
+		<div className="flex min-h-[500px] bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--foreground)_6%,transparent),transparent_45%)] md:min-h-[620px]">
 			<div className="hidden w-64 shrink-0 border-r border-border bg-secondary/30 md:block">
 				<div className="flex items-center gap-2 border-b border-border px-4 py-3">
 					<div className="flex gap-1.5">

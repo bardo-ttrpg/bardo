@@ -18,26 +18,28 @@ export default function DocsShell(props: {
 	return (
 		<div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
 			<div className="grid gap-12 lg:grid-cols-[250px_minmax(0,1fr)]">
-				<aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
-					<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						/ Docs
-					</p>
-					<nav className="space-y-2" aria-label="Docs">
-						{DOC_LINKS.map((link) => (
-							<SiteNavLink
-								key={link.href}
-								href={link.href}
-								label={link.label}
-								className={
-									props.currentPath === link.href
-										? "block border border-foreground/20 bg-foreground/[0.04] px-3 py-3 font-mono text-[11px] uppercase tracking-widest text-foreground"
-										: "block border border-transparent px-3 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
-								}
-							/>
-						))}
-					</nav>
+				<aside className="space-y-6 lg:sticky lg:top-28 lg:self-start">
+					<div className="border border-border/80 bg-card/45 p-5">
+						<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+							/ Docs
+						</p>
+						<nav className="space-y-2" aria-label="Docs">
+							{DOC_LINKS.map((link) => (
+								<SiteNavLink
+									key={link.href}
+									href={link.href}
+									label={link.label}
+									className={
+										props.currentPath === link.href
+											? "block border border-foreground/20 bg-foreground/[0.04] px-3 py-3 font-mono text-[11px] uppercase tracking-widest text-foreground"
+											: "block border border-transparent px-3 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+									}
+								/>
+							))}
+						</nav>
+					</div>
 
-					<div className="space-y-3 border border-border bg-card/40 p-4">
+					<div className="space-y-3 border border-border/80 bg-card/30 p-4">
 						<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 							/ Read Locally
 						</p>
@@ -67,7 +69,7 @@ export default function DocsShell(props: {
 				</aside>
 
 				<div className="min-w-0">
-					<div className="border-b border-border pb-8">
+					<div className="border-b border-border/80 pb-8">
 						<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
 							/ {props.eyebrow}
 						</p>

@@ -8,22 +8,31 @@ function read(relativePath: string) {
 	return readFileSync(join(WEBSITE_ROOT, relativePath), "utf8");
 }
 
-describe("PR #30 landing surface", () => {
-	test("homepage composes the Codex-style landing sections", () => {
+describe("landing surface", () => {
+	test("homepage composes the exported template sections", () => {
 		const pageSource = read("app/(site)/page.tsx");
 
-		expect(pageSource).toContain("CodexHeroSection");
-		expect(pageSource).toContain("LogoCarousel");
-		expect(pageSource).toContain("AgentFeaturesSection");
-		expect(pageSource).toContain("TestimonialsSection");
-		expect(pageSource).toContain("IdeDemoSection");
+		expect(pageSource).toContain('id="overview"');
+		expect(pageSource).toContain('id="features"');
+		expect(pageSource).toContain('id="integrations"');
+		expect(pageSource).toContain('id="benefits"');
+		expect(pageSource).toContain('id="reviews"');
+		expect(pageSource).toContain('id="pricing"');
+		expect(pageSource).toContain('id="compliance"');
+		expect(pageSource).toContain('id="faq"');
 	});
 
-	test("does not ship a dedicated codex route or top-level navigation entry", () => {
-		expect(existsSync(join(WEBSITE_ROOT, "app/(site)/codex/page.tsx"))).toBe(
-			false,
+	test("ships the exported contact and privacy routes instead of the old docs shell", () => {
+		expect(existsSync(join(WEBSITE_ROOT, "app/(site)/contact/page.tsx"))).toBe(
+			true,
 		);
+		expect(
+			existsSync(join(WEBSITE_ROOT, "app/(site)/privacy-policy/page.tsx")),
+		).toBe(true);
 		const layoutSource = read("app/(site)/layout.tsx");
-		expect(layoutSource).not.toContain('{ href: "/codex", label: "Codex" }');
+		expect(layoutSource).not.toContain('{ href: "/docs", label: "Docs" }');
+		expect(layoutSource).not.toContain(
+			'{ href: "/pricing", label: "Pricing" }',
+		);
 	});
 });

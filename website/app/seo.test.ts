@@ -65,7 +65,7 @@ describe("SEO and production metadata", () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					userAgent: "*",
-					allow: expect.arrayContaining(["/docs/"]),
+					allow: expect.arrayContaining(["/", "/contact", "/privacy-policy"]),
 					disallow: expect.arrayContaining([
 						"/api/",
 						"/dashboard",
@@ -77,20 +77,12 @@ describe("SEO and production metadata", () => {
 		);
 	});
 
-	test("publishes a sitemap for the public marketing, docs, and legal routes", () => {
+	test("publishes a sitemap for the exported public marketing routes", () => {
 		const entries = sitemap().map((entry) => entry.url);
 		for (const expected of [
 			"https://www.bardo.gg/",
-			"https://www.bardo.gg/pricing",
-			"https://www.bardo.gg/docs",
-			"https://www.bardo.gg/docs/install",
-			"https://www.bardo.gg/docs/connect-client",
-			"https://www.bardo.gg/docs/campaign-truth",
-			"https://www.bardo.gg/docs/credits-and-billing",
-			"https://www.bardo.gg/legal",
-			"https://www.bardo.gg/legal/terms",
-			"https://www.bardo.gg/legal/privacy",
-			"https://www.bardo.gg/legal/ai-policy",
+			"https://www.bardo.gg/contact",
+			"https://www.bardo.gg/privacy-policy",
 		]) {
 			expect(entries.includes(expected)).toBe(true);
 		}

@@ -1,32 +1,27 @@
-import {
-	Geist,
-	Geist_Mono,
-	Instrument_Serif,
-	Space_Grotesk,
-} from "next/font/google";
+import { Fraunces, Host_Grotesk, IBM_Plex_Mono } from "next/font/google";
 
-export const siteSans = Geist({
+export const siteSans = Host_Grotesk({
 	subsets: ["latin"],
 	display: "swap",
-	variable: "--font-geist-sans",
+	variable: "--font-host-grotesk",
 });
 
-export const siteMono = Geist_Mono({
+export const siteMono = IBM_Plex_Mono({
 	subsets: ["latin"],
 	display: "swap",
-	variable: "--font-geist-mono",
+	weight: ["400", "500"],
+	variable: "--font-ibm-plex-mono",
 });
 
-export const siteDisplay = Instrument_Serif({
+export const siteDisplay = Fraunces({
 	subsets: ["latin"],
-	weight: "400",
-	style: ["normal", "italic"],
 	display: "swap",
-	variable: "--font-instrument-serif",
+	variable: "--font-fraunces",
 });
 
-export const siteBrand = Space_Grotesk({
+export const siteBrand = Host_Grotesk({
 	subsets: ["latin"],
 	display: "swap",
-	variable: "--font-space-grotesk",
+	weight: ["500", "600", "700"],
+	variable: "--font-host-grotesk-brand",
 });

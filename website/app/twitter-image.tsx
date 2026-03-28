@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 export const alt =
-	"Bardo - paid remote MCP for tabletop campaigns with a local workspace bridge";
+	"Asset - The intelligent platform for investing and financial analysis";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -19,9 +19,9 @@ export default function TwitterImage() {
 				flexDirection: "column",
 				justifyContent: "space-between",
 				background:
-					"linear-gradient(135deg, #050505 0%, #101010 45%, #171717 100%)",
+					"radial-gradient(circle at top, rgba(241,148,71,0.18), transparent 28%), linear-gradient(135deg, #080a09 0%, #131517 48%, #191d1f 100%)",
 				padding: "56px",
-				color: "#f7f7f4",
+				color: "#ffffff",
 			}}
 		>
 			<div
@@ -32,37 +32,35 @@ export default function TwitterImage() {
 					fontSize: 24,
 					letterSpacing: "0.35em",
 					textTransform: "uppercase",
-					color: "#9ca3af",
+					color: "rgba(255,255,255,0.6)",
 				}}
 			>
-				<span>BARDO</span>
-				<span>MCP • TTRPG • CANON</span>
+				<span>ASSET</span>
+				<span>WORKFLOWS • RESEARCH</span>
 			</div>
 
 			<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 				<div
 					style={{
 						maxWidth: 920,
-						fontSize: 72,
-						lineHeight: 1.04,
+						fontSize: 74,
+						lineHeight: 1.02,
 						fontWeight: 700,
-						letterSpacing: "-0.04em",
-						textWrap: "balance",
+						letterSpacing: "-0.06em",
 					}}
 				>
-					Paid Remote MCP for Tabletop Campaign Continuity
+					Move investing forward with intelligence
 				</div>
 				<div
 					style={{
-						maxWidth: 840,
+						maxWidth: 860,
 						fontSize: 28,
 						lineHeight: 1.35,
-						color: "#d1d5db",
+						color: "rgba(255,255,255,0.76)",
 					}}
 				>
-					Keep campaign files local, approve bridge sessions in the browser, and
-					give AI clients a guarded AI GM and world-simulation layer for serious
-					TTRPG play.
+					Research faster, automate modern finance workflows, and keep decisions
+					visible across secure teams and systems.
 				</div>
 			</div>
 
@@ -71,14 +69,14 @@ export default function TwitterImage() {
 					display: "flex",
 					gap: 16,
 					fontSize: 22,
-					color: "#a3a3a3",
+					color: "#f3ffc9",
 					textTransform: "uppercase",
 					letterSpacing: "0.18em",
 				}}
 			>
-				<span>Remote MCP</span>
-				<span>Readable Workspace</span>
-				<span>Campaign Truth</span>
+				<span>Workflow Automation</span>
+				<span>Custom Models</span>
+				<span>Governance</span>
 			</div>
 		</div>,
 		size,

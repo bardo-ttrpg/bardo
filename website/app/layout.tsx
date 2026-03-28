@@ -1,6 +1,5 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 	title: { default: siteConfig.name, template: `%s | ${siteConfig.name}` },
 	description: siteConfig.description,
 	keywords: [...siteConfig.keywords],
-	category: "games",
+	category: "finance",
 	creator: siteConfig.creator,
 	publisher: siteConfig.publisher,
 	referrer: "origin-when-cross-origin",
@@ -60,11 +59,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	colorScheme: "dark light",
-	themeColor: [
-		{ media: "(prefers-color-scheme: dark)", color: "#0f0f10" },
-		{ media: "(prefers-color-scheme: light)", color: "#f6f5f1" },
-	],
+	colorScheme: "dark",
+	themeColor: "#080a09",
 };
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
@@ -76,19 +72,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<html
 			lang="en"
-			data-scroll-behavior="smooth"
 			suppressHydrationWarning
 			className={`${siteSans.variable} ${siteMono.variable} ${siteDisplay.variable} ${siteBrand.variable}`}
 		>
-			<body className="font-sans selection:bg-foreground selection:text-background">
+			<body>
 				<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
-					<RootProvider>
-						<a href="#main-content" className="skip-link">
-							Skip to content
-						</a>
-						<div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(120%_80%_at_50%_0%,rgba(255,255,255,0.08),transparent_68%)] opacity-80" />
-						<div className="relative z-[1]">{children}</div>
-					</RootProvider>
+					{children}
 				</OptionalClerkProvider>
 				<Analytics />
 				<SpeedInsights />
