@@ -74,6 +74,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 			lang="en"
 			suppressHydrationWarning
 			className={`${siteSans.variable} ${siteMono.variable} ${siteDisplay.variable} ${siteBrand.variable}`}
+			style={{ backgroundColor: "#080a09" }}
 		>
 			<body>
 				<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
