@@ -27,18 +27,6 @@ type HostedAuthSpanAttributesArgs = {
 	result: "valid" | "invalid" | "error";
 };
 
-type UsageLimitSpanAttributesArgs = {
-	plan?: "free" | "solo" | null;
-	backend: "none" | "memory";
-	limitPresent: boolean;
-	allowed: boolean;
-	period?: string | null;
-	blockCacheHit: boolean;
-	writeTotalsEnabled: boolean;
-	writeLastUsedEnabled: boolean;
-	writeModelMetadataEnabled: boolean;
-};
-
 function compactAttributes(
 	attributes: Record<string, SpanAttributeValue | null | undefined>,
 ): SpanAttributes {
@@ -96,22 +84,6 @@ export function buildHostedAuthSpanAttributes(
 	});
 }
 
-export function buildUsageLimitSpanAttributes(
-	args: UsageLimitSpanAttributesArgs,
-): SpanAttributes {
-	return compactAttributes({
-		"bardo.usage.plan": args.plan,
-		"bardo.usage.backend": args.backend,
-		"bardo.usage.limit_present": args.limitPresent,
-		"bardo.usage.allowed": args.allowed,
-		"bardo.usage.period": args.period,
-		"bardo.usage.block_cache_hit": args.blockCacheHit,
-		"bardo.usage.write_totals_enabled": args.writeTotalsEnabled,
-		"bardo.usage.write_last_used_enabled": args.writeLastUsedEnabled,
-		"bardo.usage.write_model_metadata_enabled": args.writeModelMetadataEnabled,
-	});
-}
-
 export function withRequestSpan<T>(
 	_args: Omit<
 		RequestSpanAttributesArgs,
@@ -126,9 +98,5 @@ export function withHostedAuthSpan<T>(
 	_args: Omit<HostedAuthSpanAttributesArgs, "httpOk" | "timeout" | "result">,
 	callback: (span: SpanLike) => T,
 ): T {
-	return callback(createNoopSpan());
-}
-
-export function withUsageLimitSpan<T>(callback: (span: SpanLike) => T): T {
 	return callback(createNoopSpan());
 }

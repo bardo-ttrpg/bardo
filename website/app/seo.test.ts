@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { listBlogEntries, listDocsEntries } from "@/content/site-content";
 import robots from "./robots";
 import sitemap from "./sitemap";
 
@@ -9,11 +9,15 @@ const rootLayoutSource = readFileSync(
 	"utf8",
 );
 const signInSource = readFileSync(
-	new URL("./(site)/sign-in/[[...sign-in]]/page.tsx", import.meta.url),
+	new URL("./(site)/(auth)/sign-in/[[...sign-in]]/page.tsx", import.meta.url),
 	"utf8",
 );
 const signUpSource = readFileSync(
-	new URL("./(site)/sign-up/[[...sign-up]]/page.tsx", import.meta.url),
+	new URL("./(site)/(auth)/sign-up/[[...sign-up]]/page.tsx", import.meta.url),
+	"utf8",
+);
+const forgotPasswordSource = readFileSync(
+	new URL("./(site)/(auth)/forgot-password/page.tsx", import.meta.url),
 	"utf8",
 );
 const dashboardPageSource = readFileSync(
@@ -48,16 +52,11 @@ describe("SEO and production metadata", () => {
 	test("keeps private routes out of search indexes", () => {
 		expect(signInSource).toContain("createPrivateMetadata");
 		expect(signUpSource).toContain("createPrivateMetadata");
+		expect(forgotPasswordSource).toContain("createPrivateMetadata");
 		expect(dashboardPageSource).toContain("createPrivateMetadata");
-		const removedLegacyPath = path.join(
-			new URL("./(site)", import.meta.url).pathname,
-			["onboard", "ing"].join(""),
-			"page.tsx",
-		);
-		expect(existsSync(removedLegacyPath)).toBe(false);
 	});
 
-	test("publishes a robots policy that protects private and API paths", () => {
+	test("publishes a robots policy for the public minimal surface", () => {
 		const policy = robots();
 		expect(policy.host).toBe("www.bardo.gg");
 		expect(policy.sitemap).toBe("https://www.bardo.gg/sitemap.xml");
@@ -65,25 +64,36 @@ describe("SEO and production metadata", () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					userAgent: "*",
-					allow: expect.arrayContaining(["/", "/contact", "/privacy-policy"]),
+					allow: expect.arrayContaining(["/", "/docs", "/blog", "/legal"]),
 					disallow: expect.arrayContaining([
 						"/api/",
 						"/dashboard",
 						"/sign-in",
 						"/sign-up",
+						"/forgot-password",
 					]),
 				}),
 			]),
 		);
 	});
 
-	test("publishes a sitemap for the exported public marketing routes", () => {
+	test("publishes a sitemap for the retained public routes", () => {
 		const entries = sitemap().map((entry) => entry.url);
-		for (const expected of [
+		const expectedRoutes = [
 			"https://www.bardo.gg/",
-			"https://www.bardo.gg/contact",
-			"https://www.bardo.gg/privacy-policy",
-		]) {
+			"https://www.bardo.gg/docs",
+			"https://www.bardo.gg/blog",
+			"https://www.bardo.gg/legal",
+			"https://www.bardo.gg/legal/terms",
+			"https://www.bardo.gg/legal/privacy",
+			"https://www.bardo.gg/legal/ai-policy",
+			...listDocsEntries()
+				.filter((entry) => entry.href !== "/docs")
+				.map((entry) => `https://www.bardo.gg${entry.href}`),
+			...listBlogEntries().map((entry) => `https://www.bardo.gg${entry.href}`),
+		];
+
+		for (const expected of expectedRoutes) {
 			expect(entries.includes(expected)).toBe(true);
 		}
 	});

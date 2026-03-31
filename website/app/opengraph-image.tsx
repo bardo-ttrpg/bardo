@@ -1,8 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt =
-	"Asset - The intelligent platform for investing and financial analysis";
+export const alt = "Bardo - minimal docs, dashboard, and auth surface";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -18,9 +17,9 @@ export default function OpenGraphImage() {
 				width: "100%",
 				flexDirection: "column",
 				justifyContent: "space-between",
-				background:
-					"radial-gradient(circle at top, rgba(243,255,201,0.16), transparent 30%), linear-gradient(135deg, #080a09 0%, #121517 52%, #171b1d 100%)",
+				background: "#000000",
 				padding: "56px",
+				border: "1px solid #FFFFFF",
 				color: "#ffffff",
 			}}
 		>
@@ -29,39 +28,39 @@ export default function OpenGraphImage() {
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
-					fontSize: 24,
-					letterSpacing: "0.35em",
+					fontSize: 22,
+					letterSpacing: "0.18em",
 					textTransform: "uppercase",
-					color: "rgba(255,255,255,0.6)",
+					color: "rgba(255,255,255,0.7)",
 				}}
 			>
-				<span>ASSET</span>
-				<span>INVESTING • INTELLIGENCE</span>
+				<span>BARDO</span>
+				<span>DOCS / BLOG / DASHBOARD</span>
 			</div>
 
 			<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 				<div
 					style={{
 						maxWidth: 920,
-						fontSize: 74,
-						lineHeight: 1.02,
-						fontWeight: 700,
-						letterSpacing: "-0.06em",
+						fontSize: 78,
+						lineHeight: 1.04,
+						fontWeight: 400,
 					}}
 				>
-					The intelligent platform for investing and financial analysis
+					A narrow surface for docs, writing, account access, and bridge
+					approval.
 				</div>
 				<div
 					style={{
 						maxWidth: 860,
 						fontSize: 28,
 						lineHeight: 1.35,
-						color: "rgba(255,255,255,0.76)",
+						color: "rgba(255,255,255,0.78)",
 					}}
 				>
-					Build investing workflows, create intelligent agents, and automate
-					financial operations with secure infrastructure designed for modern
-					finance teams.
+					Bardo keeps the public website static where possible and reserves
+					server-backed flows for authentication, billing, and local bridge
+					approvals.
 				</div>
 			</div>
 
@@ -70,14 +69,14 @@ export default function OpenGraphImage() {
 					display: "flex",
 					gap: 16,
 					fontSize: 22,
-					color: "#f3ffc9",
+					color: "#ffffff",
 					textTransform: "uppercase",
-					letterSpacing: "0.18em",
+					letterSpacing: "0.12em",
 				}}
 			>
-				<span>Financial Agents</span>
-				<span>Trusted Data</span>
-				<span>Secure Ecosystem</span>
+				<span>Black</span>
+				<span>White</span>
+				<span>Static</span>
 			</div>
 		</div>,
 		size,

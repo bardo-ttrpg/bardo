@@ -11,8 +11,6 @@ import {
 } from "../../../../../lib/connect-telemetry";
 import { applyRateLimitHeaders } from "../../../../../lib/rate-limit-headers";
 
-export const runtime = "nodejs";
-
 type BridgeSessionPollDeps = {
 	consumeBudget: (request: Request) => Promise<{
 		allowed: boolean;

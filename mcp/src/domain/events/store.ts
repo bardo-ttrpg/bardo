@@ -11,7 +11,7 @@ const CANONICAL_EVENT_METADATA_PATH = "_settings/canonical-event-log-meta.json";
 
 const canonicalEventDataSchema = z.record(z.string(), z.unknown());
 
-export const canonicalEventSchema = z.object({
+const canonicalEventSchema = z.object({
 	id: z.string().trim().min(1).max(120),
 	type: z.string().trim().min(1).max(120),
 	atISO: z.iso.datetime(),

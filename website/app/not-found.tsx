@@ -1,5 +1,5 @@
-import { FramerTemplatePage } from "./(site)/_components/framer-template-page";
+import { Minimal404Page } from "./(site)/_components/site-shells";
 
-export default async function NotFound() {
-	return <FramerTemplatePage relativePath="404/index.html" />;
+export default function NotFound() {
+	return <Minimal404Page />;
 }

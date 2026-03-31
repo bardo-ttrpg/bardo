@@ -1,17 +1,17 @@
 import { randomInt } from "node:crypto";
 
-export type DiceRng = (maxInclusive: number) => number;
+type DiceRng = (maxInclusive: number) => number;
 
 export type AdvantageMode = "none" | "advantage" | "disadvantage";
 
-export type ParsedDiceExpression = {
+type ParsedDiceExpression = {
 	normalizedExpression: string;
 	diceCount: number;
 	diceSides: number;
 	modifier: number;
 };
 
-export type DiceRollResult = ParsedDiceExpression & {
+type DiceRollResult = ParsedDiceExpression & {
 	rolls: number[];
 	subtotal: number;
 	total: number;

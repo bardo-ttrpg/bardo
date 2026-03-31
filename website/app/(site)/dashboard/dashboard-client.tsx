@@ -2,7 +2,10 @@
 
 import { listConnectionClientAdapters } from "@bardo/mcp/client-adapters";
 import Link from "next/link";
-import { startTransition, useEffect, useState } from "react";
+import { type ReactNode, startTransition, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import CheckoutButton from "./_billing/checkout-button";
+import SubscriptionDetailsCta from "./_billing/subscription-details-button";
 import { DashboardSignOutButton } from "./signout-button";
 
 type BillingState = {
@@ -41,6 +44,30 @@ const SUPPORTED_CLIENT_LABELS = listConnectionClientAdapters()
 	.filter((client) => client.supportsLocal)
 	.map((client) => client.label);
 
+const dashboardCardClassName = "space-y-4 border border-border bg-card p-6";
+const dashboardLabelClassName = "ui-label text-muted-foreground";
+const dashboardActionClassName =
+	"ui-button inline-flex border border-border px-4 py-2 text-foreground transition-colors hover:bg-subtle";
+const dashboardSubtleActionClassName =
+	"ui-button inline-flex border border-border px-4 py-2 text-muted-foreground transition-colors hover:bg-subtle";
+
+function DashboardCard({
+	label,
+	children,
+	className,
+}: {
+	label: string;
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<section className={cn(dashboardCardClassName, className)}>
+			<p className={dashboardLabelClassName}>{label}</p>
+			{children}
+		</section>
+	);
+}
+
 export function BillingPlanCard({
 	billingLoading,
 	billing,
@@ -51,49 +78,48 @@ export function BillingPlanCard({
 	mcpPeriodLimit: number;
 }) {
 	return (
-		<div className="border border-border p-6">
-			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Plan & Usage
-			</p>
+		<DashboardCard label="Plan & Usage">
 			{billingLoading ? (
-				<p className="text-sm text-muted-foreground">Loading…</p>
+				<p className="font-reading-body text-muted-foreground">Loading...</p>
 			) : billing ? (
 				<div className="space-y-3">
-					<p className="text-sm">
+					<p className="font-reading-body text-foreground">
 						Access:{" "}
-						<strong className="uppercase">
+						<strong className="font-ui text-xs uppercase tracking-[0.12em]">
 							{billing.plan === "solo" ? "subscribed" : billing.plan}
 						</strong>
 					</p>
-					<p className="text-sm">
+					<p className="font-reading-body text-foreground">
 						Status:{" "}
-						<strong className="uppercase">{billing.subscriptionStatus}</strong>
+						<strong className="font-ui text-xs uppercase tracking-[0.12em]">
+							{billing.subscriptionStatus}
+						</strong>
 					</p>
-					<p className="text-sm">
+					<p className="font-reading-body text-foreground">
 						MCP calls this period:{" "}
 						<strong>{billing.mcpCallsThisPeriod.toLocaleString()}</strong> /{" "}
 						{mcpPeriodLimit.toLocaleString()}
 					</p>
-					<p className="text-sm">
+					<p className="font-reading-body text-foreground">
 						Credits remaining:{" "}
 						<strong>{billing.creditsRemaining.toLocaleString()}</strong>
 					</p>
-					<p className="text-sm text-muted-foreground">
+					<p className="font-reading-body text-muted-foreground">
 						MCP calls total: {billing.mcpCallsTotal.toLocaleString()}
 					</p>
-					<p className="text-sm text-muted-foreground">
+					<p className="font-reading-body text-muted-foreground">
 						Credits total: {billing.creditsTotal.toLocaleString()}
 					</p>
-					<p className="text-sm text-muted-foreground">
+					<p className="font-reading-body text-muted-foreground">
 						Next reset: {formatDate(billing.currentPeriodEnd)}
 					</p>
 				</div>
 			) : (
-				<p className="text-sm text-muted-foreground">
+				<p className="font-reading-body text-muted-foreground">
 					No subscription found yet.
 				</p>
 			)}
-		</div>
+		</DashboardCard>
 	);
 }
 
@@ -101,45 +127,78 @@ function ConnectBridgeCard({ billing }: { billing: BillingState | null }) {
 	const paid = isPaidPlan(billing?.plan);
 
 	return (
-		<div className="border border-border p-6">
-			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				Connect Your Bridge
+		<DashboardCard label="Connect Your Bridge">
+			<p className="font-reading-body text-foreground">
+				Your AI client talks to a local bridge. The browser approval flow keeps
+				workspace access explicit and leaves campaign files on your machine.
 			</p>
-			<p className="text-sm text-foreground">
-				Bardo V1 keeps your campaign workspace local. Your AI client talks to a
-				thin local bridge, and the bridge proxies Bardo MCP tools to the hosted
-				server after browser approval.
-			</p>
-			<ol className="mt-4 space-y-2 text-sm text-muted-foreground">
-				<li>1. Subscribe with Clerk Billing.</li>
+			<ol className="font-reading-body mt-4 space-y-2 text-muted-foreground">
+				<li>1. Confirm billing access from this dashboard.</li>
 				<li>2. Follow the client setup guide.</li>
 				<li>3. Approve the bridge session in your browser.</li>
-				<li>4. Use Bardo tools against your local workspace.</li>
+				<li>4. Return to your client and keep working locally.</li>
 			</ol>
-			<p className="mt-4 text-sm">
+			<p className="font-reading-body mt-4 text-foreground">
 				{paid
 					? "This account is eligible to approve new bridge sessions."
 					: "An active subscription is required before a bridge session can be approved."}
 			</p>
 			<div className="mt-6 flex flex-wrap gap-3">
-				<Link
-					href="/docs/connect-client"
-					className="border border-foreground px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-foreground transition-colors hover:bg-foreground hover:text-background"
-				>
+				<Link href="/docs/connect-client" className={dashboardActionClassName}>
 					Open Setup Guide
 				</Link>
 				<Link
-					href="/pricing"
-					className="border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+					href="/docs/credits-and-billing"
+					className={dashboardSubtleActionClassName}
 				>
-					Manage Plan
+					Billing Notes
 				</Link>
 			</div>
-		</div>
+		</DashboardCard>
 	);
 }
 
-export function DashboardClient() {
+function BillingActionsCard({
+	billing,
+	clerkEnabled,
+	clerkPlanId,
+}: {
+	billing: BillingState | null;
+	clerkEnabled: boolean;
+	clerkPlanId: string | null;
+}) {
+	const buttonClassName = dashboardActionClassName;
+
+	return (
+		<DashboardCard label="Billing Actions">
+			<p className="font-reading-body text-muted-foreground">
+				Subscription actions moved into the dashboard so pricing no longer needs
+				its own public route.
+			</p>
+			<div className="mt-6">
+				{isPaidPlan(billing?.plan) ? (
+					<SubscriptionDetailsCta clerkEnabled={clerkEnabled} />
+				) : (
+					<CheckoutButton
+						clerkEnabled={clerkEnabled}
+						clerkPlanId={clerkPlanId}
+						planPeriod="month"
+						label="Subscribe"
+						className={buttonClassName}
+					/>
+				)}
+			</div>
+		</DashboardCard>
+	);
+}
+
+export function DashboardClient({
+	clerkEnabled,
+	clerkPlanId,
+}: {
+	clerkEnabled: boolean;
+	clerkPlanId: string | null;
+}) {
 	const [dashboardData, setDashboardData] = useState<DashboardData | null>(
 		null,
 	);
@@ -177,25 +236,23 @@ export function DashboardClient() {
 	const mcpPeriodLimit = dashboardData?.accessPolicy.mcpPeriodLimit ?? 0;
 
 	return (
-		<div className="mx-auto max-w-6xl px-6 py-16">
-			<div className="flex flex-col gap-6 border border-border p-6 lg:flex-row lg:items-end lg:justify-between">
+		<div className="mx-auto max-w-5xl px-6 py-16 sm:py-24">
+			<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
 				<div className="space-y-3">
-					<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						Account Dashboard
-					</p>
-					<h1 className="text-3xl font-semibold tracking-tight text-foreground">
-						Remote MCP access for your local campaign workspace
+					<p className={dashboardLabelClassName}>Account Dashboard</p>
+					<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+						Dashboard.
 					</h1>
-					<p className="max-w-3xl text-sm text-muted-foreground">
-						Use this account to subscribe, connect a supported AI client, and
-						approve bridge sessions. Bardo keeps campaign files local and runs
-						the AI GM and world-simulation layer remotely.
+					<p className="font-reading-body max-w-3xl text-muted-foreground">
+						Use this page to verify billing state, connect a supported client,
+						and approve bridge sessions without the old marketing shell around
+						it.
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<Link
 						href="/docs/connect-client"
-						className="border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+						className={dashboardSubtleActionClassName}
 					>
 						Client Setup
 					</Link>
@@ -213,44 +270,29 @@ export function DashboardClient() {
 			</div>
 
 			<div className="mt-6 grid gap-6 lg:grid-cols-2">
-				<div className="border border-border p-6">
-					<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						Supported Clients
-					</p>
-					<p className="text-sm text-muted-foreground">
-						The V1 bridge is designed for common MCP-capable clients. The happy
-						path is the same across them: install the local bridge, select your
-						workspace, approve in the browser, then use Bardo tools.
+				<BillingActionsCard
+					billing={billing}
+					clerkEnabled={clerkEnabled}
+					clerkPlanId={clerkPlanId}
+				/>
+
+				<DashboardCard label="Supported Clients">
+					<p className="font-reading-body text-muted-foreground">
+						The bridge is designed for common MCP-capable clients. The path is
+						intentionally narrow: install, connect, approve in the browser, then
+						work from your local workspace.
 					</p>
 					<div className="mt-4 flex flex-wrap gap-2">
 						{SUPPORTED_CLIENT_LABELS.map((label) => (
 							<span
 								key={label}
-								className="border border-border px-3 py-1 text-xs text-muted-foreground"
+								className="technical-meta border border-border px-3 py-1 text-muted-foreground"
 							>
 								{label}
 							</span>
 						))}
 					</div>
-				</div>
-
-				<div className="border border-border p-6">
-					<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						V1 Boundary
-					</p>
-					<div className="space-y-2 text-sm text-muted-foreground">
-						<p>Website: signup, billing, docs, and bridge approval.</p>
-						<p>Local bridge: workspace root selection and local file I/O.</p>
-						<p>
-							Remote MCP: subscription checks, guardrails, tool execution, and
-							metering.
-						</p>
-						<p>
-							AI client: connects only to the local bridge in the canonical
-							flow.
-						</p>
-					</div>
-				</div>
+				</DashboardCard>
 			</div>
 		</div>
 	);

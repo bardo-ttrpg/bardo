@@ -23,13 +23,16 @@ function isPublicChunk(chunk: ClientChunk): boolean {
 	const normalized = chunk.path.replaceAll("\\", "/").toLowerCase();
 	return (
 		normalized.includes("app-home") ||
-		normalized.includes("app-pricing") ||
+		normalized.includes("app-blog") ||
+		normalized.includes("app-docs") ||
 		normalized.includes("app-legal") ||
 		normalized.includes("/(site)/page") ||
-		normalized.includes("/(site)/pricing/") ||
+		normalized.includes("/(site)/blog/") ||
+		normalized.includes("/(site)/docs/") ||
 		normalized.includes("/(site)/legal/") ||
 		source.includes("app/(site)/page") ||
-		source.includes("app/(site)/pricing/") ||
+		source.includes("app/(site)/blog/") ||
+		source.includes("app/(site)/docs/") ||
 		source.includes("app/(site)/legal/")
 	);
 }

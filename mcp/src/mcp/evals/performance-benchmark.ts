@@ -7,7 +7,7 @@ import { regenerateCurrentStateProjection } from "../../domain/projections/curre
 import type { AuthContext } from "../../types/contracts";
 import { runPlayerAction } from "../tools/player-action/register";
 
-export type PerformanceBenchmarkResult = {
+type PerformanceBenchmarkResult = {
 	success: boolean;
 	seedEvents: number;
 	sampleRuns: number;

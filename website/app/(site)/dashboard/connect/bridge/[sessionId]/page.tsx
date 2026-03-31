@@ -11,7 +11,7 @@ export default async function BridgeApprovalPage({
 	const { sessionId } = await params;
 
 	return (
-		<div className="px-4 py-12 sm:px-6">
+		<div className="px-6 py-16 sm:py-24">
 			<BridgeApprovalClient sessionId={sessionId} />
 		</div>
 	);

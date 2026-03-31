@@ -39,6 +39,18 @@
 			"assist": {
 				"enabled": false
 			}
+		},
+		{
+			"includes": [".agents/skills/tailwind-v4-shadcn/templates/index.css"],
+			"formatter": {
+				"enabled": false
+			},
+			"linter": {
+				"enabled": false
+			},
+			"assist": {
+				"enabled": false
+			}
 		}
 	]
 }

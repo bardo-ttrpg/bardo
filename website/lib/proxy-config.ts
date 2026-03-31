@@ -1,4 +1,4 @@
-export const PAGE_PROXY_MATCHER_SOURCE =
+const PAGE_PROXY_MATCHER_SOURCE =
 	"/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)";
 
 export const PAGE_PROXY_MATCHER = {
@@ -25,6 +25,8 @@ export function shouldRunClerkForPagePathname(pathname: string): boolean {
 		pathname.startsWith("/dashboard") ||
 		pathname === "/sign-in" ||
 		pathname.startsWith("/sign-in/") ||
+		pathname === "/forgot-password" ||
+		pathname.startsWith("/forgot-password/") ||
 		pathname === "/sign-up" ||
 		pathname.startsWith("/sign-up/")
 	);

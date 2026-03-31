@@ -1,12 +1,10 @@
 const CLEAN_ROOM_EXCLUDED_SEGMENTS = new Set([
 	".git",
 	".next",
-	".playwright",
 	".turbo",
 	"coverage",
 	"dist",
 	"node_modules",
-	"playwright-report",
 	"test-results",
 ]);
 

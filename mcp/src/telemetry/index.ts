@@ -8,10 +8,8 @@ export {
 	applySpanAttributes,
 	buildHostedAuthSpanAttributes,
 	buildRequestSpanAttributes,
-	buildUsageLimitSpanAttributes,
 	withHostedAuthSpan,
 	withRequestSpan,
-	withUsageLimitSpan,
 } from "./span-helpers";
 
 const LATENCY_BUCKETS = [

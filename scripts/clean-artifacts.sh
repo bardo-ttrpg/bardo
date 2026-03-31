@@ -21,8 +21,6 @@ clean_dir "$ROOT_DIR/website/.next"
 clean_dir "$ROOT_DIR/website/.bun-tmp"
 clean_dir "$ROOT_DIR/website/.bun-install"
 clean_dir "$ROOT_DIR/website/test-results"
-clean_dir "$ROOT_DIR/website/playwright-report"
-clean_dir "$ROOT_DIR/website/.playwright"
 clean_dir "$ROOT_DIR/packages/bardo-mcp/node_modules"
 clean_dir "$ROOT_DIR/packages/bardo-mcp/dist/release"
 

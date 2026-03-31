@@ -9,7 +9,7 @@ type CreateRateLimiterOptions = {
 	fetchImpl?: typeof fetch;
 };
 
-export function createRuntimeStatusRateLimiter(
+function createRuntimeStatusRateLimiter(
 	options: CreateRateLimiterOptions = {},
 ) {
 	return createRequestRateLimiter({

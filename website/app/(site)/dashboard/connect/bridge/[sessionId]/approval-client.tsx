@@ -27,20 +27,18 @@ export function BridgeApprovalClient({ sessionId }: { sessionId: string }) {
 	}, [sessionId]);
 
 	return (
-		<div className="mx-auto max-w-2xl border border-border p-8">
-			<p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-				/ Bridge approval
-			</p>
-			<h1 className="mb-3 text-xl font-semibold text-foreground">
+		<div className="mx-auto max-w-2xl border border-border bg-card p-8">
+			<p className="ui-label mb-3 text-muted-foreground">Bridge approval</p>
+			<h1 className="mb-3 font-reading-heading text-4xl text-foreground">
 				{state.status === "approved"
 					? "Bridge access approved"
 					: state.status === "error"
 						? "Approval failed"
 						: "Waiting for approval"}
 			</h1>
-			<p className="text-sm text-muted-foreground">{state.message}</p>
+			<p className="font-reading-body text-muted-foreground">{state.message}</p>
 			{state.status === "approved" ? (
-				<p className="mt-4 text-xs text-muted-foreground">
+				<p className="technical-meta mt-4 text-muted-foreground">
 					You can close this tab and return to your AI client.
 				</p>
 			) : null}

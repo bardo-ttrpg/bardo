@@ -1,28 +1,34 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const privacyPolicySource = readFileSync(
-	new URL("../privacy-policy/page.tsx", import.meta.url),
+const legalIndexSource = readFileSync(
+	new URL("./page.tsx", import.meta.url),
 	"utf8",
 );
-const landingSource = readFileSync(
-	new URL("../page.tsx", import.meta.url),
+const privacySource = readFileSync(
+	new URL("./privacy/page.tsx", import.meta.url),
+	"utf8",
+);
+const termsSource = readFileSync(
+	new URL("./terms/page.tsx", import.meta.url),
+	"utf8",
+);
+const aiPolicySource = readFileSync(
+	new URL("./ai-policy/page.tsx", import.meta.url),
 	"utf8",
 );
 
-describe("privacy and landing product copy", () => {
-	test("uses the exported privacy policy date, sections, and contact email", () => {
-		expect(privacyPolicySource).toContain("February 17, 2026");
-		expect(privacyPolicySource).toContain("1. Information We Collect");
-		expect(privacyPolicySource).toContain("8. Changes to This Privacy Policy");
-		expect(privacyPolicySource).toContain("contact@asset.com");
-	});
-
-	test("keeps the landing page aligned with the exported finance template", () => {
-		expect(landingSource).toContain("investing");
-		expect(landingSource).toContain("financial analysis");
-		expect(landingSource).toContain(
-			"Simple pricing that scales with your needs",
-		);
+describe("legal content", () => {
+	test("keeps legal pages as first-class public routes", () => {
+		expect(legalIndexSource).toContain("Terms");
+		expect(legalIndexSource).toContain("Privacy");
+		expect(legalIndexSource).toContain("AI policy");
+		expect(privacySource).toContain("Effective");
+		expect(termsSource).toContain("Use of service");
+		expect(aiPolicySource).toContain("Acceptable use");
+		expect(legalIndexSource).not.toContain("redirect(");
+		expect(privacySource).not.toContain("redirect(");
+		expect(termsSource).not.toContain("redirect(");
+		expect(aiPolicySource).not.toContain("redirect(");
 	});
 });

@@ -1,6 +1,6 @@
 import { regenerateCurrentStateProjection } from "./current-state";
 
-export type ProjectionId = "current_state";
+type ProjectionId = "current_state";
 
 const PROJECTION_EVENT_DEPENDENCIES: Record<ProjectionId, readonly string[]> = {
 	current_state: [

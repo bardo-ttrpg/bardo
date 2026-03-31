@@ -25,7 +25,7 @@ export const GOLDEN_SCENARIO_IDS = [
 
 export type GoldenScenarioId = (typeof GOLDEN_SCENARIO_IDS)[number];
 
-export type GoldenScenarioResult = {
+type GoldenScenarioResult = {
 	id: GoldenScenarioId;
 	success: boolean;
 	message: string;

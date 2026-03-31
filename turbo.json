@@ -41,22 +41,6 @@
 		"test:connect-gates": {
 			"outputs": []
 		},
-		"test:e2e": {
-			"cache": false,
-			"outputs": []
-		},
-		"test:e2e:headed": {
-			"cache": false,
-			"outputs": []
-		},
-		"test:e2e:auth": {
-			"cache": false,
-			"outputs": []
-		},
-		"test:e2e:auth:headed": {
-			"cache": false,
-			"outputs": []
-		},
 		"test:ga-gates": {
 			"dependsOn": ["^test:ga-gates"],
 			"outputs": []
@@ -87,9 +71,6 @@
 			"outputs": []
 		},
 		"validate:staging-env": {
-			"outputs": []
-		},
-		"validate:e2e-auth-env": {
 			"outputs": []
 		},
 		"check:release-health": {

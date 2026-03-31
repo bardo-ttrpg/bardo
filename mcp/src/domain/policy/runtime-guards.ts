@@ -4,7 +4,7 @@ import {
 } from "../../infra/filesystem/filesystem";
 import { parseMarkdown } from "../markdown/markdown";
 
-export type TableContract = {
+type TableContract = {
 	tone: string;
 	boundaries: {
 		lines: string[];
@@ -14,7 +14,7 @@ export type TableContract = {
 	retconPolicy: string;
 };
 
-export type AuthorityPolicy = {
+type AuthorityPolicy = {
 	mode: string;
 	factIntroduction: string;
 	ruleAdjudication: string;
@@ -24,13 +24,13 @@ export type AuthorityPolicy = {
 	allowPlayerCanonDeclarations: boolean;
 };
 
-export type RuntimePolicyViolationCode =
+type RuntimePolicyViolationCode =
 	| "CONTENT_BOUNDARY_LINE"
 	| "RULE_BYPASS_DISALLOWED"
 	| "UNILATERAL_RETCON_DISALLOWED"
 	| "CANON_DECLARATION_DISALLOWED";
 
-export type RuntimePolicyViolation = {
+type RuntimePolicyViolation = {
 	code: RuntimePolicyViolationCode;
 	message: string;
 	match: string;
@@ -234,20 +234,4 @@ export function summarizeRuntimePolicyViolations(
 	return `Runtime policy blocked action for ${String(violations.length)} reasons: ${violations
 		.map((violation) => violation.code)
 		.join(", ")}.`;
-}
-
-export function defaultTableContract(): TableContract {
-	return {
-		...DEFAULT_TABLE_CONTRACT,
-		boundaries: {
-			lines: [...DEFAULT_TABLE_CONTRACT.boundaries.lines],
-			veils: [...DEFAULT_TABLE_CONTRACT.boundaries.veils],
-		},
-	};
-}
-
-export function defaultAuthorityPolicy(): AuthorityPolicy {
-	return {
-		...DEFAULT_AUTHORITY_POLICY,
-	};
 }

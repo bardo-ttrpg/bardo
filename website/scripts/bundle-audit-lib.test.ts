@@ -80,7 +80,7 @@ describe("auditBundleArtifacts", () => {
 					contents: 'import "@clerk/nextjs";',
 				},
 				{
-					path: "static/chunks/app-pricing.js",
+					path: "static/chunks/app-blog.js",
 					bytes: 30_000,
 					contents: 'import "framer-motion";',
 				},
@@ -89,7 +89,7 @@ describe("auditBundleArtifacts", () => {
 
 		expect(result.warnings).toEqual([
 			"Public route chunk static/chunks/app-home.js includes Clerk runtime code.",
-			"Public route chunk static/chunks/app-pricing.js includes framer-motion.",
+			"Public route chunk static/chunks/app-blog.js includes framer-motion.",
 		]);
 	});
 });

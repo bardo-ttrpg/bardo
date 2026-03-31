@@ -1,8 +1,16 @@
+import nextMDX from "@next/mdx";
 import type { NextConfig } from "next";
 import {
 	resolveAllowedDevOrigins,
 	resolveSecurityHeaders,
 } from "./lib/next-config-policy";
+
+const withMDX = nextMDX({
+	extension: /\.mdx?$/,
+	options: {
+		remarkPlugins: ["remark-gfm"],
+	},
+});
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
@@ -32,4 +40,4 @@ const nextConfig: NextConfig = {
 	},
 };
 
-export default nextConfig;
+export default withMDX(nextConfig);

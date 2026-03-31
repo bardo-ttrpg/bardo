@@ -18,8 +18,6 @@ import {
 	getDefaultConnectTelemetry,
 } from "../../../../../lib/connect-telemetry";
 
-export const runtime = "nodejs";
-
 type BridgeSessionApproveDeps = {
 	resolveUserId: (
 		request: Request,

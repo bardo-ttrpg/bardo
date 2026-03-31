@@ -72,7 +72,7 @@ function consumeWithMemory(args: {
 	return { ok: true };
 }
 
-export class CliLoginReplayStoreError extends BackendAvailabilityError {
+class CliLoginReplayStoreError extends BackendAvailabilityError {
 	constructor(message: string) {
 		super({
 			message,

@@ -1286,10 +1286,7 @@ export async function runPlayerAction(args: {
 	}
 }
 
-export function registerPlayerActionTool(
-	server: McpServer,
-	auth: AuthContext,
-): void {
+function _registerPlayerActionTool(server: McpServer, auth: AuthContext): void {
 	server.registerTool(
 		"player_action",
 		{

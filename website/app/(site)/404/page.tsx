@@ -1,12 +1,8 @@
-import {
-	buildFramerTemplateMetadata,
-	FramerTemplatePage,
-} from "../_components/framer-template-page";
+import { createPrivateMetadata } from "@/lib/site-metadata";
+import { Minimal404Page } from "../_components/site-shells";
 
-export async function generateMetadata() {
-	return buildFramerTemplateMetadata("404/index.html");
-}
+export const metadata = createPrivateMetadata("404");
 
-export default async function Template404Page() {
-	return <FramerTemplatePage relativePath="404/index.html" />;
+export default function Explicit404Page() {
+	return <Minimal404Page />;
 }

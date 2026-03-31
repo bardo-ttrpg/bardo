@@ -1,11 +1,9 @@
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { absoluteUrl, siteConfig } from "@/lib/site-config";
-import { siteBrand, siteDisplay, siteMono, siteSans } from "@/lib/site-fonts";
+import { siteCode, siteReading, siteUi } from "@/lib/site-fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +12,7 @@ export const metadata: Metadata = {
 	title: { default: siteConfig.name, template: `%s | ${siteConfig.name}` },
 	description: siteConfig.description,
 	keywords: [...siteConfig.keywords],
-	category: "finance",
+	category: "technology",
 	creator: siteConfig.creator,
 	publisher: siteConfig.publisher,
 	referrer: "origin-when-cross-origin",
@@ -60,7 +58,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
 	colorScheme: "dark",
-	themeColor: "#080a09",
+	themeColor: "#000000",
 };
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
@@ -73,15 +71,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 		<html
 			lang="en"
 			suppressHydrationWarning
-			className={`${siteSans.variable} ${siteMono.variable} ${siteDisplay.variable} ${siteBrand.variable}`}
-			style={{ backgroundColor: "#080a09" }}
+			className={`${siteReading.variable} ${siteUi.variable} ${siteCode.variable}`}
 		>
-			<body>
+			<body className="bg-background text-foreground antialiased">
 				<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
 					{children}
 				</OptionalClerkProvider>
-				<Analytics />
-				<SpeedInsights />
 			</body>
 		</html>
 	);

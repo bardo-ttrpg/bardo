@@ -3,7 +3,7 @@ import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJsonStringify } from "./canonical-json";
 
-export type PendingUsageEntry = {
+type PendingUsageEntry = {
 	id: string;
 	ts: number;
 	tool: string;

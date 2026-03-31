@@ -3,7 +3,7 @@ import { loadPreferredCurrentState } from "../projections/preferred-state";
 import { regenerateProjectionsForEventTypes } from "../projections/refresh";
 import { appendSchemaMigrationRecord } from "../schema/version";
 
-export type LegacyStateMigrationResult = {
+type LegacyStateMigrationResult = {
 	migrated: boolean;
 	dryRun: boolean;
 	canonicalEventsBefore: number;

@@ -1,4 +1,4 @@
-export type BackendFailureCode =
+type BackendFailureCode =
 	| "clerk_unavailable"
 	| "billing_unavailable"
 	| "website_backend_unavailable";

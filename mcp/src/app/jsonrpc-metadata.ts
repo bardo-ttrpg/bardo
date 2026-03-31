@@ -67,7 +67,7 @@ function parseToolCallMetadata(payload: unknown): {
 	};
 }
 
-export function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
+function parseJsonRpcMetadata(payload: unknown): JsonRpcMetadata {
 	if (Array.isArray(payload)) {
 		const toolCalls = payload
 			.map((item) => parseToolCallMetadata(item))

@@ -19,7 +19,7 @@ export function createPublicMetadata(options: PublicMetadataOptions): Metadata {
 		description: options.description,
 		alternates: { canonical },
 		keywords,
-		category: "finance",
+		category: "technology",
 		creator: siteConfig.creator,
 		publisher: siteConfig.publisher,
 		robots: {

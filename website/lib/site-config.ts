@@ -1,24 +1,21 @@
 export const siteConfig = {
-	name: "Asset",
-	shortName: "Asset",
+	name: "Bardo",
+	shortName: "Bardo",
 	url: "https://www.bardo.gg",
 	locale: "en_US",
-	creator: "Asset",
-	publisher: "Asset",
+	creator: "Bardo",
+	publisher: "Bardo",
 	description:
-		"The intelligent platform for investing and financial analysis. Build investing workflows, create intelligent agents, and automate financial operations with secure infrastructure.",
+		"A small, focused website for Bardo docs, notes, auth, and dashboard access.",
 	ogDescription:
-		"Build investing workflows, research across your financial data sources, and automate modern finance operations with Asset's intelligent platform.",
+		"Bardo keeps the website surface minimal: docs, blog, account access, and a protected dashboard for bridge approvals.",
 	keywords: [
-		"investing workflows",
-		"financial analysis platform",
-		"financial agents",
-		"investment research automation",
-		"finance team software",
-		"modern finance infrastructure",
-		"investment operations platform",
-		"portfolio research tools",
-		"secure financial workflows",
+		"bardo",
+		"mcp dashboard",
+		"ai workspace bridge",
+		"docs",
+		"blog",
+		"clerk auth",
 	],
 } as const;
 

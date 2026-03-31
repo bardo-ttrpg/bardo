@@ -8,8 +8,6 @@ import {
 	decodeBridgeRefreshToken,
 } from "../../../../../lib/bridge-session-auth";
 
-export const runtime = "nodejs";
-
 type BridgeSessionRefreshDeps = {
 	readBillingSnapshot: (userId: string) => Promise<BillingSnapshot>;
 	decodeRefreshToken: (token: string) => Promise<{

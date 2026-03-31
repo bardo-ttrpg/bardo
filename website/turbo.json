@@ -23,26 +23,6 @@
 				"BARDO_*"
 			]
 		},
-		"test:e2e": {
-			"cache": false,
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["playwright-report/**", "test-results/**"]
-		},
-		"test:e2e:headed": {
-			"cache": false,
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["playwright-report/**", "test-results/**"]
-		},
-		"test:e2e:auth": {
-			"cache": false,
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["playwright-report/**", "test-results/**"]
-		},
-		"test:e2e:auth:headed": {
-			"cache": false,
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["playwright-report/**", "test-results/**"]
-		},
 		"validate:deploy-env": {
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": []
@@ -52,10 +32,6 @@
 			"outputs": []
 		},
 		"validate:staging-env": {
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": []
-		},
-		"validate:e2e-auth-env": {
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
 			"outputs": []
 		},

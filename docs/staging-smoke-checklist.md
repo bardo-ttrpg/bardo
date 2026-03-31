@@ -5,13 +5,14 @@ Run this after every meaningful staging deployment.
 ## Website
 
 1. Open `/` and confirm it renders.
-2. Open `/pricing` and `/legal`.
+2. Open `/docs`, `/blog`, and `/legal`.
 3. Confirm `/dashboard` redirects correctly when signed out.
 4. Sign in and confirm `/dashboard` renders.
 5. Confirm `Plan & Usage` loads without crashing.
 6. Confirm the dashboard points users to the browser-approved bridge flow.
-7. Confirm the pricing page opens the correct Clerk Billing checkout or customer portal action.
-8. Confirm paid-plan copy and connect docs stay aligned with the remote-MCP-plus-local-workspace story.
+7. Confirm the dashboard billing actions open the correct Clerk Billing checkout or customer portal action.
+8. Confirm `/pricing` and `/contact` render the shared custom 404 page.
+9. Confirm paid-plan copy and connect docs stay aligned with the remote-MCP-plus-local-workspace story.
 
 ## Connect Flow
 

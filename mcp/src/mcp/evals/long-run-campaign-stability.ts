@@ -34,7 +34,7 @@ const ACTION_SCRIPT = [
 	"I rest and regroup by the campfire",
 ] as const;
 
-export type LongRunTurnResult = {
+type LongRunTurnResult = {
 	turn: number;
 	action: string;
 	success: boolean;
@@ -50,7 +50,7 @@ export type LongRunTurnResult = {
 	eventOrderingOk: boolean;
 };
 
-export type LongRunCampaignStabilityResult = {
+type LongRunCampaignStabilityResult = {
 	success: boolean;
 	turnCount: number;
 	failedTurns: number;

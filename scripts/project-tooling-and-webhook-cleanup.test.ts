@@ -53,6 +53,7 @@ describe("project cleanup and tooling setup", () => {
 		const packageJson = JSON.parse(readFromRepo("package.json")) as {
 			packageManager?: string;
 			devDependencies?: Record<string, string>;
+			dependencies?: Record<string, string>;
 			scripts?: Record<string, string>;
 		};
 		const websitePackageJson = JSON.parse(
@@ -98,15 +99,10 @@ describe("project cleanup and tooling setup", () => {
 		expect(packageJson.scripts?.dev).toBe("turbo run dev --filter=website");
 		expect(packageJson.scripts?.["dev:all"]).toBe("turbo run dev");
 		expect(packageJson.scripts?.format).toBe("turbo run format");
-		expect(packageJson.scripts?.["test:e2e"]).toBe(
-			"turbo run test:e2e --filter=website",
-		);
-		expect(packageJson.scripts?.["test:e2e:auth"]).toBe(
-			"turbo run test:e2e:auth --filter=website",
-		);
-		expect(packageJson.scripts?.["test:e2e:headed"]).toBe(
-			"turbo run test:e2e:headed --filter=website",
-		);
+		expect(packageJson.scripts).not.toHaveProperty("test:e2e");
+		expect(packageJson.scripts).not.toHaveProperty("test:e2e:auth");
+		expect(packageJson.scripts).not.toHaveProperty("test:e2e:headed");
+		expect(packageJson.scripts).not.toHaveProperty("test:e2e:auth:headed");
 		expect(packageJson.scripts?.["test:runtime-smoke"]).toBe(
 			"turbo run test:runtime-smoke --filter=@bardo/mcp",
 		);
@@ -138,6 +134,7 @@ describe("project cleanup and tooling setup", () => {
 			"biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
 		);
 		expect(packageJson.devDependencies).not.toHaveProperty("lint-staged");
+		expect(packageJson.dependencies).toBeUndefined();
 
 		for (const scriptCommand of Object.values(packageJson.scripts ?? {})) {
 			expect(scriptCommand).not.toContain("--cwd");
@@ -148,6 +145,12 @@ describe("project cleanup and tooling setup", () => {
 
 		expect(websitePackageJson.scripts?.lint).toBe("biome lint .");
 		expect(websitePackageJson.scripts?.format).toBe("biome format --write .");
+		expect(websitePackageJson.scripts).not.toHaveProperty("dev:e2e");
+		expect(websitePackageJson.scripts).not.toHaveProperty(
+			"validate:e2e-auth-env",
+		);
+		expect(websitePackageJson.scripts).not.toHaveProperty("test:e2e");
+		expect(websitePackageJson.scripts).not.toHaveProperty("test:e2e:auth");
 		expect(websitePackageJson.scripts?.["typecheck:unused-report"]).toBe(
 			"tsc --noEmit -p tsconfig.unused.json",
 		);
@@ -156,18 +159,22 @@ describe("project cleanup and tooling setup", () => {
 		expect(mcpPackageJson.scripts?.["typecheck:unused-report"]).toBe(
 			"tsc --noEmit -p tsconfig.unused.json",
 		);
-		expect(packageMcpPackageJson.scripts?.build).toBe("bun run build:release");
+		expect(packageMcpPackageJson.scripts?.build).toBe(
+			`"\${npm_execpath:-bun}" run build:release`,
+		);
 		expect(packageMcpPackageJson.scripts?.typecheck).toBe("tsc --noEmit");
 		expect(packageMcpPackageJson.scripts?.check).toBe(
-			"bun run lint && bun run typecheck",
+			`"\${npm_execpath:-bun}" run lint && "\${npm_execpath:-bun}" run typecheck`,
 		);
 
 		expect(turboJson.tasks).toHaveProperty("format");
 		expect(turboJson.tasks).toHaveProperty("validate:staging-env");
 		expect(turboJson.tasks).toHaveProperty("typecheck:unused-report");
-		expect(turboJson.tasks).toHaveProperty("test:e2e");
-		expect(turboJson.tasks).toHaveProperty("test:e2e:auth");
-		expect(turboJson.tasks).toHaveProperty("test:e2e:headed");
+		expect(turboJson.tasks).not.toHaveProperty("test:e2e");
+		expect(turboJson.tasks).not.toHaveProperty("test:e2e:auth");
+		expect(turboJson.tasks).not.toHaveProperty("test:e2e:headed");
+		expect(turboJson.tasks).not.toHaveProperty("test:e2e:auth:headed");
+		expect(turboJson.tasks).not.toHaveProperty("validate:e2e-auth-env");
 		expect(turboJson.tasks).toHaveProperty("test:runtime-smoke");
 		expect(turboJson.tasks).toHaveProperty("ga:readiness");
 		expect(turboJson.tasks).not.toHaveProperty("website#build");
@@ -234,7 +241,7 @@ describe("project cleanup and tooling setup", () => {
 		}
 	});
 
-	test("fully removes the current website blog surface", () => {
+	test("keeps only the minimal blog surface", () => {
 		const blogSegment = joinTokens(["", "blog"], "/");
 		expect(
 			existsSync(
@@ -248,34 +255,42 @@ describe("project cleanup and tooling setup", () => {
 			existsSync(
 				join(repoRoot, joinTokens(["website", "app", "(site)", "blog"], "/")),
 			),
-		).toBe(false);
+		).toBe(true);
 		expect(
 			existsSync(
 				join(repoRoot, joinTokens(["website", "public", "blog"], "/")),
 			),
 		).toBe(false);
 
-		const layoutSource = readFromRepo("website/app/(site)/layout.tsx");
 		const landingPageSource = readFromRepo("website/app/(site)/page.tsx");
+		const blogPageSource = readFromRepo("website/app/(site)/blog/page.tsx");
 		const robotsSource = readFromRepo("website/app/robots.ts");
 		const sitemapSource = readFromRepo("website/app/sitemap.ts");
 		const seoTestSource = readFromRepo("website/app/seo.test.ts");
 		const stagingSmokeSource = readFromRepo("scripts/staging-smoke.ts");
 
 		for (const fileSource of [
-			layoutSource,
 			landingPageSource,
+			blogPageSource,
 			robotsSource,
 			sitemapSource,
 			seoTestSource,
 			stagingSmokeSource,
 		]) {
-			expect(fileSource).not.toContain(blogSegment);
+			expect(fileSource).toContain(blogSegment);
 		}
 	});
 
-	test("keeps local skill frontmatter compatible with Codex skill parsing", () => {
-		const unsupportedKey = joinTokens(["allowed", "tools:"], "-");
+	test("keeps local skill frontmatter aligned with current Codex conventions", () => {
+		const supportedKey = joinTokens(["allowed", "tools:"], "-");
+		const unsupportedKey = "allowed_tools:";
+		const shadcnSkill = readFileSync(
+			join(repoRoot, ".agents/skills/shadcn/SKILL.md"),
+			"utf8",
+		);
+
+		expect(shadcnSkill).toContain(`\n${supportedKey}`);
+
 		for (const skillFile of listSkillFiles(join(repoRoot, ".agents/skills"))) {
 			const skillSource = readFileSync(skillFile, "utf8");
 			expect(skillSource).not.toContain(`\n${unsupportedKey}`);

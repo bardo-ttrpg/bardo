@@ -1,6 +1,6 @@
-export type PolicyCoverageStatus = "guarded" | "exempt" | "profile_blocked";
+type PolicyCoverageStatus = "guarded" | "exempt" | "profile_blocked";
 
-export type PolicyCoverageEntry = {
+type PolicyCoverageEntry = {
 	pathId: string;
 	kind: "tool" | "route";
 	status: PolicyCoverageStatus;

@@ -4,7 +4,7 @@ import {
 } from "../domain/config/loop-detection";
 
 type SessionKind = "main" | "agent";
-export type SessionStatus = "active" | "idle" | "queued" | "closed";
+type SessionStatus = "active" | "idle" | "queued" | "closed";
 
 type SessionHistoryEntry = {
 	at: number;

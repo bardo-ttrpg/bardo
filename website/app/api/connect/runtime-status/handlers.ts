@@ -11,8 +11,6 @@ import { applyRateLimitHeaders } from "../../../../lib/rate-limit-headers";
 import { getDefaultRuntimeStatusRateLimiter } from "../../../../lib/runtime-status-rate-limit";
 import type { PlanTier } from "../../../../lib/user-billing";
 
-export const runtime = "nodejs";
-
 type VerifiedKeyRecord = {
 	id?: string;
 	subject?: string;

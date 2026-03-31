@@ -1,8 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt =
-	"Asset - The intelligent platform for investing and financial analysis";
+export const alt = "Bardo - minimal docs, dashboard, and auth surface";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -18,9 +17,9 @@ export default function TwitterImage() {
 				width: "100%",
 				flexDirection: "column",
 				justifyContent: "space-between",
-				background:
-					"radial-gradient(circle at top, rgba(241,148,71,0.18), transparent 28%), linear-gradient(135deg, #080a09 0%, #131517 48%, #191d1f 100%)",
+				background: "#000000",
 				padding: "56px",
+				border: "1px solid #FFFFFF",
 				color: "#ffffff",
 			}}
 		>
@@ -29,38 +28,37 @@ export default function TwitterImage() {
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
-					fontSize: 24,
-					letterSpacing: "0.35em",
+					fontSize: 22,
+					letterSpacing: "0.18em",
 					textTransform: "uppercase",
-					color: "rgba(255,255,255,0.6)",
+					color: "rgba(255,255,255,0.7)",
 				}}
 			>
-				<span>ASSET</span>
-				<span>WORKFLOWS • RESEARCH</span>
+				<span>BARDO</span>
+				<span>MINIMAL SURFACE</span>
 			</div>
 
 			<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 				<div
 					style={{
 						maxWidth: 920,
-						fontSize: 74,
-						lineHeight: 1.02,
-						fontWeight: 700,
-						letterSpacing: "-0.06em",
+						fontSize: 78,
+						lineHeight: 1.04,
+						fontWeight: 400,
 					}}
 				>
-					Move investing forward with intelligence
+					Static content where possible. Dynamic flows only where necessary.
 				</div>
 				<div
 					style={{
 						maxWidth: 860,
 						fontSize: 28,
 						lineHeight: 1.35,
-						color: "rgba(255,255,255,0.76)",
+						color: "rgba(255,255,255,0.78)",
 					}}
 				>
-					Research faster, automate modern finance workflows, and keep decisions
-					visible across secure teams and systems.
+					Docs and blog are MDX-backed. Account access and bridge approval stay
+					server-backed.
 				</div>
 			</div>
 
@@ -69,14 +67,14 @@ export default function TwitterImage() {
 					display: "flex",
 					gap: 16,
 					fontSize: 22,
-					color: "#f3ffc9",
+					color: "#ffffff",
 					textTransform: "uppercase",
-					letterSpacing: "0.18em",
+					letterSpacing: "0.12em",
 				}}
 			>
-				<span>Workflow Automation</span>
-				<span>Custom Models</span>
-				<span>Governance</span>
+				<span>MDX</span>
+				<span>CLERK</span>
+				<span>TURBOPACK</span>
 			</div>
 		</div>,
 		size,

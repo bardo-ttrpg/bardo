@@ -1,46 +1,43 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { listDocsEntries, listDocsStaticParams } from "@/content/site-content";
 
-const docsIndexSource = readFileSync(
-	new URL("./page.tsx", import.meta.url),
+const docsRouteSource = readFileSync(
+	new URL("./[[...slug]]/page.tsx", import.meta.url),
 	"utf8",
 );
-const installDocsSource = readFileSync(
-	new URL("./install/page.tsx", import.meta.url),
-	"utf8",
-);
-const connectClientDocsSource = readFileSync(
-	new URL("./connect-client/page.tsx", import.meta.url),
-	"utf8",
-);
-const campaignTruthDocsSource = readFileSync(
-	new URL("./campaign-truth/page.tsx", import.meta.url),
-	"utf8",
-);
-const creditsDocsSource = readFileSync(
-	new URL("./credits-and-billing/page.tsx", import.meta.url),
-	"utf8",
-);
-const pricingPageSource = readFileSync(
-	new URL("../pricing/page.tsx", import.meta.url),
-	"utf8",
-);
-const legalIndexSource = readFileSync(
-	new URL("../legal/page.tsx", import.meta.url),
+const docsLayoutSource = readFileSync(
+	new URL("./layout.tsx", import.meta.url),
 	"utf8",
 );
 
-describe("legacy public routes", () => {
-	test("redirect docs entry points into the new template sections", () => {
-		expect(docsIndexSource).toContain('redirect("/#overview")');
-		expect(installDocsSource).toContain('redirect("/#overview")');
-		expect(connectClientDocsSource).toContain('redirect("/#integrations")');
-		expect(campaignTruthDocsSource).toContain('redirect("/#about")');
-		expect(creditsDocsSource).toContain('redirect("/#pricing")');
+describe("docs content", () => {
+	test("drives docs from a local manifest and static params", () => {
+		expect(listDocsEntries().map((entry) => entry.href)).toEqual([
+			"/docs",
+			"/docs/install",
+			"/docs/connect-client",
+			"/docs/campaign-truth",
+			"/docs/credits-and-billing",
+		]);
+		expect(listDocsStaticParams()).toEqual([
+			{ slug: [] },
+			{ slug: ["install"] },
+			{ slug: ["connect-client"] },
+			{ slug: ["campaign-truth"] },
+			{ slug: ["credits-and-billing"] },
+		]);
 	});
 
-	test("redirect pricing and legal index routes into the exported surface", () => {
-		expect(pricingPageSource).toContain('redirect("/#pricing")');
-		expect(legalIndexSource).toContain('redirect("/privacy-policy")');
+	test("uses a single catch-all route with static params instead of per-page docs files", () => {
+		expect(docsRouteSource).toContain("export const dynamicParams = false");
+		expect(docsRouteSource).toContain("generateStaticParams");
+		expect(docsRouteSource).toContain("getDocsEntryBySlug");
+		expect(docsRouteSource).not.toContain("redirect(");
+	});
+
+	test("renders docs inside the dedicated docs layout shell", () => {
+		expect(docsLayoutSource).toContain("DocsShell");
+		expect(docsLayoutSource).toContain("listDocsEntries");
 	});
 });

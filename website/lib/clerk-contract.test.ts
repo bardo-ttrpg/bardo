@@ -66,6 +66,7 @@ describe("Clerk integration contract", () => {
 				WEBSITE_ROOT,
 				"app",
 				"(site)",
+				"(auth)",
 				"sign-in",
 				"[[...sign-in]]",
 				"page.tsx",
@@ -77,6 +78,7 @@ describe("Clerk integration contract", () => {
 				WEBSITE_ROOT,
 				"app",
 				"(site)",
+				"(auth)",
 				"sign-up",
 				"[[...sign-up]]",
 				"page.tsx",
@@ -90,19 +92,24 @@ describe("Clerk integration contract", () => {
 		expect(signUpSource).not.toContain("forceRedirectUrl=");
 	});
 
-	test("keeps public marketing routes free of request-time auth lookups", () => {
-		const siteLayoutSource = readFileSync(
-			join(WEBSITE_ROOT, "app", "(site)", "layout.tsx"),
+	test("keeps retained public routes free of request-time auth lookups", () => {
+		const homeSource = readFileSync(
+			join(WEBSITE_ROOT, "app", "(site)", "page.tsx"),
 			"utf8",
 		);
-		const pricingSource = readFileSync(
-			join(WEBSITE_ROOT, "app", "(site)", "pricing", "page.tsx"),
+		const docsSource = readFileSync(
+			join(WEBSITE_ROOT, "app", "(site)", "docs", "[[...slug]]", "page.tsx"),
+			"utf8",
+		);
+		const blogSource = readFileSync(
+			join(WEBSITE_ROOT, "app", "(site)", "blog", "page.tsx"),
 			"utf8",
 		);
 
-		expect(siteLayoutSource).not.toContain("await auth(");
-		expect(siteLayoutSource).not.toContain("resolveOptionalUserId");
-		expect(pricingSource).not.toContain("await auth(");
+		expect(homeSource).not.toContain("await auth(");
+		expect(homeSource).not.toContain("resolveOptionalUserId");
+		expect(docsSource).not.toContain("await auth(");
+		expect(blogSource).not.toContain("await auth(");
 	});
 
 	test("keeps the project-local web-design-guidelines skill available", () => {

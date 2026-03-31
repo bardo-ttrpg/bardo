@@ -3,8 +3,6 @@ import { mcpPeriodLimitForPlan } from "../../../lib/api-keys";
 import { createBillingAdminClient } from "../../../lib/billing-admin";
 import { resolveRouteUserId } from "../../../lib/clerk-route-auth";
 
-export const runtime = "nodejs";
-
 type BillingRouteDeps = {
 	resolveUserId: typeof resolveRouteUserId;
 	readBillingSnapshot: (userId: string) => Promise<{

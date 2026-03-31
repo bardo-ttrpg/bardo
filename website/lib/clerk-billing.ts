@@ -1,5 +1,6 @@
-import type { CheckoutPlanTier } from "./billing-catalog";
 import type { BillingInterval } from "./user-billing";
+
+type CheckoutPlanTier = "solo";
 
 const CLERK_PLAN_ENV: Record<CheckoutPlanTier, string> = {
 	solo: "CLERK_BILLING_PLAN_SOLO",

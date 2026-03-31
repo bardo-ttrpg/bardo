@@ -17,10 +17,7 @@ import {
 	projectionIdsForEventTypes,
 } from "./refresh";
 
-export type PreferredStateSource =
-	| "projection"
-	| "legacy_state"
-	| "empty_default";
+type PreferredStateSource = "projection" | "legacy_state" | "empty_default";
 
 type ParsedStateFile = {
 	path: string;

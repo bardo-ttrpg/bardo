@@ -25,7 +25,7 @@ type ReportOptions = {
 	playerView?: boolean;
 };
 
-export const WORLD_STATE_REPORTS = {
+const WORLD_STATE_REPORTS = {
 	world_state_overview: {
 		path: "logs/world-state-overview.md",
 		title: "World State Overview",

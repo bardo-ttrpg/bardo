@@ -12,7 +12,7 @@ describe("shouldUseClerkOnlyProxyPathname", () => {
 		);
 		expect(shouldUseClerkOnlyProxyPathname("/trpc")).toBe(true);
 		expect(shouldUseClerkOnlyProxyPathname("/trpc/example")).toBe(true);
-		expect(shouldUseClerkOnlyProxyPathname("/pricing")).toBe(false);
+		expect(shouldUseClerkOnlyProxyPathname("/blog")).toBe(false);
 	});
 });
 
@@ -22,9 +22,10 @@ describe("shouldRunClerkForPagePathname", () => {
 		expect(shouldRunClerkForPagePathname("/dashboard/connect/bridge/abc")).toBe(
 			true,
 		);
-		expect(shouldRunClerkForPagePathname("/pricing")).toBe(false);
+		expect(shouldRunClerkForPagePathname("/blog")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/sign-in")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/sign-up")).toBe(true);
+		expect(shouldRunClerkForPagePathname("/forgot-password")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/docs/install")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/legal/privacy")).toBe(false);

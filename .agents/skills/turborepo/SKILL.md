@@ -9,7 +9,7 @@ description: |
   monorepo, shares code between apps, runs changed/affected packages, debugs cache,
   or has apps/packages directories.
 metadata:
-  version: 2.8.18-canary.12
+  version: 2.9.1
 ---
 
 # Turborepo Skill
@@ -102,13 +102,13 @@ Root Tasks (`//#taskname`) are ONLY for tasks that truly cannot exist in package
 
 ```
 Configure a task?
-├─ Define task dependencies → See the official task configuration docs
+├─ Define task dependencies → references/configuration/tasks.md
 ├─ Lint/check-types (parallel + caching) → Use Transit Nodes pattern (see below)
-├─ Specify build outputs → See the official task outputs docs
-├─ Handle environment variables → See the official environment variable docs
-├─ Set up dev/watch tasks → See the official persistent task and watch docs
-├─ Package-specific config → See the official Package Configurations docs
-└─ Global settings (cacheDir, daemon) → See the official configuration reference
+├─ Specify build outputs → references/configuration/tasks.md#outputs
+├─ Handle environment variables → references/environment/RULE.md
+├─ Set up dev/watch tasks → references/configuration/tasks.md#persistent
+├─ Package-specific config → references/configuration/RULE.md#package-configurations
+└─ Global settings (cacheDir, daemon) → references/configuration/global-options.md
 ```
 
 ### "My cache isn't working"
@@ -116,11 +116,11 @@ Configure a task?
 ```
 Cache problems?
 ├─ Tasks run but outputs not restored → Missing `outputs` key
-├─ Cache misses unexpectedly → Review the official caching troubleshooting docs
+├─ Cache misses unexpectedly → references/caching/gotchas.md
 ├─ Need to debug hash inputs → Use --summarize or --dry
 ├─ Want to skip cache entirely → Use --force or cache: false
-├─ Remote cache not working → Review the official Remote Cache docs
-└─ Environment causing misses → Review the official environment variable docs
+├─ Remote cache not working → references/caching/remote-cache.md
+└─ Environment causing misses → references/environment/gotchas.md
 ```
 
 ### "I want to run only changed packages"
@@ -130,7 +130,7 @@ Run only what changed?
 ├─ Changed packages + dependents (RECOMMENDED) → turbo run build --affected
 ├─ Custom base branch → --affected --affected-base=origin/develop
 ├─ Manual git comparison → --filter=...[origin/main]
-└─ See all filter options → Review the official `turbo run` reference
+└─ See all filter options → references/filtering/RULE.md
 ```
 
 **`--affected` is the primary way to run only changed packages.** It automatically compares against the default branch and includes dependents.
@@ -144,7 +144,7 @@ Filter packages?
 ├─ By directory → --filter=./apps/*
 ├─ Package + dependencies → --filter=web...
 ├─ Package + dependents → --filter=...web
-└─ Complex combinations → Review the official filtering examples
+└─ Complex combinations → references/filtering/patterns.md
 ```
 
 ### "Environment variables aren't working"
@@ -154,7 +154,7 @@ Environment issues?
 ├─ Vars not available at runtime → Strict mode filtering (default)
 ├─ Cache hits with wrong env → Var not in `env` key
 ├─ .env changes not causing rebuilds → .env not in `inputs`
-├─ CI variables missing → Review the official environment variable docs
+├─ CI variables missing → references/environment/gotchas.md
 └─ Framework vars (NEXT_PUBLIC_*) → Auto-included via inference
 ```
 
@@ -162,11 +162,11 @@ Environment issues?
 
 ```
 CI setup?
-├─ GitHub Actions → Review the official CI docs
-├─ Vercel deployment → Review the official CI and Remote Cache docs
-├─ Remote cache in CI → Review the official Remote Cache docs
+├─ GitHub Actions → references/ci/github-actions.md
+├─ Vercel deployment → references/ci/vercel.md
+├─ Remote cache in CI → references/caching/remote-cache.md
 ├─ Only build changed packages → --affected flag
-├─ Skip unnecessary builds → `turbo-ignore`
+├─ Skip unnecessary builds → turbo-ignore (references/cli/commands.md)
 └─ Skip container setup when no changes → turbo-ignore
 ```
 
@@ -174,8 +174,8 @@ CI setup?
 
 ```
 Watch mode?
-├─ Re-run tasks on change → `turbo watch`
-├─ Dev servers with dependencies → Use the `with` key
+├─ Re-run tasks on change → turbo watch (references/watch/RULE.md)
+├─ Dev servers with dependencies → Use `with` key (references/configuration/tasks.md#with)
 ├─ Restart dev server on dep change → Use `interruptible: true`
 └─ Persistent dev tasks → Use `persistent: true`
 ```
@@ -184,25 +184,25 @@ Watch mode?
 
 ```
 Package creation/structure?
-├─ Create an internal package → See the official Internal Packages docs
-├─ Repository structure → See the official package graph and structure docs
-├─ Dependency management → See the official dependency guidance
-├─ Best practices overview → Follow the official package types and internal package docs
-├─ JIT vs Compiled packages → See the official compilation strategy guidance
-└─ Sharing code between apps → Review the official package types docs
+├─ Create an internal package → references/best-practices/packages.md
+├─ Repository structure → references/best-practices/structure.md
+├─ Dependency management → references/best-practices/dependencies.md
+├─ Best practices overview → references/best-practices/RULE.md
+├─ JIT vs Compiled packages → references/best-practices/packages.md#compilation-strategies
+└─ Sharing code between apps → references/best-practices/RULE.md#package-types
 ```
 
 ### "How should I structure my monorepo?"
 
 ```
 Monorepo structure?
-├─ Standard layout (apps/, packages/) → Follow the official package types docs
-├─ Package types (apps vs libraries) → Review the official package types docs
-├─ Creating internal packages → See the official Internal Packages docs
-├─ TypeScript configuration → Prefer workspace-level config packages where useful
-├─ ESLint configuration → Prefer shared config packages where useful
-├─ Dependency management → See the official dependency guidance
-└─ Enforce package boundaries → Review the official `turbo boundaries` docs
+├─ Standard layout (apps/, packages/) → references/best-practices/RULE.md
+├─ Package types (apps vs libraries) → references/best-practices/RULE.md#package-types
+├─ Creating internal packages → references/best-practices/packages.md
+├─ TypeScript configuration → references/best-practices/structure.md#typescript-configuration
+├─ ESLint configuration → references/best-practices/structure.md#eslint-configuration
+├─ Dependency management → references/best-practices/dependencies.md
+└─ Enforce package boundaries → references/boundaries/RULE.md
 ```
 
 ### "I want to enforce architectural boundaries"
@@ -210,9 +210,9 @@ Monorepo structure?
 ```
 Enforce boundaries?
 ├─ Check for violations → turbo boundaries
-├─ Tag packages → Review the official boundaries tag docs
-├─ Restrict which packages can import others → Review the official boundaries rule docs
-└─ Prevent cross-package file imports → Review the official boundaries docs
+├─ Tag packages → references/boundaries/RULE.md#tags
+├─ Restrict which packages can import others → references/boundaries/RULE.md#rule-types
+└─ Prevent cross-package file imports → references/boundaries/RULE.md
 ```
 
 ## Critical Anti-Patterns
@@ -338,7 +338,7 @@ Scripts like `prebuild` that manually build other packages bypass Turborepo's de
 
 ### Overly Broad `globalDependencies`
 
-`globalDependencies` affects ALL tasks in ALL packages. Be specific.
+`globalDependencies` affects ALL tasks in ALL packages via the **global hash** — tasks cannot opt out of specific files, even with negation globs in `inputs`. Be specific.
 
 ```json
 // WRONG - heavy hammer, affects all hashes
@@ -353,6 +353,24 @@ Scripts like `prebuild` that manually build other packages bypass Turborepo's de
     "build": {
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
+    }
+  }
+}
+```
+
+With `futureFlags.globalConfiguration`, this problem is reduced because `global.inputs` files are folded into each task's inputs (not the global hash). Tasks can exclude specific files:
+
+```json
+// BEST - global.inputs with per-task exclusion
+{
+  "futureFlags": { "globalConfiguration": true },
+  "global": {
+    "inputs": [".env"]
+  },
+  "tasks": {
+    "build": { "outputs": ["dist/**"] },
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "!$TURBO_ROOT$/.env"]
     }
   }
 }
@@ -474,7 +492,7 @@ When multiple packages need different task configurations, use **Package Configu
 - Single package needs a unique dependency (e.g., `"deploy": { "dependsOn": ["web#build"] }`)
 - Temporary override while migrating
 
-See the official Package Configurations reference for full details.
+See `references/configuration/RULE.md#package-configurations` for full details.
 
 ### Using `../` to Traverse Out of Package in `inputs`
 
@@ -722,7 +740,7 @@ import { Button } from "@repo/ui/button";
 
 ```json
 {
-  "$schema": "https://v2-8-18-canary-12.turborepo.dev/schema.json",
+  "$schema": "https://v2-9-1.turborepo.dev/schema.json",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -835,40 +853,95 @@ The `transit` task creates dependency relationships without matching any actual 
 }
 ```
 
-## Official Docs Quick Links
+With `futureFlags.globalConfiguration`, the same config moves global settings under `global` — and `.env` becomes a per-task input instead of a global hash input:
 
-### Core Configuration
+```json
+{
+  "futureFlags": { "globalConfiguration": true },
+  "global": {
+    "env": ["NODE_ENV"],
+    "inputs": [".env"]
+  },
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": ["API_URL", "DATABASE_URL"]
+    }
+  }
+}
+```
 
-| Doc | Purpose |
-| --- | --- |
-| [Configuration reference](https://turborepo.com/repo/docs/reference/configuration) | Root `turbo.json`, task keys, env modes, global options |
-| [Package Configurations](https://turborepo.com/repo/docs/reference/package-configurations) | Package-level `turbo.json` files and overrides |
-| [Run reference](https://turborepo.com/repo/docs/reference/run) | `turbo run`, filtering, affected runs, CLI flags |
+## Reference Index
 
-### Execution and Caching
+### Configuration
 
-| Doc | Purpose |
-| --- | --- |
-| [Caching](https://turborepo.com/repo/docs/crafting-your-repository/caching) | Cache behavior, outputs, hash inputs, troubleshooting |
-| [Using environment variables](https://turborepo.com/repo/docs/crafting-your-repository/using-environment-variables) | `env`, `globalEnv`, passthrough variables, strict mode |
-| [Constructing CI](https://turborepo.com/repo/docs/crafting-your-repository/constructing-ci) | CI patterns, `--affected`, cache strategy |
-| [turbo-ignore](https://turborepo.com/repo/docs/reference/turbo-ignore) | Skipping no-op CI work safely |
+| File                                                                            | Purpose                                                                   |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [configuration/RULE.md](./references/configuration/RULE.md)                     | turbo.json overview, Package Configurations                               |
+| [configuration/tasks.md](./references/configuration/tasks.md)                   | dependsOn, outputs, inputs, env, cache, persistent                        |
+| [configuration/global-options.md](./references/configuration/global-options.md) | globalEnv, globalDependencies, global key, futureFlags, cacheDir, envMode |
+| [configuration/gotchas.md](./references/configuration/gotchas.md)               | Common configuration mistakes                                             |
 
-### Repository Design
+### Caching
 
-| Doc | Purpose |
-| --- | --- |
-| [Package types](https://turborepo.com/repo/docs/core-concepts/package-types) | App vs library package guidance |
-| [Internal Packages](https://turborepo.com/repo/docs/core-concepts/internal-packages) | Shared package patterns and compilation strategies |
-| [Creating an Internal Package](https://turborepo.com/repo/docs/crafting-your-repository/creating-an-internal-package) | Step-by-step package creation |
-| [Package and Task Graphs](https://turborepo.com/repo/docs/core-concepts/package-and-task-graph) | How dependency relationships affect execution |
+| File                                                            | Purpose                                      |
+| --------------------------------------------------------------- | -------------------------------------------- |
+| [caching/RULE.md](./references/caching/RULE.md)                 | How caching works, hash inputs               |
+| [caching/remote-cache.md](./references/caching/remote-cache.md) | Vercel Remote Cache, self-hosted, login/link |
+| [caching/gotchas.md](./references/caching/gotchas.md)           | Debugging cache misses, --summarize, --dry   |
 
-### Watch and Boundaries
+### Environment Variables
 
-| Doc | Purpose |
-| --- | --- |
-| [watch](https://turborepo.com/repo/docs/reference/watch) | `turbo watch`, restart behavior, dev workflows |
-| [boundaries](https://turborepo.com/docs/reference/boundaries) | Experimental package boundary enforcement and tags |
+| File                                                          | Purpose                                   |
+| ------------------------------------------------------------- | ----------------------------------------- |
+| [environment/RULE.md](./references/environment/RULE.md)       | env, globalEnv, passThroughEnv            |
+| [environment/modes.md](./references/environment/modes.md)     | Strict vs Loose mode, framework inference |
+| [environment/gotchas.md](./references/environment/gotchas.md) | .env files, CI issues                     |
+
+### Filtering
+
+| File                                                        | Purpose                  |
+| ----------------------------------------------------------- | ------------------------ |
+| [filtering/RULE.md](./references/filtering/RULE.md)         | --filter syntax overview |
+| [filtering/patterns.md](./references/filtering/patterns.md) | Common filter patterns   |
+
+### CI/CD
+
+| File                                                      | Purpose                         |
+| --------------------------------------------------------- | ------------------------------- |
+| [ci/RULE.md](./references/ci/RULE.md)                     | General CI principles           |
+| [ci/github-actions.md](./references/ci/github-actions.md) | Complete GitHub Actions setup   |
+| [ci/vercel.md](./references/ci/vercel.md)                 | Vercel deployment, turbo-ignore |
+| [ci/patterns.md](./references/ci/patterns.md)             | --affected, caching strategies  |
+
+### CLI
+
+| File                                            | Purpose                                       |
+| ----------------------------------------------- | --------------------------------------------- |
+| [cli/RULE.md](./references/cli/RULE.md)         | turbo run basics                              |
+| [cli/commands.md](./references/cli/commands.md) | turbo run flags, turbo-ignore, other commands |
+
+### Best Practices
+
+| File                                                                          | Purpose                                                         |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [best-practices/RULE.md](./references/best-practices/RULE.md)                 | Monorepo best practices overview                                |
+| [best-practices/structure.md](./references/best-practices/structure.md)       | Repository structure, workspace config, TypeScript/ESLint setup |
+| [best-practices/packages.md](./references/best-practices/packages.md)         | Creating internal packages, JIT vs Compiled, exports            |
+| [best-practices/dependencies.md](./references/best-practices/dependencies.md) | Dependency management, installing, version sync                 |
+
+### Watch Mode
+
+| File                                        | Purpose                                         |
+| ------------------------------------------- | ----------------------------------------------- |
+| [watch/RULE.md](./references/watch/RULE.md) | turbo watch, interruptible tasks, dev workflows |
+
+### Boundaries (Experimental)
+
+| File                                                  | Purpose                                               |
+| ----------------------------------------------------- | ----------------------------------------------------- |
+| [boundaries/RULE.md](./references/boundaries/RULE.md) | Enforce package isolation, tag-based dependency rules |
 
 ## Source Documentation
 

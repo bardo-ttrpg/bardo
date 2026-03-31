@@ -41,7 +41,7 @@ function validateWebsiteScripts(
 	}
 
 	const scripts = manifest.scripts ?? {};
-	for (const name of ["dev", "dev:e2e", "build"] as const) {
+	for (const name of ["dev", "build"] as const) {
 		const command = scripts[name];
 		if (!command?.includes("--turbopack")) {
 			errors.push(

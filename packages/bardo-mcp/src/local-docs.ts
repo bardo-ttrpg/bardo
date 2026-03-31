@@ -11,7 +11,7 @@ const DOCS_RELATIVE_PATHS = {
 	credits: "docs/credits-and-billing.md",
 } as const;
 
-export type LocalDocId = keyof typeof DOCS_RELATIVE_PATHS;
+type LocalDocId = keyof typeof DOCS_RELATIVE_PATHS;
 
 const LOCAL_DOC_ORDER = [
 	"quickstart",

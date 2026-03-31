@@ -29,7 +29,7 @@ export type DiscoveryCandidate = {
 	persisted?: boolean;
 };
 
-export type GmPacket = {
+type GmPacket = {
 	sceneFrame: {
 		locationId: string;
 		locationName: string;

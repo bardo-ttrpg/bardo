@@ -1,0 +1,26 @@
+{
+	"$schema": "https://unpkg.com/knip@latest/schema.json",
+	"workspaces": {
+		".": {
+			"entry": ["scripts/**/*.ts", "*.config.{js,cjs,mjs,ts}"],
+			"project": ["scripts/**/*.{js,ts}"]
+		},
+		"website": {
+			"entry": [
+				"app/**/*.{test,spec}.{js,jsx,ts,tsx}",
+				"lib/**/*.{test,spec}.{js,jsx,ts,tsx}",
+				"scripts/**/*.ts",
+				"instrumentation-client.test.ts"
+			],
+			"project": ["**/*.{js,jsx,ts,tsx,mdx}"]
+		},
+		"mcp": {
+			"entry": ["scripts/**/*.ts", "src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+			"project": ["**/*.{js,jsx,ts,tsx}"]
+		},
+		"packages/*": {
+			"entry": ["scripts/**/*.ts", "src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+			"project": ["**/*.{js,jsx,ts,tsx}"]
+		}
+	}
+}

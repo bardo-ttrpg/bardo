@@ -30,7 +30,7 @@ export const playerActionInputSchema = z.object({
 	idempotencyKey: z.string().trim().min(8).max(200).optional(),
 });
 
-export const discoveryCandidateSchema = z.object({
+const discoveryCandidateSchema = z.object({
 	kind: z.enum(["npc", "location", "faction", "item", "clue", "thread"]),
 	id: z.string(),
 	displayName: z.string(),

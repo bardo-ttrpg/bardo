@@ -1,8 +1,8 @@
 import path from "node:path";
 
-export const BARDO_ROOT_DIRNAME = "bardo";
+const BARDO_ROOT_DIRNAME = "bardo";
 
-export const CANONICAL_DIRECTORIES = [
+const CANONICAL_DIRECTORIES = [
 	"_settings",
 	"context",
 	"docs",
@@ -21,7 +21,7 @@ export const CANONICAL_DIRECTORIES = [
 	"manifests",
 ] as const;
 
-export const NESTED_DIRECTORIES = [
+const NESTED_DIRECTORIES = [
 	"docs/clients",
 	"rules/sources/system",
 	"rules/sources/rulebook",
@@ -40,7 +40,7 @@ export const WORKSPACE_DIRECTORIES = [
 	...NESTED_DIRECTORIES,
 ] as const;
 
-export function useFlatWorkspaceLayout(
+function useFlatWorkspaceLayout(
 	env: Record<string, string | undefined> = process.env,
 ): boolean {
 	return env.BARDO_WORKSPACE_LAYOUT?.trim().toLowerCase() === "flat";

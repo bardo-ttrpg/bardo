@@ -1,9 +1,25 @@
 @import "tailwindcss";
-@import "tw-animate-css";
+
+@theme {
+	--color-background: #000000;
+	--color-foreground: #ffffff;
+	--color-muted-foreground: #ffffff;
+	--color-border: #ffffff;
+	--color-card: #1a1a1a;
+	--color-card-foreground: #ffffff;
+	--color-subtle: #1a1a1a;
+	--color-subtle-inverse: #f5f5f5;
+	--color-destructive: #ffffff;
+	--font-reading: var(--font-newsreader), serif;
+	--font-ui: var(--font-geist-sans), sans-serif;
+	--font-code: var(--font-geist-mono), monospace;
+	--spacing-grid: 8px;
+}
 
 @layer base {
 	html {
-		scroll-behavior: smooth;
+		min-height: 100%;
+		background: var(--color-background);
 	}
 
 	*,
@@ -15,74 +31,146 @@
 	body {
 		margin: 0;
 		min-height: 100vh;
-		font-family: var(--font-host-grotesk), sans-serif;
-		background-color: rgb(8, 10, 9);
-		color: white;
+		font-family: var(--font-reading);
+		font-size: 18px;
+		line-height: 1.6;
+		background: var(--color-background);
+		color: var(--color-foreground);
+		text-rendering: optimizeLegibility;
 	}
 
-	/* Framer accordion trigger styles */
-	.nce-acc-trigger {
-		cursor: pointer;
-		user-select: none;
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		margin: 0;
+		font-family: var(--font-reading);
+		font-variation-settings: "opsz" 72, "wght" 400;
+		font-weight: 400;
+		line-height: 1.1;
 	}
 
-	/* Framer accordion content animation */
-	.nce-acc-content {
-		overflow: hidden;
-		transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-			opacity 0.35s ease;
+	a {
+		color: inherit;
 	}
 
-	.nce-acc-text {
-		transition: opacity 0.35s ease;
+	button,
+	input,
+	textarea,
+	select {
+		font-family: var(--font-ui);
+		border-radius: 0;
 	}
 
-	.nce-acc-icon {
-		transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	input,
+	textarea,
+	select {
+		border: 1px solid var(--color-border);
+		background: var(--color-background);
+		color: var(--color-foreground);
 	}
 
-	/* Framer scroll fallback - elements start visible if JS fails */
-	[data-nce-scroll] {
-		opacity: 1 !important;
-		transform: none !important;
+	code {
+		font-family: var(--font-code);
+		font-size: 14px;
+		line-height: 1.5;
 	}
 
-	/* Fix for elements that should be initially hidden for animation */
-	[data-framer-appear-id]:not([data-codex-appear-init]) {
-		opacity: 0.001;
+	pre,
+	code,
+	kbd,
+	samp {
+		font-family: var(--font-code);
 	}
 
-	/* Smooth hover transitions for interactive elements */
-	a[data-framer-name],
-	[data-highlight="true"] {
-		transition: transform 0.2s ease, opacity 0.2s ease;
+	*:where([class*="rounded-"]) {
+		border-radius: 0 !important;
 	}
 
-	a[data-framer-name]:hover,
-	[data-highlight="true"]:hover {
-		opacity: 0.85;
+	::selection {
+		background: #ffffff;
+		color: #000000;
+	}
+}
+
+@layer utilities {
+	.font-reading {
+		font-family: var(--font-reading);
 	}
 
-	/* Button hover effects */
-	a.framer-Rwptr:hover {
-		transform: translateY(-1px);
-		opacity: 0.95;
+	.font-reading-body {
+		font-family: var(--font-reading);
+		font-variation-settings: "opsz" 16, "wght" 400;
+		font-size: 18px;
+		line-height: 1.6;
 	}
 
-	/* Pricing toggle cursor */
-	[data-framer-name="Switch"] {
-		cursor: pointer;
+	.font-reading-heading {
+		font-family: var(--font-reading);
+		font-variation-settings: "opsz" 72, "wght" 400;
+		line-height: 1.1;
 	}
 
-	/* Mobile menu hamburger lines */
-	[data-framer-name="Line 1"],
-	[data-framer-name="Line 2"],
-	[data-framer-name="Line 3"] {
-		transition: transform 0.25s ease, opacity 0.25s ease;
+	.font-ui {
+		font-family: var(--font-ui);
 	}
 
-	/* FAQ indicator color transition */
-	[data-framer-name="Indicator"] {
-		transition: background-color 0.25s ease;
+	.font-code {
+		font-family: var(--font-code);
+	}
+
+	.ui-nav {
+		font-family: var(--font-ui);
+		font-size: 14px;
+		letter-spacing: 0.02em;
+		font-weight: 500;
+	}
+
+	.ui-label {
+		font-family: var(--font-ui);
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		font-weight: 600;
+		text-transform: uppercase;
+	}
+
+	.ui-button {
+		font-family: var(--font-ui);
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		font-weight: 600;
+		text-transform: uppercase;
+	}
+
+	.prose-reading {
+		font-family: var(--font-reading);
+		font-variation-settings: "opsz" 16, "wght" 400;
+		font-size: 18px;
+		line-height: 1.6;
+	}
+
+	.prose-reading :where(p, ul, ol, blockquote) {
+		margin: 0;
+	}
+
+	.lore-fragment {
+		font-family: var(--font-reading);
+		font-style: italic;
+		font-variation-settings: "opsz" 16, "wght" 400;
+	}
+
+	.technical-meta {
+		font-family: var(--font-code);
+		font-size: 14px;
+		line-height: 1.5;
+	}
+
+	.code-inline {
+		display: inline-block;
+		padding: 0.2em 0.4em;
+		border: 1px solid var(--color-border);
+		background: var(--color-subtle);
 	}
 }

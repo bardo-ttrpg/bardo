@@ -323,9 +323,9 @@ async function main() {
 
 	for (const [name, pathname] of [
 		["website root", "/"],
-		["website pricing", "/pricing"],
+		["website docs", "/docs"],
+		["website blog", "/blog"],
 		["website legal", "/legal"],
-		["website docs index", "/docs"],
 		["website docs install", "/docs/install"],
 		["website docs connect", "/docs/connect-client"],
 	] as const) {
@@ -338,6 +338,15 @@ async function main() {
 			}),
 		);
 	}
+
+	checks.push(
+		await expectStatus({
+			name: "removed pricing route renders custom 404",
+			url: new URL("/pricing", websiteUrl).toString(),
+			init: { headers: protectionHeaders },
+			expectedStatuses: [404],
+		}),
+	);
 
 	checks.push(
 		await expectStatus({

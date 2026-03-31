@@ -28,9 +28,7 @@ describe("validateToolchainPolicy", () => {
 				}),
 				makeManifest("/repo/website/package.json", {
 					scripts: {
-						dev: "next dev --turbopack -p ${PORT:-3001}",
-						"dev:e2e":
-							"next dev --turbopack --hostname ${PLAYWRIGHT_LOOPBACK_HOST:-localhost} -p ${PORT:-3001}",
+						dev: `next dev --turbopack -p \${PORT:-3001}`,
 						build:
 							"bun run validate:deploy-env && bun run check:release-health && next build --turbopack",
 						"build:analyze":
@@ -57,7 +55,6 @@ describe("validateToolchainPolicy", () => {
 				makeManifest("/repo/website/package.json", {
 					scripts: {
 						dev: "next dev --turbopack",
-						"dev:e2e": "next dev --turbopack",
 						build: "next build --turbopack",
 						"build:analyze":
 							"ANALYZE=true next build --turbopack --experimental-analyze",
@@ -89,7 +86,6 @@ describe("validateToolchainPolicy", () => {
 				makeManifest("/repo/website/package.json", {
 					scripts: {
 						dev: "next dev --turbopack",
-						"dev:e2e": "next dev --turbopack",
 						build: "next build --turbopack",
 						"build:analyze":
 							"ANALYZE=true next build --turbopack --experimental-analyze",
@@ -113,7 +109,6 @@ describe("validateToolchainPolicy", () => {
 				makeManifest("/repo/website/package.json", {
 					scripts: {
 						dev: "next dev",
-						"dev:e2e": "next dev --webpack",
 						build: "next build",
 						"build:analyze": "ANALYZE=true next build --webpack",
 					},
@@ -123,9 +118,6 @@ describe("validateToolchainPolicy", () => {
 
 		expect(errors).toContain(
 			'/repo/website/package.json script "dev" must include --turbopack.',
-		);
-		expect(errors).toContain(
-			'/repo/website/package.json script "dev:e2e" must include --turbopack.',
 		);
 		expect(errors).toContain(
 			'/repo/website/package.json script "build" must include --turbopack.',

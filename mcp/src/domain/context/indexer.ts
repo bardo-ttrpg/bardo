@@ -127,7 +127,7 @@ function normalizeDoc({
 	};
 }
 
-export async function rebuildContextIndex(bardoRoot: string): Promise<{
+async function rebuildContextIndex(bardoRoot: string): Promise<{
 	indexPath: string;
 	docsIndexed: number;
 }> {

@@ -9,21 +9,21 @@ import {
 	listConnectionClientAdapters,
 } from "./client-adapters";
 
-export type ClientDetectionSource = "explicit" | "workspace";
+type ClientDetectionSource = "explicit" | "workspace";
 
-export type AutoInstallClientSelection = {
+type AutoInstallClientSelection = {
 	client: AutoInstallConnectionClient;
 	configPath: string;
 	detectionSource: ClientDetectionSource;
 };
 
-export type DoctorClientSelection = {
+type DoctorClientSelection = {
 	client: ConnectionClient;
 	configPath: string | null;
 	detectionSource: ClientDetectionSource;
 };
 
-export async function detectWorkspaceClient(
+async function detectWorkspaceClient(
 	workspaceRoot: string,
 ): Promise<AutoInstallConnectionClient> {
 	const detected: AutoInstallConnectionClient[] = [];

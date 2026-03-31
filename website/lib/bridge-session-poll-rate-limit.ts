@@ -9,7 +9,7 @@ type CreateRateLimiterOptions = {
 	fetchImpl?: typeof fetch;
 };
 
-export function createBridgeSessionPollRateLimiter(
+function createBridgeSessionPollRateLimiter(
 	options: CreateRateLimiterOptions = {},
 ) {
 	const env = options.env ?? process.env;

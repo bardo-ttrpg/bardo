@@ -1,64 +1,60 @@
 import * as z from "zod/v4";
 
-export const evidenceSourceSchema = z.enum([
-	"canonical",
-	"user-provided",
-	"inferred",
-]);
+const evidenceSourceSchema = z.enum(["canonical", "user-provided", "inferred"]);
 
-export const evidenceConfidenceSchema = z.enum(["high", "medium", "low"]);
+const evidenceConfidenceSchema = z.enum(["high", "medium", "low"]);
 
-export const groundingStatusSchema = z.enum([
+const groundingStatusSchema = z.enum([
 	"grounded_enough",
 	"partially_grounded",
 	"underspecified",
 ]);
 
-export const inferencePolicySchema = z.enum([
+const inferencePolicySchema = z.enum([
 	"must_ask",
 	"safe_inference",
 	"structured_possibilities",
 ]);
 
-export const guidanceFactSchema = z.object({
+const guidanceFactSchema = z.object({
 	summary: z.string(),
 	source: evidenceSourceSchema,
 	confidence: evidenceConfidenceSchema,
 	citation: z.string().optional(),
 });
 
-export const recommendedNextStepSchema = z.object({
+const recommendedNextStepSchema = z.object({
 	action: z.string(),
 	reason: z.string(),
 	tool: z.string().optional(),
 });
 
-export const riskFlagSchema = z.object({
+const riskFlagSchema = z.object({
 	severity: z.enum(["low", "medium", "high"]),
 	flag: z.string(),
 	reason: z.string(),
 });
 
-export const writeTargetSchema = z.object({
+const writeTargetSchema = z.object({
 	path: z.string(),
 	operation: z.enum(["read", "refresh", "append", "update", "review"]),
 	reason: z.string(),
 });
 
-export const writePlanSchema = z.object({
+const writePlanSchema = z.object({
 	status: z.enum(["none", "recommended_only", "already_applied"]),
 	shouldWrite: z.boolean(),
 	summary: z.string(),
 	targets: z.array(writeTargetSchema),
 });
 
-export const verificationCheckSchema = z.object({
+const verificationCheckSchema = z.object({
 	name: z.string(),
 	status: z.enum(["passed", "warning", "failed"]),
 	reason: z.string(),
 });
 
-export const provenanceEntrySchema = z.object({
+const provenanceEntrySchema = z.object({
 	source: evidenceSourceSchema,
 	detail: z.string(),
 	confidence: evidenceConfidenceSchema,
@@ -85,8 +81,7 @@ export const decisionGuidanceSchema = z.object({
 	provenance: z.array(provenanceEntrySchema),
 });
 
-export type EvidenceConfidence = z.infer<typeof evidenceConfidenceSchema>;
-export type GroundingStatus = z.infer<typeof groundingStatusSchema>;
+type EvidenceConfidence = z.infer<typeof evidenceConfidenceSchema>;
 
 export function inferWorkspaceEvidenceSource(
 	relativePath: string,

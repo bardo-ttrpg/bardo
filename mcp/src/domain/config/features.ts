@@ -1,4 +1,4 @@
-export type FeatureFlags = {
+type FeatureFlags = {
 	guidedSetupEnabled: boolean;
 	strictCanonicalMode: boolean;
 };
@@ -23,5 +23,3 @@ export function resolveFeatureFlags(
 		),
 	};
 }
-
-export const FEATURE_FLAGS = resolveFeatureFlags(Bun.env);

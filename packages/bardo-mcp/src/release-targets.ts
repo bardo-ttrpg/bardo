@@ -1,13 +1,13 @@
 import path from "node:path";
 
-export type ReleaseCompileTarget =
+type ReleaseCompileTarget =
 	| "bun-linux-x64"
 	| "bun-linux-arm64"
 	| "bun-darwin-arm64"
 	| "bun-darwin-x64"
 	| "bun-windows-x64";
 
-export type ReleaseTarget = {
+type ReleaseTarget = {
 	target: ReleaseCompileTarget;
 	platform: "linux" | "darwin" | "windows";
 	arch: "x64" | "arm64";

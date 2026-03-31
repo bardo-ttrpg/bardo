@@ -25,8 +25,6 @@ import {
 import { createIntrospectionVerifyCache } from "@/lib/introspection-verify-cache";
 import type { PlanTier } from "@/lib/user-billing";
 
-export const runtime = "nodejs";
-
 type IntrospectRequest = {
 	apiKey?: string;
 	requiredScope?: string;

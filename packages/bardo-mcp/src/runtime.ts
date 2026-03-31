@@ -97,7 +97,7 @@ type ClientsListCommandOptions = {
 	json: boolean;
 };
 
-export type ServeCommandOptions = WorkspaceCommandOptions & {
+type ServeCommandOptions = WorkspaceCommandOptions & {
 	apiKey: string | null;
 	url: string | null;
 };
@@ -115,7 +115,7 @@ type ParsedCliCommand =
 	| { command: "doctor"; options: DoctorCommandOptions }
 	| { command: "mcp-serve"; options: ServeCommandOptions };
 
-export type CliRuntimeDeps = {
+type CliRuntimeDeps = {
 	cwd?: string;
 	env?: Record<string, string | undefined>;
 	homeDir?: string;
