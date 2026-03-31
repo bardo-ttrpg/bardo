@@ -28,6 +28,11 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      CLERK_SECRET_KEY: sk_test_ci_placeholder
+      BARDO_MCP_BASE_URL: https://example.com
+      NEXT_PUBLIC_APP_URL: https://example.com
     steps:
       - name: Checkout
         uses: actions/checkout@v6
