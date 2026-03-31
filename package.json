@@ -7,6 +7,9 @@
 		"mcp",
 		"packages/*"
 	],
+	"overrides": {
+		"path-to-regexp": "8.4.1"
+	},
 	"scripts": {
 		"dev": "turbo run dev --filter=website",
 		"dev:all": "turbo run dev",

@@ -47,6 +47,7 @@ C:\\Users\\*\\AppData\\Local\\lighthouse.*/
 
 # local runtime data (never commit)
 customers/
+website/.data/
 website/.bun-tmp/
 website/.bun-install/
 website/.tmp-*
