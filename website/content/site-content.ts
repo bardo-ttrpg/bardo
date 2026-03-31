@@ -18,7 +18,7 @@ type BlogEntry = {
 	href: string;
 	title: string;
 	description: string;
-	preview: string;
+	preview?: string;
 	publishedAt: string;
 	load(): Promise<MdxModule>;
 };

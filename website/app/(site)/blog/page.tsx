@@ -36,7 +36,7 @@ export default function BlogPage() {
 									{entry.title}
 								</Link>
 								<p className="font-reading-body text-foreground">
-									{entry.preview}
+									{entry.preview ?? entry.description}
 								</p>
 							</li>
 						))}

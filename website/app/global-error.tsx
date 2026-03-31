@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { siteCode, siteReading, siteUi } from "@/lib/site-fonts";
 
 export default function GlobalError({
 	error,
@@ -15,10 +14,7 @@ export default function GlobalError({
 	}, [error]);
 
 	return (
-		<html
-			lang="en"
-			className={`${siteReading.variable} ${siteUi.variable} ${siteCode.variable}`}
-		>
+		<html lang="en">
 			<body className="bg-background text-foreground">
 				<main className="flex min-h-screen items-center justify-center px-6">
 					<div className="w-full max-w-xl border border-border bg-card p-8">
