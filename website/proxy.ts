@@ -6,8 +6,6 @@ import {
 } from "next/server";
 import { isClerkAuthConfigured } from "./lib/clerk-config";
 import {
-	API_PROXY_MATCHER,
-	PAGE_PROXY_MATCHER,
 	shouldRunClerkForPagePathname,
 	shouldUseClerkOnlyProxyPathname,
 } from "./lib/proxy-config";
@@ -101,5 +99,15 @@ export default async function proxy(
 }
 
 export const config = {
-	matcher: [PAGE_PROXY_MATCHER, API_PROXY_MATCHER],
+	matcher: [
+		{
+			source:
+				"/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+			missing: [
+				{ type: "header", key: "next-router-prefetch" },
+				{ type: "header", key: "purpose", value: "prefetch" },
+			],
+		},
+		"/(api|trpc)(.*)",
+	],
 };
