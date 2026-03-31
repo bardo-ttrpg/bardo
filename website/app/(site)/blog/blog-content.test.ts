@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { listBlogEntries, listBlogStaticParams } from "@/content/site-content";
 
-const blogPageSource = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+const blogPageSource = readFileSync(
+	new URL("./page.tsx", import.meta.url),
+	"utf8",
+);
 const blogEntryRouteSource = readFileSync(
 	new URL("./[slug]/page.tsx", import.meta.url),
 	"utf8",
@@ -19,7 +22,9 @@ describe("blog content", () => {
 	});
 
 	test("uses a single static route for blog entries", () => {
-		expect(blogEntryRouteSource).toContain("export const dynamicParams = false");
+		expect(blogEntryRouteSource).toContain(
+			"export const dynamicParams = false",
+		);
 		expect(blogEntryRouteSource).toContain("generateStaticParams");
 		expect(blogEntryRouteSource).toContain("getBlogEntryBySlug");
 	});

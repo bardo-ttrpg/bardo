@@ -7,11 +7,12 @@ const globalErrorSource = readFileSync(
 );
 
 describe("GlobalError", () => {
-	test("keeps a root-level fallback document with the shared font contract", () => {
+	test("keeps a root-level fallback document without importing app font modules", () => {
 		expect(globalErrorSource).toContain("<html");
-		expect(globalErrorSource).toContain("siteReading.variable");
-		expect(globalErrorSource).toContain("siteUi.variable");
-		expect(globalErrorSource).toContain("siteCode.variable");
+		expect(globalErrorSource).not.toContain("siteReading.variable");
+		expect(globalErrorSource).not.toContain("siteUi.variable");
+		expect(globalErrorSource).not.toContain("siteCode.variable");
+		expect(globalErrorSource).toContain('className="bg-background text-foreground"');
 		expect(globalErrorSource).toContain("Something went wrong");
 		expect(globalErrorSource).toContain("Try again");
 	});
