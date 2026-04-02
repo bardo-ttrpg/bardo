@@ -7,12 +7,14 @@ type PublicMetadataOptions = {
 	path: string;
 	keywords?: readonly string[];
 	type?: "website" | "article";
+	socialDescription?: string;
 };
 
 export function createPublicMetadata(options: PublicMetadataOptions): Metadata {
 	const canonical = absoluteUrl(options.path);
 	const keywords = [...(options.keywords ?? siteConfig.keywords)];
 	const type = options.type ?? "website";
+	const socialDescription = options.socialDescription ?? options.description;
 
 	return {
 		title: options.title,
@@ -36,7 +38,7 @@ export function createPublicMetadata(options: PublicMetadataOptions): Metadata {
 		},
 		openGraph: {
 			title: `${options.title} | ${siteConfig.name}`,
-			description: options.description,
+			description: socialDescription,
 			url: canonical,
 			siteName: siteConfig.name,
 			locale: siteConfig.locale,
@@ -53,7 +55,7 @@ export function createPublicMetadata(options: PublicMetadataOptions): Metadata {
 		twitter: {
 			card: "summary_large_image",
 			title: `${options.title} | ${siteConfig.name}`,
-			description: options.description,
+			description: socialDescription,
 			images: [absoluteUrl("/twitter-image")],
 		},
 	};

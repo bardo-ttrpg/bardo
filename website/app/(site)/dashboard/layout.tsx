@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import OptionalClerkProvider from "@/components/optional-clerk-provider";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
@@ -22,5 +23,9 @@ export default async function DashboardLayout({
 		return redirectToSignIn();
 	}
 
-	return <>{children}</>;
+	return (
+		<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
+			{children}
+		</OptionalClerkProvider>
+	);
 }

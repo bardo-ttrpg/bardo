@@ -174,4 +174,62 @@ describe("createWebsiteBackendClient", () => {
 			await rm(root, { recursive: true, force: true });
 		}
 	});
+
+	test("rotates bridge refresh tokens and rejects replay of stale refresh tokens", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-website-backend-"),
+		);
+		const sqlitePath = path.join(root, "backend.sqlite");
+
+		try {
+			const starter = createRequiredWebsiteBackendClient(sqlitePath);
+			const approver = createRequiredWebsiteBackendClient(sqlitePath);
+			const rotator = createRequiredWebsiteBackendClient(sqlitePath);
+			const started = await starter.startCliDeviceSession({
+				now: new Date("2036-03-25T00:00:00.000Z"),
+				ttlMs: 60_000,
+				intervalMs: 3000,
+			});
+
+			const approved = await approver.approveCliDeviceSession({
+				sessionId: started.sessionId,
+				approvedAtISO: "2036-03-25T00:00:10.000Z",
+				payload: {
+					accessToken: "access-token",
+					refreshToken: "refresh-token-1",
+					expiresAt: "2036-03-25T00:10:00.000Z",
+					mcpBaseUrl: "https://mcp.example.com",
+					statusUrl: "https://app.example.com/api/connect/runtime-status",
+					refreshUrl:
+						"https://app.example.com/api/connect/bridge-session/refresh",
+					plan: "solo",
+					accountLabel: "Armando",
+					serverName: "bardo",
+					issuedAtISO: "2036-03-25T00:00:10.000Z",
+				},
+			});
+			const rotated = await rotator.rotateBridgeRefreshSession({
+				sessionId: started.sessionId,
+				refreshToken: "refresh-token-1",
+				nextRefreshToken: "refresh-token-2",
+			});
+			const replay = await rotator.rotateBridgeRefreshSession({
+				sessionId: started.sessionId,
+				refreshToken: "refresh-token-1",
+				nextRefreshToken: "refresh-token-3",
+			});
+			const current = await rotator.rotateBridgeRefreshSession({
+				sessionId: started.sessionId,
+				refreshToken: "refresh-token-2",
+				nextRefreshToken: "refresh-token-4",
+			});
+
+			expect(approved).toEqual({ ok: true });
+			expect(rotated).toEqual({ ok: true });
+			expect(replay).toEqual({ ok: false, reason: "invalid" });
+			expect(current).toEqual({ ok: true });
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
 });

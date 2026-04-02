@@ -24,6 +24,10 @@ type ApproveSessionResult =
 	| { ok: true }
 	| { ok: false; reason: "missing" | "expired" | "consumed" };
 
+type RotateRefreshSessionResult =
+	| { ok: true }
+	| { ok: false; reason: "missing" | "invalid" };
+
 type UsageSnapshot = {
 	total: number;
 	thisPeriod: number;
@@ -52,6 +56,10 @@ type BackendState = {
 			intervalMs: number;
 		}
 	>;
+	bridgeRefreshSessions: Record<
+		string,
+		{ refreshTokenHash: string; updatedAtISO: string }
+	>;
 	mcpUserUsage: Record<
 		string,
 		{ total: number; byPeriod: Record<string, number> }
@@ -78,6 +86,7 @@ function defaultState(): BackendState {
 		rateLimitWindows: {},
 		cliLoginTokens: {},
 		cliDeviceSessions: {},
+		bridgeRefreshSessions: {},
 		mcpUserUsage: {},
 		mcpKeyUsage: {},
 	};
@@ -150,6 +159,7 @@ function readState(filePath: string): BackendState {
 			rateLimitWindows: parsed.rateLimitWindows ?? {},
 			cliLoginTokens: parsed.cliLoginTokens ?? {},
 			cliDeviceSessions: parsed.cliDeviceSessions ?? {},
+			bridgeRefreshSessions: parsed.bridgeRefreshSessions ?? {},
 			mcpUserUsage: parsed.mcpUserUsage ?? {},
 			mcpKeyUsage: parsed.mcpKeyUsage ?? {},
 		};
@@ -371,6 +381,30 @@ export function createWebsiteBackendClient(
 				record.status = "approved";
 				record.approvedAtISO = args.approvedAtISO;
 				record.payload = args.payload;
+				state.bridgeRefreshSessions[args.sessionId] = {
+					refreshTokenHash: hashSecret(args.payload.refreshToken),
+					updatedAtISO: args.approvedAtISO,
+				};
+				return { ok: true as const };
+			});
+		},
+
+		async rotateBridgeRefreshSession(args: {
+			sessionId: string;
+			refreshToken: string;
+			nextRefreshToken: string;
+			updatedAtISO?: string;
+		}): Promise<RotateRefreshSessionResult> {
+			return await mutateState(backendPath, (state) => {
+				const record = state.bridgeRefreshSessions[args.sessionId];
+				if (!record) {
+					return { ok: false, reason: "missing" as const };
+				}
+				if (record.refreshTokenHash !== hashSecret(args.refreshToken)) {
+					return { ok: false, reason: "invalid" as const };
+				}
+				record.refreshTokenHash = hashSecret(args.nextRefreshToken);
+				record.updatedAtISO = args.updatedAtISO ?? new Date().toISOString();
 				return { ok: true as const };
 			});
 		},

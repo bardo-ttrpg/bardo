@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
 	allowedDevOrigins: resolveAllowedDevOrigins(process.env),
 	images: {
 		formats: ["image/avif", "image/webp"],
+		qualities: [100, 75, 82],
 		remotePatterns: [
 			{
 				protocol: "https",

@@ -46,10 +46,14 @@ export function resolveSecurityHeaders(
 	const allowUnsafeInlineScripts = parseBoolean(
 		env.BARDO_CSP_ALLOW_UNSAFE_INLINE_SCRIPTS,
 	);
+	// The App Router currently emits inline runtime and metadata scripts that are
+	// incompatible with a static header-only nonce strategy. Until the app moves
+	// to per-request nonces or hashes, production needs inline script allowance to
+	// avoid blocking first-party Next.js behavior on public routes.
 	const scriptSrc = isProduction
-		? allowUnsafeInlineScripts === true
-			? "script-src 'self' 'unsafe-inline' https:"
-			: "script-src 'self' https:"
+		? allowUnsafeInlineScripts === false
+			? "script-src 'self' https:"
+			: "script-src 'self' 'unsafe-inline' https:"
 		: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
 	const connectSrc = isProduction
 		? "connect-src 'self' https:"

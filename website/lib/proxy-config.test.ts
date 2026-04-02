@@ -18,6 +18,7 @@ describe("shouldUseClerkOnlyProxyPathname", () => {
 
 describe("shouldRunClerkForPagePathname", () => {
 	test("runs Clerk on auth-aware routes only", () => {
+		expect(shouldRunClerkForPagePathname("/")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/dashboard")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/dashboard/connect/bridge/abc")).toBe(
 			true,
@@ -26,7 +27,6 @@ describe("shouldRunClerkForPagePathname", () => {
 		expect(shouldRunClerkForPagePathname("/sign-in")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/sign-up")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/forgot-password")).toBe(true);
-		expect(shouldRunClerkForPagePathname("/")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/docs/install")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/legal/privacy")).toBe(false);
 	});

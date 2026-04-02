@@ -12,7 +12,7 @@ function SiteFrame({
 	return (
 		<main
 			className={cn(
-				"mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-16 sm:py-24",
+				"mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 sm:px-8",
 				className,
 			)}
 		>
@@ -29,9 +29,7 @@ export function PublicPageShell({
 	className?: string;
 }) {
 	return (
-		<SiteFrame className={cn("max-w-3xl gap-10", className)}>
-			{children}
-		</SiteFrame>
+		<SiteFrame className={cn("max-w-3xl", className)}>{children}</SiteFrame>
 	);
 }
 
@@ -45,12 +43,12 @@ export function PublicPageHeader({
 	description: string;
 }) {
 	return (
-		<header className="space-y-4">
+		<header className="flex flex-col gap-4">
 			<p className="ui-label text-muted-foreground">{eyebrow}</p>
-			<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+			<h1 className="font-reading-heading text-5xl text-foreground sm:text-6xl">
 				{title}
 			</h1>
-			<p className="font-reading-body max-w-2xl text-foreground">
+			<p className="font-reading-body max-w-2xl text-muted-foreground">
 				{description}
 			</p>
 		</header>
@@ -63,16 +61,16 @@ export function RouteList({
 	items: Array<{ href: string; label: string; description: string }>;
 }) {
 	return (
-		<ul className="space-y-3 pl-0">
+		<ul className="flex flex-col gap-4 pl-0">
 			{items.map((item) => (
 				<li key={item.href} className="list-none">
 					<Link
 						href={item.href}
-						className="font-reading-body underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+						className="interactive-link font-reading-body text-foreground"
 					>
 						{item.label}
 					</Link>{" "}
-					<span className="font-reading-body text-foreground">
+					<span className="font-reading-body text-muted-foreground">
 						{item.description}
 					</span>
 				</li>
@@ -89,12 +87,12 @@ export function InlineLinkNav({
 	className?: string;
 }) {
 	return (
-		<nav className={cn("flex flex-wrap gap-4", className)}>
+		<nav className={cn("flex flex-wrap gap-5", className)}>
 			{links.map((link) => (
 				<Link
 					key={link.href}
 					href={link.href}
-					className="ui-nav underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+					className="interactive-link ui-nav text-foreground"
 				>
 					{link.label}
 				</Link>
@@ -111,9 +109,9 @@ export function ProseSection({
 	children: ReactNode;
 }) {
 	return (
-		<section className="space-y-4">
+		<section className="flex flex-col gap-4">
 			<h2 className="font-reading-heading text-3xl text-foreground">{title}</h2>
-			<div className="prose-reading space-y-4 text-foreground">{children}</div>
+			<div className="prose-reading flex flex-col gap-4">{children}</div>
 		</section>
 	);
 }
@@ -121,7 +119,7 @@ export function ProseSection({
 export function Minimal404Page() {
 	return (
 		<PublicPageShell className="justify-center">
-			<div className="w-full max-w-2xl space-y-10">
+			<div className="flex w-full max-w-2xl flex-col gap-10">
 				<PublicPageHeader
 					eyebrow="404"
 					title="Page not found."

@@ -46,12 +46,12 @@ function resolveAuthMode(
 
 function resolveQueryApiKeyPolicy(
 	env: Record<string, string | undefined>,
-	isProduction: boolean,
+	_isProduction: boolean,
 ): boolean {
 	const rawValue = env.BARDO_ALLOW_QUERY_API_KEY?.trim().toLowerCase();
 	if (rawValue === "true") return true;
 	if (rawValue === "false") return false;
-	return !isProduction;
+	return false;
 }
 
 function resolveFailClosedRateLimit(

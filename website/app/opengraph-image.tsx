@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Bardo - minimal docs, dashboard, and auth surface";
+export const alt =
+	"Bardo - solo tabletop RPG play with AI and local campaign files";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -35,7 +36,7 @@ export default function OpenGraphImage() {
 				}}
 			>
 				<span>BARDO</span>
-				<span>DOCS / BLOG / DASHBOARD</span>
+				<span>SOLO RPG / AI / LOCAL FILES</span>
 			</div>
 
 			<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -47,8 +48,8 @@ export default function OpenGraphImage() {
 						fontWeight: 400,
 					}}
 				>
-					A narrow surface for docs, writing, account access, and bridge
-					approval.
+					Play solo tabletop RPGs with an AI game master and your own local
+					campaign files.
 				</div>
 				<div
 					style={{
@@ -58,9 +59,8 @@ export default function OpenGraphImage() {
 						color: "rgba(255,255,255,0.78)",
 					}}
 				>
-					Bardo keeps the public website static where possible and reserves
-					server-backed flows for authentication, billing, and local bridge
-					approvals.
+					Bardo grounds your AI client in the real state of your campaign so you
+					can play without a human GM at the table.
 				</div>
 			</div>
 
@@ -74,9 +74,9 @@ export default function OpenGraphImage() {
 					letterSpacing: "0.12em",
 				}}
 			>
-				<span>Black</span>
-				<span>White</span>
-				<span>Static</span>
+				<span>Solo Play</span>
+				<span>AI GM</span>
+				<span>Local Truth</span>
 			</div>
 		</div>,
 		size,

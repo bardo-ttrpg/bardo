@@ -33,6 +33,10 @@ function requireLocalUrl(
 	}
 }
 
+function isLocalHostValue(value: string): boolean {
+	return value === "localhost" || value === "127.0.0.1" || value === "::1";
+}
+
 export function validateDevelopmentEnv(
 	env: Record<string, string | undefined>,
 ): ValidationResult {
@@ -90,6 +94,11 @@ export function validateDevelopmentEnv(
 		errors.push(
 			"BARDO_SETUP_CONTRACT_V2_REQUIRED must not be false during development; setup contract v2 is now the default V1 path",
 		);
+	}
+
+	const explicitHost = normalize(env.BARDO_HOST);
+	if (explicitHost && !isLocalHostValue(explicitHost)) {
+		errors.push("BARDO_HOST should stay on localhost during development");
 	}
 
 	if (!normalize(env.BARDO_AUTH_PROVIDER)) {

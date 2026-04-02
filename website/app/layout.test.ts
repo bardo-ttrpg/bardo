@@ -14,26 +14,39 @@ const siteFontsSource = readFileSync(
 	"utf8",
 );
 const siteLayoutPath = new URL("./(site)/layout.tsx", import.meta.url);
+const authLayoutSource = readFileSync(
+	new URL("./(site)/(auth)/layout.tsx", import.meta.url),
+	"utf8",
+);
+const dashboardLayoutSource = readFileSync(
+	new URL("./(site)/dashboard/layout.tsx", import.meta.url),
+	"utf8",
+);
 
 describe("Clerk provider placement", () => {
-	test("wraps the app at the root layout", () => {
-		expect(rootLayoutSource).toContain("OptionalClerkProvider");
-		expect(rootLayoutSource).toContain("isClerkAuthConfigured");
+	test("keeps the root layout free of Clerk and scopes the provider to auth-aware surfaces", () => {
+		expect(rootLayoutSource).not.toContain("OptionalClerkProvider");
+		expect(rootLayoutSource).not.toContain("isClerkAuthConfigured");
+		expect(authLayoutSource).toContain("OptionalClerkProvider");
+		expect(dashboardLayoutSource).toContain("OptionalClerkProvider");
 	});
 
 	test("does not add a no-op layout for the site route group", () => {
 		expect(existsSync(siteLayoutPath)).toBe(false);
 	});
 
-	test("does not wire marketing analytics into the minimal root layout", () => {
+	test("prepares speed insights for Vercel deployments without adding analytics", () => {
 		expect(rootLayoutSource).not.toContain("@vercel/analytics/next");
-		expect(rootLayoutSource).not.toContain("@vercel/speed-insights/next");
+		expect(rootLayoutSource).toContain("@vercel/speed-insights/next");
 		expect(rootLayoutSource).not.toContain("<Analytics");
-		expect(rootLayoutSource).not.toContain("<SpeedInsights");
+		expect(rootLayoutSource).toContain("SHOW_SPEED_INSIGHTS");
+		expect(rootLayoutSource).toContain("<SpeedInsights");
 	});
 
 	test("defines canonical, social, and robots metadata at the root layout", () => {
 		expect(rootLayoutSource).toContain("metadataBase");
+		expect(rootLayoutSource).toContain("manifest");
+		expect(rootLayoutSource).toContain("icons");
 		expect(rootLayoutSource).toContain("openGraph");
 		expect(rootLayoutSource).toContain("twitter");
 		expect(rootLayoutSource).toContain("robots");
@@ -42,32 +55,34 @@ describe("Clerk provider placement", () => {
 
 	test("keeps the root layout visually stripped down", () => {
 		expect(rootLayoutSource).not.toContain('backgroundColor: "#080a09"');
-		expect(rootLayoutSource).toContain('colorScheme: "dark"');
-		expect(rootLayoutSource).toContain('themeColor: "#000000"');
+		expect(rootLayoutSource).toContain('colorScheme: "light"');
+		expect(rootLayoutSource).toContain('themeColor: "#ffffff"');
 		expect(rootLayoutSource).toContain("siteReading.variable");
 		expect(rootLayoutSource).toContain("siteUi.variable");
-		expect(rootLayoutSource).toContain("siteCode.variable");
 	});
 
-	test("uses Newsreader plus Geist Sans and Geist Mono at the root", () => {
+	test("uses Newsreader plus Inter at the root", () => {
 		expect(siteFontsSource).toContain("Newsreader");
-		expect(siteFontsSource).toContain("GeistSans");
-		expect(siteFontsSource).toContain("GeistMono");
+		expect(siteFontsSource).toContain("Inter");
+		expect(siteFontsSource).toContain('from "next/font/google"');
+		expect(siteFontsSource).not.toContain("Geist");
 		expect(siteFontsSource).not.toContain("Cardo");
 		expect(siteFontsSource).not.toContain("Literata");
 	});
 
-	test("defines brutalist black and white font and color tokens globally", () => {
+	test("defines shadcn tokens plus heading and body font variables globally", () => {
 		expect(globalStylesSource).toContain("--font-reading");
 		expect(globalStylesSource).toContain("--font-ui");
 		expect(globalStylesSource).toContain("--font-code");
-		expect(globalStylesSource).toContain("--color-background: #000000");
-		expect(globalStylesSource).toContain("--color-foreground: #ffffff");
+		expect(globalStylesSource).toContain("--motion-duration-base");
+		expect(globalStylesSource).toContain(".landing-footer-link");
 		expect(globalStylesSource).toContain(
-			'font-variation-settings: "opsz" 72, "wght" 400',
+			"@media (prefers-reduced-motion: reduce)",
 		);
+		expect(globalStylesSource).toContain('@import "shadcn/tailwind.css"');
 		expect(globalStylesSource).toContain(
-			'font-variation-settings: "opsz" 16, "wght" 400',
+			"--font-heading: var(--font-newsreader)",
 		);
+		expect(globalStylesSource).toContain("--font-sans: var(--font-inter)");
 	});
 });

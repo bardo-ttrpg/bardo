@@ -8,7 +8,7 @@ export async function writeTextAtomic(
 ): Promise<void> {
 	await mkdir(path.dirname(filePath), { recursive: true });
 	const tempPath = `${filePath}.${randomUUID()}.tmp`;
-	await writeFile(tempPath, content, "utf8");
+	await writeFile(tempPath, content, { encoding: "utf8", mode: 0o600 });
 	try {
 		await rename(tempPath, filePath);
 	} catch (error) {

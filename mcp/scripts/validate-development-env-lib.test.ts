@@ -55,4 +55,15 @@ describe("validateDevelopmentEnv", () => {
 			"BARDO_SETUP_CONTRACT_V2_REQUIRED must not be false during development; setup contract v2 is now the default V1 path",
 		);
 	});
+
+	test("rejects an explicit non-local BARDO_HOST during development", () => {
+		const result = validateDevelopmentEnv({
+			NODE_ENV: "development",
+			BARDO_HOST: "0.0.0.0",
+		});
+
+		expect(result.errors).toContain(
+			"BARDO_HOST should stay on localhost during development",
+		);
+	});
 });

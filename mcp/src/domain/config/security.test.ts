@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { resolveSecurityPolicy } from "./security";
 
 describe("resolveSecurityPolicy", () => {
-	test("defaults to optional auth in development", () => {
+	test("defaults to optional auth and disables query API keys in development", () => {
 		const policy = resolveSecurityPolicy({});
 
 		expect(policy.authMode).toBe("optional");
-		expect(policy.allowQueryApiKey).toBe(true);
+		expect(policy.allowQueryApiKey).toBe(false);
 		expect(policy.maxRequestBytes).toBe(1_048_576);
 		expect(policy.sessionTtlMs).toBe(3_600_000);
 		expect(policy.rateLimitMaxRequests).toBe(120);

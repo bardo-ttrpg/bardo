@@ -46,6 +46,7 @@ import { resolveUsageMetering } from "./usage-metering";
 
 type ServerOptions = {
 	port?: number;
+	hostname?: string;
 	sessionStore?: SessionStore;
 	sessionRegistry?: SessionRegistry;
 	securityPolicy?: SecurityPolicy;
@@ -135,6 +136,7 @@ function metricsAuthRequiredResponse(): Response {
 
 export function createHttpServer({
 	port = PORT,
+	hostname = resolveServerHostname(Bun.env),
 	securityPolicy = SECURITY_POLICY,
 	toolPolicy = TOOL_POLICY_CONFIG,
 	loopPolicy = LOOP_DETECTION_POLICY,
@@ -151,6 +153,7 @@ export function createHttpServer({
 
 	return Bun.serve({
 		port,
+		hostname,
 		idleTimeout: 0,
 		async fetch(request, bunServer) {
 			return handleRequest(request, (req, timeoutSeconds) =>
@@ -158,6 +161,17 @@ export function createHttpServer({
 			);
 		},
 	});
+}
+
+export function resolveServerHostname(
+	env: Record<string, string | undefined>,
+): string {
+	const explicitHost = env.BARDO_HOST?.trim();
+	if (explicitHost) {
+		return explicitHost;
+	}
+
+	return env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
 }
 
 export function createHttpRequestHandler({
@@ -298,6 +312,8 @@ export function createHttpRequestHandler({
 						if (!auth.apiKey) {
 							return finalize(metricsAuthRequiredResponse());
 						}
+
+						return finalize(handleMetricsRequest());
 					}
 
 					return finalize(handleMetricsRequest());

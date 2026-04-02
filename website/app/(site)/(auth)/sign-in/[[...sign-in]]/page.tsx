@@ -28,8 +28,7 @@ export default function SignInPage() {
 			<div className="space-y-5">
 				<SignIn
 					appearance={clerkAppearance}
-					path="/sign-in"
-					routing="path"
+					routing="hash"
 					signUpUrl="/sign-up"
 					fallbackRedirectUrl="/dashboard"
 				/>

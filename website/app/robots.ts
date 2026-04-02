@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
 					"/",
 					"/docs",
 					"/blog",
+					"/pricing",
 					"/legal",
 					"/legal/terms",
 					"/legal/privacy",

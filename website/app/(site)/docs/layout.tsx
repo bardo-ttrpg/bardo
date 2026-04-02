@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { listDocsEntries } from "@/content/site-content";
 import { DocsShell } from "./_components/docs-shell";
 
@@ -9,5 +10,9 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
 		description: entry.description,
 	}));
 
-	return <DocsShell items={items}>{children}</DocsShell>;
+	return (
+		<TooltipProvider>
+			<DocsShell items={items}>{children}</DocsShell>
+		</TooltipProvider>
+	);
 }

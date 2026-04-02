@@ -1,9 +1,8 @@
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import OptionalClerkProvider from "@/components/optional-clerk-provider";
-import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { absoluteUrl, siteConfig } from "@/lib/site-config";
-import { siteCode, siteReading, siteUi } from "@/lib/site-fonts";
+import { siteReading, siteUi } from "@/lib/site-fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,8 +15,13 @@ export const metadata: Metadata = {
 	creator: siteConfig.creator,
 	publisher: siteConfig.publisher,
 	referrer: "origin-when-cross-origin",
+	manifest: "/manifest.webmanifest",
 	alternates: {
 		canonical: "/",
+	},
+	icons: {
+		icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+		apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
 	},
 	robots: {
 		index: true,
@@ -57,26 +61,22 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	colorScheme: "dark",
-	themeColor: "#000000",
+	colorScheme: "light",
+	themeColor: "#ffffff",
 };
-
-const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
-	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-	secretKey: process.env.CLERK_SECRET_KEY,
-});
+const SHOW_SPEED_INSIGHTS = process.env.VERCEL === "1";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<html
 			lang="en"
+			data-scroll-behavior="smooth"
 			suppressHydrationWarning
-			className={`${siteReading.variable} ${siteUi.variable} ${siteCode.variable}`}
+			className={`${siteReading.variable} ${siteUi.variable}`}
 		>
-			<body className="bg-background text-foreground antialiased">
-				<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
-					{children}
-				</OptionalClerkProvider>
+			<body className="bg-background font-sans text-foreground">
+				{children}
+				{SHOW_SPEED_INSIGHTS ? <SpeedInsights /> : null}
 			</body>
 		</html>
 	);

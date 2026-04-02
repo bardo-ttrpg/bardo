@@ -31,7 +31,7 @@ export default function BlogPage() {
 							<li key={entry.href} className="list-none">
 								<Link
 									href={entry.href}
-									className="font-reading-body underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+									className="interactive-link font-reading-body"
 								>
 									{entry.title}
 								</Link>

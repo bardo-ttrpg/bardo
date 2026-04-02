@@ -5,6 +5,7 @@ import { absoluteUrl } from "@/lib/site-config";
 const STATIC_ROUTES = [
 	"/",
 	"/blog",
+	"/pricing",
 	"/legal",
 	"/legal/terms",
 	"/legal/privacy",

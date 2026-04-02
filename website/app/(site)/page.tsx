@@ -1,113 +1,130 @@
+import { headers } from "next/headers";
+import Image from "next/image";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPublicMetadata } from "@/lib/site-metadata";
+import { getLandingPageJsonLd, homeSeo } from "@/lib/site-seo";
+import desktopLandingImage from "../../../public/landing-page-image.png";
+import mobileLandingImage from "../../../public/landing-page-image-mobile.jpg";
+import { HomePrimaryAction } from "./_components/home-primary-action";
 import { PublicPageShell } from "./_components/site-shells";
 
 export const metadata = createPublicMetadata({
-	title: "Bardo",
-	description: "The MCP for any tabletop role-playing game.",
+	title: homeSeo.title,
+	description: homeSeo.description,
+	socialDescription: homeSeo.socialDescription,
 	path: "/",
+	keywords: homeSeo.keywords,
 });
 
-export default function SitePage() {
+const homeSectionClassName = "flex flex-col gap-2";
+const bodyClassName = "font-reading-body text-muted-foreground";
+const homeActionClassName = "home-action-button";
+const landingPageJsonLd = JSON.stringify(getLandingPageJsonLd());
+const landingFooterLinks = [
+	{ href: "/blog", label: "Journal" },
+	{ href: "/docs", label: "Documentation" },
+	{ href: "/pricing", label: "Pricing" },
+] as const;
+const MOBILE_LANDING_IMAGE_USER_AGENT_PATTERN =
+	/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i;
+
+function shouldUseMobileLandingImage(
+	userAgentHeader: string,
+	mobileHint: string | null,
+) {
+	if (mobileHint === "?1") {
+		return true;
+	}
+
+	return MOBILE_LANDING_IMAGE_USER_AGENT_PATTERN.test(userAgentHeader);
+}
+
+const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
+	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+	secretKey: process.env.CLERK_SECRET_KEY,
+});
+
+export default async function SitePage() {
+	const requestHeaders = await headers();
+	const userAgentHeader = requestHeaders.get("user-agent") ?? "";
+	const mobileHint = requestHeaders.get("sec-ch-ua-mobile");
+	const useMobileLandingImage = shouldUseMobileLandingImage(
+		userAgentHeader,
+		mobileHint,
+	);
+	const landingImage = useMobileLandingImage
+		? mobileLandingImage
+		: desktopLandingImage;
+	const landingImageAlt = useMobileLandingImage
+		? "Bardo landing page preview for mobile devices"
+		: "Bardo landing page preview";
+	const landingImageSizes = useMobileLandingImage
+		? "calc(100vw - 3rem)"
+		: "(max-width: 1024px) calc(100vw - 4rem), 896px";
+
 	return (
-		<PublicPageShell>
-			<main className="w-full pt-0 sm:pt-10">
-				<h1 className="font-reading-heading mb-1 text-2xl text-foreground">
+		<PublicPageShell className="max-w-5xl py-8 sm:py-10 lg:py-12 text-balance">
+			<script type="application/ld+json">{landingPageJsonLd}</script>
+			<section className={homeSectionClassName}>
+				<h1 className="font-reading-heading max-w-3xl text-3xl text-foreground font-medium">
 					Bardo
 				</h1>
-				<p className="font-reading-body my-5 text-foreground">
-					Bardo is the{" "}
-					<Link
-						href="/docs"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						MCP for tabletop role-playing games
-					</Link>
-					. It keeps the useful parts small: docs, a blog, auth, and one
-					protected dashboard for bridge approvals and billing.
+
+				<p className={bodyClassName}>
+					Bardo is the MCP for playing any tabletop role-playing game. It works
+					with many modern AI clients, keeps your campaign files local, and
+					grounds the model in your real workspace so it stays far more
+					accurate.
 				</p>
-				<p className="font-reading-body my-5 text-foreground">
-					It is built for game masters and players who want AI help without
-					giving up control of their local files. Install the bridge, connect
-					your client, approve access in the browser, and keep your campaign
-					truth where it belongs.
-				</p>
-				<p className="font-reading-body my-5 text-foreground">
-					Some of the most useful pages include:
-				</p>
-				<ul className="space-y-1 pl-0">
-					<li className="list-none pl-1">
-						<Link
-							href="/docs/install"
-							className="font-reading-body underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-						>
-							Install
-						</Link>
-					</li>
-					<li className="list-none pl-1">
-						<Link
-							href="/docs/connect-client"
-							className="font-reading-body underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-						>
-							Connect a client
-						</Link>
-					</li>
-					<li className="list-none pl-1">
-						<Link
-							href="/dashboard"
-							className="font-reading-body underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-						>
-							Dashboard
-						</Link>
-					</li>
-					<li className="list-none pl-1">
-						<Link
-							href="/blog"
-							className="font-reading-body underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-						>
-							Blog
-						</Link>
-					</li>
+
+				<div className="flex flex-wrap items-center gap-4 pt-2">
+					<Button asChild size="sm" className={homeActionClassName}>
+						<Link href="/docs">Start Playing</Link>
+					</Button>
+					<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
+				</div>
+
+				{useMobileLandingImage ? (
+					<Image
+						src={landingImage}
+						alt={landingImageAlt}
+						placeholder="blur"
+						preload
+						className="my-6 rounded-sm"
+						quality={100}
+						sizes={landingImageSizes}
+						width={500}
+					/>
+				) : (
+					<Image
+						src={landingImage}
+						alt={landingImageAlt}
+						placeholder="blur"
+						preload
+						className="my-6 h-auto w-full rounded-sm"
+						quality={100}
+						sizes={landingImageSizes}
+						width={1000}
+					/>
+				)}
+			</section>
+
+			<nav
+				aria-label="Primary site links"
+				className="flex flex-row flex-wrap gap-4 text-center text-sm "
+			>
+				<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
+					{landingFooterLinks.map((link) => (
+						<li key={link.href} className="list-none grow text-center">
+							<Link href={link.href} className="landing-footer-link inline">
+								{link.label}
+							</Link>
+						</li>
+					))}
 				</ul>
-				<p className="font-reading-body my-5 text-foreground">
-					You can read the{" "}
-					<Link
-						href="/docs"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						docs
-					</Link>
-					, open the{" "}
-					<Link
-						href="/dashboard"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						dashboard
-					</Link>
-					,{" "}
-					<Link
-						href="/sign-in"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						sign in
-					</Link>
-					, or{" "}
-					<Link
-						href="/sign-up"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						create an account
-					</Link>
-					. If you need the rules of the service, they live under{" "}
-					<Link
-						href="/legal"
-						className="underline decoration-border underline-offset-[2.5px] transition-colors hover:decoration-foreground"
-					>
-						legal
-					</Link>
-					.
-				</p>
-			</main>
+			</nav>
 		</PublicPageShell>
 	);
 }

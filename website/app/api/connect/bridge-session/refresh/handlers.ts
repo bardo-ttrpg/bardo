@@ -7,6 +7,7 @@ import {
 	createBridgeSessionCredentialBundle,
 	decodeBridgeRefreshToken,
 } from "../../../../../lib/bridge-session-auth";
+import { createWebsiteBackendClient } from "../../../../../lib/website-backend";
 
 type BridgeSessionRefreshDeps = {
 	readBillingSnapshot: (userId: string) => Promise<BillingSnapshot>;
@@ -36,6 +37,11 @@ type BridgeSessionRefreshDeps = {
 		serverName: string;
 		issuedAtISO: string;
 	}>;
+	rotateRefreshSession: (args: {
+		sessionId: string;
+		refreshToken: string;
+		nextRefreshToken: string;
+	}) => Promise<{ ok: boolean; reason?: "missing" | "invalid" }>;
 	resolveMcpBaseUrl: (request: Request) => string;
 	resolveStatusUrl: (request: Request) => string;
 	resolveRefreshUrl: (request: Request) => string;
@@ -85,6 +91,13 @@ const defaultDeps: BridgeSessionRefreshDeps = {
 			statusUrl: args.statusUrl,
 			refreshUrl: args.refreshUrl,
 		}),
+	rotateRefreshSession: async (args) => {
+		const backend = createWebsiteBackendClient();
+		if (!backend) {
+			throw new Error("Bridge session store is not configured.");
+		}
+		return await backend.rotateBridgeRefreshSession(args);
+	},
 	resolveMcpBaseUrl,
 	resolveStatusUrl,
 	resolveRefreshUrl,
@@ -137,6 +150,17 @@ export function createBridgeSessionRefreshPostHandler(
 			statusUrl: deps.resolveStatusUrl(request),
 			refreshUrl: deps.resolveRefreshUrl(request),
 		});
+		const rotated = await deps.rotateRefreshSession({
+			sessionId: decoded.sessionId,
+			refreshToken,
+			nextRefreshToken: nextBundle.refreshToken,
+		});
+		if (!rotated.ok) {
+			return NextResponse.json(
+				{ error: "Invalid refresh token." },
+				{ status: 401 },
+			);
+		}
 
 		return NextResponse.json(nextBundle);
 	};

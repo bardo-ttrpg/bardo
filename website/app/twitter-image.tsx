@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Bardo - minimal docs, dashboard, and auth surface";
+export const alt =
+	"Bardo - solo tabletop RPG play with AI and local campaign files";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -35,7 +36,7 @@ export default function TwitterImage() {
 				}}
 			>
 				<span>BARDO</span>
-				<span>MINIMAL SURFACE</span>
+				<span>NO GM REQUIRED</span>
 			</div>
 
 			<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -47,7 +48,8 @@ export default function TwitterImage() {
 						fontWeight: 400,
 					}}
 				>
-					Static content where possible. Dynamic flows only where necessary.
+					Solo tabletop role-playing with an AI guide grounded in your local
+					campaign files.
 				</div>
 				<div
 					style={{
@@ -57,8 +59,8 @@ export default function TwitterImage() {
 						color: "rgba(255,255,255,0.78)",
 					}}
 				>
-					Docs and blog are MDX-backed. Account access and bridge approval stay
-					server-backed.
+					Bring your own AI client, keep your world on your machine, and let
+					Bardo handle the tabletop context bridge.
 				</div>
 			</div>
 
@@ -72,9 +74,9 @@ export default function TwitterImage() {
 					letterSpacing: "0.12em",
 				}}
 			>
-				<span>MDX</span>
-				<span>CLERK</span>
-				<span>TURBOPACK</span>
+				<span>Solo RPG</span>
+				<span>AI Assist</span>
+				<span>Local Files</span>
 			</div>
 		</div>,
 		size,

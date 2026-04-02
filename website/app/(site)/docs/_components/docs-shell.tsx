@@ -57,10 +57,12 @@ export function DocsShell({
 								{items.map((item) => (
 									<SidebarMenuItem key={item.href}>
 										<SidebarMenuButton
-											href={item.href}
+											asChild
 											isActive={pathname === item.href}
 										>
-											<span>{item.label}</span>
+											<Link href={item.href}>
+												<span>{item.label}</span>
+											</Link>
 										</SidebarMenuButton>
 										<p className="font-reading-body mt-2 px-3 text-foreground">
 											{item.description}
