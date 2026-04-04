@@ -6,7 +6,7 @@
 
 @theme inline {
 	--font-sans: var(--font-inter);
-	--font-heading: var(--font-newsreader);
+	--font-heading: var(--font-space-grotesk);
 	--font-reading: var(--font-inter);
 	--font-ui: var(--font-inter);
 	--font-code:
@@ -142,6 +142,62 @@
 		line-height: 1.75;
 	}
 
+	@media (prefers-reduced-motion: no-preference) {
+		::view-transition-old(root),
+		::view-transition-new(root) {
+			animation-duration: 420ms;
+			animation-timing-function: var(--motion-ease-standard);
+		}
+
+		::view-transition-old(root) {
+			animation-name: theme-fade-out;
+		}
+
+		::view-transition-new(root) {
+			animation-name: theme-fade-in;
+		}
+
+		body,
+		body :where(
+				main,
+				header,
+				footer,
+				section,
+				article,
+				aside,
+				nav,
+				div,
+				p,
+				span,
+				a,
+				button,
+				h1,
+				h2,
+				h3,
+				h4,
+				h5,
+				h6,
+				ul,
+				ol,
+				li,
+				code,
+				pre,
+				svg,
+				path
+			) {
+			transition-duration: var(--motion-duration-slow);
+			transition-property:
+				color,
+				background-color,
+				border-color,
+				text-decoration-color,
+				fill,
+				stroke,
+				box-shadow;
+			transition-timing-function: var(--motion-ease-standard);
+		}
+	}
+
 	h1,
 	h2,
 	h3,
@@ -175,10 +231,31 @@
 	kbd,
 	samp {
 		font-family: var(--font-code);
+		border-radius: 0 !important;
 	}
 
 	::selection {
 		@apply bg-foreground text-background;
+	}
+}
+
+@keyframes theme-fade-in {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes theme-fade-out {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
 	}
 }
 
@@ -253,8 +330,30 @@
 	}
 
 	.code-inline {
-		@apply rounded-md border bg-muted px-1.5 py-0.5 text-sm text-foreground;
+		@apply border bg-muted px-1.5 py-0.5 text-sm text-foreground;
 		font-family: var(--font-code);
+	}
+
+	.pricing-number-flow {
+		--number-flow-mask-height: 0.18em;
+		--number-flow-mask-width: 0.42em;
+		line-height: 0.88;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.pricing-number-flow::part(suffix) {
+		margin-left: 0.12em;
+		padding-bottom: 0.12em;
+		font-family: var(--font-ui);
+		font-size: 0.36em;
+		font-weight: 500;
+		line-height: 1.2;
+		letter-spacing: 0;
+		color: var(--muted-foreground);
+	}
+
+	.pricing-copy-swap {
+		animation: pricing-copy-fade 260ms var(--motion-ease-standard);
 	}
 
 	.interactive-link {
@@ -313,6 +412,20 @@
 	.home-action-button:active,
 	.home-action-button:focus-visible {
 		transform: none !important;
+	}
+}
+
+@keyframes pricing-copy-fade {
+	from {
+		opacity: 0;
+		transform: translateY(0.2em);
+		filter: blur(4px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+		filter: blur(0);
 	}
 }
 

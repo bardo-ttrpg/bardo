@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
+import { listLegalEntries } from "@/content/legal-content";
 import { listBlogEntries, listDocsEntries } from "@/content/site-content";
+import { getDocsBreadcrumbJsonLd, getLegalBreadcrumbJsonLd } from "@/lib/site-seo";
 import manifest from "./manifest";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -27,6 +29,17 @@ const dashboardPageSource = readFileSync(
 );
 const homeSource = readFileSync(
 	new URL("./(site)/page.tsx", import.meta.url),
+	"utf8",
+);
+const docsPageSource = readFileSync(
+	new URL("./(site)/docs/[[...slug]]/page.tsx", import.meta.url),
+	"utf8",
+);
+const legalShellSource = readFileSync(
+	new URL(
+		"./(site)/(public-secondary)/legal/_components/legal-shell.tsx",
+		import.meta.url,
+	),
 	"utf8",
 );
 const siteSeoSource = readFileSync(
@@ -71,6 +84,7 @@ describe("SEO and production metadata", () => {
 
 	test("publishes a robots policy for the public minimal surface", () => {
 		const policy = robots();
+		const publicRules = policy.rules.find((rule) => rule.userAgent === "*");
 		expect(policy.host).toBe("www.bardo.gg");
 		expect(policy.sitemap).toBe("https://www.bardo.gg/sitemap.xml");
 		expect(policy.rules).toEqual(
@@ -82,7 +96,8 @@ describe("SEO and production metadata", () => {
 						"/docs",
 						"/blog",
 						"/pricing",
-						"/legal",
+						"/legal/data-use",
+						"/legal/security",
 					]),
 					disallow: expect.arrayContaining([
 						"/api/",
@@ -94,6 +109,7 @@ describe("SEO and production metadata", () => {
 				}),
 			]),
 		);
+		expect(publicRules?.allow).not.toContain("/legal/ai-policy");
 	});
 
 	test("publishes a sitemap for the retained public routes", () => {
@@ -103,10 +119,7 @@ describe("SEO and production metadata", () => {
 			"https://www.bardo.gg/docs",
 			"https://www.bardo.gg/blog",
 			"https://www.bardo.gg/pricing",
-			"https://www.bardo.gg/legal",
-			"https://www.bardo.gg/legal/terms",
-			"https://www.bardo.gg/legal/privacy",
-			"https://www.bardo.gg/legal/ai-policy",
+			...listLegalEntries().map((entry) => `https://www.bardo.gg${entry.href}`),
 			...listDocsEntries()
 				.filter((entry) => entry.href !== "/docs")
 				.map((entry) => `https://www.bardo.gg${entry.href}`),
@@ -116,6 +129,7 @@ describe("SEO and production metadata", () => {
 		for (const expected of expectedRoutes) {
 			expect(entries.includes(expected)).toBe(true);
 		}
+		expect(entries.includes("https://www.bardo.gg/legal/ai-policy")).toBe(false);
 	});
 
 	test("publishes a web manifest aligned with the public product surface", () => {
@@ -136,5 +150,43 @@ describe("SEO and production metadata", () => {
 		expect(siteSeoSource).toContain("WebSite");
 		expect(siteSeoSource).toContain("solo tabletop RPG");
 		expect(siteSeoSource).toContain("AI dungeon master");
+	});
+
+	test("adds docs breadcrumb structured data from the docs manifest", () => {
+		const installEntry = listDocsEntries().find(
+			(entry) => entry.href === "/docs/install",
+		);
+		if (!installEntry) {
+			throw new Error("Expected install docs entry to exist.");
+		}
+
+		const breadcrumb = getDocsBreadcrumbJsonLd(installEntry);
+		expect(breadcrumb["@type"]).toBe("BreadcrumbList");
+		expect(breadcrumb.itemListElement.map((item) => item.name)).toEqual([
+			"Bardo",
+			"Docs",
+			"Install",
+		]);
+		expect(docsPageSource).toContain('type="application/ld+json"');
+		expect(siteSeoSource).toContain("BreadcrumbList");
+	});
+
+	test("adds legal breadcrumb structured data from the legal manifest", () => {
+		const securityEntry = listLegalEntries().find(
+			(entry) => entry.href === "/legal/security",
+		);
+		if (!securityEntry) {
+			throw new Error("Expected security legal entry to exist.");
+		}
+
+		const breadcrumb = getLegalBreadcrumbJsonLd(securityEntry);
+		expect(breadcrumb["@type"]).toBe("BreadcrumbList");
+		expect(breadcrumb.itemListElement.map((item) => item.name)).toEqual([
+			"Bardo",
+			"Legal",
+			"Security",
+		]);
+		expect(legalShellSource).toContain('type="application/ld+json"');
+		expect(siteSeoSource).toContain("getLegalBreadcrumbJsonLd");
 	});
 });

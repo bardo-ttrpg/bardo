@@ -102,7 +102,14 @@ describe("Clerk integration contract", () => {
 			"utf8",
 		);
 		const blogSource = readFileSync(
-			join(WEBSITE_ROOT, "app", "(site)", "blog", "page.tsx"),
+			join(
+				WEBSITE_ROOT,
+				"app",
+				"(site)",
+				"(public-secondary)",
+				"blog",
+				"page.tsx",
+			),
 			"utf8",
 		);
 

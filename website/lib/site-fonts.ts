@@ -1,12 +1,9 @@
-import { Inter, Newsreader } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 
-export const siteReading = Newsreader({
+export const siteHeading = Space_Grotesk({
 	subsets: ["latin"],
 	display: "swap",
-	weight: "variable",
-	style: ["normal", "italic"],
-	axes: ["opsz"],
-	variable: "--font-newsreader",
+	variable: "--font-space-grotesk",
 });
 
 export const siteUi = Inter({

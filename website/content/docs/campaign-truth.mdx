@@ -1,17 +1,15 @@
-# Campaign truth
-
 Bardo is opinionated about where authority lives so the product stays simple and predictable.
 
 ## Local source of truth
 
-Your workspace remains the canonical source for campaign files and any local file operations.
+Your workspace remains the canonical source for campaign files and any local file operations. If the answer depends on campaign notes, world state, or other files you control, the local workspace should define it.
 
 ## Remote service boundary
 
-The hosted side governs bridge approvals, subscription state, rate limits, and remote tool execution.
+The hosted side governs bridge approvals, subscription state, rate limits, and remote tool execution. Those concerns are account- and service-level, not campaign truth.
 
-## What this means in practice
+## How to think about the split
 
-If a question depends on your files, the answer should come from the local workspace. If it depends on access policy or metering, it comes from the remote service.
+Use a simple rule: if a question depends on your files, the answer should come from the local workspace. If it depends on access policy, billing, or metering, it comes from the remote service.
 
 <Lore>The campaign remembers what the table agreed was true.</Lore>

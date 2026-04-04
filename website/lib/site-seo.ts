@@ -53,3 +53,63 @@ export function getLandingPageJsonLd() {
 		},
 	] as const;
 }
+
+export function getDocsBreadcrumbJsonLd(entry: {
+	title: string;
+	href: string;
+}) {
+	return {
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		itemListElement: [
+			{
+				"@type": "ListItem",
+				position: 1,
+				name: siteConfig.name,
+				item: siteConfig.url,
+			},
+			{
+				"@type": "ListItem",
+				position: 2,
+				name: "Docs",
+				item: absoluteUrl("/docs"),
+			},
+			{
+				"@type": "ListItem",
+				position: 3,
+				name: entry.title,
+				item: absoluteUrl(entry.href),
+			},
+		],
+	} as const;
+}
+
+export function getLegalBreadcrumbJsonLd(entry: {
+	title: string;
+	href: string;
+}) {
+	return {
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		itemListElement: [
+			{
+				"@type": "ListItem",
+				position: 1,
+				name: siteConfig.name,
+				item: siteConfig.url,
+			},
+			{
+				"@type": "ListItem",
+				position: 2,
+				name: "Legal",
+				item: absoluteUrl("/legal/terms"),
+			},
+			{
+				"@type": "ListItem",
+				position: 3,
+				name: entry.title,
+				item: absoluteUrl(entry.href),
+			},
+		],
+	} as const;
+}

@@ -21,6 +21,12 @@ describe("blog content", () => {
 		expect(blogPageSource).toContain("entry.preview ?? entry.description");
 	});
 
+	test("keeps the redesigned index honest when there are no published posts", () => {
+		expect(blogPageSource).toContain("No posts are published yet.");
+		expect(blogPageSource).toContain("Read the docs");
+		expect(blogPageSource).toContain("Published entries right now.");
+	});
+
 	test("uses a single static route for blog entries", () => {
 		expect(blogEntryRouteSource).toContain(
 			"export const dynamicParams = false",

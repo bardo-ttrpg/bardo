@@ -1,17 +1,17 @@
-# Connect a client
-
 The supported path is simple: install the bridge locally, choose your workspace, then approve the browser session from the dashboard.
 
-## Expected flow
+## Connection flow
 
-Install the bridge locally and open the dashboard in the browser.
+1. Install the bridge locally and open the dashboard in your browser.
+2. Start a bridge session from your client.
+3. Bardo generates a user code and verification URL.
+4. Approve the session in the browser.
+5. Return to your client and use Bardo tools against the local workspace.
 
-Start a bridge session from your client. Bardo generates a user code and a verification URL.
+## What you approve
 
-Approve the session in the browser, then return to your client and use Bardo tools against the local workspace.
+The browser approval step confirms that the current account can start the requested bridge session. It is the checkpoint where hosted access policy, subscription state, and metering are enforced.
 
-## Boundary
+## What the client keeps local
 
-Your files stay local.
-
-The hosted side handles subscription checks, metering, and the remote MCP service layer.
+Your workspace files stay local. The hosted side handles subscription checks, metering, and the remote MCP service layer around the session.

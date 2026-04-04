@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+	getDocsEntryByHref,
 	getDocsEntryBySlug,
 	listDocsStaticParams,
 } from "@/content/site-content";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import { InlineLinkNav, PublicPageHeader } from "../../_components/site-shells";
+import { getDocsBreadcrumbJsonLd } from "@/lib/site-seo";
 
 export const dynamicParams = false;
 
@@ -49,24 +51,56 @@ export default async function DocsEntryPage({
 	}
 
 	const Content = (await entry.load()).default;
+	const previousEntry = entry.previousHref
+		? getDocsEntryByHref(entry.previousHref)
+		: null;
+	const nextEntry = entry.nextHref ? getDocsEntryByHref(entry.nextHref) : null;
+	const breadcrumbJsonLd = JSON.stringify(getDocsBreadcrumbJsonLd(entry));
 
 	return (
-		<article className="space-y-10">
-			<PublicPageHeader
-				eyebrow={entry.eyebrow}
-				title={entry.title}
-				description={entry.description}
-			/>
-			<div className="prose-reading space-y-6 text-foreground">
+		<article className="flex min-w-0 flex-col gap-10">
+			<script type="application/ld+json">{breadcrumbJsonLd}</script>
+			<header className="flex flex-col gap-4 border-b border-border pb-8">
+				<p className="ui-label text-muted-foreground">{entry.eyebrow}</p>
+				<h1 className="font-reading-heading max-w-3xl text-4xl text-foreground sm:text-5xl">
+					{entry.title}
+				</h1>
+				<p className="font-reading-body max-w-2xl text-muted-foreground">
+					{entry.description}
+				</p>
+			</header>
+			<div className="prose-reading docs-prose flex min-w-0 flex-col gap-6 text-foreground">
 				<Content />
 			</div>
-			<InlineLinkNav
-				links={[
-					{ href: "/", label: "Home" },
-					{ href: "/dashboard", label: "Dashboard" },
-					{ href: "/blog", label: "Blog" },
-				]}
-			/>
+			<nav
+				aria-label="Docs page navigation"
+				className="grid gap-3 border-t border-border pt-8 sm:grid-cols-2"
+			>
+				{previousEntry ? (
+					<Link
+						href={previousEntry.href}
+						className="group flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border bg-background px-4 py-4 transition-colors hover:bg-muted"
+					>
+						<span className="ui-label text-muted-foreground">Previous</span>
+						<span className="font-reading-body text-foreground">
+							{previousEntry.title}
+						</span>
+					</Link>
+				) : (
+					<div className="hidden sm:block" />
+				)}
+				{nextEntry ? (
+					<Link
+						href={nextEntry.href}
+						className="group flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border bg-background px-4 py-4 text-left transition-colors hover:bg-muted"
+					>
+						<span className="ui-label text-muted-foreground">Next</span>
+						<span className="font-reading-body text-foreground">
+							{nextEntry.title}
+						</span>
+					</Link>
+				) : null}
+			</nav>
 		</article>
 	);
 }

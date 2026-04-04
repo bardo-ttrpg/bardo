@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import { resolveCheckoutRenderState } from "./billing-cta-state";
 import CheckoutAction from "./checkout-action";
@@ -11,7 +11,7 @@ type CheckoutButtonProps = {
 	clerkEnabled: boolean;
 	clerkPlanId: string | null;
 	planPeriod: ClerkPlanPeriod;
-	label: string;
+	label: ReactNode;
 	className: string;
 };
 
@@ -59,7 +59,7 @@ function EnabledCheckoutButton({
 	isUnavailable: boolean;
 	planId: string | undefined;
 	planPeriod: ClerkPlanPeriod;
-	label: string;
+	label: ReactNode;
 	className: string;
 }) {
 	const { isLoaded, isSignedIn } = useAuth();

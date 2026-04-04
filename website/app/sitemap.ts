@@ -1,19 +1,17 @@
 import type { MetadataRoute } from "next";
+import { listLegalEntries } from "@/content/legal-content";
 import { listBlogEntries, listDocsEntries } from "@/content/site-content";
 import { absoluteUrl } from "@/lib/site-config";
 
-const STATIC_ROUTES = [
-	"/",
-	"/blog",
-	"/pricing",
-	"/legal",
-	"/legal/terms",
-	"/legal/privacy",
-	"/legal/ai-policy",
-] as const;
+const STATIC_ROUTES = ["/", "/blog", "/pricing"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
+	const legalRoutes = listLegalEntries().map((entry) => ({
+		route: entry.href,
+		lastModified: new Date("2026-04-03T00:00:00.000Z"),
+	}));
 	const contentRoutes = [
+		...legalRoutes,
 		...listDocsEntries().map((entry) => ({
 			route: entry.href,
 			lastModified: new Date(entry.lastModified),

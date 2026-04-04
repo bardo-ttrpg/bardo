@@ -1,10 +1,8 @@
-# Install
+Use the published installer first, then confirm the CLI can authenticate and start bridge sessions from your machine.
 
-Use the published install scripts, then confirm the CLI can authenticate and start bridge sessions.
+## macOS and Linux
 
-## Shell
-
-Run `curl -fsSL https://bardo.gg/install | sh` on macOS or Linux.
+Run `curl -fsSL https://bardo.gg/install | sh`.
 
 The installer clones the repo, installs dependencies with Bun, and writes local command shims for `bardo` and `bardo-mcp`.
 
@@ -12,8 +10,8 @@ The installer clones the repo, installs dependencies with Bun, and writes local 
 
 Run `irm https://bardo.gg/install.ps1 | iex` in PowerShell.
 
-The PowerShell installer performs the same repo and shim setup for the Windows workflow.
+The PowerShell installer performs the same repository setup and command shim step for the Windows workflow.
 
-## After install
+## What happens next
 
-Next, connect your client and approve a browser session from the dashboard.
+After the install completes, connect your client and approve a browser session from the dashboard. The install step only prepares the local bridge; it does not authorize a client on its own.

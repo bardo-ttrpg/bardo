@@ -1,8 +1,9 @@
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { ThemeProvider } from "@/components/theme-provider";
 import { absoluteUrl, siteConfig } from "@/lib/site-config";
-import { siteReading, siteUi } from "@/lib/site-fonts";
+import { siteHeading, siteUi } from "@/lib/site-fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -61,8 +62,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	colorScheme: "light",
-	themeColor: "#ffffff",
+	colorScheme: "dark light",
+	themeColor: "#171717",
 };
 const SHOW_SPEED_INSIGHTS = process.env.VERCEL === "1";
 
@@ -72,10 +73,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 			lang="en"
 			data-scroll-behavior="smooth"
 			suppressHydrationWarning
-			className={`${siteReading.variable} ${siteUi.variable}`}
+			className={`${siteHeading.variable} ${siteUi.variable}`}
 		>
 			<body className="bg-background font-sans text-foreground">
-				{children}
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="dark"
+					enableSystem={false}
+				>
+					{children}
+				</ThemeProvider>
 				{SHOW_SPEED_INSIGHTS ? <SpeedInsights /> : null}
 			</body>
 		</html>

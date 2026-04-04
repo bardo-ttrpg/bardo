@@ -1,12 +1,13 @@
 "use client";
 
 import { CheckoutButton as ClerkCheckoutButton } from "@clerk/nextjs/experimental";
+import type { ReactNode } from "react";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 
 type CheckoutActionProps = {
 	planId: string;
 	planPeriod: ClerkPlanPeriod;
-	label: string;
+	label: ReactNode;
 	className: string;
 };
 

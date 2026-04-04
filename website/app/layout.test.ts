@@ -55,19 +55,28 @@ describe("Clerk provider placement", () => {
 
 	test("keeps the root layout visually stripped down", () => {
 		expect(rootLayoutSource).not.toContain('backgroundColor: "#080a09"');
-		expect(rootLayoutSource).toContain('colorScheme: "light"');
-		expect(rootLayoutSource).toContain('themeColor: "#ffffff"');
-		expect(rootLayoutSource).toContain("siteReading.variable");
+		expect(rootLayoutSource).toContain('colorScheme: "dark light"');
+		expect(rootLayoutSource).toContain('themeColor: "#171717"');
+		expect(rootLayoutSource).toContain("siteHeading.variable");
 		expect(rootLayoutSource).toContain("siteUi.variable");
 	});
 
-	test("uses Newsreader plus Inter at the root", () => {
-		expect(siteFontsSource).toContain("Newsreader");
+	test("wraps the app in a next-themes provider with dark mode as the default", () => {
+		expect(rootLayoutSource).toContain('from "@/components/theme-provider"');
+		expect(rootLayoutSource).toContain("<ThemeProvider");
+		expect(rootLayoutSource).toContain('attribute="class"');
+		expect(rootLayoutSource).toContain('defaultTheme="dark"');
+		expect(rootLayoutSource).toContain("enableSystem={false}");
+	});
+
+	test("uses Space Grotesk plus Inter at the root", () => {
+		expect(siteFontsSource).toContain("Space_Grotesk");
 		expect(siteFontsSource).toContain("Inter");
 		expect(siteFontsSource).toContain('from "next/font/google"');
 		expect(siteFontsSource).not.toContain("Geist");
 		expect(siteFontsSource).not.toContain("Cardo");
 		expect(siteFontsSource).not.toContain("Literata");
+		expect(siteFontsSource).not.toContain("Newsreader");
 	});
 
 	test("defines shadcn tokens plus heading and body font variables globally", () => {
@@ -81,8 +90,9 @@ describe("Clerk provider placement", () => {
 		);
 		expect(globalStylesSource).toContain('@import "shadcn/tailwind.css"');
 		expect(globalStylesSource).toContain(
-			"--font-heading: var(--font-newsreader)",
+			"--font-heading: var(--font-space-grotesk)",
 		);
 		expect(globalStylesSource).toContain("--font-sans: var(--font-inter)");
+		expect(globalStylesSource).toContain("prefers-reduced-motion: no-preference");
 	});
 });

@@ -147,11 +147,8 @@ function ConnectBridgeCard({ billing }: { billing: BillingState | null }) {
 				<Link href="/docs/connect-client" className={dashboardActionClassName}>
 					Open Setup Guide
 				</Link>
-				<Link
-					href="/docs/credits-and-billing"
-					className={dashboardSubtleActionClassName}
-				>
-					Billing Notes
+				<Link href="/pricing" className={dashboardSubtleActionClassName}>
+					Pricing
 				</Link>
 			</div>
 		</DashboardCard>
@@ -172,8 +169,8 @@ function BillingActionsCard({
 	return (
 		<DashboardCard label="Billing Actions">
 			<p className="font-reading-body text-muted-foreground">
-				Subscription actions moved into the dashboard so pricing no longer needs
-				its own public route.
+				Pricing stays simple on the public site. Subscription actions and
+				account-specific billing controls still live here in the dashboard.
 			</p>
 			<div className="mt-6">
 				{isPaidPlan(billing?.plan) ? (
@@ -236,7 +233,7 @@ export function DashboardClient({
 	const mcpPeriodLimit = dashboardData?.accessPolicy.mcpPeriodLimit ?? 0;
 
 	return (
-		<div className="mx-auto max-w-5xl px-6 py-16 sm:py-24">
+		<div className="mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pb-24 sm:pt-8 lg:pt-10">
 			<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
 				<div className="space-y-3">
 					<p className={dashboardLabelClassName}>Account Dashboard</p>

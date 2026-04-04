@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { BrandScrambleHover } from "./brand-scramble-hover";
+import { ThemeToggle } from "./theme-toggle";
 
 function SiteFrame({
 	children,
@@ -30,6 +32,31 @@ export function PublicPageShell({
 }) {
 	return (
 		<SiteFrame className={cn("max-w-3xl", className)}>{children}</SiteFrame>
+	);
+}
+
+export function SiteBrandHeader({ className }: { className?: string }) {
+	return (
+		<header
+			className={cn("flex items-center justify-between gap-4", className)}
+		>
+			<Link href="/" aria-label="Bardo home" className="inline-block">
+				<BrandScrambleHover
+					text="BARDO"
+					scrambleSpeed={85}
+					className="font-reading-heading max-w-3xl text-3xl font-bold text-foreground"
+				/>
+			</Link>
+			<ThemeToggle />
+		</header>
+	);
+}
+
+export function SiteBrandHeaderFrame() {
+	return (
+		<div className="mx-auto w-full max-w-5xl pt-10 sm:px-8 sm:pt-12 lg:pt-16 px-6">
+			<SiteBrandHeader />
+		</div>
 	);
 }
 
@@ -118,33 +145,23 @@ export function ProseSection({
 
 export function Minimal404Page() {
 	return (
-		<PublicPageShell className="justify-center">
-			<div className="flex w-full max-w-2xl flex-col gap-10">
-				<PublicPageHeader
-					eyebrow="404"
-					title="Page not found."
-					description="This route is no longer part of the public surface. Use one of the remaining entry points below."
-				/>
-				<RouteList
-					items={[
-						{
-							href: "/",
-							label: "Home",
-							description: "Return to the main entry point.",
-						},
-						{
-							href: "/docs",
-							label: "Docs",
-							description: "Read the core setup and usage guides.",
-						},
-						{
-							href: "/dashboard",
-							label: "Dashboard",
-							description: "Open the protected account and bridge workflow.",
-						},
-					]}
-				/>
-			</div>
-		</PublicPageShell>
+		<div className="min-h-screen">
+			<PublicPageShell className="max-w-5xl justify-center pb-12 pt-8 sm:pb-16 sm:pt-8 lg:pb-20 lg:pt-10">
+				<section className="mx-auto flex w-full max-w-3xl flex-col gap-8 border border-border bg-card px-6 py-8 sm:px-8 sm:py-10">
+					<div className="flex flex-col gap-4 border-b border-border pb-6">
+						<p className="ui-label text-muted-foreground">404</p>
+						<div className="flex flex-col gap-3">
+							<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+								Page not found.
+							</h1>
+						</div>
+					</div>
+
+					<div className="grid gap-4 sm:grid-cols-3 underline">
+						<Link href="/">Go Back Home</Link>
+					</div>
+				</section>
+			</PublicPageShell>
+		</div>
 	);
 }

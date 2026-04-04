@@ -35,15 +35,18 @@ describe("minimal public surface", () => {
 			false,
 		);
 		expect(existsSync(new URL("./pricing/page.tsx", import.meta.url))).toBe(
-			true,
+			false,
 		);
+		expect(
+			existsSync(new URL("./(public-secondary)/pricing/page.tsx", import.meta.url)),
+		).toBe(true);
 		expect(
 			existsSync(new URL("./privacy-policy/page.tsx", import.meta.url)),
 		).toBe(false);
 	});
 
 	test("limits the footer link click target to the text while preserving centered flex items", () => {
-		expect(homeSource).toContain('className="grow text-center"');
+		expect(homeSource).toContain('className="list-none grow text-center"');
 		expect(homeSource).toContain('className="landing-footer-link inline"');
 	});
 

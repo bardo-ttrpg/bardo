@@ -1,16 +1,19 @@
-# Plain answers for the essential flows.
+Bardo keeps the public docs intentionally narrow. This section exists to help you install the bridge, connect a client, understand the product boundary, and find billing context without mixing those concerns into every route.
 
-Bardo keeps the public site narrow on purpose. If a page does not help someone install the bridge, connect a client, understand the product boundary, or manage account access, it does not belong here.
+## What Bardo covers
 
-The docs are local MDX content so they stay fast, static, and easy to edit without pulling UI concerns into every route file.
+- Install the local bridge with the published shell scripts.
+- Connect an MCP-capable client to your local workspace.
+- Understand where campaign truth lives and where it does not.
+- Check how credits and billing appear in the protected dashboard.
 
-## What you can do here
+## Recommended path
 
-- Install the bridge with the published shell scripts.
-- Connect an MCP-capable client to the local workflow.
-- Understand where campaign truth lives.
-- Check how credits and billing relate to the protected dashboard.
+1. Install the bridge on the machine where your campaign files live.
+2. Connect your preferred AI client and approve the browser session.
+3. Use the campaign truth model as the mental boundary for local versus hosted behavior.
+4. Open the billing page only when you need subscription or usage details.
 
-## What stays outside the docs
+## What stays outside docs
 
-The protected dashboard, Clerk authentication, bridge approval polling, and all API routes stay server-backed. The docs stay static.
+The dashboard, Clerk authentication flows, bridge approval polling, and API routes stay server-backed. The docs remain static on purpose so they load fast and stay easy to maintain.

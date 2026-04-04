@@ -28,12 +28,16 @@ function isPublicChunk(chunk: ClientChunk): boolean {
 		normalized.includes("app-legal") ||
 		normalized.includes("/(site)/page") ||
 		normalized.includes("/(site)/blog/") ||
+		normalized.includes("/(site)/(public-secondary)/blog/") ||
 		normalized.includes("/(site)/docs/") ||
 		normalized.includes("/(site)/legal/") ||
+		normalized.includes("/(site)/(public-secondary)/legal/") ||
 		source.includes("app/(site)/page") ||
 		source.includes("app/(site)/blog/") ||
+		source.includes("app/(site)/(public-secondary)/blog/") ||
 		source.includes("app/(site)/docs/") ||
-		source.includes("app/(site)/legal/")
+		source.includes("app/(site)/legal/") ||
+		source.includes("app/(site)/(public-secondary)/legal/")
 	);
 }
 
