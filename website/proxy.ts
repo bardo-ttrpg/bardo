@@ -6,7 +6,6 @@ import {
 } from "next/server";
 import { isClerkAuthConfigured } from "./lib/clerk-config";
 import {
-	shouldRedirectLegacyMcpHost,
 	shouldRunClerkForPagePathname,
 	shouldUseClerkOnlyProxyPathname,
 } from "./lib/proxy-config";
@@ -62,31 +61,10 @@ function maybeRedirectToCanonicalLocalhost(
 	return NextResponse.redirect(redirectUrl, 307);
 }
 
-function maybeRedirectLegacyMcpDomain(request: NextRequest): Response | null {
-	if (
-		!shouldRedirectLegacyMcpHost({
-			forwardedHostHeader: request.headers.get("x-forwarded-host"),
-			hostHeader: request.headers.get("host"),
-		})
-	) {
-		return null;
-	}
-
-	const appBaseUrl =
-		process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://www.bardo.gg";
-	const redirectUrl = new URL("/docs/connect-client", appBaseUrl);
-	return NextResponse.redirect(redirectUrl, 308);
-}
-
 export default async function proxy(
 	request: NextRequest,
 	event: NextFetchEvent,
 ) {
-	const legacyMcpRedirect = maybeRedirectLegacyMcpDomain(request);
-	if (legacyMcpRedirect) {
-		return legacyMcpRedirect;
-	}
-
 	const isClerkOnlyPath = shouldUseClerkOnlyProxyPathname(
 		request.nextUrl.pathname,
 	);

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
-import { SiteBrandHeaderFrame } from "../_components/site-shells";
 
 const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
 	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
@@ -26,10 +25,7 @@ export default async function DashboardLayout({
 
 	return (
 		<OptionalClerkProvider enabled={IS_CLERK_CONFIGURED}>
-			<div className="min-h-screen">
-				<SiteBrandHeaderFrame />
-				{children}
-			</div>
+			{children}
 		</OptionalClerkProvider>
 	);
 }

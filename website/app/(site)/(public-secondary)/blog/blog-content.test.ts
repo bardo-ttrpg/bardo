@@ -14,6 +14,10 @@ const blogShellSource = readFileSync(
 	new URL("./_components/blog-shell.tsx", import.meta.url),
 	"utf8",
 );
+const blogLayoutSource = readFileSync(
+	new URL("./layout.tsx", import.meta.url),
+	"utf8",
+);
 
 describe("blog content", () => {
 	test("drives blog routes from the local manifest and static params", () => {
@@ -26,14 +30,15 @@ describe("blog content", () => {
 	});
 
 	test("falls back to a no-post state when there is nothing to redirect to", () => {
-		expect(blogPageSource).toContain("No posts are published yet.");
-		expect(blogPageSource).toContain("Read the docs");
+		expect(blogPageSource).toContain("BlogEmptyState");
+		expect(blogShellSource).toContain("No posts are published yet.");
+		expect(blogShellSource).toContain("Read the docs");
 	});
 
 	test("uses a legal-style blog shell with a left navigation rail", () => {
-		expect(blogShellSource).toContain('aria-label="Blog posts"');
-		expect(blogShellSource).toContain("listBlogEntries()");
-		expect(blogEntryRouteSource).toContain("BlogEntryShell");
+		expect(blogLayoutSource).toContain("listBlogEntries()");
+		expect(blogShellSource).toContain("BlogSidebarNav");
+		expect(blogEntryRouteSource).toContain("BlogEntryContent");
 	});
 
 	test("falls back to description when a blog entry preview is missing", () => {

@@ -4,7 +4,7 @@ import {
 	listBlogStaticParams,
 } from "@/content/site-content";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import { BlogEntryShell } from "../_components/blog-shell";
+import { BlogEntryContent } from "../_components/blog-shell";
 
 export const dynamicParams = false;
 
@@ -51,8 +51,8 @@ export default async function BlogEntryPage({
 	const Content = (await entry.load()).default;
 
 	return (
-		<BlogEntryShell entry={entry}>
+		<BlogEntryContent entry={entry}>
 			<Content />
-		</BlogEntryShell>
+		</BlogEntryContent>
 	);
 }

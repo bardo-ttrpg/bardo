@@ -1,4 +1,5 @@
 import { createPublicMetadata } from "@/lib/site-metadata";
+import { BardoViewTransition } from "@/components/view-transition";
 import { PublicPageShell } from "../../_components/site-shells";
 import { resolveBillingClerkConfig } from "../../dashboard/_billing/billing-clerk-config";
 import { PricingClient } from "./pricing-client";
@@ -18,10 +19,12 @@ const billingConfig = resolveBillingClerkConfig({
 export default function PricingPage() {
 	return (
 		<PublicPageShell className="max-w-5xl pb-10 pt-8 sm:pb-12 sm:pt-8 lg:pb-16 lg:pt-10">
-			<PricingClient
-				clerkEnabled={billingConfig.clerkEnabled}
-				clerkPlanId={billingConfig.clerkPlanIds.solo}
-			/>
+			<BardoViewTransition name="bardo-page-region">
+				<PricingClient
+					clerkEnabled={billingConfig.clerkEnabled}
+					clerkPlanId={billingConfig.clerkPlanIds.solo}
+				/>
+			</BardoViewTransition>
 		</PublicPageShell>
 	);
 }

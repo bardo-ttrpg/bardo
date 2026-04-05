@@ -41,19 +41,13 @@ export function SiteBrandHeader({ className }: { className?: string }) {
 		<header
 			className={cn("flex items-center justify-between gap-4", className)}
 		>
-			<BardoViewTransition name="bardo-site-brand">
-				<TransitionLink
-					href="/"
-					aria-label="Bardo home"
-					className="inline-block"
-				>
-					<BrandScrambleHover
-						text="BARDO"
-						scrambleSpeed={85}
-						className="font-reading-heading max-w-3xl text-3xl font-bold text-foreground"
-					/>
-				</TransitionLink>
-			</BardoViewTransition>
+			<TransitionLink href="/" aria-label="Bardo home" className="inline-block">
+				<BrandScrambleHover
+					text="BARDO"
+					scrambleSpeed={85}
+					className="font-reading-heading max-w-3xl text-3xl font-bold text-foreground"
+				/>
+			</TransitionLink>
 			<ThemeToggle />
 		</header>
 	);
@@ -61,7 +55,7 @@ export function SiteBrandHeader({ className }: { className?: string }) {
 
 export function SiteBrandHeaderFrame() {
 	return (
-		<div className="mx-auto w-full max-w-5xl pt-10 sm:px-8 sm:pt-12 lg:pt-16 px-6">
+		<div className="bardo-persistent-surface mx-auto w-full max-w-5xl px-6 pt-10 sm:px-8 sm:pt-12 lg:pt-16">
 			<SiteBrandHeader />
 		</div>
 	);
@@ -152,8 +146,8 @@ export function ProseSection({
 
 export function Minimal404Page() {
 	return (
-		<div className="min-h-screen">
-			<PublicPageShell className="max-w-5xl justify-center pb-12 pt-8 sm:pb-16 sm:pt-8 lg:pb-20 lg:pt-10">
+		<PublicPageShell className="max-w-5xl justify-center pb-12 pt-8 sm:pb-16 sm:pt-8 lg:pb-20 lg:pt-10">
+			<BardoViewTransition name="bardo-page-region">
 				<section className="mx-auto flex w-full max-w-3xl flex-col gap-8 border border-border bg-card px-6 py-8 sm:px-8 sm:py-10">
 					<div className="flex flex-col gap-4 border-b border-border pb-6">
 						<p className="ui-label text-muted-foreground">404</p>
@@ -168,7 +162,7 @@ export function Minimal404Page() {
 						<TransitionLink href="/">Go Back Home</TransitionLink>
 					</div>
 				</section>
-			</PublicPageShell>
-		</div>
+			</BardoViewTransition>
+		</PublicPageShell>
 	);
 }

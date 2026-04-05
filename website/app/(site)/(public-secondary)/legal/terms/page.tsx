@@ -1,6 +1,6 @@
 import { getLegalEntryBySlug } from "@/content/legal-content";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import { LegalEntryShell, LegalSection } from "../_components/legal-shell";
+import { LegalEntryContent, LegalSection } from "../_components/legal-shell";
 
 const entry =
 	getLegalEntryBySlug("terms") ??
@@ -16,7 +16,7 @@ export const metadata = createPublicMetadata({
 
 export default function TermsPage() {
 	return (
-		<LegalEntryShell entry={entry}>
+		<LegalEntryContent entry={entry}>
 			<LegalSection id="scope" title="Scope of the service">
 				<p>
 					These terms govern access to the public Bardo website, the protected
@@ -69,6 +69,6 @@ export default function TermsPage() {
 					service is being operated and improved.
 				</p>
 			</LegalSection>
-		</LegalEntryShell>
+		</LegalEntryContent>
 	);
 }

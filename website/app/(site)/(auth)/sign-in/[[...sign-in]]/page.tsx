@@ -26,7 +26,7 @@ export default function SignInPage() {
 			title="Sign in."
 			description="Use your existing Bardo account to open the dashboard and approve bridge sessions."
 		>
-			<BardoViewTransition>
+			<BardoViewTransition name="bardo-page-region">
 				<div className="space-y-5">
 					<SignIn
 						appearance={clerkAppearance}

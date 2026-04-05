@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { TransitionLink } from "@/components/transition-link";
-import { BardoViewTransition } from "@/components/view-transition";
 import {
 	getDocsEntryByHref,
 	getDocsEntryBySlug,
@@ -61,22 +60,18 @@ export default async function DocsEntryPage({
 	return (
 		<article className="flex min-w-0 flex-col gap-10">
 			<script type="application/ld+json">{breadcrumbJsonLd}</script>
-			<BardoViewTransition>
-				<header className="flex flex-col gap-4 border-b border-border pb-8">
-					<p className="ui-label text-muted-foreground">{entry.eyebrow}</p>
-					<h1 className="font-reading-heading max-w-3xl text-4xl text-foreground sm:text-5xl">
-						{entry.title}
-					</h1>
-					<p className="font-reading-body max-w-2xl text-muted-foreground">
-						{entry.description}
-					</p>
-				</header>
-			</BardoViewTransition>
-			<BardoViewTransition>
-				<div className="prose-reading docs-prose flex min-w-0 flex-col gap-6 text-foreground">
-					<Content />
-				</div>
-			</BardoViewTransition>
+			<header className="flex flex-col gap-4 border-b border-border pb-8">
+				<p className="ui-label text-muted-foreground">{entry.eyebrow}</p>
+				<h1 className="font-reading-heading max-w-3xl text-4xl text-foreground sm:text-5xl">
+					{entry.title}
+				</h1>
+				<p className="font-reading-body max-w-2xl text-muted-foreground">
+					{entry.description}
+				</p>
+			</header>
+			<div className="prose-reading docs-prose flex min-w-0 flex-col gap-6 text-foreground">
+				<Content />
+			</div>
 			<nav
 				aria-label="Docs page navigation"
 				className="grid gap-3 border-t border-border pt-8 sm:grid-cols-2"

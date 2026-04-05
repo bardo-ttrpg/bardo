@@ -1,6 +1,6 @@
 import { getLegalEntryBySlug } from "@/content/legal-content";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import { LegalEntryShell, LegalSection } from "../_components/legal-shell";
+import { LegalEntryContent, LegalSection } from "../_components/legal-shell";
 
 const entry =
 	getLegalEntryBySlug("privacy") ??
@@ -16,7 +16,7 @@ export const metadata = createPublicMetadata({
 
 export default function PrivacyPage() {
 	return (
-		<LegalEntryShell entry={entry}>
+		<LegalEntryContent entry={entry}>
 			<LegalSection
 				id="what-bardo-collects"
 				title="What Bardo collects"
@@ -74,6 +74,6 @@ export default function PrivacyPage() {
 					main Bardo support channels.
 				</p>
 			</LegalSection>
-		</LegalEntryShell>
+		</LegalEntryContent>
 	);
 }

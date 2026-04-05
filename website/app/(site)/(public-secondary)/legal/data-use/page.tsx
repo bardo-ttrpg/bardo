@@ -1,6 +1,6 @@
 import { getLegalEntryBySlug } from "@/content/legal-content";
 import { createPublicMetadata } from "@/lib/site-metadata";
-import { LegalEntryShell, LegalSection } from "../_components/legal-shell";
+import { LegalEntryContent, LegalSection } from "../_components/legal-shell";
 
 const entry =
 	getLegalEntryBySlug("data-use") ??
@@ -16,7 +16,7 @@ export const metadata = createPublicMetadata({
 
 export default function DataUsePage() {
 	return (
-		<LegalEntryShell entry={entry}>
+		<LegalEntryContent entry={entry}>
 			<LegalSection
 				id="local-files"
 				title="Local files and workspace context"
@@ -72,6 +72,6 @@ export default function DataUsePage() {
 					Bardo unless you deliberately connect them to another tool or service.
 				</p>
 			</LegalSection>
-		</LegalEntryShell>
+		</LegalEntryContent>
 	);
 }

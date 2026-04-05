@@ -14,6 +14,7 @@ const siteFontsSource = readFileSync(
 	"utf8",
 );
 const siteLayoutPath = new URL("./(site)/layout.tsx", import.meta.url);
+const siteLayoutSource = readFileSync(siteLayoutPath, "utf8");
 const authLayoutSource = readFileSync(
 	new URL("./(site)/(auth)/layout.tsx", import.meta.url),
 	"utf8",
@@ -31,8 +32,10 @@ describe("Clerk provider placement", () => {
 		expect(dashboardLayoutSource).toContain("OptionalClerkProvider");
 	});
 
-	test("does not add a no-op layout for the site route group", () => {
-		expect(existsSync(siteLayoutPath)).toBe(false);
+	test("uses a site layout to preserve shared chrome across route navigation", () => {
+		expect(existsSync(siteLayoutPath)).toBe(true);
+		expect(siteLayoutSource).toContain("SiteLayoutChrome");
+		expect(siteLayoutSource).not.toContain("OptionalClerkProvider");
 	});
 
 	test("prepares speed insights for Vercel deployments without adding analytics", () => {

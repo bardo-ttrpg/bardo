@@ -26,7 +26,7 @@ export default function SignUpPage() {
 			title="Create your account."
 			description="Start with the smallest possible auth surface, then continue directly into the protected dashboard."
 		>
-			<BardoViewTransition>
+			<BardoViewTransition name="bardo-page-region">
 				<div className="space-y-5">
 					<SignUp
 						appearance={clerkAppearance}

@@ -241,7 +241,7 @@ export function DashboardClient({
 
 	return (
 		<div className="mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pb-24 sm:pt-8 lg:pt-10">
-			<BardoViewTransition>
+			<BardoViewTransition name="bardo-page-region">
 				<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
 					<div className="space-y-3">
 						<p className={dashboardLabelClassName}>Account Dashboard</p>
@@ -264,9 +264,6 @@ export function DashboardClient({
 						<DashboardSignOutButton />
 					</div>
 				</div>
-			</BardoViewTransition>
-
-			<BardoViewTransition>
 				<div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
 					<ConnectBridgeCard billing={billing} />
 					<BillingPlanCard
@@ -275,9 +272,6 @@ export function DashboardClient({
 						mcpPeriodLimit={mcpPeriodLimit}
 					/>
 				</div>
-			</BardoViewTransition>
-
-			<BardoViewTransition>
 				<div className="mt-6 grid gap-6 lg:grid-cols-2">
 					<BillingActionsCard
 						billing={billing}

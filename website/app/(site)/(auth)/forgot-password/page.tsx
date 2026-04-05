@@ -1,5 +1,6 @@
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPrivateMetadata } from "@/lib/site-metadata";
+import { BardoViewTransition } from "@/components/view-transition";
 import {
 	AuthPageShell,
 	ClerkMissingKeysNotice,
@@ -23,7 +24,9 @@ export default function ForgotPasswordPage() {
 			title="Reset your password."
 			description="Request a verification code, confirm it, and set a new password without leaving the minimal auth surface."
 		>
-			<ForgotPasswordForm />
+			<BardoViewTransition name="bardo-page-region">
+				<ForgotPasswordForm />
+			</BardoViewTransition>
 		</AuthPageShell>
 	);
 }

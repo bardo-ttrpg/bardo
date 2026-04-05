@@ -9,10 +9,7 @@ import { getLandingPageJsonLd, homeSeo } from "@/lib/site-seo";
 import desktopLandingImage from "../../../public/landing-page-image.png";
 import mobileLandingImage from "../../../public/landing-page-image-mobile.jpg";
 import { HomePrimaryAction } from "./_components/home-primary-action";
-import {
-	PublicPageShell,
-	SiteBrandHeaderFrame,
-} from "./_components/site-shells";
+import { PublicPageShell } from "./_components/site-shells";
 
 export const metadata = createPublicMetadata({
 	title: homeSeo.title,
@@ -71,74 +68,71 @@ export default async function SitePage() {
 		: "(max-width: 1024px) calc(100vw - 4rem), 896px";
 
 	return (
-		<div className="min-h-screen">
-			<SiteBrandHeaderFrame />
-			<PublicPageShell className="max-w-5xl pb-8 pt-8 text-balance sm:pb-10 sm:pt-8 lg:pb-20 lg:pt-4">
-				<script type="application/ld+json">{landingPageJsonLd}</script>
-				<BardoViewTransition>
-					<section className={homeSectionClassName}>
-						<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
+		<PublicPageShell className="max-w-5xl pb-8 pt-8 text-balance sm:pb-10 sm:pt-8 lg:pb-20 lg:pt-4">
+			<script type="application/ld+json">{landingPageJsonLd}</script>
+			<BardoViewTransition name="bardo-page-region">
+				<section className={homeSectionClassName}>
+					<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
 
-						<p className={bodyClassName}>
-							Bardo is the MCP for playing any tabletop role-playing game. It
-							works with many modern AI clients, keeps your campaign files
-							local, and grounds the model in your real workspace so it stays
-							far more accurate.
-						</p>
+					<p className={bodyClassName}>
+						Bardo is the MCP for playing any tabletop role-playing game. It
+						works with many modern AI clients, keeps your campaign files
+						local, and grounds the model in your real workspace so it stays
+						far more accurate.
+					</p>
 
-						<div className="flex flex-wrap items-center gap-4 pt-2">
-							<Button asChild size="sm" className={homeActionClassName}>
-								<TransitionLink href="/docs/install">
-									Start Playing
-								</TransitionLink>
-							</Button>
-							<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
-						</div>
+					<div className="flex flex-wrap items-center gap-4 pt-2">
+						<Button asChild size="sm" className={homeActionClassName}>
+							<TransitionLink href="/docs/install">
+								Start Playing
+							</TransitionLink>
+						</Button>
+						<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
+					</div>
 
-						{useMobileLandingImage ? (
-							<Image
-								src={landingImage}
-								alt={landingImageAlt}
-								placeholder="blur"
-								preload
-								className="my-6 rounded-sm"
-								quality={100}
-								sizes={landingImageSizes}
-								width={500}
-							/>
-						) : (
-							<Image
-								src={landingImage}
-								alt={landingImageAlt}
-								placeholder="blur"
-								preload
-								className="my-6 h-auto w-full rounded-sm"
-								quality={100}
-								sizes={landingImageSizes}
-								width={1000}
-							/>
-						)}
-					</section>
-				</BardoViewTransition>
+					{useMobileLandingImage ? (
+						<Image
+							src={landingImage}
+							alt={landingImageAlt}
+							placeholder="blur"
+							preload
+							className="my-6 rounded-sm"
+							quality={100}
+							sizes={landingImageSizes}
+							width={500}
+						/>
+					) : (
+						<Image
+							src={landingImage}
+							alt={landingImageAlt}
+							placeholder="blur"
+							preload
+							className="my-6 h-auto w-full rounded-sm"
+							quality={100}
+							sizes={landingImageSizes}
+							width={1000}
+						/>
+					)}
+				</section>
+			</BardoViewTransition>
 
-				<nav
-					aria-label="Primary site links"
-					className="flex flex-row flex-wrap gap-4 text-center text-sm "
-				>
-					<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
-						{landingFooterLinks.map((link) => (
-							<li key={link.href} className="list-none grow text-center">
-								<TransitionLink
-									href={link.href}
-									className="landing-footer-link inline"
-								>
-									{link.label}
-								</TransitionLink>
-							</li>
-						))}
-					</ul>
-				</nav>
-			</PublicPageShell>
-		</div>
+			<nav
+				aria-label="Primary site links"
+				className="flex flex-row flex-wrap gap-4 text-center text-sm "
+			>
+				<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
+					{landingFooterLinks.map((link) => (
+						<li key={link.href} className="list-none grow text-center">
+							<TransitionLink
+								href={link.href}
+								className="landing-footer-link inline"
+							>
+								{link.label}
+							</TransitionLink>
+						</li>
+					))}
+				</ul>
+			</nav>
+		</PublicPageShell>
 	);
 }
