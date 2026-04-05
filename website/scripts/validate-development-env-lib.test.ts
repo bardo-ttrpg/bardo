@@ -14,7 +14,6 @@ describe("validateDevelopmentEnv", () => {
 		const result = validateDevelopmentEnv({
 			NODE_ENV: "development",
 			NEXT_PUBLIC_APP_URL: "http://localhost:3001",
-			BARDO_MCP_BASE_URL: "http://localhost:3000",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/tmp/bardo-dev-backend.json",
 			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
 			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
@@ -28,7 +27,6 @@ describe("validateDevelopmentEnv", () => {
 		const result = validateDevelopmentEnv({
 			NODE_ENV: "production",
 			NEXT_PUBLIC_APP_URL: "https://staging.bardo.ai",
-			BARDO_MCP_BASE_URL: "https://staging-mcp.bardo.ai",
 			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
 		});
 
@@ -37,9 +35,6 @@ describe("validateDevelopmentEnv", () => {
 		);
 		expect(result.errors).toContain(
 			"NEXT_PUBLIC_APP_URL should point to localhost during development",
-		);
-		expect(result.errors).toContain(
-			"BARDO_MCP_BASE_URL should point to localhost during development",
 		);
 		expect(result.errors).toContain(
 			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is required when development memory fallbacks are disabled",

@@ -1,7 +1,6 @@
 "use client";
 
 import { SearchIcon } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
 	type ReactNode,
@@ -10,6 +9,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { TransitionLink } from "@/components/transition-link";
 import {
 	Sidebar,
 	SidebarContent,
@@ -25,6 +25,7 @@ import {
 	SidebarTrigger,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { BardoViewTransition } from "@/components/view-transition";
 import type { DocsSearchEntry, DocsSection } from "@/content/site-content";
 import { cn } from "@/lib/utils";
 
@@ -120,12 +121,12 @@ function DocsShellFrame({
 			>
 				<SidebarHeader className="gap-4 border-b border-sidebar-border px-4 py-4">
 					<div className="flex flex-col gap-1">
-						<Link
+						<TransitionLink
 							href="/"
 							className="font-reading-heading text-3xl leading-none text-foreground font-bold"
 						>
 							BARDO
-						</Link>
+						</TransitionLink>
 					</div>
 					<div className="space-y-3">
 						<div className="relative">
@@ -150,7 +151,7 @@ function DocsShellFrame({
 							<div className="mt-3 space-y-1">
 								{searchResults.length > 0 ? (
 									searchResults.map((entry) => (
-										<Link
+										<TransitionLink
 											key={entry.href}
 											href={entry.href}
 											className="block rounded-lg px-3 py-2 transition-colors hover:bg-sidebar-accent"
@@ -163,7 +164,7 @@ function DocsShellFrame({
 													? `${entry.description} · ${entry.groupLabel}`
 													: `${entry.groupLabel} · ${entry.description}`}
 											</p>
-										</Link>
+										</TransitionLink>
 									))
 								) : (
 									<p className="font-reading-body px-3 text-sm text-muted-foreground">
@@ -189,7 +190,7 @@ function DocsShellFrame({
 														: "text-muted-foreground hover:text-foreground",
 												)}
 											>
-												<Link href={entry.href}>
+												<TransitionLink href={entry.href}>
 													<span
 														className={cn(
 															"py-0",
@@ -200,7 +201,7 @@ function DocsShellFrame({
 													>
 														{entry.navigationLabel}
 													</span>
-												</Link>
+												</TransitionLink>
 											</SidebarMenuButton>
 										</SidebarMenuItem>
 									))}
@@ -219,32 +220,37 @@ function DocsShellFrame({
 				</div>
 				<div className="mx-auto flex w-full max-w-[92rem] flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
 					<div className="grid min-w-0 gap-12 xl:grid-cols-[minmax(0,48rem)_15rem] xl:items-start">
-						<div className="min-w-0">{children}</div>
-						<aside className="hidden xl:block">
-							<div className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
-								<p className="ui-label">On this page</p>
-								{activeEntry?.sections.length ? (
-									<nav aria-label="On this page" className="mt-4">
-										<ul className="space-y-1.5">
-											{activeEntry.sections.map((section) => (
-												<li key={section.id}>
-													<Link
-														href={`${activeEntry.href}#${section.id}`}
-														className="font-reading-body block rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-													>
-														{section.title}
-													</Link>
-												</li>
-											))}
-										</ul>
-									</nav>
-								) : (
-									<p className="font-reading-body mt-4 text-sm text-muted-foreground">
-										This page has no section links yet.
-									</p>
-								)}
-							</div>
-						</aside>
+						<BardoViewTransition>
+							<div className="min-w-0">{children}</div>
+						</BardoViewTransition>
+						<BardoViewTransition>
+							<aside className="hidden xl:block">
+								<div className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
+									<p className="ui-label">On this page</p>
+									{activeEntry?.sections.length ? (
+										<nav aria-label="On this page" className="mt-4">
+											<ul className="space-y-1.5">
+												{activeEntry.sections.map((section) => (
+													<li key={section.id}>
+														<TransitionLink
+															href={`${activeEntry.href}#${section.id}`}
+															className="font-reading-body block rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+															transitionTypes={[]}
+														>
+															{section.title}
+														</TransitionLink>
+													</li>
+												))}
+											</ul>
+										</nav>
+									) : (
+										<p className="font-reading-body mt-4 text-sm text-muted-foreground">
+											This page has no section links yet.
+										</p>
+									)}
+								</div>
+							</aside>
+						</BardoViewTransition>
 					</div>
 				</div>
 			</SidebarInset>

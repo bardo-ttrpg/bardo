@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { TransitionLink } from "@/components/transition-link";
 import { resolveSubscriptionDetailsRenderState } from "./billing-cta-state";
 import SubscriptionDetailsAction from "./subscription-details-action";
 
@@ -41,9 +41,9 @@ function EnabledSubscriptionDetailsCta({ className }: { className: string }) {
 	return (
 		<div className="mt-4 flex justify-center">
 			{renderState === "sign_in" ? (
-				<Link href="/sign-in" className={className}>
+				<TransitionLink href="/sign-in" className={className}>
 					Sign In to Manage Billing
-				</Link>
+				</TransitionLink>
 			) : null}
 			{renderState === "manage" ? (
 				<SubscriptionDetailsAction className={className} />

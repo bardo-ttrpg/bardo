@@ -1,5 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import { cn } from "@/lib/utils";
 import { BrandScrambleHover } from "./brand-scramble-hover";
 import { ThemeToggle } from "./theme-toggle";
@@ -40,13 +41,15 @@ export function SiteBrandHeader({ className }: { className?: string }) {
 		<header
 			className={cn("flex items-center justify-between gap-4", className)}
 		>
-			<Link href="/" aria-label="Bardo home" className="inline-block">
-				<BrandScrambleHover
-					text="BARDO"
-					scrambleSpeed={85}
-					className="font-reading-heading max-w-3xl text-3xl font-bold text-foreground"
-				/>
-			</Link>
+			<BardoViewTransition name="bardo-site-brand">
+				<TransitionLink href="/" aria-label="Bardo home" className="inline-block">
+					<BrandScrambleHover
+						text="BARDO"
+						scrambleSpeed={85}
+						className="font-reading-heading max-w-3xl text-3xl font-bold text-foreground"
+					/>
+				</TransitionLink>
+			</BardoViewTransition>
 			<ThemeToggle />
 		</header>
 	);
@@ -91,12 +94,12 @@ export function RouteList({
 		<ul className="flex flex-col gap-4 pl-0">
 			{items.map((item) => (
 				<li key={item.href} className="list-none">
-					<Link
+					<TransitionLink
 						href={item.href}
 						className="interactive-link font-reading-body text-foreground"
 					>
 						{item.label}
-					</Link>{" "}
+					</TransitionLink>{" "}
 					<span className="font-reading-body text-muted-foreground">
 						{item.description}
 					</span>
@@ -116,13 +119,13 @@ export function InlineLinkNav({
 	return (
 		<nav className={cn("flex flex-wrap gap-5", className)}>
 			{links.map((link) => (
-				<Link
+				<TransitionLink
 					key={link.href}
 					href={link.href}
 					className="interactive-link ui-nav text-foreground"
 				>
 					{link.label}
-				</Link>
+				</TransitionLink>
 			))}
 		</nav>
 	);
@@ -158,7 +161,7 @@ export function Minimal404Page() {
 					</div>
 
 					<div className="grid gap-4 sm:grid-cols-3 underline">
-						<Link href="/">Go Back Home</Link>
+						<TransitionLink href="/">Go Back Home</TransitionLink>
 					</div>
 				</section>
 			</PublicPageShell>

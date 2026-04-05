@@ -8,7 +8,6 @@ describe("validateStagingEnv", () => {
 		expect(result.errors).toContain(
 			"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing",
 		);
-		expect(result.errors).toContain("BARDO_MCP_BASE_URL is missing");
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
 			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
@@ -21,7 +20,6 @@ describe("validateStagingEnv", () => {
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",
 			CLERK_SECRET_KEY: "sk_test_123",
 			NEXT_PUBLIC_APP_URL: "https://staging.bardo.ai",
-			BARDO_MCP_BASE_URL: "https://staging-mcp.bardo.ai",
 			BARDO_AUTH_INTROSPECTION_TOKEN: "secret",
 			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/srv/bardo/website-backend.json",
@@ -39,7 +37,6 @@ describe("validateStagingEnv", () => {
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
 			CLERK_SECRET_KEY: "sk_live_123",
 			NEXT_PUBLIC_APP_URL: "http://localhost:3001",
-			BARDO_MCP_BASE_URL: "http://127.0.0.1:3000",
 			BARDO_AUTH_INTROSPECTION_TOKEN: "secret",
 			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/srv/bardo/website-backend.json",
@@ -57,9 +54,6 @@ describe("validateStagingEnv", () => {
 			"NEXT_PUBLIC_APP_URL must use https for staging",
 		);
 		expect(result.errors).toContain(
-			"BARDO_MCP_BASE_URL must not point to localhost for staging",
-		);
-		expect(result.errors).toContain(
 			"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK must be false for staging",
 		);
 	});
@@ -70,7 +64,6 @@ describe("validateStagingEnv", () => {
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",
 			CLERK_SECRET_KEY: "sk_test_123",
 			NEXT_PUBLIC_APP_URL: "https://staging.bardo.ai",
-			BARDO_MCP_BASE_URL: "https://staging-mcp.bardo.ai",
 			BARDO_AUTH_INTROSPECTION_TOKEN: "secret",
 			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/srv/bardo/website-backend.json",

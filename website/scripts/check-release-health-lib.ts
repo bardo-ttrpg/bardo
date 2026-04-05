@@ -101,7 +101,6 @@ export async function checkReleaseHealth(
 	requireValue(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY", errors);
 	requireHttpsUrl(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
 	requireHttpsUrl(env.BARDO_APP_BASE_URL, "BARDO_APP_BASE_URL", errors);
-	requireHttpsUrl(env.BARDO_MCP_BASE_URL, "BARDO_MCP_BASE_URL", errors);
 	requireHttpsUrl(
 		env.BARDO_RUNTIME_STATUS_URL,
 		"BARDO_RUNTIME_STATUS_URL",

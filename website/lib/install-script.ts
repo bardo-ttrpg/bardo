@@ -21,6 +21,7 @@ BIN_DIR="\${BARDO_BIN_DIR:-$HOME/.local/bin}"
 REPO_DIR="$INSTALL_ROOT/repo"
 SOURCE_REPO="\${BARDO_INSTALL_REPO:-${REPO_URL}}"
 REPO_REF="\${BARDO_INSTALL_REF:-${REPO_REF}}"
+BUN_BIN="$(command -v bun)"
 
 mkdir -p "$INSTALL_ROOT" "$BIN_DIR"
 
@@ -57,13 +58,13 @@ bun install --frozen-lockfile
 
 cat > "$BIN_DIR/bardo" <<EOF
 #!/usr/bin/env sh
-exec bun "$REPO_DIR/packages/bardo-mcp/src/cli.ts" "\\$@"
+exec "$BUN_BIN" "$REPO_DIR/packages/bardo-mcp/src/cli.ts" "\\$@"
 EOF
 chmod +x "$BIN_DIR/bardo"
 
 cat > "$BIN_DIR/bardo-mcp" <<EOF
 #!/usr/bin/env sh
-exec bun "$REPO_DIR/packages/bardo-mcp/src/cli.ts" "\\$@"
+exec "$BUN_BIN" "$REPO_DIR/packages/bardo-mcp/src/cli.ts" "\\$@"
 EOF
 chmod +x "$BIN_DIR/bardo-mcp"
 
@@ -91,6 +92,7 @@ Require-Command bun
 $installRoot = if ($env:BARDO_INSTALL_ROOT) { $env:BARDO_INSTALL_ROOT } else { Join-Path $HOME '.local/share/bardo' }
 $binDir = if ($env:BARDO_BIN_DIR) { $env:BARDO_BIN_DIR } else { Join-Path $HOME '.local/bin' }
 $repoDir = Join-Path $installRoot 'repo'
+$bunPath = (Get-Command bun).Source
 $repoUrl = '${REPO_URL}'
 $sourceRepo = if ($env:BARDO_INSTALL_REPO) { $env:BARDO_INSTALL_REPO } else { $repoUrl }
 $repoRef = if ($env:BARDO_INSTALL_REF) { $env:BARDO_INSTALL_REF } else { '${REPO_REF}' }
@@ -144,7 +146,7 @@ try {
 
 $wrapper = @"
 @echo off
-bun "$repoDir\\packages\\bardo-mcp\\src\\cli.ts" %*
+"$bunPath" "$repoDir\\packages\\bardo-mcp\\src\\cli.ts" %*
 "@
 
 Set-Content -LiteralPath (Join-Path $binDir 'bardo.cmd') -Value $wrapper -NoNewline

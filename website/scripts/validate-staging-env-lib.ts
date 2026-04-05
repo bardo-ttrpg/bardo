@@ -99,11 +99,6 @@ export function validateStagingEnv(
 		"NEXT_PUBLIC_APP_URL",
 		errors,
 	);
-	requireHttpsUrl(
-		normalize(env.BARDO_MCP_BASE_URL),
-		"BARDO_MCP_BASE_URL",
-		errors,
-	);
 
 	if (!normalize(env.BARDO_AUTH_INTROSPECTION_TOKEN)) {
 		errors.push("BARDO_AUTH_INTROSPECTION_TOKEN is missing");

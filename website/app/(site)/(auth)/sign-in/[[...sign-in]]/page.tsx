@@ -1,5 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
-import Link from "next/link";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPrivateMetadata } from "@/lib/site-metadata";
@@ -25,24 +26,26 @@ export default function SignInPage() {
 			title="Sign in."
 			description="Use your existing Bardo account to open the dashboard and approve bridge sessions."
 		>
-			<div className="space-y-5">
-				<SignIn
-					appearance={clerkAppearance}
-					routing="hash"
-					signUpUrl="/sign-up"
-					fallbackRedirectUrl="/dashboard"
-				/>
-				<p className="font-reading-body text-muted-foreground">
-					Forgot your password?{" "}
-					<Link
-						href="/forgot-password"
-						className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
-					>
-						Reset it here
-					</Link>
-					.
-				</p>
-			</div>
+			<BardoViewTransition>
+				<div className="space-y-5">
+					<SignIn
+						appearance={clerkAppearance}
+						routing="hash"
+						signUpUrl="/sign-up"
+						fallbackRedirectUrl="/dashboard"
+					/>
+					<p className="font-reading-body text-muted-foreground">
+						Forgot your password?{" "}
+						<TransitionLink
+							href="/forgot-password"
+							className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
+						>
+							Reset it here
+						</TransitionLink>
+						.
+					</p>
+				</div>
+			</BardoViewTransition>
 		</AuthPageShell>
 	);
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
+import { TransitionLink } from "@/components/transition-link";
 import { Button } from "@/components/ui/button";
 import { resolveHomePrimaryActionState } from "./home-primary-action-state";
 
@@ -37,7 +37,7 @@ function ResolvedHomePrimaryAction() {
 				size="sm"
 				className={homeActionOutlineClassName}
 			>
-				<Link href="/dashboard">Dashboard</Link>
+				<TransitionLink href="/dashboard">Dashboard</TransitionLink>
 			</Button>
 		);
 	}
@@ -73,7 +73,7 @@ function PrimaryHomeLink({
 			size="sm"
 			className={homeActionOutlineClassName}
 		>
-			<Link href={href}>{children}</Link>
+			<TransitionLink href={href}>{children}</TransitionLink>
 		</Button>
 	);
 }

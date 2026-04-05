@@ -11,6 +11,27 @@ export const PAGE_PROXY_MATCHER = {
 
 export const API_PROXY_MATCHER = "/(api|trpc)(.*)";
 
+function normalizeRequestHost(hostHeader: string | null | undefined): string {
+	const normalized = hostHeader?.split(",")[0]?.trim().toLowerCase() ?? "";
+	if (!normalized) {
+		return "";
+	}
+	if (normalized.startsWith("[")) {
+		return normalized;
+	}
+	return normalized.split(":")[0] ?? normalized;
+}
+
+export function shouldRedirectLegacyMcpHost(args: {
+	forwardedHostHeader?: string | null;
+	hostHeader?: string | null;
+}): boolean {
+	const forwardedHost = normalizeRequestHost(args.forwardedHostHeader);
+	const requestHost = normalizeRequestHost(args.hostHeader);
+
+	return forwardedHost === "mcp.bardo.gg" || requestHost === "mcp.bardo.gg";
+}
+
 export function shouldUseClerkOnlyProxyPathname(pathname: string): boolean {
 	return (
 		pathname === "/api" ||

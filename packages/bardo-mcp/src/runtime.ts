@@ -736,8 +736,8 @@ Usage:
   bardo login --api-key <key> [--url <mcp-url>]
   bardo logout
   bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
-  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local|remote>] [--config-path <path>] [--dry-run]
-  bardo connect --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local|remote>] [--ruleset <slug>] [--rulebook <path>]
+  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--config-path <path>] [--dry-run]
+  bardo connect --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--ruleset <slug>] [--rulebook <path>]
   bardo export --output <path> [--workspace-root <path>]
   bardo pack-debug --output <path> [--workspace-root <path>]
   bardo doctor [--workspace-root <path>] [--client <client|auto>] [--json]
@@ -752,6 +752,7 @@ Notes:
   login starts a browser approval flow by default and stores bridge session credentials for the local bridge.
   login also supports direct API keys when you already have a bridge credential for local testing.
   connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
+  install and connect only support local mode in V1; passing --mode remote returns a migration error.
   --status-url lets doctor fetch plan and bridge credential status details from the website runtime status service.
   If you are testing from the source tree, run commands as: bun run --cwd packages/bardo-mcp start -- <command>.
   The workspace root defaults to the current working directory.
@@ -966,11 +967,6 @@ async function handleInstall(
 			workspaceRoot,
 		});
 		const client = selection.client;
-		if (options.mode?.trim().toLowerCase() === "remote") {
-			stderr.write(
-				"Remote mode is deprecated and temporarily shimmed to local stdio mode.\n",
-			);
-		}
 		const mode = normalizeInstallMode(options.mode);
 		const credentials = resolveStoredCredentials(config, env);
 		const installUrl = credentials.url || DEFAULT_MCP_URL;
@@ -1025,11 +1021,6 @@ async function handleConnect(
 		const config = await readConfig(resolveConfigPath(deps));
 		const credentials = resolveConnectCredentials(options, config, env);
 		if (options.dryRun) {
-			if (options.mode?.trim().toLowerCase() === "remote") {
-				stderr.write(
-					"Remote mode is deprecated and temporarily shimmed to local stdio mode.\n",
-				);
-			}
 			if (!credentials.apiKey || !credentials.url) {
 				throw new Error(
 					"Missing credentials for dry-run. Pass --api-key with --url or run `bardo login` first.",
@@ -1817,7 +1808,10 @@ function resolveConnectCredentials(
 			env.BARDO_API_KEY?.trim() ||
 			null,
 		url:
-			options.url?.trim() || config?.url || env.BARDO_MCP_URL?.trim() || null,
+			options.url?.trim() ||
+			config?.url ||
+			env.BARDO_MCP_URL?.trim() ||
+			DEFAULT_MCP_URL,
 	};
 }
 
@@ -1827,9 +1821,11 @@ function normalizeInstallMode(value: string | null): ConnectionMode {
 		return "local";
 	}
 	if (normalized === "remote") {
-		return "local";
+		throw new Error(
+			"Remote mode is no longer supported. Use local mode and approve the bridge in your browser.",
+		);
 	}
-	throw new Error("Unsupported mode. Use local or remote.");
+	throw new Error("Unsupported mode. Use local.");
 }
 
 function resolveInstallConfigPath(args: {
@@ -1937,7 +1933,6 @@ async function runInteractiveLoginFlow(args: {
 			expiresAt: string;
 			expiresAtISO: string;
 			apiKey: string;
-			mcpBaseUrl: string;
 			mcpUrl: string;
 			statusUrl: string;
 			refreshUrl: string;
@@ -2057,6 +2052,38 @@ function resolveApprovedInteractivePayload(
 			mcpUrl: pollBody.mcpUrl,
 			statusUrl:
 				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
+			accountLabel:
+				typeof pollBody.accountLabel === "string"
+					? pollBody.accountLabel
+					: undefined,
+			plan: normalizePlan(pollBody.plan) ?? undefined,
+			serverName:
+				typeof pollBody.serverName === "string"
+					? pollBody.serverName
+					: undefined,
+		};
+	}
+
+	if (
+		typeof pollBody.refreshToken === "string" &&
+		pollBody.refreshToken.trim().length > 0
+	) {
+		return {
+			accessToken,
+			refreshToken: pollBody.refreshToken,
+			expiresAtISO:
+				typeof pollBody.expiresAtISO === "string"
+					? pollBody.expiresAtISO
+					: typeof pollBody.expiresAt === "string"
+						? pollBody.expiresAt
+						: undefined,
+			mcpUrl: DEFAULT_MCP_URL,
+			statusUrl:
+				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
+			refreshUrl:
+				typeof pollBody.refreshUrl === "string"
+					? pollBody.refreshUrl
+					: undefined,
 			accountLabel:
 				typeof pollBody.accountLabel === "string"
 					? pollBody.accountLabel

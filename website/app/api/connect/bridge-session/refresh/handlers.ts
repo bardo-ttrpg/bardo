@@ -22,14 +22,12 @@ type BridgeSessionRefreshDeps = {
 		accountLabel: string;
 		plan: BillingSnapshot["plan"];
 		now: Date;
-		mcpBaseUrl: string;
 		statusUrl: string;
 		refreshUrl: string;
 	}) => Promise<{
 		accessToken: string;
 		refreshToken: string;
 		expiresAt: string;
-		mcpBaseUrl: string;
 		statusUrl: string;
 		refreshUrl: string;
 		plan: BillingSnapshot["plan"];
@@ -42,22 +40,10 @@ type BridgeSessionRefreshDeps = {
 		refreshToken: string;
 		nextRefreshToken: string;
 	}) => Promise<{ ok: boolean; reason?: "missing" | "invalid" }>;
-	resolveMcpBaseUrl: (request: Request) => string;
 	resolveStatusUrl: (request: Request) => string;
 	resolveRefreshUrl: (request: Request) => string;
 	now: () => Date;
 };
-
-function resolveMcpBaseUrl(request: Request): string {
-	const envBase =
-		process.env.BARDO_MCP_BASE_URL?.trim() ||
-		process.env.NEXT_PUBLIC_MCP_BASE_URL?.trim();
-	if (envBase) {
-		return envBase.replace(/\/+$/g, "");
-	}
-	const url = new URL(request.url);
-	return `${url.protocol}//${url.host}`;
-}
 
 function resolveStatusUrl(request: Request): string {
 	const envValue = process.env.BARDO_RUNTIME_STATUS_URL?.trim();
@@ -87,7 +73,6 @@ const defaultDeps: BridgeSessionRefreshDeps = {
 			accountLabel: args.accountLabel,
 			plan: args.plan,
 			now: args.now,
-			mcpBaseUrl: args.mcpBaseUrl,
 			statusUrl: args.statusUrl,
 			refreshUrl: args.refreshUrl,
 		}),
@@ -98,7 +83,6 @@ const defaultDeps: BridgeSessionRefreshDeps = {
 		}
 		return await backend.rotateBridgeRefreshSession(args);
 	},
-	resolveMcpBaseUrl,
 	resolveStatusUrl,
 	resolveRefreshUrl,
 	now: () => new Date(),
@@ -146,7 +130,6 @@ export function createBridgeSessionRefreshPostHandler(
 			accountLabel: decoded.accountLabel,
 			plan: billing.plan,
 			now: deps.now(),
-			mcpBaseUrl: deps.resolveMcpBaseUrl(request),
 			statusUrl: deps.resolveStatusUrl(request),
 			refreshUrl: deps.resolveRefreshUrl(request),
 		});

@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import Image from "next/image";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPublicMetadata } from "@/lib/site-metadata";
 import { getLandingPageJsonLd, homeSeo } from "@/lib/site-seo";
@@ -74,47 +75,49 @@ export default async function SitePage() {
 			<SiteBrandHeaderFrame />
 			<PublicPageShell className="max-w-5xl pb-8 pt-8 text-balance sm:pb-10 sm:pt-8 lg:pb-20 lg:pt-4">
 				<script type="application/ld+json">{landingPageJsonLd}</script>
-				<section className={homeSectionClassName}>
-					<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
+				<BardoViewTransition>
+					<section className={homeSectionClassName}>
+						<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
 
-					<p className={bodyClassName}>
-						Bardo is the MCP for playing any tabletop role-playing game. It
-						works with many modern AI clients, keeps your campaign files local,
-						and grounds the model in your real workspace so it stays far more
-						accurate.
-					</p>
+						<p className={bodyClassName}>
+							Bardo is the MCP for playing any tabletop role-playing game. It
+							works with many modern AI clients, keeps your campaign files local,
+							and grounds the model in your real workspace so it stays far more
+							accurate.
+						</p>
 
-					<div className="flex flex-wrap items-center gap-4 pt-2">
-						<Button asChild size="sm" className={homeActionClassName}>
-							<Link href="/docs/install">Start Playing</Link>
-						</Button>
-						<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
-					</div>
+						<div className="flex flex-wrap items-center gap-4 pt-2">
+							<Button asChild size="sm" className={homeActionClassName}>
+								<TransitionLink href="/docs/install">Start Playing</TransitionLink>
+							</Button>
+							<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
+						</div>
 
-					{useMobileLandingImage ? (
-						<Image
-							src={landingImage}
-							alt={landingImageAlt}
-							placeholder="blur"
-							preload
-							className="my-6 rounded-sm"
-							quality={100}
-							sizes={landingImageSizes}
-							width={500}
-						/>
-					) : (
-						<Image
-							src={landingImage}
-							alt={landingImageAlt}
-							placeholder="blur"
-							preload
-							className="my-6 h-auto w-full rounded-sm"
-							quality={100}
-							sizes={landingImageSizes}
-							width={1000}
-						/>
-					)}
-				</section>
+						{useMobileLandingImage ? (
+							<Image
+								src={landingImage}
+								alt={landingImageAlt}
+								placeholder="blur"
+								preload
+								className="my-6 rounded-sm"
+								quality={100}
+								sizes={landingImageSizes}
+								width={500}
+							/>
+						) : (
+							<Image
+								src={landingImage}
+								alt={landingImageAlt}
+								placeholder="blur"
+								preload
+								className="my-6 h-auto w-full rounded-sm"
+								quality={100}
+								sizes={landingImageSizes}
+								width={1000}
+							/>
+						)}
+					</section>
+				</BardoViewTransition>
 
 				<nav
 					aria-label="Primary site links"
@@ -123,9 +126,12 @@ export default async function SitePage() {
 					<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
 						{landingFooterLinks.map((link) => (
 							<li key={link.href} className="list-none grow text-center">
-								<Link href={link.href} className="landing-footer-link inline">
+								<TransitionLink
+									href={link.href}
+									className="landing-footer-link inline"
+								>
 									{link.label}
-								</Link>
+								</TransitionLink>
 							</li>
 						))}
 					</ul>

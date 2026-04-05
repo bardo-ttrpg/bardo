@@ -143,7 +143,6 @@ describe("createWebsiteBackendClient", () => {
 					accessToken: "access-token",
 					refreshToken: "refresh-token",
 					expiresAt: "2036-03-25T00:10:00.000Z",
-					mcpBaseUrl: "https://mcp.example.com",
 					statusUrl: "https://app.example.com/api/connect/runtime-status",
 					refreshUrl:
 						"https://app.example.com/api/connect/bridge-session/refresh",
@@ -198,7 +197,6 @@ describe("createWebsiteBackendClient", () => {
 					accessToken: "access-token",
 					refreshToken: "refresh-token-1",
 					expiresAt: "2036-03-25T00:10:00.000Z",
-					mcpBaseUrl: "https://mcp.example.com",
 					statusUrl: "https://app.example.com/api/connect/runtime-status",
 					refreshUrl:
 						"https://app.example.com/api/connect/bridge-session/refresh",

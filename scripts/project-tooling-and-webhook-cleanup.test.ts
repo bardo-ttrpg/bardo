@@ -253,7 +253,13 @@ describe("project cleanup and tooling setup", () => {
 		).toBe(false);
 		expect(
 			existsSync(
-				join(repoRoot, joinTokens(["website", "app", "(site)", "blog"], "/")),
+				join(
+					repoRoot,
+					joinTokens(
+						["website", "app", "(site)", "(public-secondary)", "blog"],
+						"/",
+					),
+				),
 			),
 		).toBe(true);
 		expect(
@@ -263,7 +269,9 @@ describe("project cleanup and tooling setup", () => {
 		).toBe(false);
 
 		const landingPageSource = readFromRepo("website/app/(site)/page.tsx");
-		const blogPageSource = readFromRepo("website/app/(site)/blog/page.tsx");
+		const blogPageSource = readFromRepo(
+			"website/app/(site)/(public-secondary)/blog/page.tsx",
+		);
 		const robotsSource = readFromRepo("website/app/robots.ts");
 		const sitemapSource = readFromRepo("website/app/sitemap.ts");
 		const seoTestSource = readFromRepo("website/app/seo.test.ts");
@@ -316,9 +324,8 @@ describe("project cleanup and tooling setup", () => {
 			"packages/bardo-mcp/src/runtime.smoke.test.ts",
 		);
 
-		expect(websiteEnvExample).toContain(
-			'BARDO_MCP_BASE_URL="https://mcp.bardo.gg"',
-		);
+		expect(websiteEnvExample).not.toContain("BARDO_MCP_BASE_URL");
+		expect(websiteEnvExample).not.toContain("NEXT_PUBLIC_MCP_BASE_URL");
 		expect(websiteEnvExample).toContain(
 			'E2E_CLERK_PASSWORD="YourEmailClerkTest123!$"',
 		);
@@ -333,6 +340,7 @@ describe("project cleanup and tooling setup", () => {
 		expect(stagingChecklist).not.toContain("/api/connect/cli-token");
 		expect(stagingChecklist).not.toContain("/api/connect/snippets");
 		expect(localDocs).toContain("approve the bridge in your browser");
+		expect(localDocs).toContain("hosted control plane");
 		expect(localDocs).not.toContain("last_session_diff");
 		expect(runtimeSmoke).toContain("bridge-authenticated connect");
 	});

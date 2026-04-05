@@ -389,7 +389,7 @@ describe("bardo runtime", () => {
 								accessToken: "bardo_bridge_access_device_flow",
 								refreshToken: "bardo_bridge_refresh_device_flow",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "https://mcp.bardo.gg",
+								mcpBaseUrl: "http://127.0.0.1:3000",
 								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",
@@ -432,7 +432,7 @@ describe("bardo runtime", () => {
 			expect(saved.accessToken).toBe("bardo_bridge_access_device_flow");
 			expect(saved.refreshToken).toBe("bardo_bridge_refresh_device_flow");
 			expect(saved.expiresAtISO).toBe("2099-03-03T00:10:00.000Z");
-			expect(saved.url).toBe("https://mcp.bardo.gg/mcp");
+			expect(saved.url).toBe("http://127.0.0.1:3000/mcp");
 			expect(saved.statusUrl).toBe(
 				"https://www.bardo.gg/api/connect/runtime-status",
 			);
@@ -843,12 +843,13 @@ describe("bardo runtime", () => {
 			expect(payload.some((client) => client.id === "kilo")).toBe(true);
 			expect(payload.some((client) => client.id === "generic")).toBe(true);
 			expect(payload.find((client) => client.id === "vscode")).toMatchObject({
+				id: "vscode",
 				label: "VS Code / GitHub Copilot",
 				tier: "tier1",
 				autoInstall: true,
 				defaultConfigPath: ".vscode/settings.json",
 				supportsLocal: true,
-				supportsRemote: true,
+				supportsRemote: false,
 			});
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -868,7 +869,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -921,7 +922,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -946,7 +947,7 @@ describe("bardo runtime", () => {
 								? init.headers.get("authorization")
 								: new Headers(init?.headers).get("authorization"),
 					});
-					if (url === "https://mcp.bardo.gg/health") {
+					if (url === "http://127.0.0.1:3000/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },
@@ -998,7 +999,7 @@ describe("bardo runtime", () => {
 			expect(payload.account.mcpPeriodLimit).toBe(25000);
 			expect(calls).toEqual([
 				{
-					url: "https://mcp.bardo.gg/health",
+					url: "http://127.0.0.1:3000/health",
 					auth: null,
 				},
 				{
@@ -1230,7 +1231,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -1249,7 +1250,7 @@ describe("bardo runtime", () => {
 					stderr: createWriter(),
 					fetch: async (input, init) => {
 						const url = String(input);
-						if (url === "https://mcp.bardo.gg/health") {
+						if (url === "http://127.0.0.1:3000/health") {
 							return new Response(JSON.stringify({ ok: true }), {
 								status: 200,
 								headers: { "content-type": "application/json" },
@@ -1320,7 +1321,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1383,7 +1384,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1447,7 +1448,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1460,7 +1461,7 @@ describe("bardo runtime", () => {
 				path.join(workspaceRoot, ".codex/config.toml"),
 				`[mcp_servers.bardo]
 
-url = "https://mcp.bardo.gg/mcp"
+url = "http://127.0.0.1:3000/mcp"
 http_headers = { Authorization = "Bearer bardo_live_saved" }
 `,
 				"utf8",
@@ -1512,7 +1513,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1759,7 +1760,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -1808,7 +1809,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(exitCode).toBe(0);
 			expect(received).toEqual({
 				apiKey: "test-key",
-				url: "https://mcp.bardo.gg/mcp",
+				url: "http://127.0.0.1:3000/mcp",
 				workspaceRoot,
 				plan: "solo",
 			});
@@ -2111,7 +2112,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -2161,7 +2162,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -2218,7 +2219,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -2260,7 +2261,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2318,7 +2319,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2358,7 +2359,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2398,7 +2399,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2475,7 +2476,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2530,7 +2531,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_connect",
 					"--url",
-					"https://mcp.bardo.gg/mcp",
+					"http://127.0.0.1:3000/mcp",
 					"--ruleset",
 					"shadowdark",
 				],
@@ -2587,7 +2588,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_connect",
 					"--url",
-					"https://mcp.bardo.gg/mcp",
+					"http://127.0.0.1:3000/mcp",
 					"--ruleset",
 					"shadowdark",
 				],
@@ -2628,7 +2629,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -2667,7 +2668,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				statusUrl?: string;
 			};
 			expect(saved.apiKey).toBe("bardo_live_saved");
-			expect(saved.url).toBe("https://mcp.bardo.gg/mcp");
+			expect(saved.url).toBe("http://127.0.0.1:3000/mcp");
 			expect(saved.statusUrl).toBe(
 				"https://staging.bardo.ai/api/connect/runtime-status",
 			);
@@ -2864,7 +2865,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_preview",
 					"--url",
-					"https://mcp.bardo.gg/mcp",
+					"http://127.0.0.1:3000/mcp",
 				],
 				{
 					cwd: workspaceRoot,
@@ -2946,7 +2947,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2994,7 +2995,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
-	test("install shims OpenCode remote mode to local stdio config", async () => {
+	test("install rejects unsupported OpenCode remote mode", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 
@@ -3005,7 +3006,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -3042,38 +3043,10 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				},
 			);
 
-			expect(exitCode).toBe(0);
-			const config = JSON.parse(
-				await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
-			) as {
-				theme: string;
-				mcp: Record<
-					string,
-					{
-						type: string;
-						url?: string;
-						headers?: Record<string, string>;
-						command?: string[];
-						enabled?: boolean;
-					}
-				>;
-			};
-			expect(config.theme).toBe("opencode");
-			expect(config.mcp.existing.command).toEqual(["uvx", "existing-tool"]);
-			expect(config.mcp.bardo).toEqual({
-				type: "local",
-				command: [
-					"bardo",
-					"mcp",
-					"serve",
-					"--url",
-					"https://mcp.bardo.gg/mcp",
-					"--workspace-root",
-					".",
-				],
-				enabled: true,
-			});
-			expect(config.mcp.bardo.command).not.toContain("--api-key");
+			expect(exitCode).toBe(1);
+			await expect(
+				readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			).resolves.toContain('"existing"');
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -3123,7 +3096,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved_secret",
-						url: "https://mcp.bardo.gg/mcp",
+						url: "http://127.0.0.1:3000/mcp",
 						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
@@ -3146,7 +3119,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				stderr: createWriter(),
 				fetch: async (input) => {
 					const url = String(input);
-					if (url === "https://mcp.bardo.gg/health") {
+					if (url === "http://127.0.0.1:3000/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },

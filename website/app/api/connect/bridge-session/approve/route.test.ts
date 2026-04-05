@@ -29,7 +29,6 @@ describe("POST /api/connect/bridge-session/approve", () => {
 					accessToken: "bridge_access",
 					refreshToken: "bridge_refresh",
 					expiresAt: "2099-03-03T00:10:00.000Z",
-					mcpBaseUrl: "https://mcp.bardo.ai",
 					statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 					refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
 					plan: "solo",
@@ -44,7 +43,6 @@ describe("POST /api/connect/bridge-session/approve", () => {
 				expect(payload.refreshUrl).toContain("/bridge-session/refresh");
 				return { ok: true };
 			},
-			resolveMcpBaseUrl: () => "https://mcp.bardo.ai",
 			resolveStatusUrl: () => "https://app.bardo.ai/api/connect/runtime-status",
 			resolveRefreshUrl: () =>
 				"https://app.bardo.ai/api/connect/bridge-session/refresh",
@@ -162,7 +160,6 @@ describe("POST /api/connect/bridge-session/approve", () => {
 				accessToken: "bridge_access",
 				refreshToken: "bridge_refresh",
 				expiresAt: "2099-03-03T00:10:00.000Z",
-				mcpBaseUrl: "https://mcp.bardo.ai",
 				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 				refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
 				plan: "solo",

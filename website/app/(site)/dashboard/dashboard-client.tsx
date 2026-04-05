@@ -1,8 +1,9 @@
 "use client";
 
 import { listConnectionClientAdapters } from "@bardo/mcp/client-adapters";
-import Link from "next/link";
 import { type ReactNode, startTransition, useEffect, useState } from "react";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import { cn } from "@/lib/utils";
 import CheckoutButton from "./_billing/checkout-button";
 import SubscriptionDetailsCta from "./_billing/subscription-details-button";
@@ -144,12 +145,18 @@ function ConnectBridgeCard({ billing }: { billing: BillingState | null }) {
 					: "An active subscription is required before a bridge session can be approved."}
 			</p>
 			<div className="mt-6 flex flex-wrap gap-3">
-				<Link href="/docs/connect-client" className={dashboardActionClassName}>
+				<TransitionLink
+					href="/docs/connect-client"
+					className={dashboardActionClassName}
+				>
 					Open Setup Guide
-				</Link>
-				<Link href="/pricing" className={dashboardSubtleActionClassName}>
+				</TransitionLink>
+				<TransitionLink
+					href="/pricing"
+					className={dashboardSubtleActionClassName}
+				>
 					Pricing
-				</Link>
+				</TransitionLink>
 			</div>
 		</DashboardCard>
 	);
@@ -234,7 +241,8 @@ export function DashboardClient({
 
 	return (
 		<div className="mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pb-24 sm:pt-8 lg:pt-10">
-			<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
+			<BardoViewTransition>
+				<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
 				<div className="space-y-3">
 					<p className={dashboardLabelClassName}>Account Dashboard</p>
 					<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
@@ -247,50 +255,55 @@ export function DashboardClient({
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<Link
+					<TransitionLink
 						href="/docs/connect-client"
 						className={dashboardSubtleActionClassName}
 					>
 						Client Setup
-					</Link>
+					</TransitionLink>
 					<DashboardSignOutButton />
 				</div>
-			</div>
+				</div>
+			</BardoViewTransition>
 
-			<div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-				<ConnectBridgeCard billing={billing} />
-				<BillingPlanCard
-					billingLoading={billingLoading}
-					billing={billing}
-					mcpPeriodLimit={mcpPeriodLimit}
-				/>
-			</div>
+			<BardoViewTransition>
+				<div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+					<ConnectBridgeCard billing={billing} />
+					<BillingPlanCard
+						billingLoading={billingLoading}
+						billing={billing}
+						mcpPeriodLimit={mcpPeriodLimit}
+					/>
+				</div>
+			</BardoViewTransition>
 
-			<div className="mt-6 grid gap-6 lg:grid-cols-2">
-				<BillingActionsCard
-					billing={billing}
-					clerkEnabled={clerkEnabled}
-					clerkPlanId={clerkPlanId}
-				/>
+			<BardoViewTransition>
+				<div className="mt-6 grid gap-6 lg:grid-cols-2">
+					<BillingActionsCard
+						billing={billing}
+						clerkEnabled={clerkEnabled}
+						clerkPlanId={clerkPlanId}
+					/>
 
-				<DashboardCard label="Supported Clients">
-					<p className="font-reading-body text-muted-foreground">
-						The bridge is designed for common MCP-capable clients. The path is
-						intentionally narrow: install, connect, approve in the browser, then
-						work from your local workspace.
-					</p>
-					<div className="mt-4 flex flex-wrap gap-2">
-						{SUPPORTED_CLIENT_LABELS.map((label) => (
-							<span
-								key={label}
-								className="technical-meta border border-border px-3 py-1 text-muted-foreground"
-							>
-								{label}
-							</span>
-						))}
-					</div>
-				</DashboardCard>
-			</div>
+					<DashboardCard label="Supported Clients">
+						<p className="font-reading-body text-muted-foreground">
+							The bridge is designed for common MCP-capable clients. The path is
+							intentionally narrow: install, connect, approve in the browser, then
+							work from your local workspace.
+						</p>
+						<div className="mt-4 flex flex-wrap gap-2">
+							{SUPPORTED_CLIENT_LABELS.map((label) => (
+								<span
+									key={label}
+									className="technical-meta border border-border px-3 py-1 text-muted-foreground"
+								>
+									{label}
+								</span>
+							))}
+						</div>
+					</DashboardCard>
+				</div>
+			</BardoViewTransition>
 		</div>
 	);
 }

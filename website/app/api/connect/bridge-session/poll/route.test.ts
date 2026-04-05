@@ -47,7 +47,6 @@ describe("GET /api/connect/bridge-session/poll", () => {
 						accessToken: "bridge_access",
 						refreshToken: "bridge_refresh",
 						expiresAt: "2099-03-03T00:10:00.000Z",
-						mcpBaseUrl: "https://mcp.bardo.ai",
 						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 						refreshUrl:
 							"https://app.bardo.ai/api/connect/bridge-session/refresh",
@@ -74,7 +73,6 @@ describe("GET /api/connect/bridge-session/poll", () => {
 		expect(body.status).toBe("approved");
 		expect(body.accessToken).toBe("bridge_access");
 		expect(body.refreshToken).toBe("bridge_refresh");
-		expect(body.mcpBaseUrl).toBe("https://mcp.bardo.ai");
 	});
 
 	test("returns pending when approval has not happened yet", async () => {

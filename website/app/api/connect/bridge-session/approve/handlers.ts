@@ -32,27 +32,14 @@ type BridgeSessionApproveDeps = {
 		userId: string;
 		plan: BillingSnapshot["plan"];
 		now: Date;
-		mcpBaseUrl: string;
 		statusUrl: string;
 		refreshUrl: string;
 	}) => Promise<BridgeSessionCredentialBundle>;
-	resolveMcpBaseUrl: (request: Request) => string;
 	resolveStatusUrl: (request: Request) => string;
 	resolveRefreshUrl: (request: Request) => string;
 	now: () => Date;
 	telemetry: ConnectTelemetry;
 };
-
-function resolveMcpBaseUrl(request: Request): string {
-	const envBase =
-		process.env.BARDO_MCP_BASE_URL?.trim() ||
-		process.env.NEXT_PUBLIC_MCP_BASE_URL?.trim();
-	if (envBase) {
-		return envBase.replace(/\/+$/g, "");
-	}
-	const url = new URL(request.url);
-	return `${url.protocol}//${url.host}`;
-}
 
 function resolveStatusUrl(request: Request): string {
 	const envValue = process.env.BARDO_RUNTIME_STATUS_URL?.trim();
@@ -105,11 +92,9 @@ const defaultDeps: BridgeSessionApproveDeps = {
 			plan: args.plan,
 			accountLabel: args.userId,
 			now: args.now,
-			mcpBaseUrl: args.mcpBaseUrl,
 			statusUrl: args.statusUrl,
 			refreshUrl: args.refreshUrl,
 		}),
-	resolveMcpBaseUrl,
 	resolveStatusUrl,
 	resolveRefreshUrl,
 	now: () => new Date(),
@@ -160,7 +145,6 @@ export function createBridgeSessionApprovePostHandler(
 				userId: authState.userId,
 				plan: billing.plan,
 				now,
-				mcpBaseUrl: deps.resolveMcpBaseUrl(request),
 				statusUrl: deps.resolveStatusUrl(request),
 				refreshUrl: deps.resolveRefreshUrl(request),
 			});

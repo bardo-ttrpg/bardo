@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import {
 	getDocsEntryByHref,
 	getDocsEntryBySlug,
@@ -60,24 +61,28 @@ export default async function DocsEntryPage({
 	return (
 		<article className="flex min-w-0 flex-col gap-10">
 			<script type="application/ld+json">{breadcrumbJsonLd}</script>
-			<header className="flex flex-col gap-4 border-b border-border pb-8">
-				<p className="ui-label text-muted-foreground">{entry.eyebrow}</p>
-				<h1 className="font-reading-heading max-w-3xl text-4xl text-foreground sm:text-5xl">
-					{entry.title}
-				</h1>
-				<p className="font-reading-body max-w-2xl text-muted-foreground">
-					{entry.description}
-				</p>
-			</header>
-			<div className="prose-reading docs-prose flex min-w-0 flex-col gap-6 text-foreground">
-				<Content />
-			</div>
+			<BardoViewTransition>
+				<header className="flex flex-col gap-4 border-b border-border pb-8">
+					<p className="ui-label text-muted-foreground">{entry.eyebrow}</p>
+					<h1 className="font-reading-heading max-w-3xl text-4xl text-foreground sm:text-5xl">
+						{entry.title}
+					</h1>
+					<p className="font-reading-body max-w-2xl text-muted-foreground">
+						{entry.description}
+					</p>
+				</header>
+			</BardoViewTransition>
+			<BardoViewTransition>
+				<div className="prose-reading docs-prose flex min-w-0 flex-col gap-6 text-foreground">
+					<Content />
+				</div>
+			</BardoViewTransition>
 			<nav
 				aria-label="Docs page navigation"
 				className="grid gap-3 border-t border-border pt-8 sm:grid-cols-2"
 			>
 				{previousEntry ? (
-					<Link
+					<TransitionLink
 						href={previousEntry.href}
 						className="group flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border bg-background px-4 py-4 transition-colors hover:bg-muted"
 					>
@@ -85,12 +90,12 @@ export default async function DocsEntryPage({
 						<span className="font-reading-body text-foreground">
 							{previousEntry.title}
 						</span>
-					</Link>
+					</TransitionLink>
 				) : (
 					<div className="hidden sm:block" />
 				)}
 				{nextEntry ? (
-					<Link
+					<TransitionLink
 						href={nextEntry.href}
 						className="group flex h-full w-full min-w-0 flex-col gap-1 rounded-lg border border-border bg-background px-4 py-4 text-left transition-colors hover:bg-muted"
 					>
@@ -98,7 +103,7 @@ export default async function DocsEntryPage({
 						<span className="font-reading-body text-foreground">
 							{nextEntry.title}
 						</span>
-					</Link>
+					</TransitionLink>
 				) : null}
 			</nav>
 		</article>

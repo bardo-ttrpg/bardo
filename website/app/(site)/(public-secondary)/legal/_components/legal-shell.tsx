@@ -1,5 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+import { TransitionLink } from "@/components/transition-link";
+import { BardoViewTransition } from "@/components/view-transition";
 import type { LegalEntry } from "@/content/legal-content";
 import { listLegalEntries } from "@/content/legal-content";
 import { getLegalBreadcrumbJsonLd } from "@/lib/site-seo";
@@ -28,40 +29,43 @@ export function LegalEntryShell({
 			<script type="application/ld+json">{breadcrumbJsonLd}</script>
 			<div className="flex flex-col gap-10">
 				<div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-14">
-					<aside className="lg:sticky lg:top-10 lg:self-start">
-						<nav
-							aria-label="Legal sections"
-							className="flex flex-col gap-2 border-b border-border pb-6 lg:border-b-0 lg:pb-0"
-						>
-							<div className="flex justify-between lg:flex-col">
-								{legalEntries.map((item) =>
-									(() => {
-										const isCurrentPage = item.href === entry.href;
+					<BardoViewTransition>
+						<aside className="lg:sticky lg:top-10 lg:self-start">
+							<nav
+								aria-label="Legal sections"
+								className="flex flex-col gap-2 border-b border-border pb-6 lg:border-b-0 lg:pb-0"
+							>
+								<div className="flex justify-between lg:flex-col">
+									{legalEntries.map((item) =>
+										(() => {
+											const isCurrentPage = item.href === entry.href;
 
-										return (
-											<Link
-												key={item.href}
-												href={item.href}
-												className="rounded-none bg-transparent py-2 transition-colors hover:bg-transparent lg:py-2"
-											>
-												<span
-													className={cn(
-														"ui-nav",
-														isCurrentPage
-															? "font-medium !text-foreground"
-															: "!text-muted-foreground hover:!text-foreground",
-													)}
+											return (
+												<TransitionLink
+													key={item.href}
+													href={item.href}
+													className="rounded-none bg-transparent py-2 transition-colors hover:bg-transparent lg:py-2"
 												>
-													{item.navigationLabel}
-												</span>
-											</Link>
-										);
-									})(),
-								)}
-							</div>
-						</nav>
-					</aside>
-					<div className="min-w-0">
+													<span
+														className={cn(
+															"ui-nav",
+															isCurrentPage
+																? "font-medium !text-foreground"
+																: "!text-muted-foreground hover:!text-foreground",
+														)}
+													>
+														{item.navigationLabel}
+													</span>
+												</TransitionLink>
+											);
+										})(),
+									)}
+								</div>
+							</nav>
+						</aside>
+					</BardoViewTransition>
+					<BardoViewTransition>
+						<div className="min-w-0">
 						<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
 							{/* <p className="ui-label text-muted-foreground">{entry.eyebrow}</p> */}
 							<div className="flex flex-col gap-3">
@@ -92,7 +96,8 @@ export function LegalEntryShell({
 						<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-8 text-foreground">
 							{children}
 						</article>
-					</div>
+						</div>
+					</BardoViewTransition>
 				</div>
 			</div>
 		</main>

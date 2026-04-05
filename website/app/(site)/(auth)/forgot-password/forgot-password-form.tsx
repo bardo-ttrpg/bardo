@@ -2,9 +2,9 @@
 
 import { useSignIn } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { TransitionLink } from "@/components/transition-link";
 
 type ForgotPasswordStep = "request" | "verify" | "complete";
 
@@ -195,12 +195,12 @@ export function ForgotPasswordForm() {
 						Password reset complete. Continue to the dashboard if you are not
 						redirected automatically.
 					</p>
-					<Link
+					<TransitionLink
 						href="/dashboard"
 						className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
 					>
 						Open dashboard
-					</Link>
+					</TransitionLink>
 				</div>
 			) : null}
 
@@ -218,12 +218,12 @@ export function ForgotPasswordForm() {
 
 			<p className="font-reading-body text-muted-foreground">
 				Remembered it?{" "}
-				<Link
+				<TransitionLink
 					href="/sign-in"
 					className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
 				>
 					Back to sign in
-				</Link>
+				</TransitionLink>
 				.
 			</p>
 		</div>

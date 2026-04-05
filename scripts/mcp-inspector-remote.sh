@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MCP_URL="${BARDO_MCP_BASE_URL:-http://127.0.0.1:3000/mcp}"
+MCP_URL="${BARDO_MCP_URL:-http://127.0.0.1:3000/mcp}"
 CONFIG_DIR="${BARDO_CONFIG_DIR:-}"
 METHOD="${MCP_INSPECTOR_METHOD:-tools/list}"
 ACCESS_TOKEN=""
@@ -27,7 +27,7 @@ if [[ $# -gt 0 ]]; then
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required for Inspector remote validation." >&2
+  echo "jq is required for Inspector HTTP validation." >&2
   exit 1
 fi
 
@@ -133,8 +133,11 @@ config["accessToken"] = bundle["accessToken"]
 config["refreshToken"] = bundle["refreshToken"]
 config["expiresAtISO"] = bundle.get("expiresAt") or bundle.get("expiresAtISO")
 
+mcp_url = bundle.get("mcpUrl")
 mcp_base_url = bundle.get("mcpBaseUrl")
-if mcp_base_url:
+if mcp_url:
+    config["url"] = mcp_url
+elif mcp_base_url:
     config["url"] = f'{mcp_base_url.rstrip("/")}/mcp'
 
 for key in ("statusUrl", "refreshUrl", "plan", "accountLabel", "serverName"):
@@ -155,7 +158,7 @@ PY
     NOW_EPOCH="$(date -u +%s)"
     EXPIRES_AT_EPOCH="$(date -u -d "$EXPIRES_AT_ISO" +%s 2>/dev/null || true)"
     if [[ -n "$EXPIRES_AT_EPOCH" ]] && (( EXPIRES_AT_EPOCH <= NOW_EPOCH )) && [[ "$REFRESH_FAILED" == "true" || -z "$ACCESS_TOKEN" ]]; then
-      echo "Bridge access token is expired and refresh failed. Re-run 'bardo login' or fix the website refresh origin before using direct remote Inspector." >&2
+      echo "Bridge access token is expired and refresh failed. Re-run 'bardo login' or fix the website refresh origin before using direct HTTP Inspector." >&2
       echo "Refresh URL attempted: ${REFRESH_URL:-<missing>}" >&2
       exit 1
     fi
@@ -177,13 +180,13 @@ if [[ -z "$WORKSPACE_ROOT" && -n "$CONFIG_DIR" && "$CONFIG_DIR" == */.config/bar
 fi
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$PWD}"
 
-echo "Inspecting the remote Bardo MCP at $MCP_URL" >&2
+echo "Inspecting the direct Bardo MCP endpoint at $MCP_URL" >&2
 echo "Workspace root header: $WORKSPACE_ROOT" >&2
 if [[ -n "$CONFIG_DIR" ]]; then
   echo "Bridge config dir: $CONFIG_DIR" >&2
 fi
 if [[ "$REFRESH_ATTEMPTED" == "true" ]]; then
-  echo "Bridge credential refresh attempted before remote inspection." >&2
+  echo "Bridge credential refresh attempted before direct HTTP inspection." >&2
 fi
 
 exec npx -y @modelcontextprotocol/inspector \

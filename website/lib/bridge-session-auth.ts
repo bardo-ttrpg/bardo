@@ -6,7 +6,6 @@ export type BridgeSessionCredentialBundle = {
 	accessToken: string;
 	refreshToken: string;
 	expiresAt: string;
-	mcpBaseUrl: string;
 	statusUrl: string;
 	refreshUrl: string;
 	plan: PlanTier;
@@ -27,7 +26,6 @@ export async function createBridgeSessionCredentialBundle(args: {
 	plan: PlanTier;
 	accountLabel: string;
 	now: Date;
-	mcpBaseUrl: string;
 	statusUrl: string;
 	refreshUrl: string;
 	serverName?: string;
@@ -70,7 +68,6 @@ export async function createBridgeSessionCredentialBundle(args: {
 			expiresAtISO: refreshExpiresAt,
 		}),
 		expiresAt,
-		mcpBaseUrl: args.mcpBaseUrl,
 		statusUrl: args.statusUrl,
 		refreshUrl: args.refreshUrl,
 		plan: args.plan,

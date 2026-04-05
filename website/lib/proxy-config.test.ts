@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	shouldRedirectLegacyMcpHost,
 	shouldRunClerkForPagePathname,
 	shouldUseClerkOnlyProxyPathname,
 } from "./proxy-config";
@@ -29,5 +30,32 @@ describe("shouldRunClerkForPagePathname", () => {
 		expect(shouldRunClerkForPagePathname("/forgot-password")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/docs/install")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/legal/privacy")).toBe(false);
+	});
+});
+
+describe("shouldRedirectLegacyMcpHost", () => {
+	test("matches the legacy hosted MCP domain on host headers", () => {
+		expect(
+			shouldRedirectLegacyMcpHost({ hostHeader: "mcp.bardo.gg" }),
+		).toBe(true);
+		expect(
+			shouldRedirectLegacyMcpHost({
+				forwardedHostHeader: "mcp.bardo.gg",
+			}),
+		).toBe(true);
+		expect(
+			shouldRedirectLegacyMcpHost({
+				hostHeader: "MCP.BARDO.GG:443",
+			}),
+		).toBe(true);
+	});
+
+	test("ignores the public website host", () => {
+		expect(
+			shouldRedirectLegacyMcpHost({ hostHeader: "www.bardo.gg" }),
+		).toBe(false);
+		expect(
+			shouldRedirectLegacyMcpHost({ forwardedHostHeader: "bardo.gg" }),
+		).toBe(false);
 	});
 });

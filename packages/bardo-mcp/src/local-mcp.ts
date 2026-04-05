@@ -1016,7 +1016,7 @@ export function createRemoteConnectionCoordinator(
 						remoteTools = [];
 						remoteWorkspaceRoot = null;
 						options.stderr.write(
-							`remote MCP unavailable, continuing with local workspace tools only: ${
+							`direct HTTP MCP unavailable, continuing with local workspace tools only: ${
 								error instanceof Error ? error.message : String(error)
 							}\n`,
 						);

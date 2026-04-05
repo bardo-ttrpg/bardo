@@ -52,7 +52,7 @@ function buildDocContent(args: {
 				[
 					"# Bardo Quickstart",
 					"",
-					"Bardo keeps your campaign files in the local workspace. The remote MCP provides subscription-gated guardrails and tool execution, but the workspace remains the source of truth.",
+					"Bardo keeps your campaign files in the local workspace. The hosted control plane provides subscription-gated guardrails, approval, and runtime guidance, but MCP execution and campaign truth remain local.",
 					"",
 					"## Start here",
 					"",

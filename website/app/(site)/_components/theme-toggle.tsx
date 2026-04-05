@@ -41,7 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 		setTheme(nextTheme);
 		window.setTimeout(() => {
 			delete rootElement.dataset.themeTransition;
-		}, 420);
+		}, 560);
 	}
 
 	return (

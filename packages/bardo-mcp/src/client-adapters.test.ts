@@ -11,7 +11,7 @@ describe("client adapters", () => {
 				client: "kiro",
 				mode: "local",
 				serverName: "bardo",
-				url: "https://mcp.bardo.gg/mcp",
+				url: "http://127.0.0.1:3000/mcp",
 				existingContent: "{invalid-json",
 			}),
 		).toThrow(
@@ -25,7 +25,7 @@ describe("client adapters", () => {
 			client: "codex",
 			mode: "remote",
 			serverName,
-			url: "https://mcp.bardo.gg/mcp",
+			url: "http://127.0.0.1:3000/mcp",
 			existingContent: `[mcp_servers."${serverName}"]
 url = "https://old.example.com/mcp"
 http_headers = { "Authorization" = "Bearer old-token" }
@@ -46,7 +46,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName: "bardo",
-			url: "https://mcp.bardo.gg/mcp",
+			url: "http://127.0.0.1:3000/mcp",
 			existingContent: `[mcp_servers.bardo]
 
 url = "https://old.example.com/mcp"
@@ -67,7 +67,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName: "bardo",
-			url: "https://mcp.bardo.gg/mcp",
+			url: "http://127.0.0.1:3000/mcp",
 			existingContent: `[mcp_servers.bardo] # existing bardo server
 url = "https://old.example.com/mcp"
 http_headers = { "Authorization" = "Bearer old-token" }
@@ -87,7 +87,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "claude",
 			mode: "remote",
 			serverName: "bardo",
-			url: "https://mcp.bardo.gg/mcp",
+			url: "http://127.0.0.1:3000/mcp",
 			existingContent: "",
 		});
 		const config = JSON.parse(output);
@@ -98,7 +98,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 
 	test("codex local snippet uses the same escaping as the install path", () => {
 		const apiKey = 'bardo_live_"quoted"';
-		const url = "https://mcp.bardo.gg/mcp";
+		const url = "http://127.0.0.1:3000/mcp";
 		const snippet = buildConnectionSnippet({
 			client: "codex",
 			mode: "local",
@@ -123,7 +123,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName,
-			url: "https://mcp.bardo.gg/mcp",
+			url: "http://127.0.0.1:3000/mcp",
 			existingContent: "",
 		});
 

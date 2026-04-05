@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import { TransitionLink } from "@/components/transition-link";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import { resolveCheckoutRenderState } from "./billing-cta-state";
 import CheckoutAction from "./checkout-action";
@@ -79,9 +79,9 @@ function EnabledCheckoutButton({
 	return (
 		<div>
 			{renderState === "sign_in" ? (
-				<Link href="/sign-in" className={className}>
+				<TransitionLink href="/sign-in" className={className}>
 					{label}
-				</Link>
+				</TransitionLink>
 			) : null}
 			{renderState === "disabled_unavailable" ? (
 				<button type="button" className={className} disabled>

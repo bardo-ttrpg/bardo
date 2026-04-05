@@ -73,7 +73,7 @@ describe("bardo runtime smoke gate", () => {
 								accessToken: "bardo_bridge_access_smoke",
 								refreshToken: "bardo_bridge_refresh_smoke",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "https://mcp.bardo.gg",
+								mcpBaseUrl: "http://127.0.0.1:3000",
 								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",
@@ -116,7 +116,7 @@ describe("bardo runtime smoke gate", () => {
 				stderr: doctorStderr,
 				fetch: async (input, init) => {
 					const url = String(input);
-					if (url === "https://mcp.bardo.gg/health") {
+					if (url === "http://127.0.0.1:3000/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },

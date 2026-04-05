@@ -2,6 +2,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { BardoViewTransition } from "@/components/view-transition";
 import { absoluteUrl, siteConfig } from "@/lib/site-config";
 import { siteHeading, siteUi } from "@/lib/site-fonts";
 import "./globals.css";
@@ -81,7 +82,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 					defaultTheme="dark"
 					enableSystem={false}
 				>
-					{children}
+					<BardoViewTransition>{children}</BardoViewTransition>
 				</ThemeProvider>
 				{SHOW_SPEED_INSIGHTS ? <SpeedInsights /> : null}
 			</body>

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_DIR="${BARDO_CONFIG_DIR:-}"
-MCP_URL="${BARDO_MCP_BASE_URL:-http://127.0.0.1:3000/mcp}"
+MCP_URL="${BARDO_MCP_URL:-http://127.0.0.1:3000/mcp}"
 METHOD="${MCP_INSPECTOR_METHOD:-tools/list}"
 BRIDGE_COMMAND="${BARDO_BRIDGE_INSPECTOR_COMMAND:-}"
 
@@ -81,7 +81,7 @@ fi
 
 echo "Inspecting the local Bardo bridge with config $CONFIG_PATH" >&2
 echo "Workspace root: $WORKSPACE_ROOT" >&2
-echo "Remote MCP URL: $MCP_URL" >&2
+echo "Direct MCP URL: $MCP_URL" >&2
 echo "Bridge command: $BRIDGE_COMMAND" >&2
 
 exec npx -y @modelcontextprotocol/inspector \

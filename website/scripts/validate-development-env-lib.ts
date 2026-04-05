@@ -52,11 +52,6 @@ export function validateDevelopmentEnv(
 		"NEXT_PUBLIC_APP_URL",
 		errors,
 	);
-	validateLocalUrl(
-		normalize(env.BARDO_MCP_BASE_URL),
-		"BARDO_MCP_BASE_URL",
-		errors,
-	);
 
 	const backendPath = normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH);
 	const needsDurableBackend =
