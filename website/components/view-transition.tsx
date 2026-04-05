@@ -1,5 +1,5 @@
+import * as React from "react";
 import type { ReactNode } from "react";
-import { ViewTransition } from "react";
 
 export function BardoViewTransition({
 	children,
@@ -8,5 +8,16 @@ export function BardoViewTransition({
 	children: ReactNode;
 	name?: string;
 }) {
+	const ViewTransition =
+		"ViewTransition" in React
+			? (React.ViewTransition as
+					| ((props: { children: ReactNode; name?: string }) => React.ReactNode)
+					| undefined)
+			: undefined;
+
+	if (!ViewTransition) {
+		return <>{children}</>;
+	}
+
 	return <ViewTransition name={name}>{children}</ViewTransition>;
 }
