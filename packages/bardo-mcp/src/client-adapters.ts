@@ -426,7 +426,6 @@ export function buildInstallConfigContent(args: {
 	client: AutoInstallConnectionClient;
 	mode: ConnectionMode;
 	serverName: string;
-	apiKey: string;
 	url: string;
 	existingContent: string;
 }): string {

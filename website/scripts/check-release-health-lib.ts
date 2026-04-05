@@ -35,6 +35,37 @@ function requireValue(
 	return normalized;
 }
 
+function requireHttpsUrl(
+	value: string | undefined,
+	label: string,
+	errors: string[],
+): string | undefined {
+	const normalized = requireValue(value, label, errors);
+	if (!normalized) {
+		return undefined;
+	}
+
+	try {
+		const url = new URL(normalized);
+		if (url.protocol !== "https:") {
+			errors.push(`${label} must use https in release environments`);
+			return undefined;
+		}
+		if (
+			url.hostname === "localhost" ||
+			url.hostname === "127.0.0.1" ||
+			url.hostname === "::1"
+		) {
+			errors.push(`${label} must not point to localhost in release environments`);
+			return undefined;
+		}
+		return normalized;
+	} catch {
+		errors.push(`${label} must be a valid URL`);
+		return undefined;
+	}
+}
+
 function resolveReleaseIdentifier(
 	env: Record<string, string | undefined>,
 ): string | undefined {
@@ -68,8 +99,19 @@ export async function checkReleaseHealth(
 		errors,
 	);
 	requireValue(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY", errors);
-	requireValue(env.BARDO_MCP_BASE_URL, "BARDO_MCP_BASE_URL", errors);
-	requireValue(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
+	requireHttpsUrl(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
+	requireHttpsUrl(env.BARDO_APP_BASE_URL, "BARDO_APP_BASE_URL", errors);
+	requireHttpsUrl(env.BARDO_MCP_BASE_URL, "BARDO_MCP_BASE_URL", errors);
+	requireHttpsUrl(
+		env.BARDO_RUNTIME_STATUS_URL,
+		"BARDO_RUNTIME_STATUS_URL",
+		errors,
+	);
+	requireHttpsUrl(
+		env.BARDO_BRIDGE_SESSION_REFRESH_URL,
+		"BARDO_BRIDGE_SESSION_REFRESH_URL",
+		errors,
+	);
 
 	const release = resolveReleaseIdentifier(env);
 	if (!release) {

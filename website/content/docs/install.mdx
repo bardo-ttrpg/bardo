@@ -12,8 +12,21 @@ Run `irm https://bardo.gg/install.ps1 | iex` in PowerShell.
 
 The PowerShell installer performs the same repository setup and command shim step for the Windows workflow.
 
+## Custom install paths
+
+If you want to override the install location, pass the environment variables to the shell that runs the installer script, not just to `curl`.
+
+- macOS and Linux: `curl -fsSL https://bardo.gg/install | env BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test" BARDO_BIN_DIR="$HOME/.local/bin" sh`
+- Windows PowerShell: `$env:BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test"; $env:BARDO_BIN_DIR="$HOME/.local/bin"; irm https://bardo.gg/install.ps1 | iex`
+
 ## What happens next
 
-After the install completes, connect your client and approve a browser session from the dashboard. The install step only prepares the local bridge; it does not authorize a client on its own.
+After the install completes, use the CLI from your workspace root:
+
+1. `bardo login`
+2. `bardo init --workspace-root .`
+3. `bardo connect --client codex --workspace-root .`
+
+The install step only prepares the local bridge. `bardo login` is the step that starts the browser approval flow and stores the bridge credentials for later `connect` calls.
 
 If you are working from the repository directly, `bun dev` at the repo root launches both the website and the MCP service. That is the fastest way to exercise the current install, approval, and docs surface together during local development.

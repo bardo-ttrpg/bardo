@@ -11,8 +11,7 @@ describe("client adapters", () => {
 				client: "kiro",
 				mode: "local",
 				serverName: "bardo",
-				apiKey: "bardo_live_example",
-				url: "https://mcp.bardo.ai/mcp",
+				url: "https://mcp.bardo.gg/mcp",
 				existingContent: "{invalid-json",
 			}),
 		).toThrow(
@@ -26,8 +25,7 @@ describe("client adapters", () => {
 			client: "codex",
 			mode: "remote",
 			serverName,
-			apiKey: "bardo_live_example",
-			url: "https://mcp.bardo.ai/mcp",
+			url: "https://mcp.bardo.gg/mcp",
 			existingContent: `[mcp_servers."${serverName}"]
 url = "https://old.example.com/mcp"
 http_headers = { "Authorization" = "Bearer old-token" }
@@ -48,8 +46,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName: "bardo",
-			apiKey: "bardo_live_example",
-			url: "https://mcp.bardo.ai/mcp",
+			url: "https://mcp.bardo.gg/mcp",
 			existingContent: `[mcp_servers.bardo]
 
 url = "https://old.example.com/mcp"
@@ -70,8 +67,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName: "bardo",
-			apiKey: "bardo_live_example",
-			url: "https://mcp.bardo.ai/mcp",
+			url: "https://mcp.bardo.gg/mcp",
 			existingContent: `[mcp_servers.bardo] # existing bardo server
 url = "https://old.example.com/mcp"
 http_headers = { "Authorization" = "Bearer old-token" }
@@ -91,8 +87,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "claude",
 			mode: "remote",
 			serverName: "bardo",
-			apiKey: "bardo_live_example",
-			url: "https://mcp.bardo.ai/mcp",
+			url: "https://mcp.bardo.gg/mcp",
 			existingContent: "",
 		});
 		const config = JSON.parse(output);
@@ -103,7 +98,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 
 	test("codex local snippet uses the same escaping as the install path", () => {
 		const apiKey = 'bardo_live_"quoted"';
-		const url = "https://mcp.bardo.ai/mcp";
+		const url = "https://mcp.bardo.gg/mcp";
 		const snippet = buildConnectionSnippet({
 			client: "codex",
 			mode: "local",
@@ -115,7 +110,6 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "local",
 			serverName: "bardo",
-			apiKey,
 			url,
 			existingContent: "",
 		}).trim();
@@ -129,8 +123,7 @@ http_headers = { "Authorization" = "Bearer old-token" }
 			client: "codex",
 			mode: "remote",
 			serverName,
-			apiKey: "bardo_live_example",
-			url: "https://mcp.bardo.ai/mcp",
+			url: "https://mcp.bardo.gg/mcp",
 			existingContent: "",
 		});
 

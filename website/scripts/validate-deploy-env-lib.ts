@@ -39,6 +39,33 @@ function requirePrefix(
 	}
 }
 
+function requireHttpsUrl(
+	value: string | undefined,
+	label: string,
+	errors: string[],
+) {
+	if (!value) {
+		errors.push(`${label} is missing`);
+		return;
+	}
+
+	try {
+		const url = new URL(value);
+		if (url.protocol !== "https:") {
+			errors.push(`${label} must use https for production`);
+		}
+		if (
+			url.hostname === "localhost" ||
+			url.hostname === "127.0.0.1" ||
+			url.hostname === "::1"
+		) {
+			errors.push(`${label} must not point to localhost for production`);
+		}
+	} catch {
+		errors.push(`${label} must be a valid URL`);
+	}
+}
+
 export function isProductionDeploy(
 	env: Record<string, string | undefined>,
 ): boolean {
@@ -75,6 +102,19 @@ export function validateDeployEnv(
 		normalize(env.CLERK_SECRET_KEY),
 		"sk_live_",
 		"CLERK_SECRET_KEY",
+		errors,
+	);
+	requireHttpsUrl(normalize(env.NEXT_PUBLIC_APP_URL), "NEXT_PUBLIC_APP_URL", errors);
+	requireHttpsUrl(normalize(env.BARDO_APP_BASE_URL), "BARDO_APP_BASE_URL", errors);
+	requireHttpsUrl(normalize(env.BARDO_MCP_BASE_URL), "BARDO_MCP_BASE_URL", errors);
+	requireHttpsUrl(
+		normalize(env.BARDO_RUNTIME_STATUS_URL),
+		"BARDO_RUNTIME_STATUS_URL",
+		errors,
+	);
+	requireHttpsUrl(
+		normalize(env.BARDO_BRIDGE_SESSION_REFRESH_URL),
+		"BARDO_BRIDGE_SESSION_REFRESH_URL",
 		errors,
 	);
 

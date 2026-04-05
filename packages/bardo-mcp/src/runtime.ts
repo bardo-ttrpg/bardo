@@ -31,7 +31,7 @@ import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
 const DEFAULT_LOGIN_START_URL =
-	"https://app.bardo.ai/api/connect/bridge-session/start";
+	"https://www.bardo.gg/api/connect/bridge-session/start";
 const CONFIG_FILE_NAME = "config.json";
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -242,6 +242,10 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 	}
 
 	if (first === "--help" || first === "-h" || first === "help") {
+		return { command: "help" };
+	}
+
+	if (argv.slice(1).includes("--help") || argv.slice(1).includes("-h")) {
 		return { command: "help" };
 	}
 
@@ -969,9 +973,7 @@ async function handleInstall(
 		}
 		const mode = normalizeInstallMode(options.mode);
 		const credentials = resolveStoredCredentials(config, env);
-		if (!credentials.apiKey || !credentials.url) {
-			throw new Error("Missing saved credentials. Run `bardo login` first.");
-		}
+		const installUrl = credentials.url || DEFAULT_MCP_URL;
 
 		const serverName =
 			options.serverName?.trim() || config?.serverName || "bardo";
@@ -985,8 +987,7 @@ async function handleInstall(
 			client,
 			mode,
 			serverName,
-			apiKey: credentials.apiKey,
-			url: credentials.url,
+			url: installUrl,
 			existingContent,
 		});
 
@@ -1049,8 +1050,7 @@ async function handleConnect(
 				client,
 				mode: normalizeInstallMode(options.mode),
 				serverName,
-				apiKey: credentials.apiKey,
-				url: credentials.url,
+				url: credentials.url || DEFAULT_MCP_URL,
 				existingContent,
 			});
 			stdout.write(`${nextContent}\n`);
@@ -1747,8 +1747,12 @@ async function readExistingJson(
 function resolveConfigPath(deps: CliRuntimeDeps): string {
 	const env = deps.env ?? process.env;
 	const homeDir = deps.homeDir ?? env.HOME ?? os.homedir();
+	const xdgConfigHome = env.XDG_CONFIG_HOME?.trim();
 	const configDir =
-		env.BARDO_CONFIG_DIR?.trim() || path.join(homeDir, ".config/bardo");
+		env.BARDO_CONFIG_DIR?.trim() ||
+		(xdgConfigHome
+			? path.join(xdgConfigHome, "bardo")
+			: path.join(homeDir, ".config/bardo"));
 	return path.join(configDir, CONFIG_FILE_NAME);
 }
 

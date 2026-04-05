@@ -18,6 +18,11 @@ describe("validateDeployEnv", () => {
 		});
 
 		expect(result.skipped).toBe(false);
+		expect(result.errors).toContain("NEXT_PUBLIC_APP_URL is missing");
+		expect(result.errors).toContain("BARDO_APP_BASE_URL is missing");
+		expect(result.errors).toContain("BARDO_MCP_BASE_URL is missing");
+		expect(result.errors).toContain("BARDO_RUNTIME_STATUS_URL is missing");
+		expect(result.errors).toContain("BARDO_BRIDGE_SESSION_REFRESH_URL is missing");
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
 			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
@@ -29,6 +34,12 @@ describe("validateDeployEnv", () => {
 			VERCEL_ENV: "production",
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
 			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_MCP_BASE_URL: "https://mcp.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/var/lib/bardo/backend.sqlite",
 			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "true",
@@ -44,6 +55,12 @@ describe("validateDeployEnv", () => {
 			VERCEL_ENV: "production",
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
 			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_MCP_BASE_URL: "https://mcp.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/var/lib/bardo/backend.sqlite",
 			BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE: "true",
@@ -59,6 +76,12 @@ describe("validateDeployEnv", () => {
 			VERCEL_ENV: "production",
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
 			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_MCP_BASE_URL: "https://mcp.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
 			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/var/lib/bardo/backend.sqlite",
 			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
@@ -69,5 +92,25 @@ describe("validateDeployEnv", () => {
 		});
 
 		expect(result.errors).toEqual([]);
+	});
+
+	test("rejects localhost service URLs in production", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_MCP_BASE_URL: "http://127.0.0.1:3000",
+			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/tmp/bardo/website-backend.json",
+		});
+
+		expect(result.errors).toContain(
+			"BARDO_MCP_BASE_URL must not point to localhost for production",
+		);
 	});
 });

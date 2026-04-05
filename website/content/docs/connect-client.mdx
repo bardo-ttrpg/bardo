@@ -2,11 +2,31 @@ The supported path is simple: install the bridge locally, choose your workspace,
 
 ## Connection flow
 
-1. Install the bridge locally and open the dashboard in your browser.
-2. Start a bridge session from your client.
-3. Bardo generates a user code and verification URL.
-4. Approve the session in the browser.
-5. Return to your client and use Bardo tools against the local workspace.
+1. Install the bridge locally.
+2. From your workspace root, run `bardo login`.
+3. Approve the browser session from the dashboard.
+4. Run `bardo init --workspace-root .` if the workspace has not been bootstrapped yet.
+5. Run `bardo connect --client codex --workspace-root .`.
+6. Open your client and use Bardo tools against the local workspace.
+
+## Exact commands
+
+For a new Codex workspace:
+
+```bash
+cd ~/projects/my-campaign
+bardo login
+bardo init --workspace-root .
+bardo connect --client codex --workspace-root .
+```
+
+If you are uploading a rules document while bootstrapping, use:
+
+```bash
+bardo init --workspace-root . --rulebook ./rules/core-rulebook.pdf
+```
+
+`bardo connect` can also log in and initialize for you, but the explicit sequence above is the easiest path to debug when you are setting up a workspace for the first time.
 
 ## What you approve
 

@@ -68,8 +68,56 @@ describe("bardo runtime", () => {
 			expect(saved.apiKey).toBe("test-key");
 			expect(saved.url).toBe("https://example.com/mcp");
 			expect(saved.statusUrl).toBe(
-				"https://app.bardo.ai/api/connect/runtime-status",
+				"https://www.bardo.gg/api/connect/runtime-status",
 			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("subcommand help flags render help instead of executing the command", async () => {
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		const exitCode = await runCli(["login", "--help"], {
+			stdout,
+			stderr,
+			fetch: async () => {
+				throw new Error("login --help should not trigger network calls");
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(stderr.read()).toBe("");
+		expect(stdout.read()).toContain("Usage:");
+		expect(stdout.read()).toContain("bardo login");
+	});
+
+	test("login stores config under XDG_CONFIG_HOME when it is set", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const xdgConfigHome = path.join(homeDir, ".xdg-config");
+
+		try {
+			const exitCode = await runCli(
+				["login", "--api-key", "test-key", "--url", "https://example.com/mcp"],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+					env: {
+						HOME: homeDir,
+						XDG_CONFIG_HOME: xdgConfigHome,
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			await expect(
+				readFile(path.join(xdgConfigHome, "bardo/config.json"), "utf8"),
+			).resolves.toContain('"apiKey": "test-key"');
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -294,21 +342,21 @@ describe("bardo runtime", () => {
 				stderr,
 				env: {
 					BARDO_LOGIN_START_URL:
-						"https://app.bardo.ai/api/connect/bridge-session/start",
+						"https://www.bardo.gg/api/connect/bridge-session/start",
 				},
 				sleep: async () => {},
 				fetch: async (input, init) => {
 					const url = String(input);
-					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
+					if (url === "https://www.bardo.gg/api/connect/bridge-session/start") {
 						expect(init?.method).toBe("POST");
 						return new Response(
 							JSON.stringify({
 								sessionId: "cli_session_123",
 								userCode: "ABCD-1234",
 								verificationUrl:
-									"https://app.bardo.ai/dashboard/connect/bridge/cli_session_123",
+									"https://www.bardo.gg/dashboard/connect/bridge/cli_session_123",
 								pollUrl:
-									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
+									"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123",
 								intervalMs: 1,
 								expiresAtISO: "2099-03-03T00:10:00.000Z",
 							}),
@@ -320,7 +368,7 @@ describe("bardo runtime", () => {
 					}
 					if (
 						url ===
-						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123"
+						"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_123&pollSecret=poll_secret_123"
 					) {
 						pollCount += 1;
 						if (pollCount === 1) {
@@ -341,10 +389,10 @@ describe("bardo runtime", () => {
 								accessToken: "bardo_bridge_access_device_flow",
 								refreshToken: "bardo_bridge_refresh_device_flow",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "https://mcp.bardo.ai",
-								statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+								mcpBaseUrl: "https://mcp.bardo.gg",
+								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
-									"https://app.bardo.ai/api/connect/bridge-session/refresh",
+									"https://www.bardo.gg/api/connect/bridge-session/refresh",
 								accountLabel: "Armando",
 								plan: "solo",
 								serverName: "bardo",
@@ -363,7 +411,7 @@ describe("bardo runtime", () => {
 			expect(exitCode).toBe(0);
 			expect(stderr.read()).toBe("");
 			expect(stdout.read()).toContain(
-				"https://app.bardo.ai/dashboard/connect/bridge/cli_session_123",
+				"https://www.bardo.gg/dashboard/connect/bridge/cli_session_123",
 			);
 			expect(stdout.read()).toContain("ABCD-1234");
 
@@ -384,12 +432,12 @@ describe("bardo runtime", () => {
 			expect(saved.accessToken).toBe("bardo_bridge_access_device_flow");
 			expect(saved.refreshToken).toBe("bardo_bridge_refresh_device_flow");
 			expect(saved.expiresAtISO).toBe("2099-03-03T00:10:00.000Z");
-			expect(saved.url).toBe("https://mcp.bardo.ai/mcp");
+			expect(saved.url).toBe("https://mcp.bardo.gg/mcp");
 			expect(saved.statusUrl).toBe(
-				"https://app.bardo.ai/api/connect/runtime-status",
+				"https://www.bardo.gg/api/connect/runtime-status",
 			);
 			expect(saved.refreshUrl).toBe(
-				"https://app.bardo.ai/api/connect/bridge-session/refresh",
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			);
 			expect(saved.accountLabel).toBe("Armando");
 			expect(saved.plan).toBe("solo");
@@ -537,20 +585,20 @@ describe("bardo runtime", () => {
 				stderr,
 				env: {
 					BARDO_LOGIN_START_URL:
-						"https://app.bardo.ai/api/connect/bridge-session/start",
+						"https://www.bardo.gg/api/connect/bridge-session/start",
 				},
 				sleep: async () => {},
 				fetch: async (input) => {
 					const url = String(input);
-					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
+					if (url === "https://www.bardo.gg/api/connect/bridge-session/start") {
 						return new Response(
 							JSON.stringify({
 								sessionId: "cli_session_legacy",
 								userCode: "LEGC-Y123",
 								verificationUrl:
-									"https://app.bardo.ai/dashboard/connect/bridge/cli_session_legacy",
+									"https://www.bardo.gg/dashboard/connect/bridge/cli_session_legacy",
 								pollUrl:
-									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy",
+									"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy",
 								intervalMs: 1,
 								expiresAtISO: "2099-03-03T00:10:00.000Z",
 							}),
@@ -562,7 +610,7 @@ describe("bardo runtime", () => {
 					}
 					if (
 						url ===
-						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy"
+						"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_legacy&pollSecret=poll_secret_legacy"
 					) {
 						return new Response(
 							JSON.stringify({
@@ -820,7 +868,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -873,8 +921,8 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -898,13 +946,13 @@ describe("bardo runtime", () => {
 								? init.headers.get("authorization")
 								: new Headers(init?.headers).get("authorization"),
 					});
-					if (url === "https://mcp.bardo.ai/health") {
+					if (url === "https://mcp.bardo.gg/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },
 						});
 					}
-					if (url === "https://app.bardo.ai/api/connect/runtime-status") {
+					if (url === "https://www.bardo.gg/api/connect/runtime-status") {
 						return new Response(
 							JSON.stringify({
 								valid: true,
@@ -942,7 +990,7 @@ describe("bardo runtime", () => {
 			expect(payload.account.fetched).toBe(true);
 			expect(payload.account.ok).toBe(true);
 			expect(payload.account.statusUrl).toBe(
-				"https://app.bardo.ai/api/connect/runtime-status",
+				"https://www.bardo.gg/api/connect/runtime-status",
 			);
 			expect(payload.account.subjectId).toBe("user_123");
 			expect(payload.account.keyId).toBe("key_123");
@@ -950,15 +998,15 @@ describe("bardo runtime", () => {
 			expect(payload.account.mcpPeriodLimit).toBe(25000);
 			expect(calls).toEqual([
 				{
-					url: "https://mcp.bardo.ai/health",
+					url: "https://mcp.bardo.gg/health",
 					auth: null,
 				},
 				{
-					url: "https://app.bardo.ai/api/connect/runtime-status",
+					url: "https://www.bardo.gg/api/connect/runtime-status",
 					auth: "Bearer test-key",
 				},
 				{
-					url: "https://app.bardo.ai/api/connect/runtime-status",
+					url: "https://www.bardo.gg/api/connect/runtime-status",
 					auth: null,
 				},
 			]);
@@ -1040,7 +1088,7 @@ describe("bardo runtime", () => {
 				"http://127.0.0.1:3001/api/connect/runtime-status",
 			);
 			expect(calls).not.toContain(
-				"https://app.bardo.ai/api/connect/runtime-status",
+				"https://www.bardo.gg/api/connect/runtime-status",
 			);
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -1182,8 +1230,8 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1201,13 +1249,13 @@ describe("bardo runtime", () => {
 					stderr: createWriter(),
 					fetch: async (input, init) => {
 						const url = String(input);
-						if (url === "https://mcp.bardo.ai/health") {
+						if (url === "https://mcp.bardo.gg/health") {
 							return new Response(JSON.stringify({ ok: true }), {
 								status: 200,
 								headers: { "content-type": "application/json" },
 							});
 						}
-						if (url === "https://app.bardo.ai/api/connect/runtime-status") {
+						if (url === "https://www.bardo.gg/api/connect/runtime-status") {
 							if (new Headers(init?.headers).get("authorization")) {
 								return new Response(
 									JSON.stringify({
@@ -1272,7 +1320,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1335,7 +1383,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1399,7 +1447,7 @@ describe("bardo runtime", () => {
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1412,7 +1460,7 @@ describe("bardo runtime", () => {
 				path.join(workspaceRoot, ".codex/config.toml"),
 				`[mcp_servers.bardo]
 
-url = "https://mcp.bardo.ai/mcp"
+url = "https://mcp.bardo.gg/mcp"
 http_headers = { Authorization = "Bearer bardo_live_saved" }
 `,
 				"utf8",
@@ -1464,7 +1512,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1711,8 +1759,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -1739,7 +1787,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				},
 				fetch: async (input, init) => {
 					expect(String(input)).toBe(
-						"https://app.bardo.ai/api/connect/runtime-status",
+						"https://www.bardo.gg/api/connect/runtime-status",
 					);
 					expect(new Headers(init?.headers).get("authorization")).toBe(
 						"Bearer test-key",
@@ -1760,7 +1808,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(exitCode).toBe(0);
 			expect(received).toEqual({
 				apiKey: "test-key",
-				url: "https://mcp.bardo.ai/mcp",
+				url: "https://mcp.bardo.gg/mcp",
 				workspaceRoot,
 				plan: "solo",
 			});
@@ -2063,8 +2111,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2113,8 +2161,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "test-key",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2170,8 +2218,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2212,7 +2260,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2270,7 +2318,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2310,7 +2358,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2350,7 +2398,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2386,6 +2434,35 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
+	test("install can write a local client config before login when a local MCP URL is provided", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			const exitCode = await runCli(["install", "--client", "codex"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				env: {
+					BARDO_MCP_URL: "http://127.0.0.1:3000/mcp",
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain(".codex/config.toml");
+			await expect(
+				readFile(path.join(workspaceRoot, ".codex/config.toml"), "utf8"),
+			).resolves.toContain('command = "bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("install auto-detect fails when multiple supported client configs already exist", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -2398,7 +2475,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2453,7 +2530,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_connect",
 					"--url",
-					"https://mcp.bardo.ai/mcp",
+					"https://mcp.bardo.gg/mcp",
 					"--ruleset",
 					"shadowdark",
 				],
@@ -2510,7 +2587,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_connect",
 					"--url",
-					"https://mcp.bardo.ai/mcp",
+					"https://mcp.bardo.gg/mcp",
 					"--ruleset",
 					"shadowdark",
 				],
@@ -2551,8 +2628,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2590,7 +2667,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				statusUrl?: string;
 			};
 			expect(saved.apiKey).toBe("bardo_live_saved");
-			expect(saved.url).toBe("https://mcp.bardo.ai/mcp");
+			expect(saved.url).toBe("https://mcp.bardo.gg/mcp");
 			expect(saved.statusUrl).toBe(
 				"https://staging.bardo.ai/api/connect/runtime-status",
 			);
@@ -2616,7 +2693,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--url",
 					"https://mcp-env.bardo.ai/mcp",
 					"--status-url",
-					"https://app.bardo.ai/api/connect/runtime-status",
+					"https://www.bardo.gg/api/connect/runtime-status",
 					"--server-name",
 					"campaign-gm",
 					"--skip-init",
@@ -2645,7 +2722,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(saved).toMatchObject({
 				apiKey: "bardo_live_env_only",
 				url: "https://mcp-env.bardo.ai/mcp",
-				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+				statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 				serverName: "campaign-gm",
 			});
 
@@ -2787,7 +2864,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"--api-key",
 					"bardo_live_preview",
 					"--url",
-					"https://mcp.bardo.ai/mcp",
+					"https://mcp.bardo.gg/mcp",
 				],
 				{
 					cwd: workspaceRoot,
@@ -2869,7 +2946,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2928,7 +3005,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved",
-						url: "https://mcp.bardo.ai/mcp",
+						url: "https://mcp.bardo.gg/mcp",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -2990,7 +3067,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					"mcp",
 					"serve",
 					"--url",
-					"https://mcp.bardo.ai/mcp",
+					"https://mcp.bardo.gg/mcp",
 					"--workspace-root",
 					".",
 				],
@@ -3046,8 +3123,8 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				JSON.stringify(
 					{
 						apiKey: "bardo_live_saved_secret",
-						url: "https://mcp.bardo.ai/mcp",
-						statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+						url: "https://mcp.bardo.gg/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 						updatedAtISO: "2026-03-03T00:00:00.000Z",
 					},
 					null,
@@ -3069,13 +3146,13 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				stderr: createWriter(),
 				fetch: async (input) => {
 					const url = String(input);
-					if (url === "https://mcp.bardo.ai/health") {
+					if (url === "https://mcp.bardo.gg/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },
 						});
 					}
-					if (url === "https://app.bardo.ai/api/connect/runtime-status") {
+					if (url === "https://www.bardo.gg/api/connect/runtime-status") {
 						return new Response(
 							JSON.stringify({
 								valid: true,

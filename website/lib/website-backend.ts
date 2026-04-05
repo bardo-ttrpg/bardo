@@ -98,10 +98,19 @@ function resolveBackendPath(
 	env: Record<string, string | undefined>,
 ): string | null {
 	const configured = env.BARDO_WEBSITE_BACKEND_SQLITE_PATH?.trim();
-	if (!configured) {
-		return null;
+	if (configured) {
+		return path.resolve(configured);
 	}
-	return path.resolve(configured);
+
+	const isHostedPreviewOrProduction =
+		env.VERCEL === "1" ||
+		env.VERCEL_ENV === "preview" ||
+		env.VERCEL_ENV === "production";
+	if (isHostedPreviewOrProduction) {
+		return "/tmp/bardo/website-backend.json";
+	}
+
+	return null;
 }
 
 function ensureParent(filePath: string): void {

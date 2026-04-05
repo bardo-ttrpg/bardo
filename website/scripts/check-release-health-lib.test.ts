@@ -26,6 +26,9 @@ describe("checkReleaseHealth", () => {
 		expect(result.errors).toContain("CLERK_SECRET_KEY is missing");
 		expect(result.errors).toContain("BARDO_MCP_BASE_URL is missing");
 		expect(result.errors).toContain("NEXT_PUBLIC_APP_URL is missing");
+		expect(result.errors).toContain("BARDO_APP_BASE_URL is missing");
+		expect(result.errors).toContain("BARDO_RUNTIME_STATUS_URL is missing");
+		expect(result.errors).toContain("BARDO_BRIDGE_SESSION_REFRESH_URL is missing");
 		expect(result.errors).toContain(
 			"BARDO_RC_SHA or deployment commit SHA is missing",
 		);
@@ -36,8 +39,12 @@ describe("checkReleaseHealth", () => {
 			CI: "true",
 			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
 			CLERK_SECRET_KEY: "sk_live_123",
-			BARDO_MCP_BASE_URL: "https://mcp.bardo.ai",
-			NEXT_PUBLIC_APP_URL: "https://app.bardo.ai",
+			BARDO_MCP_BASE_URL: "https://mcp.bardo.gg",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			VERCEL_GIT_COMMIT_SHA: "abc123",
 		});
 

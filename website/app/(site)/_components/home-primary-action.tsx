@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { resolveHomePrimaryActionState } from "./home-primary-action-state";
 
 const homeActionClassName = "home-action-button";
+const homeActionOutlineClassName = `${homeActionClassName} border-border hover:border-primary hover:bg-transparent hover:text-primary`;
 
 export function HomePrimaryAction({ clerkEnabled }: { clerkEnabled: boolean }) {
 	if (!clerkEnabled) {
@@ -34,7 +35,7 @@ function ResolvedHomePrimaryAction() {
 				asChild
 				variant="outline"
 				size="sm"
-				className={`${homeActionClassName} border-border hover:border-primary hover:bg-transparent hover:text-primary`}
+				className={homeActionOutlineClassName}
 			>
 				<Link href="/dashboard">Dashboard</Link>
 			</Button>
@@ -48,7 +49,7 @@ function ResolvedHomePrimaryAction() {
 				variant="outline"
 				disabled
 				aria-busy="true"
-				className={`${homeActionClassName} border-border text-muted-foreground opacity-100`}
+				className={`${homeActionOutlineClassName} text-muted-foreground opacity-100`}
 			>
 				Account
 			</Button>
@@ -66,7 +67,12 @@ function PrimaryHomeLink({
 	children: string;
 }) {
 	return (
-		<Button asChild size="sm" className={homeActionClassName}>
+		<Button
+			asChild
+			variant="outline"
+			size="sm"
+			className={homeActionOutlineClassName}
+		>
 			<Link href={href}>{children}</Link>
 		</Button>
 	);

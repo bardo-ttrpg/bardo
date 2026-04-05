@@ -41,20 +41,20 @@ describe("bardo runtime smoke gate", () => {
 				stderr: loginStderr,
 				env: {
 					BARDO_LOGIN_START_URL:
-						"https://app.bardo.ai/api/connect/bridge-session/start",
+						"https://www.bardo.gg/api/connect/bridge-session/start",
 				},
 				sleep: async () => {},
 				fetch: async (input) => {
 					const url = String(input);
-					if (url === "https://app.bardo.ai/api/connect/bridge-session/start") {
+					if (url === "https://www.bardo.gg/api/connect/bridge-session/start") {
 						return new Response(
 							JSON.stringify({
 								sessionId: "bridge_session_123",
 								userCode: "ABCD-1234",
 								verificationUrl:
-									"https://app.bardo.ai/dashboard/connect/bridge/bridge_session_123",
+									"https://www.bardo.gg/dashboard/connect/bridge/bridge_session_123",
 								pollUrl:
-									"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123",
+									"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123",
 								intervalMs: 1,
 							}),
 							{
@@ -65,7 +65,7 @@ describe("bardo runtime smoke gate", () => {
 					}
 					if (
 						url ===
-						"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123"
+						"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123"
 					) {
 						return new Response(
 							JSON.stringify({
@@ -73,10 +73,10 @@ describe("bardo runtime smoke gate", () => {
 								accessToken: "bardo_bridge_access_smoke",
 								refreshToken: "bardo_bridge_refresh_smoke",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "https://mcp.bardo.ai",
-								statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+								mcpBaseUrl: "https://mcp.bardo.gg",
+								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
-									"https://app.bardo.ai/api/connect/bridge-session/refresh",
+									"https://www.bardo.gg/api/connect/bridge-session/refresh",
 								accountLabel: "Smoke User",
 								plan: "solo",
 								serverName: "bardo",
@@ -116,13 +116,13 @@ describe("bardo runtime smoke gate", () => {
 				stderr: doctorStderr,
 				fetch: async (input, init) => {
 					const url = String(input);
-					if (url === "https://mcp.bardo.ai/health") {
+					if (url === "https://mcp.bardo.gg/health") {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },
 						});
 					}
-					if (url === "https://app.bardo.ai/api/connect/runtime-status") {
+					if (url === "https://www.bardo.gg/api/connect/runtime-status") {
 						const auth = new Headers(init?.headers).get("authorization");
 						expect(auth).toBe("Bearer bardo_bridge_access_smoke");
 						return new Response(
