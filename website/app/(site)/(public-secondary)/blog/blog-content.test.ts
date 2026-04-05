@@ -10,6 +10,10 @@ const blogEntryRouteSource = readFileSync(
 	new URL("./[slug]/page.tsx", import.meta.url),
 	"utf8",
 );
+const blogShellSource = readFileSync(
+	new URL("./_components/blog-shell.tsx", import.meta.url),
+	"utf8",
+);
 
 describe("blog content", () => {
 	test("drives blog routes from the local manifest and static params", () => {
@@ -17,14 +21,23 @@ describe("blog content", () => {
 		expect(listBlogStaticParams()).toEqual([]);
 	});
 
-	test("falls back to description when a blog entry preview is missing", () => {
-		expect(blogPageSource).toContain("entry.preview ?? entry.description");
+	test("redirects /blog to the latest published post when one exists", () => {
+		expect(blogPageSource).toContain('redirect(latestEntry.href)');
 	});
 
-	test("keeps the redesigned index honest when there are no published posts", () => {
+	test("falls back to a no-post state when there is nothing to redirect to", () => {
 		expect(blogPageSource).toContain("No posts are published yet.");
 		expect(blogPageSource).toContain("Read the docs");
-		expect(blogPageSource).toContain("Published entries right now.");
+	});
+
+	test("uses a legal-style blog shell with a left navigation rail", () => {
+		expect(blogShellSource).toContain('aria-label="Blog posts"');
+		expect(blogShellSource).toContain("listBlogEntries()");
+		expect(blogEntryRouteSource).toContain("BlogEntryShell");
+	});
+
+	test("falls back to description when a blog entry preview is missing", () => {
+		expect(blogShellSource).toContain("entry.preview ?? entry.description");
 	});
 
 	test("uses a single static route for blog entries", () => {

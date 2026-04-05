@@ -2,14 +2,92 @@ import type {
 	MechanicsValidationInput,
 	MechanicsValidationResult,
 	ResolveMechanicsInput,
+	RulesetActionDefinition,
 	RulesetAdapter,
 } from "./types";
 
-const SUPPORTED_ACTION_TYPES = [
-	"narrative_check",
-	"social_check",
-	"exploration_check",
+const ACTION_TYPES: readonly RulesetActionDefinition[] = [
+	{
+		id: "narrative_check",
+		label: "Narrative Check",
+		description: "A generic fiction-first check with deterministic framing.",
+		intents: ["general", "combat"],
+		supportLevel: "full",
+		targetDifficulty: { required: false, min: 1, max: 40, default: 10 },
+		modifier: { default: 0, min: null, max: null },
+		contested: {
+			enabled: false,
+			opponentLabel: null,
+			opponentExpression: null,
+			tieOutcome: null,
+		},
+		resolution: {
+			mode: "deterministic",
+			expression: null,
+			successCondition: "total_gte_target",
+			deterministicTotal: 10,
+			guidance: null,
+		},
+		outcomeBands: [],
+		resourceEffects: [],
+		clockEffects: [],
+		consequenceChains: [],
+	},
+	{
+		id: "social_check",
+		label: "Social Check",
+		description: "A fiction-first social push with deterministic framing.",
+		intents: ["social"],
+		supportLevel: "full",
+		targetDifficulty: { required: false, min: 1, max: 40, default: 10 },
+		modifier: { default: 0, min: null, max: null },
+		contested: {
+			enabled: false,
+			opponentLabel: null,
+			opponentExpression: null,
+			tieOutcome: null,
+		},
+		resolution: {
+			mode: "deterministic",
+			expression: null,
+			successCondition: "total_gte_target",
+			deterministicTotal: 10,
+			guidance: null,
+		},
+		outcomeBands: [],
+		resourceEffects: [],
+		clockEffects: [],
+		consequenceChains: [],
+	},
+	{
+		id: "exploration_check",
+		label: "Exploration Check",
+		description: "A fiction-first discovery or search check.",
+		intents: ["explore"],
+		supportLevel: "full",
+		targetDifficulty: { required: false, min: 1, max: 40, default: 10 },
+		modifier: { default: 0, min: null, max: null },
+		contested: {
+			enabled: false,
+			opponentLabel: null,
+			opponentExpression: null,
+			tieOutcome: null,
+		},
+		resolution: {
+			mode: "deterministic",
+			expression: null,
+			successCondition: "total_gte_target",
+			deterministicTotal: 10,
+			guidance: null,
+		},
+		outcomeBands: [],
+		resourceEffects: [],
+		clockEffects: [],
+		consequenceChains: [],
+	},
 ] as const;
+
+const SUPPORTED_ACTION_TYPES = ACTION_TYPES.map((action) => action.id);
 
 function normalize(input: ResolveMechanicsInput): MechanicsValidationInput {
 	return {
@@ -18,6 +96,9 @@ function normalize(input: ResolveMechanicsInput): MechanicsValidationInput {
 		targetDifficulty:
 			typeof input.targetDifficulty === "number" ? input.targetDifficulty : 10,
 		modifier: typeof input.modifier === "number" ? input.modifier : 0,
+		opposedDifficulty: null,
+		opposedModifier: 0,
+		opposedTotal: null,
 		actorId:
 			typeof input.actorId === "string" && input.actorId.trim().length > 0
 				? input.actorId.trim()
@@ -28,6 +109,10 @@ function normalize(input: ResolveMechanicsInput): MechanicsValidationInput {
 				? input.declaredIntent.trim()
 				: null,
 		advantage: null,
+		availableResources:
+			input.availableResources && Object.keys(input.availableResources).length > 0
+				? input.availableResources
+				: null,
 	};
 }
 
@@ -67,11 +152,16 @@ function validate(input: ResolveMechanicsInput): MechanicsValidationResult {
 		errors,
 		warnings,
 		normalized,
+		supportLevel: "full",
+		actionDefinition:
+			ACTION_TYPES.find((action) => action.id === normalized.actionType) ?? null,
 	};
 }
 
 export const narrativeV1RulesetAdapter: RulesetAdapter = {
 	id: "narrative_v1",
+	title: "Narrative v1",
+	sourceType: "builtin",
 	supportedActionTypes: SUPPORTED_ACTION_TYPES,
 	capabilities: {
 		contested: false,
@@ -80,6 +170,7 @@ export const narrativeV1RulesetAdapter: RulesetAdapter = {
 		interrupts: false,
 		resourceTracking: false,
 	},
+	actionTypes: ACTION_TYPES,
 	validate,
 	resolve(input) {
 		const validation = validate(input);
@@ -94,7 +185,21 @@ export const narrativeV1RulesetAdapter: RulesetAdapter = {
 				total: null,
 				outcome: null,
 				margin: null,
+				outcomeBand: null,
+				contested: null,
+				stateEffects: {
+					resources: [],
+					clocks: [],
+				},
+				consequencePlan: {
+					matchedChains: [],
+					branchTransitions: [],
+					steps: [],
+					decisionNodes: [],
+				},
 				resolutionMode: "unsupported",
+				supportLevel: validation.supportLevel,
+				requiresHumanJudgment: true,
 				unsupportedReason: validation.errors.join("; "),
 				trace: {
 					validationErrors: validation.errors,
@@ -117,12 +222,31 @@ export const narrativeV1RulesetAdapter: RulesetAdapter = {
 			total,
 			outcome,
 			margin: total - targetDifficulty,
+			outcomeBand: null,
+			contested: null,
+			stateEffects: {
+				resources: [],
+				clocks: [],
+			},
+			consequencePlan: {
+				matchedChains: [],
+				branchTransitions: [],
+				steps: [],
+				decisionNodes: [],
+			},
 			resolutionMode: "deterministic",
+			supportLevel: "full",
+			requiresHumanJudgment: false,
 			unsupportedReason: null,
 			trace: {
 				model: "narrative_v1_deterministic",
 				validationWarnings: validation.warnings,
 			},
 		};
+	},
+	resolveActionTypeForIntent(intent) {
+		return (
+			ACTION_TYPES.find((action) => action.intents.includes(intent))?.id ?? null
+		);
 	},
 };

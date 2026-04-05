@@ -246,6 +246,10 @@ export function listBlogEntries() {
 	return blogEntries;
 }
 
+export function getLatestBlogEntry() {
+	return blogEntries[0] ?? null;
+}
+
 export function getBlogEntryBySlug(slug: string) {
 	return blogEntries.find((entry) => entry.slug === slug) ?? null;
 }
