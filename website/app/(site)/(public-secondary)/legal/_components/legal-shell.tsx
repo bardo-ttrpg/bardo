@@ -66,36 +66,38 @@ export function LegalEntryShell({
 					</BardoViewTransition>
 					<BardoViewTransition>
 						<div className="min-w-0">
-						<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
-							{/* <p className="ui-label text-muted-foreground">{entry.eyebrow}</p> */}
-							<div className="flex flex-col gap-3">
-								<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
-									{entry.title}
-								</h1>
-								<p className="font-reading-body max-w-2xl text-lg text-muted-foreground">
-									{entry.summary}
-								</p>
-							</div>
-							<dl className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
-								<div className="flex flex-col gap-1">
-									<dt className="ui-label text-muted-foreground">Effective</dt>
-									<dd className="font-reading-body text-foreground">
-										{entry.effectiveDate}
-									</dd>
+							<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
+								{/* <p className="ui-label text-muted-foreground">{entry.eyebrow}</p> */}
+								<div className="flex flex-col gap-3">
+									<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+										{entry.title}
+									</h1>
+									<p className="font-reading-body max-w-2xl text-lg text-muted-foreground">
+										{entry.summary}
+									</p>
 								</div>
-								<div className="flex flex-col gap-1">
-									<dt className="ui-label text-muted-foreground">
-										Last updated
-									</dt>
-									<dd className="font-reading-body text-foreground">
-										{entry.lastUpdated}
-									</dd>
-								</div>
-							</dl>
-						</header>
-						<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-8 text-foreground">
-							{children}
-						</article>
+								<dl className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
+									<div className="flex flex-col gap-1">
+										<dt className="ui-label text-muted-foreground">
+											Effective
+										</dt>
+										<dd className="font-reading-body text-foreground">
+											{entry.effectiveDate}
+										</dd>
+									</div>
+									<div className="flex flex-col gap-1">
+										<dt className="ui-label text-muted-foreground">
+											Last updated
+										</dt>
+										<dd className="font-reading-body text-foreground">
+											{entry.lastUpdated}
+										</dd>
+									</div>
+								</dl>
+							</header>
+							<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-8 text-foreground">
+								{children}
+							</article>
 						</div>
 					</BardoViewTransition>
 				</div>

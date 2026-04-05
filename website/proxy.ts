@@ -72,7 +72,8 @@ function maybeRedirectLegacyMcpDomain(request: NextRequest): Response | null {
 		return null;
 	}
 
-	const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://www.bardo.gg";
+	const appBaseUrl =
+		process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://www.bardo.gg";
 	const redirectUrl = new URL("/docs/connect-client", appBaseUrl);
 	return NextResponse.redirect(redirectUrl, 308);
 }

@@ -60,31 +60,35 @@ export function BlogEntryShell({
 					</BardoViewTransition>
 					<BardoViewTransition>
 						<div className="min-w-0">
-						<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
-							<div className="flex flex-col gap-3">
-								<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
-									{entry.title}
-								</h1>
-								<p className="font-reading-body max-w-2xl text-lg text-muted-foreground">
-									{entry.preview ?? entry.description}
-								</p>
-							</div>
-							<dl className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
-								<div className="flex flex-col gap-1">
-									<dt className="ui-label text-muted-foreground">Published</dt>
-									<dd className="font-reading-body text-foreground">
-										{entry.publishedAt}
-									</dd>
+							<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
+								<div className="flex flex-col gap-3">
+									<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+										{entry.title}
+									</h1>
+									<p className="font-reading-body max-w-2xl text-lg text-muted-foreground">
+										{entry.preview ?? entry.description}
+									</p>
 								</div>
-								<div className="flex flex-col gap-1">
-									<dt className="ui-label text-muted-foreground">Collection</dt>
-									<dd className="font-reading-body text-foreground">Blog</dd>
-								</div>
-							</dl>
-						</header>
-						<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-6 text-foreground">
-							{children}
-						</article>
+								<dl className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
+									<div className="flex flex-col gap-1">
+										<dt className="ui-label text-muted-foreground">
+											Published
+										</dt>
+										<dd className="font-reading-body text-foreground">
+											{entry.publishedAt}
+										</dd>
+									</div>
+									<div className="flex flex-col gap-1">
+										<dt className="ui-label text-muted-foreground">
+											Collection
+										</dt>
+										<dd className="font-reading-body text-foreground">Blog</dd>
+									</div>
+								</dl>
+							</header>
+							<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-6 text-foreground">
+								{children}
+							</article>
 						</div>
 					</BardoViewTransition>
 				</div>

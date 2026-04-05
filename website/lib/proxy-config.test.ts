@@ -35,9 +35,9 @@ describe("shouldRunClerkForPagePathname", () => {
 
 describe("shouldRedirectLegacyMcpHost", () => {
 	test("matches the legacy hosted MCP domain on host headers", () => {
-		expect(
-			shouldRedirectLegacyMcpHost({ hostHeader: "mcp.bardo.gg" }),
-		).toBe(true);
+		expect(shouldRedirectLegacyMcpHost({ hostHeader: "mcp.bardo.gg" })).toBe(
+			true,
+		);
 		expect(
 			shouldRedirectLegacyMcpHost({
 				forwardedHostHeader: "mcp.bardo.gg",
@@ -51,9 +51,9 @@ describe("shouldRedirectLegacyMcpHost", () => {
 	});
 
 	test("ignores the public website host", () => {
-		expect(
-			shouldRedirectLegacyMcpHost({ hostHeader: "www.bardo.gg" }),
-		).toBe(false);
+		expect(shouldRedirectLegacyMcpHost({ hostHeader: "www.bardo.gg" })).toBe(
+			false,
+		);
 		expect(
 			shouldRedirectLegacyMcpHost({ forwardedHostHeader: "bardo.gg" }),
 		).toBe(false);

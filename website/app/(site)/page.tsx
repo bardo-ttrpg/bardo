@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { TransitionLink } from "@/components/transition-link";
+import { Button } from "@/components/ui/button";
 import { BardoViewTransition } from "@/components/view-transition";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPublicMetadata } from "@/lib/site-metadata";
@@ -81,14 +81,16 @@ export default async function SitePage() {
 
 						<p className={bodyClassName}>
 							Bardo is the MCP for playing any tabletop role-playing game. It
-							works with many modern AI clients, keeps your campaign files local,
-							and grounds the model in your real workspace so it stays far more
-							accurate.
+							works with many modern AI clients, keeps your campaign files
+							local, and grounds the model in your real workspace so it stays
+							far more accurate.
 						</p>
 
 						<div className="flex flex-wrap items-center gap-4 pt-2">
 							<Button asChild size="sm" className={homeActionClassName}>
-								<TransitionLink href="/docs/install">Start Playing</TransitionLink>
+								<TransitionLink href="/docs/install">
+									Start Playing
+								</TransitionLink>
 							</Button>
 							<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
 						</div>

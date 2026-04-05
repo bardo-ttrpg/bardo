@@ -42,7 +42,11 @@ export function SiteBrandHeader({ className }: { className?: string }) {
 			className={cn("flex items-center justify-between gap-4", className)}
 		>
 			<BardoViewTransition name="bardo-site-brand">
-				<TransitionLink href="/" aria-label="Bardo home" className="inline-block">
+				<TransitionLink
+					href="/"
+					aria-label="Bardo home"
+					className="inline-block"
+				>
 					<BrandScrambleHover
 						text="BARDO"
 						scrambleSpeed={85}

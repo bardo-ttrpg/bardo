@@ -9,4 +9,3 @@ export function TransitionLink({
 }: TransitionLinkProps) {
 	return <Link transitionTypes={transitionTypes} {...props} />;
 }
-

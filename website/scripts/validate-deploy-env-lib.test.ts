@@ -21,7 +21,9 @@ describe("validateDeployEnv", () => {
 		expect(result.errors).toContain("NEXT_PUBLIC_APP_URL is missing");
 		expect(result.errors).toContain("BARDO_APP_BASE_URL is missing");
 		expect(result.errors).toContain("BARDO_RUNTIME_STATUS_URL is missing");
-		expect(result.errors).toContain("BARDO_BRIDGE_SESSION_REFRESH_URL is missing");
+		expect(result.errors).toContain(
+			"BARDO_BRIDGE_SESSION_REFRESH_URL is missing",
+		);
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
 			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
@@ -35,7 +37,8 @@ describe("validateDeployEnv", () => {
 			CLERK_SECRET_KEY: "sk_live_123",
 			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
 			BARDO_APP_BASE_URL: "https://www.bardo.gg",
-			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
 			BARDO_BRIDGE_SESSION_REFRESH_URL:
 				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
@@ -55,7 +58,8 @@ describe("validateDeployEnv", () => {
 			CLERK_SECRET_KEY: "sk_live_123",
 			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
 			BARDO_APP_BASE_URL: "https://www.bardo.gg",
-			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
 			BARDO_BRIDGE_SESSION_REFRESH_URL:
 				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
@@ -75,7 +79,8 @@ describe("validateDeployEnv", () => {
 			CLERK_SECRET_KEY: "sk_live_123",
 			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
 			BARDO_APP_BASE_URL: "https://www.bardo.gg",
-			BARDO_RUNTIME_STATUS_URL: "https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
 			BARDO_BRIDGE_SESSION_REFRESH_URL:
 				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",
@@ -97,7 +102,8 @@ describe("validateDeployEnv", () => {
 			CLERK_SECRET_KEY: "sk_live_123",
 			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
 			BARDO_APP_BASE_URL: "https://www.bardo.gg",
-			BARDO_RUNTIME_STATUS_URL: "http://127.0.0.1:3001/api/connect/runtime-status",
+			BARDO_RUNTIME_STATUS_URL:
+				"http://127.0.0.1:3001/api/connect/runtime-status",
 			BARDO_BRIDGE_SESSION_REFRESH_URL:
 				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			BARDO_BRIDGE_LOGIN_SECRET: "secret",

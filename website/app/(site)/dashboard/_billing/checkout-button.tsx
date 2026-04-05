@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { TransitionLink } from "@/components/transition-link";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import { resolveCheckoutRenderState } from "./billing-cta-state";

@@ -56,7 +56,9 @@ function requireHttpsUrl(
 			url.hostname === "127.0.0.1" ||
 			url.hostname === "::1"
 		) {
-			errors.push(`${label} must not point to localhost in release environments`);
+			errors.push(
+				`${label} must not point to localhost in release environments`,
+			);
 			return undefined;
 		}
 		return normalized;

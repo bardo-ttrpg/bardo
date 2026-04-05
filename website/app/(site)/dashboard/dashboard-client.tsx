@@ -243,26 +243,26 @@ export function DashboardClient({
 		<div className="mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pb-24 sm:pt-8 lg:pt-10">
 			<BardoViewTransition>
 				<div className="flex flex-col gap-6 border border-border bg-card p-6 lg:flex-row lg:items-end lg:justify-between">
-				<div className="space-y-3">
-					<p className={dashboardLabelClassName}>Account Dashboard</p>
-					<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
-						Dashboard.
-					</h1>
-					<p className="font-reading-body max-w-3xl text-muted-foreground">
-						Use this page to verify billing state, connect a supported client,
-						and approve bridge sessions without the old marketing shell around
-						it.
-					</p>
-				</div>
-				<div className="flex items-center gap-3">
-					<TransitionLink
-						href="/docs/connect-client"
-						className={dashboardSubtleActionClassName}
-					>
-						Client Setup
-					</TransitionLink>
-					<DashboardSignOutButton />
-				</div>
+					<div className="space-y-3">
+						<p className={dashboardLabelClassName}>Account Dashboard</p>
+						<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
+							Dashboard.
+						</h1>
+						<p className="font-reading-body max-w-3xl text-muted-foreground">
+							Use this page to verify billing state, connect a supported client,
+							and approve bridge sessions without the old marketing shell around
+							it.
+						</p>
+					</div>
+					<div className="flex items-center gap-3">
+						<TransitionLink
+							href="/docs/connect-client"
+							className={dashboardSubtleActionClassName}
+						>
+							Client Setup
+						</TransitionLink>
+						<DashboardSignOutButton />
+					</div>
 				</div>
 			</BardoViewTransition>
 
@@ -288,8 +288,8 @@ export function DashboardClient({
 					<DashboardCard label="Supported Clients">
 						<p className="font-reading-body text-muted-foreground">
 							The bridge is designed for common MCP-capable clients. The path is
-							intentionally narrow: install, connect, approve in the browser, then
-							work from your local workspace.
+							intentionally narrow: install, connect, approve in the browser,
+							then work from your local workspace.
 						</p>
 						<div className="mt-4 flex flex-wrap gap-2">
 							{SUPPORTED_CLIENT_LABELS.map((label) => (
