@@ -1,19 +1,21 @@
-Bardo keeps the public docs intentionally narrow. This section exists to help you install the bridge, connect a client, understand the product boundary, and find billing context without mixing those concerns into every route.
+Bardo keeps the public docs intentionally product-focused. This section exists to help you install the bridge, connect a client, understand where campaign truth lives, and see how the current MCP surface, runtime skills, and ruleset mechanics fit together without turning the docs into a second dashboard.
 
 ## What Bardo covers
 
 - Install the local bridge with the published shell scripts.
 - Connect an MCP-capable client to your local workspace.
 - Understand where campaign truth lives and where it does not.
-- Check how credits and billing appear in the protected dashboard.
+- Discover the trusted-copilot MCP surface, including mechanics and planning tools.
+- Understand how uploaded rulesets, runtime skills, and table-decision nodes shape behavior.
 
 ## Recommended path
 
 1. Install the bridge on the machine where your campaign files live.
 2. Connect your preferred AI client and approve the browser session.
 3. Use the campaign truth model as the mental boundary for local versus hosted behavior.
-4. Open the billing page only when you need subscription or usage details.
+4. Review the MCP surface and ruleset mechanics pages before designing a workflow around custom rules.
+5. Open the billing page only when you need subscription or usage details.
 
 ## What stays outside docs
 
-The dashboard, Clerk authentication flows, bridge approval polling, and API routes stay server-backed. The docs remain static on purpose so they load fast and stay easy to maintain.
+The dashboard, Clerk authentication flows, bridge approval polling, billing actions, and API routes stay server-backed. The docs remain static on purpose so they load fast, stay searchable, and describe the stable public product boundary rather than every internal implementation detail.

@@ -31,7 +31,7 @@ type PricingBillingState = {
 const pricingToggleClassName =
 	"ui-button rounded-full px-4 py-2 text-sm transition-colors";
 const pricingPrimaryActionClassName =
-	"ui-button inline-flex w-full items-center justify-center rounded-full bg-primary px-5 py-2.5 text-primary-foreground transition-colors hover:bg-primary/90";
+	"ui-button inline-flex w-full md:w-80 items-center justify-center rounded-full bg-primary px-5 py-2.5 text-primary-foreground transition-colors hover:bg-primary/90";
 
 const pricingPros = [
 	"Understands your world before it acts.",

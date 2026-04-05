@@ -387,7 +387,7 @@ export function syncStateForDiscoveries(args: {
 function mechanicsSummary(args: {
 	required: boolean;
 	resolved: boolean;
-	outcome: "success" | "failure" | null;
+	outcome: string | null;
 	total: number | null;
 	targetDifficulty: number | null;
 }): string {
@@ -418,7 +418,7 @@ export function buildGmPacket(args: {
 	mechanics: {
 		required: boolean;
 		resolved: boolean;
-		outcome: "success" | "failure" | null;
+		outcome: string | null;
 		total: number | null;
 		targetDifficulty: number | null;
 	};
@@ -437,9 +437,11 @@ export function buildGmPacket(args: {
 			disposition: args.state.npcs[discovery.id]?.disposition ?? "neutral",
 		}));
 	const outcome =
-		args.mechanics.required && args.mechanics.outcome
-			? args.mechanics.outcome
-			: "mixed";
+		args.mechanics.required && args.mechanics.outcome === "success"
+			? "success"
+			: args.mechanics.required && args.mechanics.outcome === "failure"
+				? "failure"
+				: "mixed";
 	const fiction =
 		outcome === "success"
 			? "The action lands cleanly and opens the scene."

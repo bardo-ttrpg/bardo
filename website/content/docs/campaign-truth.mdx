@@ -6,10 +6,12 @@ Your workspace remains the canonical source for campaign files and any local fil
 
 ## Remote service boundary
 
-The hosted side governs bridge approvals, subscription state, rate limits, and remote tool execution. Those concerns are account- and service-level, not campaign truth.
+The hosted side governs bridge approvals, subscription state, rate limits, runtime skill delivery, and remote tool execution. Those concerns are account- and service-level, not campaign truth.
 
 ## How to think about the split
 
-Use a simple rule: if a question depends on your files, the answer should come from the local workspace. If it depends on access policy, billing, or metering, it comes from the remote service.
+Use a simple rule: if a question depends on your files, the answer should come from the local workspace. If it depends on access policy, billing, metering, or tunnel/session behavior, it comes from the remote service.
+
+The current MCP surface is designed around that split. Read-only reporting, mechanics guidance, planning tools, and sync previews can help an agent reason well, but the underlying campaign truth still lives in the workspace you control.
 
 <Lore>The campaign remembers what the table agreed was true.</Lore>

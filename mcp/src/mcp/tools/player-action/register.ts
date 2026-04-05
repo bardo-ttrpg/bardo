@@ -79,9 +79,15 @@ type PlayerActionMechanics = {
 	advantage: AdvantageMode | null;
 	rawRoll: number | null;
 	total: number | null;
-	outcome: "success" | "failure" | null;
+	outcome: string | null;
 	margin: number | null;
-	resolutionMode: "dice" | "deterministic" | "unsupported" | null;
+	resolutionMode:
+		| "dice"
+		| "deterministic"
+		| "partial"
+		| "advisory"
+		| "unsupported"
+		| null;
 	unsupportedReason: string | null;
 	trace: Record<string, unknown> | null;
 	validationErrors: string[];

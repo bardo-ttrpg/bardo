@@ -17,7 +17,7 @@ const explicit404Source = readFileSync(
 
 describe("minimal public surface", () => {
 	test("ships a text-first homepage instead of the old Framer template", () => {
-		expect(homeSource).toContain('href="/docs"');
+		expect(homeSource).toContain('href="/docs/install"');
 		expect(homeSource).toContain("landingFooterLinks.map");
 		expect(homeSource).toContain("landing-footer-link");
 		expect(homeSource).toContain("Button");

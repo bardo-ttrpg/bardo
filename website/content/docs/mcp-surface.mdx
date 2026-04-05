@@ -1,0 +1,48 @@
+Bardo’s remote MCP surface is optimized for a trusted copilot, not a hidden autonomous game master. The tools are designed to stay discoverable, structured, and explicit about what is read-only, what is advisory, and what can affect canon.
+
+## Tool shape
+
+Every public tool is documented with a clear use case, a “when not to use” boundary, and structured output. The goal is to help clients route themselves correctly instead of improvising from vague descriptions.
+
+The remote surface is tool-only in this phase. Bardo does not currently depend on MCP prompts or resources to expose the trusted-copilot GM workflow.
+
+## Core and mechanics tools
+
+The core surface covers canon retrieval, reporting, scene adjudication, and mechanics support:
+
+- `context_query`
+- `world_state_overview`
+- `timeline_diff`
+- `player_knowledge_view`
+- `continuity_audit`
+- `scene_turn`
+- `validate_action_against_ruleset`
+- `resolve_mechanics`
+- `roll_dice`
+- `world_sync_preview`
+- `ruleset_mechanics_overview`
+
+These tools are meant to compose cleanly. For example, an agent can inspect the current ruleset, validate a proposed action, resolve the mechanics when authoritative support exists, and fall back to `scene_turn` when broader canon-aware judgment is still needed.
+
+## Strategy tools
+
+Bardo also exposes planning-oriented tools so an agent can operate above the single-action level:
+
+- `faction_pressure_board`
+- `campaign_clocks`
+- `encounter_prep`
+- `campaign_planning`
+
+These tools are intentionally read-only. They help an agent reason about pressure, pacing, and prep without pretending that planning output is already canonical truth.
+
+## Authoritative writes
+
+The main canon-affecting workflow still centers on `scene_turn`. `resolve_mechanics` can append authoritative mechanics events when a ruleset is fully supported, but raw mutation tools are not part of the public trusted-copilot surface.
+
+That split is intentional: Bardo tries to give agents strong guidance, previews, and planning breadth without turning the public MCP surface into a low-level maintenance API.
+
+## Rate limiting and V1 guardrails
+
+The hosted surface is also guarded by request budgets. That matters most around bridge startup, status polling, and any route that can fan out into metering or approval checks.
+
+For agents, the practical rule is simple: plan with the structured tools, call only the next best tool, and back off on `429` instead of retrying aggressively. The surface is designed for deliberate copilot behavior, not for brute-force probing.

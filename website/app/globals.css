@@ -143,18 +143,23 @@
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
-		::view-transition-old(root),
-		::view-transition-new(root) {
-			animation-duration: 420ms;
-			animation-timing-function: var(--motion-ease-standard);
+		:root[data-theme-transition]::view-transition-old(root),
+		:root[data-theme-transition]::view-transition-new(root) {
+			mix-blend-mode: normal;
+			animation-fill-mode: both;
 		}
 
-		::view-transition-old(root) {
+		:root[data-theme-transition]::view-transition-old(root) {
+			animation-duration: 180ms;
 			animation-name: theme-fade-out;
+			animation-timing-function: ease-out;
 		}
 
-		::view-transition-new(root) {
+		:root[data-theme-transition]::view-transition-new(root) {
+			animation-delay: 40ms;
+			animation-duration: 520ms;
 			animation-name: theme-fade-in;
+			animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 		}
 
 		body,

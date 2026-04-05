@@ -72,6 +72,13 @@ function DocsShellFrame({
 	const { setOpenMobile } = useSidebar();
 	const [query, setQuery] = useState("");
 	const deferredQuery = useDeferredValue(query);
+	const activeEntry = useMemo(
+		() =>
+			groups
+				.flatMap((group) => group.entries)
+				.find((entry) => entry.href === pathname) ?? null,
+		[groups, pathname],
+	);
 	const searchResults = useMemo(() => {
 		const normalizedQuery = deferredQuery.trim().toLowerCase();
 		if (!normalizedQuery) {
@@ -167,40 +174,34 @@ function DocsShellFrame({
 						</SidebarGroup>
 					) : (
 						groups.map((group) => (
-							<SidebarGroup key={group.id} className="px-2 py-3">
+							<SidebarGroup key={group.id} className="px-2 py-2">
 								<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-								<SidebarMenu className="mt-2 gap-1">
+								<SidebarMenu>
 									{group.entries.map((entry) => (
 										<SidebarMenuItem key={entry.href}>
-											{(() => {
-												const isCurrentPage = pathname === entry.href;
-
-												return (
-													<SidebarMenuButton
-														asChild
-														isActive={false}
+											<SidebarMenuButton
+												asChild
+												isActive={pathname === entry.href}
+												className={cn(
+													"h-auto bg-transparent hover:bg-secondary active:bg-transparent",
+													pathname === entry.href
+														? "font-medium text-foreground bg-transparent!"
+														: "text-muted-foreground hover:text-foreground",
+												)}
+											>
+												<Link href={entry.href}>
+													<span
 														className={cn(
-															"h-auto rounded-none bg-transparent px-3 py-2 hover:bg-transparent active:bg-transparent",
-															isCurrentPage
-																? "font-medium text-foreground"
-																: "text-muted-foreground hover:text-foreground",
+															"py-0",
+															pathname === entry.href
+																? "text-foreground!"
+																: "text-muted-foreground!",
 														)}
 													>
-														<Link href={entry.href}>
-															<span
-																className={cn(
-																	"ui-nav",
-																	isCurrentPage
-																		? "!text-foreground"
-																		: "!text-muted-foreground",
-																)}
-															>
-																{entry.navigationLabel}
-															</span>
-														</Link>
-													</SidebarMenuButton>
-												);
-											})()}
+														{entry.navigationLabel}
+													</span>
+												</Link>
+											</SidebarMenuButton>
 										</SidebarMenuItem>
 									))}
 								</SidebarMenu>
@@ -220,7 +221,7 @@ function DocsShellFrame({
 					<div className="grid min-w-0 gap-12 xl:grid-cols-[minmax(0,48rem)_15rem] xl:items-start">
 						<div className="min-w-0">{children}</div>
 						<aside className="hidden xl:block">
-							{/* <div className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
+							<div className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
 								<p className="ui-label">On this page</p>
 								{activeEntry?.sections.length ? (
 									<nav aria-label="On this page" className="mt-4">
@@ -229,9 +230,7 @@ function DocsShellFrame({
 												<li key={section.id}>
 													<Link
 														href={`${activeEntry.href}#${section.id}`}
-														className={cn(
-															"font-reading-body block rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-														)}
+														className="font-reading-body block rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 													>
 														{section.title}
 													</Link>
@@ -244,14 +243,7 @@ function DocsShellFrame({
 										This page has no section links yet.
 									</p>
 								)}
-								<Separator className="my-4" />
-								<Link
-									href="/docs"
-									className="font-reading-body text-sm text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
-								>
-									Back to overview
-								</Link>
-							</div> */}
+							</div>
 						</aside>
 					</div>
 				</div>

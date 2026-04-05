@@ -14,4 +14,16 @@ The browser approval step confirms that the current account can start the reques
 
 ## What the client keeps local
 
-Your workspace files stay local. The hosted side handles subscription checks, metering, and the remote MCP service layer around the session.
+Your workspace files stay local. The hosted side handles subscription checks, metering, runtime skill discovery, and the remote MCP service layer around the session.
+
+Clients that support skills can receive a runtime skill catalog at session start. Clients that do not support skills still receive compact protected guidance so the local behavior stays grounded in the same Bardo conventions.
+
+## Rate limits and session hygiene
+
+For V1, Bardo rate limits the most abuse-prone bridge routes separately instead of treating every connect call the same.
+
+- Session start requests are budgeted tightly because each one can create an approval flow.
+- Session polling is allowed more frequently so clients can complete the device-style handshake without feeling sluggish.
+- Runtime status checks have the loosest budget because dashboards and clients may refresh them repeatedly.
+
+These limits are there to protect the hosted approval and metering layer, not to make normal play difficult. In development, the fallback behavior is intentionally more forgiving. In production, clients should treat `429` responses as a signal to back off and retry instead of spamming the bridge.

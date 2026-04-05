@@ -154,13 +154,16 @@ export const playerActionOutputSchema = z.object({
 			.union([z.number().int(), z.null()])
 			.describe("Total resolved value when mechanics were applied"),
 		outcome: z
-			.union([z.enum(["success", "failure"]), z.null()])
+			.union([z.string(), z.null()])
 			.describe("Resolved success/failure outcome"),
 		margin: z
 			.union([z.number().int(), z.null()])
 			.describe("Outcome margin (total - targetDifficulty)"),
 		resolutionMode: z
-			.union([z.enum(["dice", "deterministic", "unsupported"]), z.null()])
+			.union([
+				z.enum(["dice", "deterministic", "partial", "advisory", "unsupported"]),
+				z.null(),
+			])
 			.describe("Resolution strategy used by the ruleset adapter."),
 		unsupportedReason: z
 			.union([z.string(), z.null()])

@@ -23,6 +23,10 @@ const installDocSource = readFileSync(
 	new URL("../../../content/docs/install.mdx", import.meta.url),
 	"utf8",
 );
+const mechanicsDocSource = readFileSync(
+	new URL("../../../content/docs/ruleset-mechanics.mdx", import.meta.url),
+	"utf8",
+);
 
 describe("docs content", () => {
 	test("drives docs from a local manifest and static params", () => {
@@ -31,12 +35,18 @@ describe("docs content", () => {
 			"/docs/install",
 			"/docs/connect-client",
 			"/docs/campaign-truth",
+			"/docs/mcp-surface",
+			"/docs/ruleset-mechanics",
+			"/docs/runtime-skills",
 		]);
 		expect(listDocsStaticParams()).toEqual([
 			{ slug: [] },
 			{ slug: ["install"] },
 			{ slug: ["connect-client"] },
 			{ slug: ["campaign-truth"] },
+			{ slug: ["mcp-surface"] },
+			{ slug: ["ruleset-mechanics"] },
+			{ slug: ["runtime-skills"] },
 		]);
 	});
 
@@ -53,7 +63,12 @@ describe("docs content", () => {
 			},
 			{
 				label: "Product Model",
-				hrefs: ["/docs/campaign-truth"],
+				hrefs: [
+					"/docs/campaign-truth",
+					"/docs/mcp-surface",
+					"/docs/ruleset-mechanics",
+					"/docs/runtime-skills",
+				],
 			},
 		]);
 
@@ -81,13 +96,31 @@ describe("docs content", () => {
 				href: "/docs/connect-client",
 				previousHref: "/docs/install",
 				nextHref: "/docs/campaign-truth",
-				sectionCount: 3,
+				sectionCount: 4,
 			},
 			{
 				href: "/docs/campaign-truth",
 				previousHref: "/docs/connect-client",
-				nextHref: null,
+				nextHref: "/docs/mcp-surface",
 				sectionCount: 3,
+			},
+			{
+				href: "/docs/mcp-surface",
+				previousHref: "/docs/campaign-truth",
+				nextHref: "/docs/ruleset-mechanics",
+				sectionCount: 5,
+			},
+			{
+				href: "/docs/ruleset-mechanics",
+				previousHref: "/docs/mcp-surface",
+				nextHref: "/docs/runtime-skills",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/runtime-skills",
+				previousHref: "/docs/ruleset-mechanics",
+				nextHref: null,
+				sectionCount: 4,
 			},
 		]);
 	});
@@ -100,6 +133,12 @@ describe("docs content", () => {
 			searchDocsEntries("remote service boundary").some(
 				(entry) =>
 					entry.href === "/docs/campaign-truth#remote-service-boundary",
+			),
+		).toBe(true);
+		expect(
+			searchDocsEntries("table decision nodes").some(
+				(entry) =>
+					entry.href === "/docs/ruleset-mechanics#table-decision-nodes",
 			),
 		).toBe(true);
 	});
@@ -117,7 +156,9 @@ describe("docs content", () => {
 		expect(docsLayoutSource).toContain("listDocsSearchEntries");
 		expect(docsShellSource).toContain("Search docs");
 		expect(docsShellSource).toContain("On this page");
+		expect(docsShellSource).toContain("const activeEntry = useMemo");
 		expect(docsShellSource).toContain("isActive={pathname === entry.href}");
+		expect(docsShellSource).toContain('aria-label="On this page"');
 	});
 
 	test("keeps the install page as a simple text-first document", () => {
@@ -128,5 +169,11 @@ describe("docs content", () => {
 		expect(installDocSource).toContain(
 			"irm https://bardo.gg/install.ps1 | iex",
 		);
+	});
+
+	test("documents workspace-driven mechanics and branching consequences in plain MDX", () => {
+		expect(mechanicsDocSource).toContain("full, partial, or advisory");
+		expect(mechanicsDocSource).toContain("ask_the_table");
+		expect(mechanicsDocSource).toContain("branch into follow-up chains");
 	});
 });

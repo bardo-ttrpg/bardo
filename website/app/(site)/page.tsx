@@ -29,8 +29,8 @@ const landingFooterLinks = [
 	{ href: "/docs", label: "Docs" },
 	{ href: "/pricing", label: "Pricing" },
 	// { href: "/community", label: "Community" },
-	{ href: "/blog", label: "Journal" },
-	{ href: "/legal/terms", label: "Legal" },
+	// { href: "/blog", label: "Journal" },
+	// { href: "/legal/terms", label: "Legal" },
 ] as const;
 const MOBILE_LANDING_IMAGE_USER_AGENT_PATTERN =
 	/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i;
@@ -86,7 +86,7 @@ export default async function SitePage() {
 
 					<div className="flex flex-wrap items-center gap-4 pt-2">
 						<Button asChild size="sm" className={homeActionClassName}>
-							<Link href="/docs">Start Playing</Link>
+							<Link href="/docs/install">Start Playing</Link>
 						</Button>
 						<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
 					</div>

@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ViewTransitionDocument = Document & {
-	startViewTransition?: (update: () => void) => void;
+	startViewTransition?: (update: () => void) => {
+		finished?: Promise<void>;
+	};
 };
 
 export function ThemeToggle({ className }: { className?: string }) {
@@ -23,14 +25,23 @@ export function ThemeToggle({ className }: { className?: string }) {
 
 	function handleToggle() {
 		const transitionDocument = document as ViewTransitionDocument;
+		const rootElement = transitionDocument.documentElement;
+		rootElement.dataset.themeTransition = nextTheme;
+
 		if (transitionDocument.startViewTransition) {
-			transitionDocument.startViewTransition(() => {
+			const transition = transitionDocument.startViewTransition(() => {
 				setTheme(nextTheme);
+			});
+			transition.finished?.finally(() => {
+				delete rootElement.dataset.themeTransition;
 			});
 			return;
 		}
 
 		setTheme(nextTheme);
+		window.setTimeout(() => {
+			delete rootElement.dataset.themeTransition;
+		}, 420);
 	}
 
 	return (

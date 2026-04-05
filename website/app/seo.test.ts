@@ -165,7 +165,7 @@ describe("SEO and production metadata", () => {
 		expect(breadcrumb.itemListElement.map((item) => item.name)).toEqual([
 			"Bardo",
 			"Docs",
-			"Install",
+			"Install Bardo",
 		]);
 		expect(docsPageSource).toContain('type="application/ld+json"');
 		expect(siteSeoSource).toContain("BreadcrumbList");

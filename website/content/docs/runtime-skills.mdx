@@ -1,0 +1,25 @@
+Bardo’s tunnel layer can shape agent behavior before the first tool call. The current runtime skill system exists to make connected clients more consistent, more grounded, and less likely to drift away from the uploaded campaign context or ruleset.
+
+## Built-in skills
+
+Bardo currently ships built-in runtime skills for the core GM loop, scene handling, ruleset adjudication, and player-safe narration. These are runtime skills, not Codex repo skills, and they are mounted from the MCP side of the product so clients can discover them as part of a live session.
+
+The built-in packs are intentionally opinionated. They aim to reinforce the trusted-copilot model: retrieve first, validate before resolving, prefer workspace truth, and keep player-facing narration aligned with what the table should know.
+
+## Client behavior
+
+Skills-capable clients can receive a compact catalog at session start and activate the pieces they need. Clients that do not support runtime skills still receive protected fallback guidance derived from the same Bardo skill content.
+
+This means the behavior model stays consistent even when the client feature set changes.
+
+## Precedence
+
+Bardo supports built-in skills plus project and user skill directories. Project-level skills override user-level skills, which makes it possible to tune behavior for one campaign or workspace without rewriting the default product guidance.
+
+Activated skills are deduplicated so clients do not repeatedly load the same instructions.
+
+## How to think about skills
+
+Runtime skills are not a replacement for tools. They are behavioral rails.
+
+Use tools to fetch evidence, inspect rules, preview consequences, and resolve supported mechanics. Use skills to influence how the client plans, narrates, and decides when it should ask for clarification or hand judgment back to the table.
