@@ -221,19 +221,62 @@
 		@apply bg-foreground text-background;
 	}
 
-	.cl-formFieldInput[type="checkbox"],
-	.cl-checkboxInput,
-	.cl-formFieldRow__terms input[type="checkbox"] {
-		appearance: auto;
-		accent-color: var(--checkbox-accent);
-		background-color: var(--checkbox-accent);
-		border-color: var(--checkbox-accent);
-		color: var(--checkbox-accent-foreground);
+	.bardo-clerk-checkbox {
+		appearance: none;
+		-webkit-appearance: none;
+		display: inline-grid;
+		place-content: center;
+		inline-size: 1rem;
+		block-size: 1rem;
+		border-width: 1px;
+		border-style: solid;
+		border-color: var(--input);
+		border-radius: calc(var(--radius) - 6px);
+		background-color: transparent;
+		box-shadow: none;
+		transition:
+			background-color var(--motion-duration-fast) ease,
+			border-color var(--motion-duration-fast) ease,
+			transform var(--motion-duration-fast) var(--motion-ease-standard);
 	}
 
-	.cl-formFieldInput[type="checkbox"]:focus-visible,
-	.cl-checkboxInput:focus-visible,
-	.cl-formFieldRow__terms input[type="checkbox"]:focus-visible {
+	.bardo-clerk-checkbox::after {
+		content: "";
+		inline-size: 0.55rem;
+		block-size: 0.55rem;
+		background-color: var(--checkbox-accent-foreground);
+		clip-path: polygon(
+			14% 44%,
+			0 59%,
+			40% 100%,
+			100% 26%,
+			84% 11%,
+			39% 66%
+		);
+		transform: scale(0);
+		transform-origin: center;
+		transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+	}
+
+	.bardo-clerk-checkbox:checked {
+		border-color: var(--checkbox-accent);
+		background-color: var(--checkbox-accent);
+	}
+
+	.bardo-clerk-checkbox:checked::after {
+		transform: scale(1);
+	}
+
+	.bardo-clerk-checkbox:hover {
+		transform: translateY(-0.5px);
+	}
+
+	.bardo-clerk-checkbox:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	.bardo-clerk-checkbox:focus-visible {
 		outline: 2px solid var(--ring);
 		outline-offset: 2px;
 	}

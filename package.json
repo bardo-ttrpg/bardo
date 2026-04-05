@@ -8,7 +8,9 @@
 		"packages/*"
 	],
 	"overrides": {
-		"path-to-regexp": "8.4.1"
+		"path-to-regexp": "8.4.1",
+		"@clerk/shared": "4.3.2",
+		"@clerk/localizations": "4.2.3"
 	},
 	"scripts": {
 		"dev": "turbo run dev --filter=website",

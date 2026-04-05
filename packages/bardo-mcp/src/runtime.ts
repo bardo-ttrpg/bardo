@@ -1434,7 +1434,6 @@ async function refreshBridgeSessionConfig(args: {
 		refreshToken: string;
 		expiresAt: string;
 		expiresAtISO: string;
-		mcpBaseUrl: string;
 		mcpUrl: string;
 		statusUrl: string;
 		refreshUrl: string;
@@ -1988,7 +1987,6 @@ function resolveApprovedInteractivePayload(
 		expiresAt: string;
 		expiresAtISO: string;
 		apiKey: string;
-		mcpBaseUrl: string;
 		mcpUrl: string;
 		statusUrl: string;
 		refreshUrl: string;
@@ -2012,37 +2010,14 @@ function resolveApprovedInteractivePayload(
 		return null;
 	}
 
-	if (typeof pollBody.mcpBaseUrl === "string" && pollBody.mcpBaseUrl.trim()) {
-		return {
-			accessToken,
-			refreshToken:
-				typeof pollBody.refreshToken === "string"
-					? pollBody.refreshToken
-					: undefined,
-			expiresAtISO:
-				typeof pollBody.expiresAt === "string" ? pollBody.expiresAt : undefined,
-			mcpUrl: new URL("/mcp", pollBody.mcpBaseUrl).toString(),
-			statusUrl:
-				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
-			refreshUrl:
-				typeof pollBody.refreshUrl === "string"
-					? pollBody.refreshUrl
-					: undefined,
-			accountLabel:
-				typeof pollBody.accountLabel === "string"
-					? pollBody.accountLabel
-					: undefined,
-			plan: normalizePlan(pollBody.plan) ?? undefined,
-			serverName:
-				typeof pollBody.serverName === "string"
-					? pollBody.serverName
-					: undefined,
-		};
-	}
-
 	if (typeof pollBody.mcpUrl === "string" && pollBody.mcpUrl.trim()) {
 		return {
 			accessToken,
+			refreshToken:
+				typeof pollBody.refreshToken === "string" &&
+				pollBody.refreshToken.trim().length > 0
+					? pollBody.refreshToken
+					: undefined,
 			expiresAtISO:
 				typeof pollBody.expiresAtISO === "string"
 					? pollBody.expiresAtISO
@@ -2052,34 +2027,6 @@ function resolveApprovedInteractivePayload(
 			mcpUrl: pollBody.mcpUrl,
 			statusUrl:
 				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
-			accountLabel:
-				typeof pollBody.accountLabel === "string"
-					? pollBody.accountLabel
-					: undefined,
-			plan: normalizePlan(pollBody.plan) ?? undefined,
-			serverName:
-				typeof pollBody.serverName === "string"
-					? pollBody.serverName
-					: undefined,
-		};
-	}
-
-	if (
-		typeof pollBody.refreshToken === "string" &&
-		pollBody.refreshToken.trim().length > 0
-	) {
-		return {
-			accessToken,
-			refreshToken: pollBody.refreshToken,
-			expiresAtISO:
-				typeof pollBody.expiresAtISO === "string"
-					? pollBody.expiresAtISO
-					: typeof pollBody.expiresAt === "string"
-						? pollBody.expiresAt
-						: undefined,
-			mcpUrl: DEFAULT_MCP_URL,
-			statusUrl:
-				typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
 			refreshUrl:
 				typeof pollBody.refreshUrl === "string"
 					? pollBody.refreshUrl
@@ -2096,7 +2043,36 @@ function resolveApprovedInteractivePayload(
 		};
 	}
 
-	return null;
+	return {
+		accessToken,
+		refreshToken:
+			typeof pollBody.refreshToken === "string" &&
+			pollBody.refreshToken.trim().length > 0
+				? pollBody.refreshToken
+				: undefined,
+		expiresAtISO:
+			typeof pollBody.expiresAtISO === "string"
+				? pollBody.expiresAtISO
+				: typeof pollBody.expiresAt === "string"
+					? pollBody.expiresAt
+					: undefined,
+		mcpUrl: DEFAULT_MCP_URL,
+		statusUrl:
+			typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
+		refreshUrl:
+			typeof pollBody.refreshUrl === "string"
+				? pollBody.refreshUrl
+				: undefined,
+		accountLabel:
+			typeof pollBody.accountLabel === "string"
+				? pollBody.accountLabel
+				: undefined,
+		plan: normalizePlan(pollBody.plan) ?? undefined,
+		serverName:
+			typeof pollBody.serverName === "string"
+				? pollBody.serverName
+				: undefined,
+	};
 }
 
 function isLoopbackHostname(hostname: string | null | undefined): boolean {

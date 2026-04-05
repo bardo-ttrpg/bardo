@@ -134,11 +134,8 @@ config["refreshToken"] = bundle["refreshToken"]
 config["expiresAtISO"] = bundle.get("expiresAt") or bundle.get("expiresAtISO")
 
 mcp_url = bundle.get("mcpUrl")
-mcp_base_url = bundle.get("mcpBaseUrl")
 if mcp_url:
     config["url"] = mcp_url
-elif mcp_base_url:
-    config["url"] = f'{mcp_base_url.rstrip("/")}/mcp'
 
 for key in ("statusUrl", "refreshUrl", "plan", "accountLabel", "serverName"):
     if key in bundle and bundle[key] is not None:

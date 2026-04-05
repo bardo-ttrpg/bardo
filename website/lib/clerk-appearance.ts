@@ -25,6 +25,8 @@ export const clerkAppearance = {
 		formFieldLabel: "ui-label text-foreground",
 		formFieldInput:
 			"rounded-[calc(var(--radius)-2px)] border border-input bg-background text-foreground shadow-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-0",
+		formFieldCheckboxInput:
+			"bardo-clerk-checkbox rounded-[calc(var(--radius)-4px)] border border-input shadow-none",
 		formFieldAction: "text-muted-foreground transition-colors hover:text-foreground",
 		formButtonPrimary:
 			"rounded-full bg-primary text-primary-foreground shadow-none transition-colors hover:bg-primary/90",

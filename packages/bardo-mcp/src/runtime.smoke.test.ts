@@ -73,7 +73,7 @@ describe("bardo runtime smoke gate", () => {
 								accessToken: "bardo_bridge_access_smoke",
 								refreshToken: "bardo_bridge_refresh_smoke",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "http://127.0.0.1:3000",
+								mcpUrl: "http://127.0.0.1:3000/mcp",
 								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",

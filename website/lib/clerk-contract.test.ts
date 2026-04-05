@@ -53,6 +53,7 @@ describe("Clerk integration contract", () => {
 		);
 
 		expect(source).toContain("<ClerkProvider");
+		expect(source).toContain("ui={clerkUi}");
 		expect(source).toContain('signInUrl="/sign-in"');
 		expect(source).toContain('signUpUrl="/sign-up"');
 		expect(source).toContain('signInFallbackRedirectUrl="/dashboard"');

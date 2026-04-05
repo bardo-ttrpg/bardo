@@ -389,7 +389,7 @@ describe("bardo runtime", () => {
 								accessToken: "bardo_bridge_access_device_flow",
 								refreshToken: "bardo_bridge_refresh_device_flow",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "http://127.0.0.1:3000",
+								mcpUrl: "http://127.0.0.1:3000/mcp",
 								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",
@@ -494,7 +494,7 @@ describe("bardo runtime", () => {
 								accessToken: "loopback_access_token",
 								refreshToken: "loopback_refresh_token",
 								expiresAt: "2099-03-03T00:10:00.000Z",
-								mcpBaseUrl: "http://127.0.0.1:3000",
+								mcpUrl: "http://127.0.0.1:3000/mcp",
 								statusUrl: "http://localhost:3001/api/connect/runtime-status",
 								refreshUrl:
 									"http://localhost:3001/api/connect/bridge-session/refresh",
@@ -1877,7 +1877,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 								accessToken: "refreshed-access-token",
 								refreshToken: "refreshed-refresh-token",
 								expiresAt: "2026-03-03T01:00:00.000Z",
-								mcpBaseUrl: "http://localhost:3000",
+								mcpUrl: "http://localhost:3000/mcp",
 								statusUrl: "http://localhost:3001/api/connect/runtime-status",
 								refreshUrl:
 									"http://localhost:3001/api/connect/bridge-session/refresh",
@@ -1998,7 +1998,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 								accessToken: "refreshed-config-token",
 								refreshToken: "refreshed-refresh-token",
 								expiresAt: "2026-03-03T01:00:00.000Z",
-								mcpBaseUrl: "http://127.0.0.1:3000",
+								mcpUrl: "http://127.0.0.1:3000/mcp",
 								statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
 								refreshUrl:
 									"http://127.0.0.1:3001/api/connect/bridge-session/refresh",

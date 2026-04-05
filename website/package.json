@@ -27,6 +27,7 @@
 	"dependencies": {
 		"@bardo/mcp": "workspace:*",
 		"@clerk/nextjs": "7.0.7",
+		"@clerk/ui": "1.2.3",
 		"@mdx-js/loader": "^3.1.1",
 		"@mdx-js/react": "^3.1.1",
 		"@next/mdx": "^16.1.6",
