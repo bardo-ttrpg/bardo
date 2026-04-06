@@ -97,6 +97,8 @@ describe("Clerk provider placement", () => {
 			"--font-heading: var(--font-space-grotesk)",
 		);
 		expect(globalStylesSource).toContain("--font-sans: var(--font-inter)");
-		expect(globalStylesSource).toContain("prefers-reduced-motion: no-preference");
+		expect(globalStylesSource).toContain(
+			"prefers-reduced-motion: no-preference",
+		);
 	});
 });
