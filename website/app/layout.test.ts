@@ -38,10 +38,11 @@ describe("Clerk provider placement", () => {
 		expect(siteLayoutSource).not.toContain("OptionalClerkProvider");
 	});
 
-	test("prepares speed insights for Vercel deployments without adding analytics", () => {
-		expect(rootLayoutSource).not.toContain("@vercel/analytics/next");
+	test("prepares analytics and speed insights for Vercel deployments", () => {
+		expect(rootLayoutSource).toContain("@vercel/analytics/next");
 		expect(rootLayoutSource).toContain("@vercel/speed-insights/next");
-		expect(rootLayoutSource).not.toContain("<Analytics");
+		expect(rootLayoutSource).toContain("SHOW_ANALYTICS");
+		expect(rootLayoutSource).toContain("<Analytics");
 		expect(rootLayoutSource).toContain("SHOW_SPEED_INSIGHTS");
 		expect(rootLayoutSource).toContain("<SpeedInsights");
 	});

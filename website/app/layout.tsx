@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
@@ -66,6 +67,7 @@ export const viewport: Viewport = {
 	themeColor: "#171717",
 };
 const SHOW_SPEED_INSIGHTS = process.env.VERCEL === "1";
+const SHOW_ANALYTICS = process.env.VERCEL === "1";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
@@ -83,6 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 				>
 					{children}
 				</ThemeProvider>
+				{SHOW_ANALYTICS ? <Analytics /> : null}
 				{SHOW_SPEED_INSIGHTS ? <SpeedInsights /> : null}
 			</body>
 		</html>

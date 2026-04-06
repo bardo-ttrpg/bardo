@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
 export const alt =
 	"Bardo - solo tabletop RPG play with AI and local campaign files";
 export const size = {
