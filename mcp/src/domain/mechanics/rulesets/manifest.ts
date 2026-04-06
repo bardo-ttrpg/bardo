@@ -5,7 +5,6 @@ import { rollD20Check, rollDiceExpression } from "../dice";
 import type {
 	MechanicsComparison,
 	MechanicsActionType,
-	MechanicsConsequenceStepResolution,
 	MechanicsDecisionNodeResolution,
 	MechanicsResolution,
 	MechanicsSupportLevel,
@@ -19,7 +18,6 @@ import type {
 	RulesetConsequenceChainDefinition,
 	RulesetConsequenceConditionDefinition,
 	RulesetConsequenceStepDefinition,
-	RulesetCapabilities,
 	RulesetCatalogEntry,
 	RulesetDecisionNodeDefinition,
 	RulesetOutcomeBandDefinition,
