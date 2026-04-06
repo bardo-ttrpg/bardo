@@ -3,8 +3,8 @@ import path from "node:path";
 import * as z from "zod/v4";
 import { rollD20Check, rollDiceExpression } from "../dice";
 import type {
-	MechanicsComparison,
 	MechanicsActionType,
+	MechanicsComparison,
 	MechanicsDecisionNodeResolution,
 	MechanicsResolution,
 	MechanicsSupportLevel,
@@ -13,12 +13,12 @@ import type {
 	ResolveMechanicsInput,
 	RulesetActionDefinition,
 	RulesetAdapter,
-	RulesetConsequenceBranchDefinition,
+	RulesetCatalogEntry,
 	RulesetClockEffectDefinition,
+	RulesetConsequenceBranchDefinition,
 	RulesetConsequenceChainDefinition,
 	RulesetConsequenceConditionDefinition,
 	RulesetConsequenceStepDefinition,
-	RulesetCatalogEntry,
 	RulesetDecisionNodeDefinition,
 	RulesetOutcomeBandDefinition,
 	RulesetResourceEffectDefinition,
@@ -293,7 +293,8 @@ function normalizeActionDefinition(
 		contested: {
 			enabled: action.resolution.contested?.enabled ?? false,
 			opponentLabel: action.resolution.contested?.opponentLabel ?? null,
-			opponentExpression: action.resolution.contested?.opponentExpression ?? null,
+			opponentExpression:
+				action.resolution.contested?.opponentExpression ?? null,
 			tieOutcome: action.resolution.contested?.tieOutcome ?? null,
 		},
 		resolution: {
@@ -354,7 +355,9 @@ function parseManifestFile(filePath: string): RulesetCatalogEntry[] {
 	return parsed.rulesets.map(normalizeRulesetEntry);
 }
 
-function readWorkspaceManifestEntries(bardoRoot: string): RulesetCatalogEntry[] {
+function readWorkspaceManifestEntries(
+	bardoRoot: string,
+): RulesetCatalogEntry[] {
 	const rulesDir = path.join(bardoRoot, "rules");
 	if (!existsSync(rulesDir)) {
 		return [];
@@ -396,7 +399,9 @@ function normalizeInput(
 				? input.modifier
 				: actionDefinition.modifier.default,
 		opposedDifficulty:
-			typeof input.opposedDifficulty === "number" ? input.opposedDifficulty : null,
+			typeof input.opposedDifficulty === "number"
+				? input.opposedDifficulty
+				: null,
 		opposedModifier:
 			typeof input.opposedModifier === "number" ? input.opposedModifier : 0,
 		opposedTotal:
@@ -411,9 +416,12 @@ function normalizeInput(
 				? input.declaredIntent.trim()
 				: null,
 		advantage:
-			actionDefinition.resolution.mode === "dice" ? (input.advantage ?? "none") : null,
+			actionDefinition.resolution.mode === "dice"
+				? (input.advantage ?? "none")
+				: null,
 		availableResources:
-			input.availableResources && Object.keys(input.availableResources).length > 0
+			input.availableResources &&
+			Object.keys(input.availableResources).length > 0
 				? input.availableResources
 				: null,
 	};
@@ -767,7 +775,8 @@ function matchesCondition(args: {
 	}
 	if (
 		condition.onOutcomes.length > 0 &&
-		(context.outcome === null || !condition.onOutcomes.includes(context.outcome))
+		(context.outcome === null ||
+			!condition.onOutcomes.includes(context.outcome))
 	) {
 		return false;
 	}
@@ -855,8 +864,12 @@ function describeCondition(
 			parts.push(`margin ${String(condition.minMargin)}`);
 		} else {
 			const range = [
-				condition.minMargin !== null ? `>= ${String(condition.minMargin)}` : null,
-				condition.maxMargin !== null ? `<= ${String(condition.maxMargin)}` : null,
+				condition.minMargin !== null
+					? `>= ${String(condition.minMargin)}`
+					: null,
+				condition.maxMargin !== null
+					? `<= ${String(condition.maxMargin)}`
+					: null,
 			]
 				.filter(Boolean)
 				.join(" and ");
@@ -1104,12 +1117,9 @@ function composeConsequencePlan(args: {
 					skippedReason:
 						describeCondition(step.when) ?? "Step conditions were not met.",
 					guidance: step.guidance,
-					resourceId:
-						step.type === "resource_effect" ? step.resourceId : null,
-					operation:
-						step.type === "resource_effect" ? step.operation : null,
-					amount:
-						step.type === "resource_effect" ? step.amount : null,
+					resourceId: step.type === "resource_effect" ? step.resourceId : null,
+					operation: step.type === "resource_effect" ? step.operation : null,
+					amount: step.type === "resource_effect" ? step.amount : null,
 					balanceAfter: null,
 					clockId: step.type === "clock_effect" ? step.clockId : null,
 					ticks: step.type === "clock_effect" ? step.ticks : null,
@@ -1319,7 +1329,8 @@ function affordabilityWarnings(args: {
 	};
 	for (const effect of args.actionDefinition.resourceEffects) {
 		if (
-			(effect.onOutcomes.length > 0 && !effect.onOutcomes.includes(args.outcome)) ||
+			(effect.onOutcomes.length > 0 &&
+				!effect.onOutcomes.includes(args.outcome)) ||
 			!matchesCondition({
 				condition: effect.when,
 				context: {
@@ -1356,7 +1367,8 @@ function affordabilityWarnings(args: {
 				continue;
 			}
 			if (
-				(step.onOutcomes.length > 0 && !step.onOutcomes.includes(args.outcome)) ||
+				(step.onOutcomes.length > 0 &&
+					!step.onOutcomes.includes(args.outcome)) ||
 				!matchesCondition({
 					condition: step.when,
 					context: {
@@ -1537,7 +1549,8 @@ function resolveFromActionDefinition(
 			actorTotal: total,
 		});
 		const contestedMargin =
-			contested?.opponentTotal !== null && contested?.opponentTotal !== undefined
+			contested?.opponentTotal !== null &&
+			contested?.opponentTotal !== undefined
 				? total - contested.opponentTotal
 				: margin;
 		const contestedOutcome =
@@ -1548,7 +1561,7 @@ function resolveFromActionDefinition(
 					: contested.comparison === "opponent_wins"
 						? "failure"
 						: contested.comparison === "tie"
-							? actionDefinition.contested.tieOutcome ?? "mixed"
+							? (actionDefinition.contested.tieOutcome ?? "mixed")
 							: outcome;
 		const outcomeBand = selectOutcomeBand({
 			actionDefinition,
@@ -1614,7 +1627,10 @@ function resolveFromActionDefinition(
 
 	const expressionTemplate =
 		actionDefinition.resolution.expression ?? "1d20+{modifier}";
-	const expression = renderDiceExpression(expressionTemplate, validation.normalized);
+	const expression = renderDiceExpression(
+		expressionTemplate,
+		validation.normalized,
+	);
 	if (
 		validation.normalized.advantage &&
 		validation.normalized.advantage !== "none" &&
@@ -1635,7 +1651,8 @@ function resolveFromActionDefinition(
 			actorTotal: roll.total,
 		});
 		const contestedMargin =
-			contested?.opponentTotal !== null && contested?.opponentTotal !== undefined
+			contested?.opponentTotal !== null &&
+			contested?.opponentTotal !== undefined
 				? roll.total - contested.opponentTotal
 				: margin;
 		const contestedOutcome =
@@ -1646,7 +1663,7 @@ function resolveFromActionDefinition(
 					: contested.comparison === "opponent_wins"
 						? "failure"
 						: contested.comparison === "tie"
-							? actionDefinition.contested.tieOutcome ?? "mixed"
+							? (actionDefinition.contested.tieOutcome ?? "mixed")
 							: outcome;
 		const outcomeBand = selectOutcomeBand({
 			actionDefinition,
@@ -1734,7 +1751,7 @@ function resolveFromActionDefinition(
 				: contested.comparison === "opponent_wins"
 					? "failure"
 					: contested.comparison === "tie"
-						? actionDefinition.contested.tieOutcome ?? "mixed"
+						? (actionDefinition.contested.tieOutcome ?? "mixed")
 						: outcome;
 	const outcomeBand = selectOutcomeBand({
 		actionDefinition,
@@ -1835,7 +1852,10 @@ export function buildWorkspaceRulesetAdapter(
 						(candidate) => canonicalIntent(candidate) === normalizedIntent,
 					),
 				)
-				.sort((left, right) => supportRank(right.supportLevel) - supportRank(left.supportLevel))[0];
+				.sort(
+					(left, right) =>
+						supportRank(right.supportLevel) - supportRank(left.supportLevel),
+				)[0];
 			return match?.id ?? null;
 		},
 	};
