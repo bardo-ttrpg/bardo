@@ -5,7 +5,7 @@ import {
 	listDocsGroupsWithEntries,
 	listDocsStaticParams,
 	searchDocsEntries,
-} from "@/content/site-content";
+} from "../../../content/site-content";
 
 const docsRouteSource = readFileSync(
 	new URL("./[[...slug]]/page.tsx", import.meta.url),
@@ -23,8 +23,28 @@ const installDocSource = readFileSync(
 	new URL("../../../content/docs/install.mdx", import.meta.url),
 	"utf8",
 );
+const opencodeDocSource = readFileSync(
+	new URL("../../../content/docs/clients/opencode.mdx", import.meta.url),
+	"utf8",
+);
+const geminiDocSource = readFileSync(
+	new URL("../../../content/docs/clients/gemini-cli.mdx", import.meta.url),
+	"utf8",
+);
 const mechanicsDocSource = readFileSync(
 	new URL("../../../content/docs/ruleset-mechanics.mdx", import.meta.url),
+	"utf8",
+);
+const mcpSurfaceDocSource = readFileSync(
+	new URL("../../../content/docs/mcp-surface.mdx", import.meta.url),
+	"utf8",
+);
+const rulesBootstrapDocSource = readFileSync(
+	new URL("../../../content/docs/rules-bootstrap.mdx", import.meta.url),
+	"utf8",
+);
+const runtimeSkillsDocSource = readFileSync(
+	new URL("../../../content/docs/runtime-skills.mdx", import.meta.url),
 	"utf8",
 );
 
@@ -34,6 +54,12 @@ describe("docs content", () => {
 			"/docs",
 			"/docs/install",
 			"/docs/connect-client",
+			"/docs/clients/opencode",
+			"/docs/clients/claude-code-desktop",
+			"/docs/clients/codex-cli-desktop",
+			"/docs/clients/gemini-cli",
+			"/docs/clients/cursor",
+			"/docs/rules-bootstrap",
 			"/docs/campaign-truth",
 			"/docs/mcp-surface",
 			"/docs/ruleset-mechanics",
@@ -43,6 +69,12 @@ describe("docs content", () => {
 			{ slug: [] },
 			{ slug: ["install"] },
 			{ slug: ["connect-client"] },
+			{ slug: ["clients", "opencode"] },
+			{ slug: ["clients", "claude-code-desktop"] },
+			{ slug: ["clients", "codex-cli-desktop"] },
+			{ slug: ["clients", "gemini-cli"] },
+			{ slug: ["clients", "cursor"] },
+			{ slug: ["rules-bootstrap"] },
 			{ slug: ["campaign-truth"] },
 			{ slug: ["mcp-surface"] },
 			{ slug: ["ruleset-mechanics"] },
@@ -59,7 +91,17 @@ describe("docs content", () => {
 		).toEqual([
 			{
 				label: "Get Started",
-				hrefs: ["/docs", "/docs/install", "/docs/connect-client"],
+				hrefs: [
+					"/docs",
+					"/docs/install",
+					"/docs/connect-client",
+					"/docs/clients/opencode",
+					"/docs/clients/claude-code-desktop",
+					"/docs/clients/codex-cli-desktop",
+					"/docs/clients/gemini-cli",
+					"/docs/clients/cursor",
+					"/docs/rules-bootstrap",
+				],
 			},
 			{
 				label: "Product Model",
@@ -90,25 +132,61 @@ describe("docs content", () => {
 				href: "/docs/install",
 				previousHref: "/docs",
 				nextHref: "/docs/connect-client",
-				sectionCount: 3,
+				sectionCount: 4,
 			},
 			{
 				href: "/docs/connect-client",
 				previousHref: "/docs/install",
-				nextHref: "/docs/campaign-truth",
+				nextHref: "/docs/clients/opencode",
 				sectionCount: 4,
 			},
 			{
-				href: "/docs/campaign-truth",
+				href: "/docs/clients/opencode",
 				previousHref: "/docs/connect-client",
+				nextHref: "/docs/clients/claude-code-desktop",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/claude-code-desktop",
+				previousHref: "/docs/clients/opencode",
+				nextHref: "/docs/clients/codex-cli-desktop",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/codex-cli-desktop",
+				previousHref: "/docs/clients/claude-code-desktop",
+				nextHref: "/docs/clients/gemini-cli",
+				sectionCount: 5,
+			},
+			{
+				href: "/docs/clients/gemini-cli",
+				previousHref: "/docs/clients/codex-cli-desktop",
+				nextHref: "/docs/clients/cursor",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/cursor",
+				previousHref: "/docs/clients/gemini-cli",
+				nextHref: "/docs/rules-bootstrap",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/rules-bootstrap",
+				previousHref: "/docs/clients/cursor",
+				nextHref: "/docs/campaign-truth",
+				sectionCount: 5,
+			},
+			{
+				href: "/docs/campaign-truth",
+				previousHref: "/docs/rules-bootstrap",
 				nextHref: "/docs/mcp-surface",
-				sectionCount: 3,
+				sectionCount: 4,
 			},
 			{
 				href: "/docs/mcp-surface",
 				previousHref: "/docs/campaign-truth",
 				nextHref: "/docs/ruleset-mechanics",
-				sectionCount: 5,
+				sectionCount: 4,
 			},
 			{
 				href: "/docs/ruleset-mechanics",
@@ -136,9 +214,9 @@ describe("docs content", () => {
 			),
 		).toBe(true);
 		expect(
-			searchDocsEntries("table decision nodes").some(
+			searchDocsEntries("table authority").some(
 				(entry) =>
-					entry.href === "/docs/ruleset-mechanics#table-decision-nodes",
+					entry.href === "/docs/ruleset-mechanics#table-authority",
 			),
 		).toBe(true);
 	});
@@ -169,11 +247,38 @@ describe("docs content", () => {
 		expect(installDocSource).toContain(
 			"irm https://bardo.gg/install.ps1 | iex",
 		);
+		expect(installDocSource).toContain("release binary");
+		expect(installDocSource).toContain("checksum");
 	});
 
-	test("documents workspace-driven mechanics and branching consequences in plain MDX", () => {
-		expect(mechanicsDocSource).toContain("full, partial, or advisory");
-		expect(mechanicsDocSource).toContain("ask_the_table");
-		expect(mechanicsDocSource).toContain("branch into follow-up chains");
+	test("documents client-specific Bardo setup for current supported clients", () => {
+		expect(opencodeDocSource).toContain("does not set OpenCode’s `model` field");
+		expect(opencodeDocSource).toContain("opencode.json");
+		expect(opencodeDocSource).toContain("bardo connect --client opencode");
+		expect(geminiDocSource).toContain("bardo connect --client gemini");
+		expect(geminiDocSource).toContain(".gemini/settings.json");
+		expect(geminiDocSource).toContain("folder trust");
+		expect(geminiDocSource).toContain("\"mcpServers\"");
+		expect(geminiDocSource).toContain("\"command\": \"bardo\"");
+	});
+
+	test("documents the rulebook bootstrap pipeline and generated outputs", () => {
+		expect(rulesBootstrapDocSource).toContain("rulebook.md");
+		expect(rulesBootstrapDocSource).toContain(".bardo/rules/rulebook.md");
+		expect(rulesBootstrapDocSource).toContain("rules/normalized");
+		expect(rulesBootstrapDocSource).toContain("simulation depth");
+	});
+
+	test("documents conservative rules adjudication in plain MDX", () => {
+		expect(mechanicsDocSource).toContain("simulation-depth recommendation");
+		expect(mechanicsDocSource).toContain("conservative adjudication");
+		expect(mechanicsDocSource).toContain("table decide");
+	});
+
+	test("documents the explicit correction flow and latest canon precedence", () => {
+		expect(mcpSurfaceDocSource).toContain("user_correction");
+		expect(mcpSurfaceDocSource).toContain("validated state-changing events");
+		expect(runtimeSkillsDocSource).toContain("explicit user correction");
+		expect(runtimeSkillsDocSource).toContain("safe partial answer");
 	});
 });

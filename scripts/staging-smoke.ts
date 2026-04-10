@@ -11,23 +11,6 @@ type CheckResult = {
 	details: string;
 };
 
-type JsonRpcSuccess<T> = {
-	jsonrpc: "2.0";
-	id: number | string | null;
-	result: T;
-};
-
-type JsonRpcError = {
-	jsonrpc: "2.0";
-	id: number | string | null;
-	error: {
-		code: number;
-		message: string;
-	};
-};
-
-type JsonRpcResponse<T> = JsonRpcSuccess<T> | JsonRpcError;
-
 function readRequiredEnv(name: string): string {
 	const value = Bun.env[name]?.trim();
 	if (!value) {
@@ -38,13 +21,6 @@ function readRequiredEnv(name: string): string {
 
 function readOptionalEnv(name: string, fallback = ""): string {
 	return Bun.env[name]?.trim() || fallback;
-}
-
-function buildHealthUrl(baseUrl: string): string {
-	const url = new URL(baseUrl);
-	url.pathname = "/health";
-	url.search = "";
-	return url.toString();
 }
 
 async function fetchWithTimeout(
@@ -122,12 +98,6 @@ async function postJson<T>(args: {
 			body: JSON.stringify(args.body),
 		},
 	});
-}
-
-function assertJsonRpcSuccess<T>(
-	payload: JsonRpcResponse<T>,
-): payload is JsonRpcSuccess<T> {
-	return "result" in payload;
 }
 
 function authHeaders(
@@ -287,32 +257,11 @@ async function expectUnpaidBridgeDenial(args: {
 	};
 }
 
-function hasReportMarkdown(value: unknown, heading: string): boolean {
-	if (!value || typeof value !== "object") {
-		return false;
-	}
-	const candidate = value as {
-		rawMarkdown?: unknown;
-		content?: Array<{ text?: unknown }>;
-	};
-	if (
-		typeof candidate.rawMarkdown === "string" &&
-		candidate.rawMarkdown.includes(heading)
-	) {
-		return true;
-	}
-	const contentText = candidate.content
-		?.map((entry) => (typeof entry.text === "string" ? entry.text : ""))
-		.join("\n");
-	return typeof contentText === "string" && contentText.includes(heading);
-}
-
 async function main() {
 	const websiteUrl = readRequiredEnv("STAGING_WEBSITE_URL");
-	const mcpUrl = readRequiredEnv("STAGING_MCP_URL");
 	const authCookie = readOptionalEnv("STAGING_AUTH_COOKIE");
 	const unpaidAuthCookie = readOptionalEnv("STAGING_UNPAID_AUTH_COOKIE");
-	const bridgeAccessToken =
+	const runtimeAccessToken =
 		readOptionalEnv("STAGING_BRIDGE_ACCESS_TOKEN") ||
 		readOptionalEnv("STAGING_API_KEY");
 	const protectionHeaders = createVercelProtectionHeaders(
@@ -326,6 +275,7 @@ async function main() {
 		["website docs", "/docs"],
 		["website blog", "/blog"],
 		["website legal", "/legal"],
+		["website pricing", "/pricing"],
 		["website docs install", "/docs/install"],
 		["website docs connect", "/docs/connect-client"],
 	] as const) {
@@ -341,8 +291,8 @@ async function main() {
 
 	checks.push(
 		await expectStatus({
-			name: "removed pricing route renders custom 404",
-			url: new URL("/pricing", websiteUrl).toString(),
+			name: "removed contact route renders custom 404",
+			url: new URL("/contact", websiteUrl).toString(),
 			init: { headers: protectionHeaders },
 			expectedStatuses: [404],
 		}),
@@ -357,14 +307,6 @@ async function main() {
 				redirect: "manual",
 			},
 			expectedStatuses: [307, 308],
-		}),
-	);
-
-	checks.push(
-		await expectStatus({
-			name: "mcp health",
-			url: buildHealthUrl(mcpUrl),
-			expectedStatuses: [200],
 		}),
 	);
 
@@ -475,132 +417,16 @@ async function main() {
 		});
 	}
 
-	const activeAccessToken = approvedBridge?.accessToken || bridgeAccessToken;
+	const activeAccessToken = approvedBridge?.accessToken || runtimeAccessToken;
 	if (!activeAccessToken) {
 		checks.push({
-			name: "protected MCP flow",
+			name: "bridge-authenticated runtime status",
 			ok: true,
 			skipped: true,
 			details:
-				"Set STAGING_AUTH_COOKIE or STAGING_BRIDGE_ACCESS_TOKEN to validate authenticated MCP requests.",
+				"Set STAGING_AUTH_COOKIE or STAGING_BRIDGE_ACCESS_TOKEN to validate an authenticated runtime-status request.",
 		});
 	} else {
-		const initializeWithoutAuth = await expectStatus({
-			name: "mcp initialize without credential",
-			url: mcpUrl,
-			init: {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					accept: "application/json, text/event-stream",
-				},
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: 1,
-					method: "initialize",
-					params: {
-						protocolVersion: "2025-06-18",
-						capabilities: {},
-						clientInfo: { name: "staging-smoke", version: "1.0.0" },
-					},
-				}),
-			},
-			expectedStatuses: [401],
-		});
-		checks.push(initializeWithoutAuth);
-
-		const initializeInvalid = await expectStatus({
-			name: "mcp initialize invalid credential",
-			url: mcpUrl,
-			init: {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					accept: "application/json, text/event-stream",
-					authorization: "Bearer invalid-staging-token",
-				},
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: 2,
-					method: "initialize",
-					params: {
-						protocolVersion: "2025-06-18",
-						capabilities: {},
-						clientInfo: { name: "staging-smoke", version: "1.0.0" },
-					},
-				}),
-			},
-			expectedStatuses: [401, 403],
-		});
-		checks.push(initializeInvalid);
-
-		const initialize = await postJson<
-			JsonRpcResponse<{
-				protocolVersion: string;
-			}>
-		>({
-			url: mcpUrl,
-			headers: authHeaders(activeAccessToken),
-			body: {
-				jsonrpc: "2.0",
-				id: 3,
-				method: "initialize",
-				params: {
-					protocolVersion: "2025-06-18",
-					capabilities: {},
-					clientInfo: { name: "staging-smoke", version: "1.0.0" },
-				},
-			},
-		});
-		const mcpSessionId = initialize.response.headers.get("mcp-session-id");
-		checks.push({
-			name: "mcp initialize valid credential",
-			ok:
-				initialize.response.ok &&
-				assertJsonRpcSuccess(initialize.json) &&
-				initialize.json.result.protocolVersion === "2025-06-18" &&
-				Boolean(mcpSessionId),
-			details: `${initialize.response.status} session=${mcpSessionId ?? "missing"}`,
-		});
-
-		const sessionHeaders = authHeaders(activeAccessToken, {
-			"mcp-session-id": mcpSessionId ?? "",
-		});
-
-		const toolsList = await postJson<
-			JsonRpcResponse<{ tools: Array<{ name: string }> }>
-		>({
-			url: mcpUrl,
-			headers: sessionHeaders,
-			body: {
-				jsonrpc: "2.0",
-				id: 4,
-				method: "tools/list",
-				params: {},
-			},
-		});
-		const toolNames =
-			toolsList.response.ok && assertJsonRpcSuccess(toolsList.json)
-				? toolsList.json.result.tools.map((tool) => tool.name).sort()
-				: [];
-		checks.push({
-			name: "mcp tools/list",
-			ok:
-				toolsList.response.ok &&
-				toolNames.join(",") ===
-					[
-						"context_query",
-						"continuity_audit",
-						"player_knowledge_view",
-						"scene_turn",
-						"timeline_diff",
-						"world_state_overview",
-					]
-						.sort()
-						.join(","),
-			details: toolNames.join(", "),
-		});
-
 		const runtimeStatus = await fetchJson<{
 			valid?: boolean;
 			plan?: string;
@@ -614,88 +440,9 @@ async function main() {
 			},
 		});
 		checks.push({
-			name: "website runtime-status",
+			name: "bridge-authenticated runtime status",
 			ok: runtimeStatus.response.ok && runtimeStatus.json.valid === true,
 			details: `${runtimeStatus.response.status} plan=${runtimeStatus.json.plan ?? "missing"}`,
-		});
-
-		const reportTool = await postJson<
-			JsonRpcResponse<{
-				structuredContent?: {
-					success?: boolean;
-					rawMarkdown?: string;
-				};
-			}>
-		>({
-			url: mcpUrl,
-			headers: sessionHeaders,
-			body: {
-				jsonrpc: "2.0",
-				id: 5,
-				method: "tools/call",
-				params: {
-					name: "world_state_overview",
-					arguments: {},
-				},
-			},
-		});
-		const reportContent =
-			reportTool.response.ok && assertJsonRpcSuccess(reportTool.json)
-				? reportTool.json.result.structuredContent
-				: undefined;
-		checks.push({
-			name: "world_state_overview tool",
-			ok:
-				reportTool.response.ok &&
-				reportContent?.success === true &&
-				hasReportMarkdown(reportContent, "# World State Overview"),
-			details: JSON.stringify(
-				reportContent ?? "missing structured content",
-			).slice(0, 160),
-		});
-
-		const sceneTurn = await postJson<
-			JsonRpcResponse<{
-				structuredContent?: {
-					success?: boolean;
-					message?: string;
-					gmPacket?: {
-						narrativeBeats?: string[];
-					};
-				};
-			}>
-		>({
-			url: mcpUrl,
-			headers: sessionHeaders,
-			body: {
-				jsonrpc: "2.0",
-				id: 6,
-				method: "tools/call",
-				params: {
-					name: "scene_turn",
-					arguments: {
-						action:
-							"I gather the most important recent facts before framing the next scene.",
-						idempotencyKey: `staging-smoke-scene-turn-${Date.now()}`,
-					},
-				},
-			},
-		});
-		const sceneTurnContent =
-			sceneTurn.response.ok && assertJsonRpcSuccess(sceneTurn.json)
-				? sceneTurn.json.result.structuredContent
-				: undefined;
-		checks.push({
-			name: "scene_turn tool",
-			ok:
-				sceneTurn.response.ok &&
-				sceneTurnContent?.success === true &&
-				(sceneTurnContent.gmPacket?.narrativeBeats?.length ?? 0) > 0,
-			details:
-				sceneTurnContent?.message ??
-				(sceneTurn.response.ok
-					? "missing structured content"
-					: "request failed"),
 		});
 	}
 

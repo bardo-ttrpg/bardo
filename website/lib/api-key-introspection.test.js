@@ -55,12 +55,12 @@ describe("resolveRequestedWorkspaceRoot", () => {
 		expect(result).toBeNull();
 	});
 
-	test("returns absolute workspace root when override is enabled", () => {
+	test("returns null when override is enabled without an allowlist", () => {
 		const result = resolveRequestedWorkspaceRoot({
 			rawWorkspaceRoot: "/home/armando/projects/bardo-testing",
 			allowOverrideEnv: "true",
 		});
-		expect(result).toBe("/home/armando/projects/bardo-testing");
+		expect(result).toBeNull();
 	});
 
 	test("rejects non-absolute workspace root", () => {
@@ -84,5 +84,14 @@ describe("resolveRequestedWorkspaceRoot", () => {
 		});
 		expect(allowed).toBe("/home/armando/projects/bardo-testing");
 		expect(blocked).toBeNull();
+	});
+
+	test("rejects workspace roots that include null bytes even with an allowlist", () => {
+		const result = resolveRequestedWorkspaceRoot({
+			rawWorkspaceRoot: "/home/armando/projects/bardo-testing\0/tmp",
+			allowOverrideEnv: "true",
+			allowlistEnv: "/home/armando/projects",
+		});
+		expect(result).toBeNull();
 	});
 });

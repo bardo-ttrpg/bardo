@@ -23,6 +23,7 @@
 		"access": "public"
 	},
 	"scripts": {
+		"dev": "\"${npm_execpath:-bun}\" --watch run src/cli.ts",
 		"start": "\"${npm_execpath:-bun}\" run src/cli.ts",
 		"build": "\"${npm_execpath:-bun}\" run build:release",
 		"lint": "biome lint .",
@@ -40,6 +41,8 @@
 		"typescript": "5.9.3"
 	},
 	"dependencies": {
+		"@bardo/engine": "workspace:*",
+		"@bardo/shared": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.29.0"
 	}
 }

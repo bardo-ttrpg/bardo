@@ -53,4 +53,24 @@ describe("checkReleaseHealth", () => {
 		expect(result.errors).toEqual([]);
 		expect(result.release).toBe("abc123");
 	});
+
+	test("allows preview deployments to derive release urls from the Vercel deployment host", async () => {
+		const result = await checkReleaseHealth({
+			VERCEL_ENV: "preview",
+			VERCEL_URL: "bardo-preview-armando.vercel.app",
+			VERCEL_GIT_COMMIT_SHA: "preview123",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",
+			CLERK_SECRET_KEY: "sk_test_123",
+		});
+
+		expect(result.skipped).toBe(false);
+		expect(result.errors).toEqual([]);
+		expect(result.release).toBe("preview123");
+		expect(result.warnings).toContain(
+			"NEXT_PUBLIC_APP_URL is missing; using Vercel preview deployment URL for release health",
+		);
+		expect(result.warnings).toContain(
+			"BARDO_RUNTIME_STATUS_URL is missing; using Vercel preview deployment URL for release health",
+		);
+	});
 });

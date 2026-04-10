@@ -1,49 +1,58 @@
-The supported path is simple: install the bridge locally, choose your workspace, then approve the browser session from the dashboard.
+Connect the client to the local bridge after the workspace is prepared.
 
 ## Connection flow
 
-1. Install the bridge locally.
-2. From your workspace root, run `bardo login`.
-3. Approve the browser session from the dashboard.
-4. Run `bardo init --workspace-root .` if the workspace has not been bootstrapped yet.
-5. Run `bardo connect --client codex --workspace-root .`.
-6. Open your client and use Bardo tools against the local workspace.
+1. Run `bardo login` from the workspace root.
+2. Approve the browser session.
+3. Run `bardo init` if the workspace has not been prepared yet.
+4. Run `bardo connect --client codex` or the matching client flag.
+5. Open the client, inspect readiness/current state, then use the local runtime tools.
+
+## Client-specific guides
+
+- [OpenCode](/docs/clients/opencode)
+- [Claude Code and Desktop App](/docs/clients/claude-code-desktop)
+- [Codex CLI and Desktop App](/docs/clients/codex-cli-desktop)
+- [Gemini CLI](/docs/clients/gemini-cli)
+- [Cursor](/docs/clients/cursor)
 
 ## Exact commands
-
-For a new Codex workspace:
 
 ```bash
 cd ~/projects/my-campaign
 bardo login
-bardo init --workspace-root .
-bardo connect --client codex --workspace-root .
+bardo init
+bardo connect --client codex
 ```
 
-If you are uploading a rules document while bootstrapping, use:
+If the rulebook is inside the workspace but not at the root:
 
 ```bash
-bardo init --workspace-root . --rulebook ./rules/core-rulebook.pdf
+bardo init --rulebook ./rules/core-rulebook.md
 ```
 
-`bardo connect` can also log in and initialize for you, but the explicit sequence above is the easiest path to debug when you are setting up a workspace for the first time.
+`bardo init` writes its prep layer into `.bardo/`, including:
+
+- `.bardo/rules/rulebook.md`
+- `.bardo/rules/normalized/index.json`
+- `.bardo/manifests/source-index.json`
+- `.bardo/entities/campaign-entities.json`
+- `.bardo/state/current-state.json`
+- `.bardo/simulation/tracking-profile.json`
+- `.bardo/manifests/readiness.json`
 
 ## What you approve
 
-The browser approval step confirms that the current account can start the requested bridge session. It is the checkpoint where hosted access policy, subscription state, and metering are enforced.
+The browser approval confirms account access for the bridge session. The hosted side enforces approvals, billing, entitlements, status checks, and token refresh. It does not own campaign truth.
 
-## What the client keeps local
+## What stays local
 
-Your workspace files stay local. The hosted side handles subscription checks, metering, runtime skill discovery, bridge approval, runtime status, and session refresh. MCP execution stays on your machine through the local Bardo bridge.
+Workspace discovery, rules bootstrap, campaign bootstrap, and runtime tool execution stay on your machine. The generated `.bardo/` artifacts are the local prep layer that clients should read before continuing play.
 
-Clients that support skills can receive a runtime skill catalog at session start. Clients that do not support skills still receive compact protected guidance so the local behavior stays grounded in the same Bardo conventions.
+When the player explicitly corrects a fact, use `user_correction` so the correction becomes the highest-precedence local truth instead of staying buried in chat history.
 
-## Rate limits and session hygiene
+## Session hygiene
 
-For V1, Bardo rate limits the most abuse-prone bridge routes separately instead of treating every connect call the same.
+Treat `429` responses from hosted routes as backpressure on approvals or status checks. The fix is to back off and retry, not to spam the bridge. Normal play and canon ownership remain local even when the hosted layer is temporarily unavailable.
 
-- Session start requests are budgeted tightly because each one can create an approval flow.
-- Session polling is allowed more frequently so clients can complete the device-style handshake without feeling sluggish.
-- Runtime status checks have the loosest budget because dashboards and clients may refresh them repeatedly.
-
-These limits are there to protect the hosted approval and metering layer, not to make normal play difficult. In development, the fallback behavior is intentionally more forgiving. In production, clients should treat `429` responses as a signal to back off and retry instead of spamming the bridge.
+Agents should behave like conservative TTRPG GMs: read the prep artifacts first, surface uncertainty, prefer safe partial answers, and avoid inventing canon when readiness or evidence is weak.

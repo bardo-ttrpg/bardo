@@ -1,0 +1,34 @@
+Use this guide for [Claude Code](https://claude.com/product/claude-code) and the [Claude desktop app](https://claude.com/download). Anthropic’s current MCP reference is the [Claude Code MCP docs](https://code.claude.com/docs/en/mcp).
+
+## Install Claude
+
+- Install Claude Code from the current Claude Code product flow.
+- Install the Claude desktop app if you want the desktop experience as well.
+
+The Claude download page currently states that Claude Code runs directly in the desktop app, so the cleanest Bardo path is to set up the Claude Code integration first and then use it from the desktop app when you want that UI.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo login
+bardo init
+bardo connect --client claude
+```
+
+This writes `.mcp.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo installs a local stdio MCP entry for the `bardo` server. That matches Anthropic’s documented Claude Code MCP shape, where project-local MCP servers can live in `.mcp.json`.
+
+## Use Bardo well in Claude
+
+- start with `bardo_workspace_status`
+- read readiness and current state before continuing play
+- use `scene_turn` for conservative narration
+- use `player_action`, `world_sync`, and `simulation_tick` only for grounded canon changes
+- use `user_correction` for explicit table corrections
+
+If you are already using Claude Desktop, keep the same workspace open there. Bardo’s truth still lives in the local `.bardo/` prep layer, not in Claude chat history.

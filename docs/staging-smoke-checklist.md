@@ -11,8 +11,8 @@ Run this after every meaningful staging deployment.
 5. Confirm `Plan & Usage` loads without crashing.
 6. Confirm the dashboard points users to the browser-approved bridge flow.
 7. Confirm the dashboard billing actions open the correct Clerk Billing checkout or customer portal action.
-8. Confirm `/pricing` and `/contact` render the shared custom 404 page.
-9. Confirm paid-plan copy and connect docs stay aligned with the remote-MCP-plus-local-workspace story.
+8. Confirm `/pricing` renders and `/contact` still returns the shared custom 404 page.
+9. Confirm paid-plan copy and connect docs stay aligned with the local-first `.bardo/` workspace story.
 
 ## Connect Flow
 
@@ -23,24 +23,32 @@ Run this after every meaningful staging deployment.
 5. Confirm `/api/connect/runtime-status` succeeds with the approved bridge access token.
 6. Confirm an unsubscribed account gets a clean denial at approval time.
 
-## MCP
-
-1. `GET /health` returns `200`.
-2. `bun run --cwd mcp validate:env` passes.
-3. Unauthenticated `POST /mcp` returns an auth error.
-4. Authenticated `POST /mcp` succeeds for one representative protected flow.
-5. `/metrics` behaves according to the current metrics auth policy.
-
 ## Local Runtime
 
 From a clean local workspace:
 
-1. `bardo login` completes through the browser approval flow.
-2. `bardo connect --client <supported-client>` succeeds.
-3. `bardo doctor --json` reports healthy MCP connectivity.
-4. `bardo clients list --json` returns the expected client matrix.
-5. One workspace bootstrap creates the expected `bardo/` structure.
-6. One protected MCP tool call succeeds for a paid account and fails cleanly for an unpaid one.
+1. Install Bardo through the release-binary flow first, not the Bun/source fallback.
+2. `bardo login` completes through the browser approval flow.
+3. `bardo init` completes and writes the prep artifacts under `.bardo/`.
+4. `bardo connect --client <supported-client>` succeeds.
+5. `bardo doctor --json` reports healthy MCP connectivity.
+6. `bardo clients list --json` returns the expected client matrix.
+7. `.bardo/manifests/readiness.json` and `.bardo/state/current-state.json` exist after bootstrap.
+8. One protected runtime-status check succeeds for a paid account and fails cleanly for an unpaid one.
+
+## Pre-Staging Gauntlet
+
+Before promotion, run the destructive clean-room harness:
+
+1. `bun run stress:test-01`
+2. Confirm `/home/armando/projects/bardo-test-01/stress-report.json` exists.
+3. Confirm it includes:
+   - release-binary install success
+   - missing and invalid rulebook failures
+   - legacy `bardo/` migration success
+   - `ready`, `ready-with-gaps`, and `needs-user-input` readiness cases
+   - corrupted artifact fail-closed behavior
+   - repeated init/connect idempotency
 
 ## Billing
 
@@ -57,5 +65,7 @@ Do not promote if any of these are failing:
 - Clerk Billing checkout or customer portal
 - browser-approved bridge session flow
 - runtime status
-- MCP health or validate:env
-- one real authenticated MCP request
+- release-binary install from a clean sandbox
+- local workspace bootstrap into `.bardo/`
+- `bardo-test-01` gauntlet coverage
+- one real authenticated runtime-status request

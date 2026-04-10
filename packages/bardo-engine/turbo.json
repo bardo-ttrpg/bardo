@@ -1,0 +1,29 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"build": {
+			"outputs": []
+		},
+		"typecheck": {
+			"outputs": []
+		},
+		"test": {
+			"outputs": []
+		},
+		"test:ga-gates": {
+			"outputs": []
+		},
+		"test:soak-gates": {
+			"outputs": []
+		},
+		"test:mechanics-edge-gates": {
+			"outputs": []
+		},
+		"test:perf-gates": {
+			"outputs": []
+		},
+		"ga:readiness": {
+			"outputs": []
+		}
+	}
+}

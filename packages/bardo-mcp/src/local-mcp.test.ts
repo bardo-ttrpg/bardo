@@ -77,7 +77,7 @@ describe("local MCP workspace roots", () => {
 
 	test("imports only rulebooks inside the active workspace root", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 		await mkdir(path.join(workspaceRoot, "rules"), { recursive: true });
 		await mkdir(bardoRoot, { recursive: true });
 		const sourcePath = path.join(workspaceRoot, "rules", "shadowdark.md");
@@ -98,13 +98,102 @@ describe("local MCP workspace roots", () => {
 				rulebookPath: "rules/shadowdark.md",
 			});
 
-			expect(imported).toEqual(["rules/sources/rulebook/shadowdark.md"]);
+			expect(imported).toEqual(["rules/rulebook.md"]);
 			await expect(
-				readFile(
-					path.join(bardoRoot, "rules/sources/rulebook/shadowdark.md"),
-					"utf8",
-				),
+				readFile(path.join(bardoRoot, "rules/rulebook.md"), "utf8"),
 			).resolves.toContain("# Shadowdark");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("auto-imports workspace-root rulebook.md when no path is provided", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+		await mkdir(bardoRoot, { recursive: true });
+		await writeFile(
+			path.join(workspaceRoot, "rulebook.md"),
+			"# Root Rulebook",
+			"utf8",
+		);
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.maybeImportRulebook).toBe("function");
+			const imported = await (
+				mod.maybeImportRulebook as (args: {
+					workspaceRoot: string;
+					bardoRoot: string;
+					rulebookPath: string | null;
+				}) => Promise<string[]>
+			)({
+				workspaceRoot,
+				bardoRoot,
+				rulebookPath: null,
+			});
+
+			expect(imported).toEqual(["rules/rulebook.md"]);
+			await expect(
+				readFile(path.join(bardoRoot, "rules/rulebook.md"), "utf8"),
+			).resolves.toContain("# Root Rulebook");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("requires a workspace rulebook when no override path is provided", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+		await mkdir(bardoRoot, { recursive: true });
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.maybeImportRulebook).toBe("function");
+			await expect(
+				(
+					mod.maybeImportRulebook as (args: {
+						workspaceRoot: string;
+						bardoRoot: string;
+						rulebookPath: string | null;
+					}) => Promise<string[]>
+				)({
+					workspaceRoot,
+					bardoRoot,
+					rulebookPath: null,
+				}),
+			).rejects.toThrow("rulebook.md");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects non-markdown rulebook imports", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+		await mkdir(path.join(workspaceRoot, "rules"), { recursive: true });
+		await mkdir(bardoRoot, { recursive: true });
+		await writeFile(
+			path.join(workspaceRoot, "rules", "shadowdark.pdf"),
+			"%PDF-not-really",
+			"utf8",
+		);
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.maybeImportRulebook).toBe("function");
+			await expect(
+				(
+					mod.maybeImportRulebook as (args: {
+						workspaceRoot: string;
+						bardoRoot: string;
+						rulebookPath: string;
+					}) => Promise<string[]>
+				)({
+					workspaceRoot,
+					bardoRoot,
+					rulebookPath: "rules/shadowdark.pdf",
+				}),
+			).rejects.toThrow("Convert PDFs to Markdown");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -115,7 +204,7 @@ describe("local MCP workspace roots", () => {
 		const externalRoot = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-external-"),
 		);
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 		await mkdir(bardoRoot, { recursive: true });
 		const externalRulebook = path.join(externalRoot, "secrets.md");
 		await writeFile(externalRulebook, "# do not leak", "utf8");
@@ -147,7 +236,7 @@ describe("local MCP workspace roots", () => {
 		const externalRoot = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-external-"),
 		);
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 		await mkdir(path.join(workspaceRoot, "rules"), { recursive: true });
 		await mkdir(bardoRoot, { recursive: true });
 		const externalRulebook = path.join(externalRoot, "secrets.md");
@@ -242,7 +331,7 @@ describe("local MCP workspace roots", () => {
 
 	test("preserves existing workspace core files when bootstrap runs twice", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 
 		try {
 			const mod = (await import("./local-mcp")) as Record<string, unknown>;
@@ -256,10 +345,8 @@ describe("local MCP workspace roots", () => {
 				importedRulebooks: string[];
 			}) => Promise<void>;
 
-			await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
 			await mkdir(path.join(bardoRoot, "state"), { recursive: true });
 			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "projections"), { recursive: true });
 			await writeFile(
 				path.join(bardoRoot, "manifest.json"),
 				JSON.stringify(
@@ -270,7 +357,7 @@ describe("local MCP workspace roots", () => {
 						workspaceRoot,
 						bardoRoot,
 						ruleset: "shadowdark",
-						importedRulebooks: ["rules/sources/rulebook/original.md"],
+						importedRulebooks: ["rules/rulebook.md"],
 					},
 					null,
 					2,
@@ -278,23 +365,13 @@ describe("local MCP workspace roots", () => {
 				"utf8",
 			);
 			await writeFile(
-				path.join(bardoRoot, "_settings/settings.md"),
-				"existing settings",
+				path.join(bardoRoot, "state/current-state.json"),
+				JSON.stringify({ existing: true }, null, 2),
 				"utf8",
 			);
 			await writeFile(
-				path.join(bardoRoot, "state/current.md"),
-				"existing state",
-				"utf8",
-			);
-			await writeFile(
-				path.join(bardoRoot, "events/history.md"),
-				"existing history",
-				"utf8",
-			);
-			await writeFile(
-				path.join(bardoRoot, "projections/current-state.md"),
-				"existing projection",
+				path.join(bardoRoot, "events/state-changes.ndjson"),
+				'{"type":"existing_event"}\n',
 				"utf8",
 			);
 
@@ -316,21 +393,74 @@ describe("local MCP workspace roots", () => {
 
 			expect(manifest.createdAtISO).toBe("2026-03-01T00:00:00.000Z");
 			expect(manifest.updatedAtISO).toBe("2026-03-03T00:00:00.000Z");
-			expect(manifest.importedRulebooks).toEqual([
-				"rules/sources/rulebook/original.md",
-			]);
+			expect(manifest.importedRulebooks).toEqual(["rules/rulebook.md"]);
 			await expect(
-				readFile(path.join(bardoRoot, "_settings/settings.md"), "utf8"),
-			).resolves.toBe("existing settings");
+				readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+			).resolves.toContain('"existing": true');
 			await expect(
-				readFile(path.join(bardoRoot, "state/current.md"), "utf8"),
-			).resolves.toBe("existing state");
+				readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8"),
+			).resolves.toBe('{"type":"existing_event"}\n');
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("writes rulebook bootstrap metadata when an imported source exists", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.ensureWorkspaceCoreFiles).toBe("function");
+
+			const ensureWorkspaceCoreFiles = mod.ensureWorkspaceCoreFiles as (args: {
+				bardoRoot: string;
+				workspaceRoot: string;
+				ruleset: string | null;
+				nowIso: string;
+				importedRulebooks: string[];
+			}) => Promise<void>;
+
+			await mkdir(path.join(bardoRoot, "rules"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(bardoRoot, "rules/rulebook.md"),
+				[
+					"# Emberfall",
+					"",
+					"## Combat",
+					"",
+					"Attacks, initiative, and damage resolve fast.",
+				].join("\n"),
+				"utf8",
+			);
+
+			await ensureWorkspaceCoreFiles({
+				bardoRoot,
+				workspaceRoot,
+				ruleset: "emberfall",
+				nowIso: "2026-04-07T00:00:00.000Z",
+				importedRulebooks: ["rules/rulebook.md"],
+			});
+
+			const manifest = JSON.parse(
+				await readFile(path.join(bardoRoot, "manifest.json"), "utf8"),
+			) as {
+				rulebookBootstrap?: {
+					sectionCount: number;
+					indexPath: string;
+					recommendedSimulationDepth: string;
+				};
+			};
+
+			expect(manifest.rulebookBootstrap).toMatchObject({
+				sectionCount: 1,
+				indexPath: "rules/normalized/index.json",
+			});
 			await expect(
-				readFile(path.join(bardoRoot, "events/history.md"), "utf8"),
-			).resolves.toBe("existing history");
-			await expect(
-				readFile(path.join(bardoRoot, "projections/current-state.md"), "utf8"),
-			).resolves.toBe("existing projection");
+				readFile(path.join(bardoRoot, "rules/normalized/index.json"), "utf8"),
+			).resolves.toContain('"sections"');
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -353,11 +483,11 @@ describe("local MCP workspace roots", () => {
 
 			await acquireWorkspaceLockForTests(workspaceRoot);
 
-			const bunPath = Bun.which("bun");
+			const bunPath = Bun.which("bun") ?? process.execPath;
 			expect(bunPath).toBeString();
 			const child = Bun.spawn({
 				cmd: [
-					bunPath ?? "bun",
+					bunPath,
 					"--eval",
 					`import { acquireWorkspaceLockForTests } from "./local-mcp.ts";
 					try {
@@ -392,8 +522,8 @@ describe("local MCP workspace roots", () => {
 
 	test("stores imported rulebook hashes and reports drift when source files change", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
-		const rulebookRelativePath = "rules/sources/rulebook/core-rules.md";
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+		const rulebookRelativePath = "rules/rulebook.md";
 		const rulebookPath = path.join(bardoRoot, rulebookRelativePath);
 
 		try {
@@ -403,10 +533,6 @@ describe("local MCP workspace roots", () => {
 
 			await mkdir(path.dirname(rulebookPath), { recursive: true });
 			await writeFile(rulebookPath, "# Core Rules v1\n", "utf8");
-			await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "state"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
-
 			await (
 				mod.ensureWorkspaceCoreFiles as (args: {
 					bardoRoot: string;
@@ -470,7 +596,7 @@ describe("local MCP workspace roots", () => {
 
 	test("ingests supplements with additive-only capability manifest updates", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 		const sourceSupplement = path.join(workspaceRoot, "imports", "psi.md");
 
 		try {
@@ -479,9 +605,6 @@ describe("local MCP workspace roots", () => {
 			expect(typeof mod.ensureWorkspaceCoreFiles).toBe("function");
 
 			await mkdir(path.join(workspaceRoot, "imports"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "_settings"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "state"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
 			await writeFile(sourceSupplement, "# Psionics\n", "utf8");
 			await (
 				mod.ensureWorkspaceCoreFiles as (args: {
@@ -560,8 +683,8 @@ describe("local MCP workspace roots", () => {
 				scope: "additive_only",
 			});
 			await expect(
-				readFile(path.join(bardoRoot, "events/history.md"), "utf8"),
-			).resolves.toContain("supplement_activation");
+				readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8"),
+			).resolves.toContain('"type":"supplement_activation"');
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -569,15 +692,13 @@ describe("local MCP workspace roots", () => {
 
 	test("rejects supplement ingestion when scope is not additive_only", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 		const sourceSupplement = path.join(workspaceRoot, "imports", "psi.md");
 
 		try {
 			const mod = (await import("./local-mcp")) as Record<string, unknown>;
 			expect(typeof mod.addWorkspaceSupplement).toBe("function");
 			await mkdir(path.join(workspaceRoot, "imports"), { recursive: true });
-			await mkdir(path.join(bardoRoot, "events"), { recursive: true });
-			await writeFile(path.join(bardoRoot, "events/history.md"), "", "utf8");
 			await writeFile(sourceSupplement, "# Psionics\n", "utf8");
 
 			await expect(
@@ -604,7 +725,7 @@ describe("local MCP workspace roots", () => {
 
 	test("recovers orphaned tmp files safely on startup", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
-		const bardoRoot = path.join(workspaceRoot, "bardo");
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
 
 		try {
 			const mod = (await import("./local-mcp")) as Record<string, unknown>;

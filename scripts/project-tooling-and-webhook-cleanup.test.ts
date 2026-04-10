@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const repoRoot = import.meta.dir.endsWith(`${join("scripts")}`)
@@ -10,350 +10,101 @@ function readFromRepo(relativePath: string) {
 	return readFileSync(join(repoRoot, relativePath), "utf8");
 }
 
-function joinTokens(parts: readonly string[], separator = "") {
-	return parts.join(separator);
-}
-
-function listSkillFiles(skillsRoot: string): string[] {
-	return readdirSync(skillsRoot, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory())
-		.map((entry) => join(skillsRoot, entry.name, "SKILL.md"))
-		.filter((skillPath) => existsSync(skillPath));
-}
-
 describe("project cleanup and tooling setup", () => {
-	test("removes the obsolete Clerk webhook route and related website env secrets", () => {
-		expect(
-			existsSync(join(repoRoot, "website/app/api/webhooks/clerk/route.ts")),
-		).toBe(false);
-		expect(
-			existsSync(
-				join(repoRoot, "website/app/api/webhooks/clerk/route.test.ts"),
-			),
-		).toBe(false);
-
-		const websiteEnvExample = readFromRepo("website/.env.example");
-		const websiteEnvLocal = readFromRepo("website/.env.local");
-		const webhookSecret = joinTokens(
-			["CLERK", "WEBHOOK", "SIGNING", "SECRET"],
-			"_",
-		);
-		const controlPlaneSecret = joinTokens(
-			["BARDO", "CONTROL", "PLANE", "SYNC", "SECRET"],
-			"_",
-		);
-
-		for (const envFile of [websiteEnvExample, websiteEnvLocal]) {
-			expect(envFile).not.toContain(webhookSecret);
-			expect(envFile).not.toContain(controlPlaneSecret);
-		}
-	});
-
-	test("keeps Bun, Biome, and Turbo configured with package-level tasks", () => {
-		const packageJson = JSON.parse(readFromRepo("package.json")) as {
-			packageManager?: string;
-			devDependencies?: Record<string, string>;
-			dependencies?: Record<string, string>;
+	test("keeps the active workspace graph aligned to website plus packages only", () => {
+		const rootPackageJson = JSON.parse(readFromRepo("package.json")) as {
+			workspaces?: string[];
 			scripts?: Record<string, string>;
+		};
+		const knipJson = JSON.parse(readFromRepo("knip.json")) as {
+			workspaces?: Record<string, unknown>;
+		};
+		const websiteTurboJson = JSON.parse(readFromRepo("website/turbo.json")) as {
+			tasks?: Record<string, { with?: string[] }>;
 		};
 		const websitePackageJson = JSON.parse(
 			readFromRepo("website/package.json"),
 		) as {
 			scripts?: Record<string, string>;
 		};
-		const mcpPackageJson = JSON.parse(readFromRepo("mcp/package.json")) as {
-			scripts?: Record<string, string>;
-		};
-		const packageMcpPackageJson = JSON.parse(
+		const bridgePackageJson = JSON.parse(
 			readFromRepo("packages/bardo-mcp/package.json"),
 		) as {
 			scripts?: Record<string, string>;
 		};
-		const turboJson = JSON.parse(readFromRepo("turbo.json")) as {
-			globalDependencies?: string[];
-			tasks?: Record<string, unknown>;
-		};
-		const websiteTurboJson = JSON.parse(readFromRepo("website/turbo.json")) as {
-			extends?: string[];
-			tasks?: Record<string, { outputs?: string[] }>;
-		};
-		const mcpTurboJson = JSON.parse(readFromRepo("mcp/turbo.json")) as {
-			extends?: string[];
-			tasks?: Record<string, unknown>;
-		};
-		const packageMcpTurboJson = JSON.parse(
-			readFromRepo("packages/bardo-mcp/turbo.json"),
-		) as {
-			extends?: string[];
-			tasks?: Record<string, { outputs?: string[] }>;
-		};
-		const biomeJson = JSON.parse(readFromRepo("biome.json")) as {
-			$schema?: string;
-			vcs?: {
-				defaultBranch?: string;
-			};
-		};
-		const bunfigToml = readFromRepo("bunfig.toml");
 
-		expect(packageJson.packageManager).toBe("bun@1.3.10");
-		expect(packageJson.scripts?.dev).toBe("turbo run dev --filter=website");
-		expect(packageJson.scripts?.["dev:all"]).toBe("turbo run dev");
-		expect(packageJson.scripts?.format).toBe("turbo run format");
-		expect(packageJson.scripts).not.toHaveProperty("test:e2e");
-		expect(packageJson.scripts).not.toHaveProperty("test:e2e:auth");
-		expect(packageJson.scripts).not.toHaveProperty("test:e2e:headed");
-		expect(packageJson.scripts).not.toHaveProperty("test:e2e:auth:headed");
-		expect(packageJson.scripts?.["test:runtime-smoke"]).toBe(
-			"turbo run test:runtime-smoke --filter=@bardo/mcp",
+		expect(rootPackageJson.workspaces).toEqual(["website", "packages/*"]);
+		expect(rootPackageJson.scripts?.["staging:validate-env"]).toBe(
+			"turbo run validate:staging-env --filter=website",
 		);
-		expect(packageJson.scripts?.["staging:validate-env"]).toBe(
-			"turbo run validate:staging-env --filter=website --filter=mcp",
+		expect(rootPackageJson.scripts?.["ga:readiness"]).toBe(
+			"turbo run ga:readiness --filter=@bardo/engine",
 		);
-		expect(packageJson.scripts?.["ga:readiness"]).toBe(
-			"turbo run ga:readiness --filter=mcp",
+		expect(rootPackageJson.scripts?.["typecheck:unused-report"]).toBe(
+			"turbo run typecheck:unused-report --filter=website",
 		);
-		expect(packageJson.scripts?.["check:release-health"]).toBe(
-			"turbo run check:release-health --filter=website",
+		expect(rootPackageJson.scripts?.["dev:bridge"]).toBe(
+			"turbo run dev --filter=@bardo/mcp",
 		);
-		expect(packageJson.scripts?.["check:react-doctor"]).toBe(
-			"turbo run check:react-doctor --filter=website",
+		expect(rootPackageJson.scripts?.["stress:test-01"]).toBe(
+			"\"${npm_execpath:-bun}\" run ./scripts/stress-bardo-test-01.ts",
 		);
-		expect(packageJson.scripts?.["bundle:audit"]).toBe(
-			"turbo run bundle:audit --filter=website",
+		expect(rootPackageJson.scripts?.["release:candidate"]).toBe(
+			"\"${npm_execpath:-bun}\" run build && \"${npm_execpath:-bun}\" run test:release-gates && \"${npm_execpath:-bun}\" run bundle:audit && \"${npm_execpath:-bun}\" run stress:test-01",
 		);
-		expect(packageJson.scripts?.["typecheck:unused-report"]).toBe(
-			"turbo run typecheck:unused-report --filter=website --filter=mcp",
+		expect(websitePackageJson.scripts?.["bundle:audit"]).toBe(
+			"\"${npm_execpath:-bun}\" run ./scripts/bundle-audit.ts",
 		);
-		expect(packageJson.scripts?.["biome:lint"]).toBe("biome lint .");
-		expect(packageJson.scripts?.["biome:format"]).toBe(
-			"biome format --write .",
+		expect(websiteTurboJson.tasks?.dev?.with).toBeUndefined();
+		expect(bridgePackageJson.scripts?.dev).toBe(
+			"\"${npm_execpath:-bun}\" --watch run src/cli.ts",
 		);
-		expect(packageJson.scripts?.["biome:check"]).toBe("biome check .");
-		expect(packageJson.scripts?.["biome:ci"]).toBe("biome ci .");
-		expect(packageJson.scripts?.["check:staged"]).toBe(
-			"biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
-		);
-		expect(packageJson.devDependencies).not.toHaveProperty("lint-staged");
-		expect(packageJson.dependencies).toBeUndefined();
-
-		for (const scriptCommand of Object.values(packageJson.scripts ?? {})) {
-			expect(scriptCommand).not.toContain("--cwd");
-			expect(scriptCommand).not.toContain("cd website &&");
-			expect(scriptCommand).not.toContain("cd mcp &&");
-			expect(scriptCommand).not.toContain("cd packages/");
-		}
-
-		expect(websitePackageJson.scripts?.lint).toBe("biome lint .");
-		expect(websitePackageJson.scripts?.format).toBe("biome format --write .");
-		expect(websitePackageJson.scripts).not.toHaveProperty("dev:e2e");
-		expect(websitePackageJson.scripts).not.toHaveProperty(
-			"validate:e2e-auth-env",
-		);
-		expect(websitePackageJson.scripts).not.toHaveProperty("test:e2e");
-		expect(websitePackageJson.scripts).not.toHaveProperty("test:e2e:auth");
-		expect(websitePackageJson.scripts?.["typecheck:unused-report"]).toBe(
-			"tsc --noEmit -p tsconfig.unused.json",
-		);
-		expect(mcpPackageJson.scripts?.lint).toBe("biome lint .");
-		expect(mcpPackageJson.scripts?.format).toBe("biome format --write .");
-		expect(mcpPackageJson.scripts?.["typecheck:unused-report"]).toBe(
-			"tsc --noEmit -p tsconfig.unused.json",
-		);
-		expect(packageMcpPackageJson.scripts?.build).toBe(
-			`"\${npm_execpath:-bun}" run build:release`,
-		);
-		expect(packageMcpPackageJson.scripts?.typecheck).toBe("tsc --noEmit");
-		expect(packageMcpPackageJson.scripts?.check).toBe(
-			`"\${npm_execpath:-bun}" run lint && "\${npm_execpath:-bun}" run typecheck`,
-		);
-
-		expect(turboJson.tasks).toHaveProperty("format");
-		expect(turboJson.tasks).toHaveProperty("validate:staging-env");
-		expect(turboJson.tasks).toHaveProperty("typecheck:unused-report");
-		expect(turboJson.tasks).not.toHaveProperty("test:e2e");
-		expect(turboJson.tasks).not.toHaveProperty("test:e2e:auth");
-		expect(turboJson.tasks).not.toHaveProperty("test:e2e:headed");
-		expect(turboJson.tasks).not.toHaveProperty("test:e2e:auth:headed");
-		expect(turboJson.tasks).not.toHaveProperty("validate:e2e-auth-env");
-		expect(turboJson.tasks).toHaveProperty("test:runtime-smoke");
-		expect(turboJson.tasks).toHaveProperty("ga:readiness");
-		expect(turboJson.tasks).not.toHaveProperty("website#build");
-		expect(turboJson.tasks).not.toHaveProperty("mcp#build");
-		expect(turboJson.globalDependencies).not.toContain(".env*");
-		expect(turboJson.globalDependencies).not.toContain("website/.env*");
-		expect(turboJson.globalDependencies).not.toContain("mcp/.env*");
-		expect(websiteTurboJson.extends).toEqual(["//"]);
-		expect(websiteTurboJson.tasks?.dev).toEqual({
-			with: ["mcp#dev"],
-			cache: false,
-			persistent: true,
-			interruptible: true,
-		});
-		expect(websiteTurboJson.tasks?.build?.outputs).toEqual([
-			"$TURBO_EXTENDS$",
-			".next/**",
-			"!.next/cache/**",
-		]);
-		expect(mcpTurboJson.extends).toEqual(["//"]);
-		expect(packageMcpTurboJson.extends).toEqual(["//"]);
-		expect(packageMcpTurboJson.tasks?.build?.outputs).toEqual([
-			"$TURBO_EXTENDS$",
-			"dist/**",
-		]);
-		expect(biomeJson.$schema).toBe(
-			"https://biomejs.dev/schemas/2.4.6/schema.json",
-		);
-		expect(biomeJson.vcs?.defaultBranch).toBe("main");
-		expect(bunfigToml).toContain("linkWorkspacePackages = true");
+		expect(knipJson.workspaces).not.toHaveProperty("mcp");
+		expect(existsSync(join(repoRoot, "mcp"))).toBe(false);
 	});
 
-	test("installs the local Turborepo skill guidance", () => {
-		const skillPath = join(repoRoot, ".agents/skills/turborepo/SKILL.md");
-		expect(existsSync(skillPath)).toBe(true);
-
-		const skill = readFileSync(skillPath, "utf8");
-		expect(skill).toContain("Turborepo Skill");
-		expect(skill).toContain("IMPORTANT: Package Tasks, Not Root Tasks");
-	});
-
-	test("removes Clerk frontend API env dependencies from the repo contract", () => {
-		expect(existsSync(join(repoRoot, ".env.local"))).toBe(false);
-
-		const websiteEnvExample = readFromRepo("website/.env.example");
-		const websiteEnvLocal = readFromRepo("website/.env.local");
-		const websiteStagingEnvValidator = readFromRepo(
-			"website/scripts/validate-staging-env-lib.ts",
-		);
-		const websiteStagingEnvValidatorTest = readFromRepo(
-			"website/scripts/validate-staging-env-lib.test.ts",
-		);
-		const mcpEnv = readFromRepo("mcp/.env");
-		const frontendApi = joinTokens(["CLERK", "FRONTEND", "API", "URL"], "_");
-
-		for (const fileSource of [
-			websiteEnvExample,
-			websiteEnvLocal,
-			websiteStagingEnvValidator,
-			websiteStagingEnvValidatorTest,
-			mcpEnv,
-		]) {
-			expect(fileSource).not.toContain(frontendApi);
-		}
-	});
-
-	test("keeps only the minimal blog surface", () => {
-		const blogSegment = joinTokens(["", "blog"], "/");
-		expect(
-			existsSync(
-				join(
-					repoRoot,
-					joinTokens(["website", "content", "blog", "posts.ts"], "/"),
-				),
-			),
-		).toBe(false);
-		expect(
-			existsSync(
-				join(
-					repoRoot,
-					joinTokens(
-						["website", "app", "(site)", "(public-secondary)", "blog"],
-						"/",
-					),
-				),
-			),
-		).toBe(true);
-		expect(
-			existsSync(
-				join(repoRoot, joinTokens(["website", "public", "blog"], "/")),
-			),
-		).toBe(false);
-
-		const landingPageSource = readFromRepo("website/app/(site)/page.tsx");
-		const blogPageSource = readFromRepo(
-			"website/app/(site)/(public-secondary)/blog/page.tsx",
-		);
-		const robotsSource = readFromRepo("website/app/robots.ts");
-		const sitemapSource = readFromRepo("website/app/sitemap.ts");
-		const seoTestSource = readFromRepo("website/app/seo.test.ts");
-		const stagingSmokeSource = readFromRepo("scripts/staging-smoke.ts");
-
-		for (const fileSource of [
-			landingPageSource,
-			blogPageSource,
-			robotsSource,
-			sitemapSource,
-			seoTestSource,
-			stagingSmokeSource,
-		]) {
-			expect(fileSource).toContain(blogSegment);
-		}
-	});
-
-	test("keeps local skill frontmatter aligned with current Codex conventions", () => {
-		const supportedKey = joinTokens(["allowed", "tools:"], "-");
-		const unsupportedKey = "allowed_tools:";
-		const shadcnSkill = readFileSync(
-			join(repoRoot, ".agents/skills/shadcn/SKILL.md"),
-			"utf8",
-		);
-
-		expect(shadcnSkill).toContain(`\n${supportedKey}`);
-
-		for (const skillFile of listSkillFiles(join(repoRoot, ".agents/skills"))) {
-			const skillSource = readFileSync(skillFile, "utf8");
-			expect(skillSource).not.toContain(`\n${unsupportedKey}`);
-		}
-	});
-
-	test("extends artifact cleanup to packaged release output", () => {
+	test("keeps cleanup and validation scripts scoped to the active packages", () => {
 		const cleanupScript = readFromRepo("scripts/clean-artifacts.sh");
-		expect(cleanupScript).toContain("packages/bardo-mcp/dist/release");
-		expect(cleanupScript).toContain("packages/bardo-mcp/.turbo");
-		expect(cleanupScript).toContain(
-			'rm -f "$ROOT_DIR/website/tsconfig.tsbuildinfo"',
+		const validateToolchainPolicy = readFromRepo(
+			"scripts/validate-toolchain-policy.ts",
 		);
+
+		expect(cleanupScript).not.toContain("$ROOT_DIR/mcp/.turbo");
+		expect(cleanupScript).toContain("$ROOT_DIR/packages/bardo-mcp/.turbo");
+		expect(cleanupScript).toContain("$ROOT_DIR/packages/bardo-mcp/dist/release");
+		expect(validateToolchainPolicy).not.toContain('"website", "mcp"');
+		expect(validateToolchainPolicy).not.toContain('"mcp/package-lock.json"');
+		expect(validateToolchainPolicy).toContain('const packageDirs = ["website"];');
 	});
 
-	test("keeps local env templates and smoke docs aligned with the bridge-first V1 contract", () => {
-		const websiteEnvExample = readFromRepo("website/.env.example");
-		const websiteEnvLocal = readFromRepo("website/.env.local");
-		const mcpEnvExample = readFromRepo("mcp/.env.example");
+	test("keeps inspector and staging docs aligned to the bridge-first local runtime", () => {
+		const inspectorDoc = readFromRepo("docs/mcp-inspector.md");
 		const stagingChecklist = readFromRepo("docs/staging-smoke-checklist.md");
-		const localDocs = readFromRepo("packages/bardo-mcp/src/local-docs.ts");
-		const runtimeSmoke = readFromRepo(
-			"packages/bardo-mcp/src/runtime.smoke.test.ts",
-		);
+		const releaseChecklist = readFromRepo("docs/release-candidate-checklist.md");
+		const recoveryRunbook = readFromRepo("docs/recovery-runbook.md");
+		const stagingSmoke = readFromRepo("scripts/staging-smoke.ts");
+		const stressHarness = readFromRepo("scripts/stress-bardo-test-01.ts");
 
-		expect(websiteEnvExample).not.toContain("BARDO_MCP_BASE_URL");
-		expect(websiteEnvExample).not.toContain("NEXT_PUBLIC_MCP_BASE_URL");
-		expect(websiteEnvExample).toContain(
-			'E2E_CLERK_PASSWORD="YourEmailClerkTest123!$"',
-		);
-		expect(websiteEnvLocal).toContain(
-			'E2E_CLERK_PASSWORD="YourEmailClerkTest123!$"',
-		);
-		expect(websiteEnvLocal).toContain(
-			'E2E_CLERK_TEST_PHONE_NUMBER="+15555550100"',
-		);
-		expect(mcpEnvExample).toContain("bridge/session credentials");
-		expect(stagingChecklist).toContain("/api/connect/bridge-session/start");
-		expect(stagingChecklist).not.toContain("/api/connect/cli-token");
-		expect(stagingChecklist).not.toContain("/api/connect/snippets");
-		expect(localDocs).toContain("approve the bridge in your browser");
-		expect(localDocs).toContain("hosted control plane");
-		expect(localDocs).not.toContain("last_session_diff");
-		expect(runtimeSmoke).toContain("bridge-authenticated connect");
-	});
-
-	test("keeps staging smoke focused on the paid bridge-first V1 flow", () => {
-		const stagingSmokeSource = readFromRepo("scripts/staging-smoke.ts");
-
-		expect(stagingSmokeSource).toContain("/api/connect/bridge-session/start");
-		expect(stagingSmokeSource).toContain("/api/connect/bridge-session/approve");
-		expect(stagingSmokeSource).toContain("world_state_overview");
-		expect(stagingSmokeSource).not.toContain("/api/connect/cli-token");
-		expect(stagingSmokeSource).not.toContain("/api/connect/snippets");
-		expect(stagingSmokeSource).not.toContain("/api/connect/cli-exchange");
-		expect(stagingSmokeSource).not.toContain("last_session_diff");
+		expect(inspectorDoc).toContain("Inspect the canonical client path");
+		expect(inspectorDoc).not.toContain("Inspect the direct HTTP server");
+		expect(inspectorDoc).not.toContain("scripts/mcp-inspector-remote.sh");
+		expect(stagingChecklist).toContain(".bardo/");
+		expect(stagingChecklist).toContain("release-binary flow");
+		expect(stagingChecklist).toContain("bun run stress:test-01");
+		expect(stagingChecklist).toContain("/api/connect/runtime-status");
+		expect(stagingChecklist).not.toContain("remote-MCP-plus-local-workspace");
+		expect(stagingChecklist).not.toContain("POST /mcp");
+		expect(stagingChecklist).not.toContain("GET /health");
+		expect(releaseChecklist).toContain("Bump");
+		expect(releaseChecklist).toContain("Draft release notes");
+		expect(recoveryRunbook).toContain("Bridge approval failure");
+		expect(recoveryRunbook).toContain("Runtime-status outage");
+		expect(stressHarness).toContain("/home/armando/projects/bardo-test-01");
+		expect(stressHarness).toContain("stress-report.json");
+		expect(stressHarness).toContain("Skipped oversized source");
+		expect(stagingSmoke).not.toContain("world_state_overview");
+		expect(stagingSmoke).not.toContain("timeline_diff");
+		expect(stagingSmoke).not.toContain('name: "mcp health"');
+		expect(stagingSmoke).not.toContain('readRequiredEnv("STAGING_MCP_URL")');
 	});
 });

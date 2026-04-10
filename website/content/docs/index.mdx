@@ -1,21 +1,26 @@
-Bardo keeps the public docs intentionally product-focused. This section exists to help you install the bridge, connect a client, understand where campaign truth lives, and see how the current MCP surface, runtime skills, and ruleset mechanics fit together without turning the docs into a second dashboard.
+Bardo is a local-first campaign runtime. The workspace is the source of truth, `.bardo/` is the only Bardo-managed root, and the hosted side stays focused on auth, approvals, billing, entitlements, and protected account logic.
 
 ## What Bardo covers
 
-- Install the local bridge with the published shell scripts.
-- Connect an MCP-capable client to your local workspace.
-- Understand where campaign truth lives and where it does not.
-- Discover the trusted-copilot MCP surface, including mechanics and planning tools.
-- Understand how uploaded rulesets, runtime skills, and table-decision nodes shape behavior.
+- Install the local bridge on the machine that holds your campaign files.
+- Run `bardo login`, `bardo init`, and `bardo connect` from the workspace root.
+- Generate a strict `.bardo/` prep layer with rules bootstrap and campaign bootstrap outputs.
+- Use local runtime tools such as `scene_turn`, `player_action`, `user_correction`, `world_sync`, and `simulation_tick`.
+- Keep the hosted boundary narrow and predictable.
 
 ## Recommended path
 
-1. Install the bridge on the machine where your campaign files live.
-2. Connect your preferred AI client and approve the browser session.
-3. Use the campaign truth model as the mental boundary for local versus hosted behavior.
-4. Review the MCP surface and ruleset mechanics pages before designing a workflow around custom rules.
-5. Open the billing page only when you need subscription or usage details.
+1. Install the CLI bridge locally.
+2. Put `rulebook.md` in the workspace root if you want the default rules bootstrap path.
+3. Run `bardo login`.
+4. Run `bardo init`.
+5. Read `.bardo/manifests/readiness.json` and `.bardo/state/current-state.json`.
+6. Run `bardo connect --client <your-client>`.
+7. Use the runtime tools against the local prep artifacts.
+8. If the player explicitly corrects canon, use `user_correction` instead of hand-editing generated state.
+
+`rulebook.md` on its own is enough to make Bardo safe and conservative, but not enough to imply a richly prepared world. Expect `ready-with-gaps` or limited continuity until campaign notes outside `.bardo/` provide grounded state.
 
 ## What stays outside docs
 
-The dashboard, Clerk authentication flows, bridge approval polling, billing actions, and API routes stay server-backed. The docs remain static on purpose so they load fast, stay searchable, and describe the stable public product boundary rather than every internal implementation detail.
+The website does not try to mirror every internal artifact. It documents the stable boundary: local workspace ownership, the generated `.bardo/` outputs, the public CLI entrypoints, and the hosted routes that remain server-backed.

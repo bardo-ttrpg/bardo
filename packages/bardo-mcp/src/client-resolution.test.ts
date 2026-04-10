@@ -32,6 +32,26 @@ describe("client resolution", () => {
 		}
 	});
 
+	test("auto-detects Gemini from a workspace settings file", async () => {
+		const workspaceRoot = await createTempDir("bardo-client-resolution-");
+		try {
+			const configPath = path.join(workspaceRoot, ".gemini/settings.json");
+			await mkdir(path.dirname(configPath), { recursive: true });
+			await writeFile(configPath, "{}\n", "utf8");
+
+			const resolved = await resolveAutoInstallClientSelection({
+				client: "auto",
+				workspaceRoot,
+			});
+
+			expect(resolved.client).toBe("gemini");
+			expect(resolved.detectionSource).toBe("workspace");
+			expect(resolved.configPath).toBe(configPath);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects ambiguous workspace auto-detection", async () => {
 		const workspaceRoot = await createTempDir("bardo-client-resolution-");
 		try {

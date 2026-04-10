@@ -1,0 +1,31 @@
+{
+	"name": "@bardo/engine",
+	"version": "0.1.0",
+	"private": true,
+	"packageManager": "bun@1.3.10",
+	"type": "module",
+	"exports": {
+		"./workspace": "./src/workspace.ts",
+		"./rules-bootstrap": "./src/rules-bootstrap.ts",
+		"./campaign-bootstrap": "./src/campaign-bootstrap.ts",
+		"./runtime-tools": "./src/runtime-tools.ts"
+	},
+	"scripts": {
+		"build": "tsc --noEmit",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "\"${npm_execpath:-bun}\" test",
+		"test:ga-gates": "\"${npm_execpath:-bun}\" test src/runtime-tools.test.ts src/campaign-bootstrap.test.ts src/rules-bootstrap.test.ts src/workspace.test.ts",
+		"test:soak-gates": "\"${npm_execpath:-bun}\" test src/runtime-tools.test.ts",
+		"test:mechanics-edge-gates": "\"${npm_execpath:-bun}\" test src/runtime-tools.test.ts",
+		"test:perf-gates": "\"${npm_execpath:-bun}\" test src/runtime-tools.test.ts",
+		"ga:readiness": "\"${npm_execpath:-bun}\" run check && \"${npm_execpath:-bun}\" run test && \"${npm_execpath:-bun}\" run test:ga-gates",
+		"check": "\"${npm_execpath:-bun}\" run lint && \"${npm_execpath:-bun}\" run typecheck"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.10",
+		"@types/node": "^25.4.0",
+		"typescript": "5.9.3"
+	}
+}

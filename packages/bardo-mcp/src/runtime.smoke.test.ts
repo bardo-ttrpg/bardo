@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { runCli } from "./runtime";
@@ -34,6 +34,11 @@ describe("bardo runtime smoke gate", () => {
 		const clientsStderr = createWriter();
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nTravel procedures and consequence tracking matter.",
+				"utf8",
+			);
 			const loginExitCode = await runCli(["login"], {
 				cwd: workspaceRoot,
 				homeDir,
@@ -174,14 +179,144 @@ describe("bardo runtime smoke gate", () => {
 			expect(clientsPayload.some((client) => client.id === "codex")).toBe(true);
 
 			await expect(
-				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
 			).resolves.toContain('"ruleset": "shadowdark"');
 			await expect(
 				readFile(path.join(workspaceRoot, ".codex/config.toml"), "utf8"),
 			).resolves.toContain("[mcp_servers.bardo]");
 			await expect(
-				readFile(path.join(workspaceRoot, "bardo/docs/quickstart.md"), "utf8"),
+				readFile(path.join(workspaceRoot, ".bardo/docs/quickstart.md"), "utf8"),
 			).resolves.toContain("approve the bridge in your browser");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("OpenCode connect produces a valid local workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nTravel procedures and consequence tracking matter.",
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"opencode",
+					"--api-key",
+					"bardo_bridge_access_smoke",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Connected Bardo to OpenCode");
+
+			const config = JSON.parse(
+				await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			) as {
+				instructions?: string[];
+				mcp: Record<
+					string,
+					{ type: string; command: string[]; enabled: boolean }
+				>;
+			};
+			expect(config.mcp.bardo).toEqual({
+				type: "local",
+				command: [
+					"bardo",
+					"mcp",
+					"serve",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--workspace-root",
+					".",
+				],
+				enabled: true,
+			});
+			expect(config.instructions).toEqual(
+				expect.arrayContaining([
+					".bardo/docs/agent-contract.md",
+					".bardo/docs/clients/opencode.md",
+				]),
+			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("Gemini connect produces a valid local workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nTravel procedures and consequence tracking matter.",
+				"utf8",
+			);
+
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"gemini",
+					"--api-key",
+					"bardo_bridge_access_smoke",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Connected Bardo to Gemini CLI");
+
+			const config = JSON.parse(
+				await readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
+			) as {
+				mcpServers: Record<string, { command: string; args: string[] }>;
+			};
+			expect(config.mcpServers.bardo).toEqual({
+				command: "bardo",
+				args: [
+					"mcp",
+					"serve",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--workspace-root",
+					".",
+				],
+			});
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

@@ -66,6 +66,12 @@ export function auditBundleArtifacts(
 		) {
 			errors.push(`Client bundle leaked @bardo/mcp into ${chunk.path}.`);
 		}
+		if (
+			chunk.contents.includes("@bardo/engine") ||
+			chunk.contents.includes("/packages/bardo-engine/")
+		) {
+			errors.push(`Client bundle leaked @bardo/engine into ${chunk.path}.`);
+		}
 
 		if (!isPublicChunk(chunk)) {
 			continue;

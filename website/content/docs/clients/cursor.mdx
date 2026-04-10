@@ -1,0 +1,44 @@
+Use this guide for [Cursor](https://cursor.com/). Bardo’s Cursor integration is workspace-local and writes the standard Cursor MCP JSON file.
+
+## Install Cursor
+
+Install or update Cursor from the current official Cursor download flow, then open the campaign workspace you want Bardo to manage.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo login
+bardo init
+bardo connect --client cursor
+```
+
+This writes `.cursor/mcp.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo adds a `mcpServers.bardo` entry that launches the local bridge:
+
+```json
+{
+  "mcpServers": {
+    "bardo": {
+      "command": "bardo",
+      "args": ["mcp", "serve", "--url", "http://127.0.0.1:3000/mcp", "--workspace-root", "."]
+    }
+  }
+}
+```
+
+You usually do not need to edit that file by hand. Re-run `bardo connect --client cursor` if the saved MCP URL or server name changes.
+
+## Use Bardo well in Cursor
+
+- call `bardo_workspace_status` first
+- read readiness and current state before continuing play
+- use `scene_turn` for safe, grounded narration
+- use `player_action`, `world_sync`, and `simulation_tick` only for validated canon changes
+- use `user_correction` when the table explicitly corrects canon
+
+Cursor should treat Bardo as the campaign runtime authority for this workspace, while `.bardo/` remains the local source of truth.

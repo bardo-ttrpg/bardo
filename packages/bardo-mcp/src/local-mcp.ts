@@ -12,8 +12,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -21,7 +20,11 @@ import {
 	ListToolsRequestSchema,
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
+import { createRuntimeToolHandlers } from "@bardo/engine/runtime-tools";
+import { migrateLegacyWorkspaceRoot } from "@bardo/engine/workspace";
 import type { PlanTier } from "./plan-utils";
+import { bootstrapImportedRulebook } from "./rules-bootstrap";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
@@ -68,6 +71,7 @@ type LocalToolDefinition = {
 	description: string;
 	inputSchema: JsonSchema;
 	annotations: Record<string, unknown>;
+	exposure?: "public" | "diagnostic";
 	handler: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
 
@@ -555,18 +559,6 @@ async function movePathToWorkspaceTrash(args: {
 	};
 }
 
-function renderMarkdown(
-	title: string,
-	description: string,
-	body: string,
-): string {
-	return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(
-		description,
-	)}\n---\n\n${body}`
-		.trimEnd()
-		.concat("\n");
-}
-
 async function ensureWorkspaceDirectories(bardoRoot: string): Promise<void> {
 	await mkdir(bardoRoot, { recursive: true });
 	for (const relative of WORKSPACE_DIRECTORIES) {
@@ -622,6 +614,77 @@ function toRulebookHashes(value: unknown): Record<string, string> {
 		}
 	}
 	return result;
+}
+
+async function readWorkspaceReadinessSummary(bardoRoot: string): Promise<{
+	status: "ready" | "ready-with-gaps" | "needs-user-input";
+	gaps: string[];
+}> {
+	const readiness = await readExistingJson(
+		path.join(bardoRoot, "manifests/readiness.json"),
+	);
+	const rawStatus = readiness?.status;
+	const status: "ready" | "ready-with-gaps" | "needs-user-input" =
+		rawStatus === "ready" ||
+		rawStatus === "ready-with-gaps" ||
+		rawStatus === "needs-user-input"
+			? rawStatus
+			: "needs-user-input";
+	const gaps = toStringArray(readiness?.gaps);
+
+	if (readiness) {
+		return { status, gaps };
+	}
+
+	return {
+		status: "needs-user-input",
+		gaps: [
+			"Readiness artifact is missing. Re-run init before trusting the workspace state.",
+		],
+	};
+}
+
+async function readWorkspaceCurrentStateSummary(bardoRoot: string): Promise<{
+	currentLocation: string | null;
+	activeQuests: string[];
+	relevantFactions: string[];
+	uncertainties: string[];
+	activeCorrections: string[];
+}> {
+	const currentState = await readExistingJson(
+		path.join(bardoRoot, "state/current-state.json"),
+	);
+
+	return {
+		currentLocation:
+			typeof currentState?.currentLocation === "string"
+				? currentState.currentLocation
+				: null,
+		activeQuests: toStringArray(currentState?.activeQuests),
+		relevantFactions: toStringArray(currentState?.relevantFactions),
+		uncertainties: toStringArray(currentState?.uncertainties),
+		activeCorrections: toStringArray(currentState?.activeCorrections),
+	};
+}
+
+function deriveWorkspaceStatusNextSteps(
+	readiness: "ready" | "ready-with-gaps" | "needs-user-input",
+): string[] {
+	if (readiness === "needs-user-input") {
+		return [
+			"Do not continue play yet. Resolve the readiness gaps or rerun init after updating campaign sources.",
+		];
+	}
+
+	if (readiness === "ready-with-gaps") {
+		return [
+			"Proceed conservatively, surface the gaps explicitly, and avoid ungrounded canon writes.",
+		];
+	}
+
+	return [
+		"Play can continue conservatively. Use scene_turn for GM guidance and mutation tools only for validated canon changes.",
+	];
 }
 
 async function hashImportedRulebooks(args: {
@@ -738,6 +801,40 @@ export async function ensureWorkspaceCoreFiles(args: {
 			importedRulebooks,
 		})),
 	};
+	let rulebookBootstrap =
+		typeof manifest?.rulebookBootstrap === "object" &&
+		manifest.rulebookBootstrap !== null
+			? manifest.rulebookBootstrap
+			: null;
+	const primaryRulebook = importedRulebooks[0] ?? null;
+	if (primaryRulebook) {
+		const sourcePath = path.join(args.bardoRoot, primaryRulebook);
+		const sourceExists = await stat(sourcePath)
+			.then(() => true)
+			.catch((error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return false;
+				}
+				throw error;
+			});
+		if (sourceExists) {
+			rulebookBootstrap = await bootstrapImportedRulebook({
+				bardoRoot: args.bardoRoot,
+				sourceRelativePath: primaryRulebook,
+				nowIso: args.nowIso,
+			});
+		}
+	}
+	const campaignBootstrap = await bootstrapCampaignWorkspace({
+		workspaceRoot: args.workspaceRoot,
+		bardoRoot: args.bardoRoot,
+		nowIso: args.nowIso,
+	});
 	await writeTextAtomic(
 		manifestPath,
 		JSON.stringify(
@@ -755,6 +852,15 @@ export async function ensureWorkspaceCoreFiles(args: {
 					(typeof manifest?.ruleset === "string" ? manifest.ruleset : null),
 				importedRulebooks,
 				rulebookHashes: nextRulebookHashes,
+				rulebookBootstrap,
+				campaignBootstrap: {
+					sourceIndexPath: campaignBootstrap.sourceIndexPath,
+					entitiesPath: campaignBootstrap.entitiesPath,
+					currentStatePath: campaignBootstrap.currentStatePath,
+					trackingProfilePath: campaignBootstrap.trackingProfilePath,
+					readinessPath: campaignBootstrap.readinessPath,
+					readiness: campaignBootstrap.readiness,
+				},
 				capabilityManifest: toStringArray(manifest?.capabilityManifest),
 				supplements: Array.isArray(manifest?.supplements)
 					? manifest.supplements
@@ -764,38 +870,7 @@ export async function ensureWorkspaceCoreFiles(args: {
 			2,
 		),
 	);
-	await ensureFile(
-		path.join(args.bardoRoot, "_settings/settings.md"),
-		renderMarkdown(
-			"Campaign Settings",
-			"Campaign setup settings and preferences.",
-			JSON.stringify({ updatedAtISO: args.nowIso }, null, 2),
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "state/current.md"),
-		renderMarkdown(
-			"Campaign State",
-			"Current campaign state and memory snapshot.",
-			JSON.stringify({}, null, 2),
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "projections/current-state.md"),
-		renderMarkdown(
-			"Current State Projection",
-			"Derived campaign state projection generated from canonical event log.",
-			JSON.stringify({}, null, 2),
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "events/history.md"),
-		renderMarkdown(
-			"Campaign History",
-			"Chronological campaign action history log.",
-			"",
-		),
-	);
+	await ensureFile(path.join(args.bardoRoot, "events/state-changes.ndjson"), "");
 }
 
 export async function maybeImportRulebook(args: {
@@ -803,20 +878,38 @@ export async function maybeImportRulebook(args: {
 	bardoRoot: string;
 	rulebookPath: string | null;
 }): Promise<string[]> {
-	if (!args.rulebookPath) {
-		return [];
+	const requestedPath = args.rulebookPath?.trim() ?? "";
+	const fallbackPath = path.join(args.workspaceRoot, "rulebook.md");
+	const absoluteSource = requestedPath
+		? await resolveScopedPath(args.workspaceRoot, requestedPath)
+		: await stat(fallbackPath)
+				.then(() => fallbackPath)
+				.catch((error: unknown) => {
+					if (
+						typeof error === "object" &&
+						error !== null &&
+						"code" in error &&
+						error.code === "ENOENT"
+					) {
+						return null;
+					}
+					throw error;
+				});
+	if (!absoluteSource) {
+		throw new Error(
+			"Rules bootstrap requires rulebook.md in the workspace root unless you pass an explicit --rulebook override.",
+		);
 	}
 
-	const absoluteSource = await resolveScopedPath(
-		args.workspaceRoot,
-		args.rulebookPath,
-	);
+	const extension = path.extname(absoluteSource).toLowerCase();
+	if (![".md", ".markdown", ".mdx", ".txt"].includes(extension)) {
+		throw new Error(
+			"Rulebook import currently supports markdown or text sources only. Convert PDFs to Markdown before bootstrapping.",
+		);
+	}
+
 	const sourceContents = await readFile(absoluteSource, "utf8");
-	const target = path.join(
-		args.bardoRoot,
-		"rules/sources/rulebook",
-		path.basename(absoluteSource),
-	);
+	const target = path.join(args.bardoRoot, "rules", "rulebook.md");
 	await mkdir(path.dirname(target), { recursive: true });
 	await writeTextAtomic(target, sourceContents);
 	return [path.relative(args.bardoRoot, target).replaceAll("\\", "/")];
@@ -920,8 +1013,11 @@ export async function addWorkspaceSupplement(args: {
 		),
 	);
 
-	const historyPath = path.join(args.bardoRoot, "events/history.md");
-	const existingHistory = await readFile(historyPath, "utf8").catch(
+	const stateChangesPath = path.join(
+		args.bardoRoot,
+		"events/state-changes.ndjson",
+	);
+	const existingStateChanges = await readFile(stateChangesPath, "utf8").catch(
 		(error: unknown) => {
 			if (
 				typeof error === "object" &&
@@ -934,12 +1030,17 @@ export async function addWorkspaceSupplement(args: {
 			throw error;
 		},
 	);
-	const historyEntry = `\n- ${nowIso} supplement_activation ${JSON.stringify({
+	const stateChangeEntry = `${JSON.stringify({
+		type: "supplement_activation",
+		recordedAtISO: nowIso,
 		supplement: relativeTarget,
 		scope: "additive_only",
 		addedCapabilities,
 	})}\n`;
-	await writeTextAtomic(historyPath, `${existingHistory}${historyEntry}`);
+	await writeTextAtomic(
+		stateChangesPath,
+		`${existingStateChanges}${stateChangeEntry}`,
+	);
 
 	return {
 		copiedTo: relativeTarget,
@@ -953,8 +1054,12 @@ function makeToolResult(
 	structuredContent: Record<string, unknown>,
 	isError = false,
 ) {
+	const renderedPayload =
+		Object.keys(structuredContent).length > 0
+			? `\n\n${JSON.stringify(structuredContent, null, 2)}`
+			: "";
 	return {
-		content: [{ type: "text" as const, text: message }],
+		content: [{ type: "text" as const, text: `${message}${renderedPayload}` }],
 		structuredContent,
 		isError,
 	};
@@ -1029,52 +1134,6 @@ export function createRemoteConnectionCoordinator(
 
 			return connectingPromise;
 		},
-	};
-}
-
-async function connectRemoteMcpClient(args: {
-	apiKey: string;
-	url: string;
-	workspaceRoot: string;
-}): Promise<RemoteConnectionResult> {
-	const transport = new StreamableHTTPClientTransport(new URL(args.url), {
-		requestInit: {
-			headers: {
-				authorization: `Bearer ${args.apiKey}`,
-				"x-bardo-workspace-root": args.workspaceRoot,
-			},
-		},
-	});
-	const client = new Client(
-		{
-			name: "bardo-local-bridge",
-			version: "0.1.0",
-		},
-		{
-			capabilities: {},
-		},
-	);
-	await client.connect(transport);
-	const list = await client.listTools();
-	return {
-		client,
-		tools: list.tools.map((tool) => ({
-			name: tool.name,
-			title: tool.title,
-			description: tool.description,
-			inputSchema:
-				typeof tool.inputSchema === "object" && tool.inputSchema !== null
-					? (tool.inputSchema as JsonSchema)
-					: undefined,
-			outputSchema:
-				typeof tool.outputSchema === "object" && tool.outputSchema !== null
-					? (tool.outputSchema as JsonSchema)
-					: undefined,
-			annotations:
-				typeof tool.annotations === "object" && tool.annotations !== null
-					? tool.annotations
-					: undefined,
-		})),
 	};
 }
 
@@ -1189,12 +1248,20 @@ function localToolDefinitions(
 	textFileLimitBytes: number,
 	ensureWorkspaceLock: (workspaceRoot: string) => Promise<void>,
 ): LocalToolDefinition[] {
+	const runtimeToolHandlers = createRuntimeToolHandlers();
+	function requireRuntimeToolHandler(name: string) {
+		const handler = runtimeToolHandlers[name];
+		if (typeof handler !== "function") {
+			throw new Error(`Missing runtime tool handler: ${name}`);
+		}
+		return handler;
+	}
 	return [
 		{
 			name: "bardo_workspace_status",
 			title: "Workspace Status",
 			description:
-				"Return the active workspace root, active bardo root, and whether the workspace is initialized.",
+				"Return the active workspace root, initialization state, readiness summary, and current-state highlights so agents can decide whether play can continue safely.",
 			inputSchema: {
 				type: "object",
 				properties: {},
@@ -1208,6 +1275,7 @@ function localToolDefinitions(
 			},
 			handler: async () => {
 				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
 				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
 				const manifestPath = path.join(bardoRoot, "manifest.json");
 				const initialized = await stat(manifestPath)
@@ -1219,6 +1287,26 @@ function localToolDefinitions(
 							detected: false,
 							warnings: [],
 						};
+				const readiness: {
+					status: "ready" | "ready-with-gaps" | "needs-user-input";
+					gaps: string[];
+				} = initialized
+					? await readWorkspaceReadinessSummary(bardoRoot)
+					: {
+							status: "needs-user-input",
+							gaps: [
+								"Workspace is not initialized yet. Run init before continuing play.",
+							],
+						};
+				const currentStateSummary = initialized
+					? await readWorkspaceCurrentStateSummary(bardoRoot)
+					: {
+							currentLocation: null,
+							activeQuests: [],
+							relevantFactions: [],
+							uncertainties: [],
+							activeCorrections: [],
+						};
 				return {
 					workspaceRoot: context.workspaceRoot,
 					bardoRoot,
@@ -1226,15 +1314,18 @@ function localToolDefinitions(
 					roots: context.roots,
 					manifestPath,
 					initialized,
+					readiness,
+					currentStateSummary,
+					nextSteps: deriveWorkspaceStatusNextSteps(readiness.status),
 					rulebookHashDrift,
 				};
 			},
 		},
 		{
-			name: "bardo_workspace_bootstrap",
-			title: "Bootstrap Workspace",
+			name: "init",
+			title: "Initialize Bardo Workspace",
 			description:
-				"Initialize the canonical Bardo workspace scaffold in the active project and optionally import a rulebook.",
+				"Run rules bootstrap and campaign bootstrap for the active workspace using the strict .bardo local-first contract.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1251,6 +1342,56 @@ function localToolDefinitions(
 			},
 			handler: async (args) => {
 				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				await ensureWorkspaceLock(context.workspaceRoot);
+				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
+				await ensureWorkspaceDirectories(bardoRoot);
+				const importedRulebooks = await maybeImportRulebook({
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot,
+					rulebookPath:
+						typeof args.rulebookPath === "string" ? args.rulebookPath : null,
+				});
+				const nowIso = new Date().toISOString();
+				await ensureWorkspaceCoreFiles({
+					bardoRoot,
+					workspaceRoot: context.workspaceRoot,
+					ruleset: typeof args.ruleset === "string" ? args.ruleset : null,
+					nowIso,
+					importedRulebooks,
+				});
+				const manifest =
+					(await readExistingJson(path.join(bardoRoot, "manifest.json"))) ?? {};
+				return {
+					success: true,
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot,
+					manifest,
+				};
+			},
+		},
+		{
+			name: "bardo_workspace_bootstrap",
+			title: "Bootstrap Workspace",
+			description:
+				"Legacy alias for init. Initializes the canonical .bardo workspace and generates the local runtime artifacts.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					rulebookPath: { type: "string" },
+					ruleset: { type: "string" },
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
 				await ensureWorkspaceLock(context.workspaceRoot);
 				const bardoRoot = resolveBardoRoot(context.workspaceRoot);
 				await ensureWorkspaceDirectories(bardoRoot);
@@ -1269,11 +1410,301 @@ function localToolDefinitions(
 					importedRulebooks,
 				});
 				return {
+					success: true,
 					workspaceRoot: context.workspaceRoot,
 					bardoRoot,
 					importedRulebooks,
 					ruleset: typeof args.ruleset === "string" ? args.ruleset : null,
+					rulebookBootstrap:
+						(await readExistingJson(path.join(bardoRoot, "manifest.json")))?.rulebookBootstrap ??
+						null,
 				};
+			},
+		},
+		{
+			name: "scene_turn",
+			title: "Resolve Scene Turn",
+			description:
+				"Resolve a scene turn from the local prep artifacts, consult grounded rules first, and behave like a conservative TTRPG GM without auto-promoting flavor into canon.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					playerIntent: { type: "string" },
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				return await requireRuntimeToolHandler("scene_turn")(args, {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot: resolveBardoRoot(context.workspaceRoot),
+				});
+			},
+		},
+		{
+			name: "player_action",
+			title: "Commit Player Action",
+			description:
+				"Resolve a player action into a validated state-changing event and commit only the grounded state changes.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					action: { type: "string" },
+					currentLocation: { type: "string" },
+					activeQuests: {
+						type: "array",
+						items: { type: "string" },
+					},
+					relevantFactions: {
+						type: "array",
+						items: { type: "string" },
+					},
+					recentEvents: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factsRevealed: {
+						type: "array",
+						items: { type: "string" },
+					},
+					resourcesSpent: {
+						type: "array",
+						items: { type: "string" },
+					},
+					damageTaken: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factionConsequences: {
+						type: "array",
+						items: { type: "string" },
+					},
+					npcAttitudes: {
+						type: "object",
+						additionalProperties: { type: "string" },
+					},
+					clockProgress: {
+						type: "array",
+						items: { type: "string" },
+					},
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				await ensureWorkspaceLock(context.workspaceRoot);
+				return await requireRuntimeToolHandler("player_action")(args, {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot: resolveBardoRoot(context.workspaceRoot),
+				});
+			},
+		},
+		{
+			name: "user_correction",
+			title: "Apply User Correction",
+			description:
+				"Record an explicit user correction at the highest canon precedence so later play honors the corrected truth.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					correction: { type: "string" },
+					currentLocation: { type: "string" },
+					activeQuests: {
+						type: "array",
+						items: { type: "string" },
+					},
+					relevantFactions: {
+						type: "array",
+						items: { type: "string" },
+					},
+					recentEvents: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factsRevealed: {
+						type: "array",
+						items: { type: "string" },
+					},
+					resourcesSpent: {
+						type: "array",
+						items: { type: "string" },
+					},
+					damageTaken: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factionConsequences: {
+						type: "array",
+						items: { type: "string" },
+					},
+					npcAttitudes: {
+						type: "object",
+						additionalProperties: { type: "string" },
+					},
+					clockProgress: {
+						type: "array",
+						items: { type: "string" },
+					},
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				await ensureWorkspaceLock(context.workspaceRoot);
+				return await requireRuntimeToolHandler("user_correction")(args, {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot: resolveBardoRoot(context.workspaceRoot),
+				});
+			},
+		},
+		{
+			name: "world_sync",
+			title: "Synchronize World State",
+			description:
+				"Commit validated world-state changes to the local runtime artifacts without handing ownership to a remote gameplay service.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					currentLocation: { type: "string" },
+					activeQuests: {
+						type: "array",
+						items: { type: "string" },
+					},
+					relevantFactions: {
+						type: "array",
+						items: { type: "string" },
+					},
+					recentEvents: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factsRevealed: {
+						type: "array",
+						items: { type: "string" },
+					},
+					resourcesSpent: {
+						type: "array",
+						items: { type: "string" },
+					},
+					damageTaken: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factionConsequences: {
+						type: "array",
+						items: { type: "string" },
+					},
+					npcAttitudes: {
+						type: "object",
+						additionalProperties: { type: "string" },
+					},
+					clockProgress: {
+						type: "array",
+						items: { type: "string" },
+					},
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				await ensureWorkspaceLock(context.workspaceRoot);
+				return await requireRuntimeToolHandler("world_sync")(args, {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot: resolveBardoRoot(context.workspaceRoot),
+				});
+			},
+		},
+		{
+			name: "simulation_tick",
+			title: "Advance Simulation",
+			description:
+				"Advance the local world simulation through validated state-changing events grounded in the prep artifacts and current state.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					tickLabel: { type: "string" },
+					currentLocation: { type: "string" },
+					activeQuests: {
+						type: "array",
+						items: { type: "string" },
+					},
+					relevantFactions: {
+						type: "array",
+						items: { type: "string" },
+					},
+					recentEvents: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factsRevealed: {
+						type: "array",
+						items: { type: "string" },
+					},
+					resourcesSpent: {
+						type: "array",
+						items: { type: "string" },
+					},
+					damageTaken: {
+						type: "array",
+						items: { type: "string" },
+					},
+					factionConsequences: {
+						type: "array",
+						items: { type: "string" },
+					},
+					npcAttitudes: {
+						type: "object",
+						additionalProperties: { type: "string" },
+					},
+					clockProgress: {
+						type: "array",
+						items: { type: "string" },
+					},
+				},
+				additionalProperties: false,
+			},
+			annotations: {
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			},
+			handler: async (args) => {
+				const context = await manager.getWorkspaceContext();
+				await migrateLegacyWorkspaceRoot(context.workspaceRoot);
+				await ensureWorkspaceLock(context.workspaceRoot);
+				return await requireRuntimeToolHandler("simulation_tick")(args, {
+					workspaceRoot: context.workspaceRoot,
+					bardoRoot: resolveBardoRoot(context.workspaceRoot),
+				});
 			},
 		},
 		{
@@ -1281,6 +1712,7 @@ function localToolDefinitions(
 			title: "List Workspace Paths",
 			description:
 				"List files and directories under the active workspace root to help the agent inspect the project safely.",
+			exposure: "diagnostic",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1320,6 +1752,7 @@ function localToolDefinitions(
 			name: "bardo_workspace_read_text",
 			title: "Read Workspace File",
 			description: "Read a UTF-8 text file inside the active workspace root.",
+			exposure: "diagnostic",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1350,6 +1783,7 @@ function localToolDefinitions(
 			name: "bardo_workspace_write_text",
 			title: "Write Workspace File",
 			description: "Write UTF-8 text content inside the active workspace root.",
+			exposure: "diagnostic",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1405,6 +1839,7 @@ function localToolDefinitions(
 			title: "Add Rulebook Supplement",
 			description:
 				"Add a mid-campaign supplement using additive-only capability updates and log supplement activation.",
+			exposure: "diagnostic",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1451,6 +1886,7 @@ function localToolDefinitions(
 			title: "Delete Workspace Path",
 			description:
 				"Move a file or directory under the active workspace root into the Bardo trash.",
+			exposure: "diagnostic",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1516,7 +1952,7 @@ export async function startLocalMcpServer(
 				},
 			},
 			instructions:
-				"Use the high-level Bardo GM and world-simulation tools through this local bridge. The bridge keeps workspace access on the local machine and proxies protected tool execution to the remote Bardo MCP.",
+				"Use the local-first Bardo GM and world-simulation tools through this bridge. The bridge keeps workspace access and canon ownership on the local machine while hosted routes remain limited to auth, billing, approvals, and protected account logic.",
 		},
 	);
 	const manager = createWorkspaceRootManager({
@@ -1530,40 +1966,20 @@ export async function startLocalMcpServer(
 		ensureWorkspaceLock,
 	);
 	const exposeLocalTools = shouldExposeBridgeLocalTools(env);
-	const listedLocalTools = exposeLocalTools ? localTools : [];
+	const listedLocalTools = localTools.filter(
+		(tool) => tool.exposure !== "diagnostic" || exposeLocalTools,
+	);
 	const localToolMap = new Map(localTools.map((tool) => [tool.name, tool]));
-	const remoteToolAccess = createRemoteToolAccessController({
-		plan: options.plan ?? null,
-		env,
-	});
-	const remoteConnection = createRemoteConnectionCoordinator({
-		apiKey: options.apiKey,
-		stderr,
-		getWorkspaceContext: () => manager.getWorkspaceContext(),
-		connectRemoteClient: async (workspaceRoot) =>
-			await connectRemoteMcpClient({
-				apiKey: options.apiKey ?? "",
-				url: options.url,
-				workspaceRoot,
-			}),
-		closeRemoteClient: async (client) => {
-			await client?.close();
-		},
-	});
-
 	server.oninitialized = () => {
 		void manager.refreshFromClientRoots();
 	};
 	server.setNotificationHandler(
 		RootsListChangedNotificationSchema,
 		async () => {
-			await remoteConnection.invalidate();
 			await manager.refreshFromClientRoots();
 		},
 	);
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
-		const remote = await remoteConnection.ensureRemoteConnection();
-		const remoteTools = remoteToolAccess.filterTools(remote.tools);
 		return {
 			tools: [
 				...listedLocalTools.map((tool) => ({
@@ -1573,24 +1989,15 @@ export async function startLocalMcpServer(
 					inputSchema: tool.inputSchema,
 					annotations: tool.annotations,
 				})),
-				...remoteTools.map((tool) => ({
-					name: tool.name,
-					title: tool.title,
-					description: tool.description,
-					inputSchema: tool.inputSchema ?? {
-						type: "object",
-						properties: {},
-						additionalProperties: true,
-					},
-					outputSchema: tool.outputSchema,
-					annotations: tool.annotations,
-				})),
 			],
 		};
 	});
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		const localTool = localToolMap.get(request.params.name);
-		if (localTool && exposeLocalTools) {
+		if (
+			localTool &&
+			(localTool.exposure !== "diagnostic" || exposeLocalTools)
+		) {
 			try {
 				const payload = await localTool.handler(
 					(request.params.arguments as Record<string, unknown>) ?? {},
@@ -1604,37 +2011,11 @@ export async function startLocalMcpServer(
 				);
 			}
 		}
-
-		try {
-			const remote = await remoteConnection.ensureRemoteConnection();
-			const remoteTool = remote.tools.find(
-				(tool) => tool.name === request.params.name,
-			);
-			if (!remote.client || !remoteTool) {
-				return makeToolResult(
-					`Remote tool "${request.params.name}" is unavailable for the current bridge session.`,
-					{ success: false, reason: "REMOTE_TOOL_UNAVAILABLE" },
-					true,
-				);
-			}
-			if (!remoteToolAccess.isAllowed(remoteTool)) {
-				return makeToolResult(
-					remoteToolAccess.blockedMessage(request.params.name, remoteTool),
-					{ success: false, reason: "PLAN_RESTRICTED" },
-					true,
-				);
-			}
-			return await remote.client.callTool({
-				name: request.params.name,
-				arguments: (request.params.arguments as Record<string, unknown>) ?? {},
-			});
-		} catch (error) {
-			return makeToolResult(
-				error instanceof Error ? error.message : String(error),
-				{ success: false, reason: "REMOTE_TOOL_CALL_FAILED" },
-				true,
-			);
-		}
+		return makeToolResult(
+			`Tool "${request.params.name}" is unavailable in the local-first runtime.`,
+			{ success: false, reason: "TOOL_UNAVAILABLE" },
+			true,
+		);
 	});
 
 	const transport = new StdioServerTransport();
@@ -1646,7 +2027,6 @@ export async function startLocalMcpServer(
 	try {
 		await transportClosed;
 	} finally {
-		await remoteConnection.invalidate();
 		await releaseWorkspaceLocks();
 	}
 }

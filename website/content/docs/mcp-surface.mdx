@@ -1,48 +1,43 @@
-Bardo’s MCP surface is optimized for a trusted copilot, not a hidden autonomous game master. The tools are designed to stay discoverable, structured, and explicit about what is read-only, what is advisory, and what can affect canon.
+Bardo exposes a small runtime surface built on top of the local prep artifacts instead of a large remote gameplay API.
 
 ## Tool shape
 
-Every public tool is documented with a clear use case, a “when not to use” boundary, and structured output. The goal is to help clients route themselves correctly instead of improvising from vague descriptions.
+The preferred public runtime tools are:
 
-The surface is tool-only in this phase. Bardo does not currently depend on MCP prompts or resources to expose the trusted-copilot GM workflow.
-
-## Core and mechanics tools
-
-The core surface covers canon retrieval, reporting, scene adjudication, and mechanics support:
-
-- `context_query`
-- `world_state_overview`
-- `timeline_diff`
-- `player_knowledge_view`
-- `continuity_audit`
+- `init`
 - `scene_turn`
-- `validate_action_against_ruleset`
-- `resolve_mechanics`
-- `roll_dice`
-- `world_sync_preview`
-- `ruleset_mechanics_overview`
+- `player_action`
+- `user_correction`
+- `world_sync`
+- `simulation_tick`
 
-These tools are meant to compose cleanly. For example, an agent can inspect the current ruleset, validate a proposed action, resolve the mechanics when authoritative support exists, and fall back to `scene_turn` when broader canon-aware judgment is still needed.
+The tools read from `.bardo/` artifacts, apply canon precedence conservatively, and only commit validated state-changing events or explicit user corrections.
 
-## Strategy tools
+## Local prep first
 
-Bardo also exposes planning-oriented tools so an agent can operate above the single-action level:
+`init` is the entrypoint for rules bootstrap plus campaign bootstrap. It prepares:
 
-- `faction_pressure_board`
-- `campaign_clocks`
-- `encounter_prep`
-- `campaign_planning`
+- `.bardo/rules/normalized/index.json`
+- `.bardo/manifests/source-index.json`
+- `.bardo/entities/campaign-entities.json`
+- `.bardo/state/current-state.json`
+- `.bardo/simulation/tracking-profile.json`
+- `.bardo/manifests/readiness.json`
+- `.bardo/events/state-changes.ndjson`
 
-These tools are intentionally read-only. They help an agent reason about pressure, pacing, and prep without pretending that planning output is already canonical truth.
+Runtime tools should operate from those artifacts instead of improvising their own shadow state.
 
-## Authoritative writes
+## Canon and commits
 
-The main canon-affecting workflow still centers on `scene_turn`. `resolve_mechanics` can append authoritative mechanics events when a ruleset is fully supported, but raw mutation tools are not part of the public trusted-copilot surface.
+- `scene_turn` can narrate conservatively from the current state.
+- Narration is not canon by itself.
+- `user_correction` records explicit player corrections at the highest precedence.
+- `player_action`, `world_sync`, and `simulation_tick` commit validated state-changing events to `.bardo/events/state-changes.ndjson`.
+- The committed event stream and `state/current-state.json` form the local runtime truth.
+- The default precedence order is: explicit user correction, preserved source rules text, current campaign source files, approved committed state, recent validated play result, inference, narration flavor.
 
-That split is intentional: Bardo tries to give agents strong guidance, previews, and planning breadth without turning the public MCP surface into a low-level maintenance API.
+## Guardrails
 
-## Rate limiting and V1 guardrails
+The bridge intentionally does not proxy a remote gameplay surface. Hosted routes still support approvals, introspection, billing, and runtime status, but campaign execution remains local.
 
-The hosted surface is also guarded by request budgets. That matters most around bridge startup, status polling, and any route that can fan out into metering or approval checks.
-
-For agents, the practical rule is simple: plan with the structured tools, call only the next best tool, and back off on `429` instead of retrying aggressively. The surface is designed for deliberate copilot behavior, not for brute-force probing.
+Bardo should stop or ask when canon conflict, rule ambiguity, or missing state would change the outcome materially. It may continue conservatively only when uncertainty stays marked and does not corrupt canon.

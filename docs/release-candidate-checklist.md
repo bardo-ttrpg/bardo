@@ -1,0 +1,39 @@
+# Release Candidate Checklist
+
+Use this before calling a build staging-ready.
+
+## Freeze the surface
+
+1. Confirm the frozen product surface still matches the contract:
+   - `bardo login`
+   - `bardo init`
+   - `bardo connect`
+   - `.bardo/` as the only managed steady-state root
+   - `/api/connect/*`, `/api/auth/introspect-key`, and `/api/billing`
+   - runtime MCP tools `init`, `scene_turn`, `player_action`, `world_sync`, `simulation_tick`
+2. Confirm any compatibility logic is migration-only, not a second steady-state path.
+
+## Release artifacts
+
+1. Bump [`/home/armando/projects/bardo/packages/bardo-mcp/package.json`](/home/armando/projects/bardo/packages/bardo-mcp/package.json) intentionally.
+2. Review [`/home/armando/projects/bardo/bun.lock`](/home/armando/projects/bardo/bun.lock) and confirm the lockfile diff is intentional.
+3. Run `bun run build` so the release binaries under `packages/bardo-mcp/dist/release/` are fresh for the version being shipped.
+4. Confirm `SHA256SUMS.txt` matches the freshly built binaries.
+5. Draft release notes before promotion. Call out install changes, `.bardo` migration notes, any user-visible runtime behavior changes, and rollback guidance.
+
+## Validation gates
+
+1. Run `bun run test:release-gates`.
+2. Run `bun run bundle:audit`.
+3. Run `bun run stress:test-01`.
+4. Run `bun run staging:smoke` against the real staging deployment after env validation.
+5. Re-run the Replacement Audit Plan and do not waive blocking findings.
+
+## Promotion decision
+
+Promote only if all of these are true:
+
+- the packaged install flow succeeds from a clean environment
+- `bardo-test-01` passes without canon drift or unsafe commits
+- staging hosted routes behave correctly for connect, auth introspection, billing, approval, and runtime status
+- docs and operator runbooks still match the shipped behavior

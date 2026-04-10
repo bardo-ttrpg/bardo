@@ -1,0 +1,38 @@
+Use this guide if you want Bardo inside [OpenCode](https://opencode.ai/). OpenCode’s current docs cover [config](https://opencode.ai/docs/config/) and [MCP servers](https://opencode.ai/docs/mcp-servers/). Bardo integrates as a local MCP server and does not override your OpenCode model choice.
+
+## Install OpenCode
+
+Install or update OpenCode with the current official steps from [opencode.ai](https://opencode.ai/), then open the campaign workspace that owns your `rulebook.md` and source notes.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo login
+bardo init
+bardo connect --client opencode
+```
+
+This writes `opencode.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo adds:
+
+- a local MCP server entry under `mcp.bardo`
+- `enabled: true`
+- instruction files that point OpenCode at `.bardo/docs/agent-contract.md` and `.bardo/docs/clients/opencode.md`
+
+Bardo intentionally does not set OpenCode’s `model` field. OpenCode should keep using your current default model unless you explicitly change it in OpenCode itself.
+
+## Use Bardo well in OpenCode
+
+Ask the agent to:
+
+1. call `bardo_workspace_status` first
+2. inspect readiness and current state
+3. use `scene_turn` before mutation tools
+4. use `user_correction` when the player explicitly corrects canon
+
+OpenCode supports local MCP servers through `opencode.json`, and its docs note that MCP tools become available to the model alongside built-in tools. Bardo’s generated instruction files are there to keep the agent on the MCP path instead of inventing a manual HTTP workaround.

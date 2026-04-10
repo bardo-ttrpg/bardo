@@ -212,4 +212,32 @@ describe("GET /api/connect/runtime-status", () => {
 		expect(telemetry.snapshot().runtime_status_success).toBe(1);
 		expect(telemetry.snapshot().runtime_status_invalid).toBe(1);
 	});
+
+	test("normalizes not-found key verification failures into a clean invalid credential response", async () => {
+		const handler = createRuntimeStatusGetHandler({
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						const error = new Error("Not Found") as Error & {
+							status: number;
+						};
+						error.status = 404;
+						throw error;
+					},
+				},
+			}),
+		});
+
+		const response = await handler(
+			new Request("https://www.bardo.gg/api/connect/runtime-status", {
+				headers: {
+					authorization: "Bearer missing-key",
+				},
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(401);
+		expect(body.error).toBe("Invalid bridge credential.");
+	});
 });

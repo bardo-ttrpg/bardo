@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { listBlogEntries, listBlogStaticParams } from "@/content/site-content";
+import { listBlogEntries, listBlogStaticParams } from "../../../../content/site-content";
 
 const blogPageSource = readFileSync(
 	new URL("./page.tsx", import.meta.url),

@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "next dev --turbopack -p ${PORT:-3001}",
+		"dev": "\"${npm_execpath:-bun}\" run ./scripts/run-dev.ts --turbopack",
 		"validate:development-env": "\"${npm_execpath:-bun}\" run ./scripts/validate-development-env.ts",
 		"build": "\"${npm_execpath:-bun}\" run validate:deploy-env && \"${npm_execpath:-bun}\" run check:release-health && next build --turbopack",
 		"validate:deploy-env": "\"${npm_execpath:-bun}\" run ./scripts/validate-deploy-env.ts",
@@ -13,7 +13,7 @@
 		"check:react-doctor": "\"${npm_execpath:-bun}\" run ./scripts/check-react-doctor.ts",
 		"audit:lighthouse:home": "\"${npm_execpath:-bun}\" run ./scripts/run-lighthouse-home.ts",
 		"build:analyze": "NEXT_BUILD_ANALYZE_ARGS='build --turbopack --experimental-analyze' ANALYZE=true \"${npm_execpath:-bun}\" run ./scripts/run-build-analyze.ts",
-		"bundle:audit": "\"${npm_execpath:-bun}\" run build:analyze && \"${npm_execpath:-bun}\" run ./scripts/bundle-audit.ts",
+		"bundle:audit": "\"${npm_execpath:-bun}\" run ./scripts/bundle-audit.ts",
 		"start": "next start -p ${PORT:-3001}",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
@@ -25,7 +25,7 @@
 		"ci": "biome ci ."
 	},
 	"dependencies": {
-		"@bardo/mcp": "workspace:*",
+		"@bardo/shared": "workspace:*",
 		"@clerk/nextjs": "7.0.7",
 		"@clerk/ui": "1.2.3",
 		"@mdx-js/loader": "^3.1.1",
@@ -52,7 +52,7 @@
 		"@types/node": "^25.4.0",
 		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.2.3",
-		"lighthouse": "^13.0.3",
+		"lighthouse": "^13.1.0",
 		"shadcn": "^4.1.2",
 		"tailwind-merge": "^3.5.0",
 		"typescript": "5.9.3"

@@ -1,0 +1,45 @@
+Use this guide for [Gemini CLI](https://geminicli.com/). Gemini’s current MCP docs are at [MCP servers with the Gemini CLI](https://geminicli.com/docs/tools/mcp-server/).
+
+## Install Gemini CLI
+
+Follow the latest official Gemini CLI install steps from the Gemini CLI docs. Their current docs also document MCP management through both `settings.json` and `gemini mcp` commands.
+
+Gemini’s current settings docs say workspace settings live at `.gemini/settings.json`, and their trust docs note that workspace MCP config is ignored until the folder is trusted.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo login
+bardo init
+bardo connect --client gemini
+```
+
+This writes `.gemini/settings.json` for the current workspace.
+
+## What Bardo writes
+
+Bardo adds a local `mcpServers.bardo` entry in `.gemini/settings.json` that launches:
+
+```json
+{
+  "mcpServers": {
+    "bardo": {
+      "command": "bardo",
+      "args": ["mcp", "serve", "--url", "http://127.0.0.1:3000/mcp", "--workspace-root", "."]
+    }
+  }
+}
+```
+
+If Gemini CLI folder trust is enabled, trust the workspace so Gemini will load the project `.gemini/settings.json` and connect to the configured MCP server.
+
+## Use Bardo well in Gemini
+
+- start with `bardo_workspace_status`
+- stop when readiness is `needs-user-input`
+- use `scene_turn` before mutation tools
+- use `user_correction` for explicit canon corrections
+
+Gemini’s MCP docs also note that discovered tools are namespaced as `mcp_{serverName}_{toolName}`. Keep the server name simple and avoid underscores.

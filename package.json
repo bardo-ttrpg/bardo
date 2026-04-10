@@ -4,13 +4,15 @@
 	"packageManager": "bun@1.3.10",
 	"workspaces": [
 		"website",
-		"mcp",
 		"packages/*"
 	],
 	"overrides": {
 		"path-to-regexp": "8.4.1",
 		"@clerk/shared": "4.3.2",
-		"@clerk/localizations": "4.2.3"
+		"@clerk/localizations": "4.2.3",
+		"hono": "4.12.12",
+		"@hono/node-server": "1.19.13",
+		"basic-ftp": "5.2.1"
 	},
 	"scripts": {
 		"dev": "turbo run dev --filter=website",
@@ -19,20 +21,19 @@
 		"lint": "turbo run lint",
 		"format": "turbo run format",
 		"typecheck": "turbo run typecheck",
-		"typecheck:unused-report": "turbo run typecheck:unused-report --filter=website --filter=mcp",
+		"typecheck:unused-report": "turbo run typecheck:unused-report --filter=website",
 		"test": "turbo run test",
 		"test:connect-gates": "turbo run test:connect-gates --filter=website && turbo run test:runtime-smoke --filter=@bardo/mcp",
 		"test:runtime-smoke": "turbo run test:runtime-smoke --filter=@bardo/mcp",
 		"inspector:bridge": "bash scripts/mcp-inspector-bridge.sh",
-		"inspector:remote": "bash scripts/mcp-inspector-remote.sh",
-		"test:ga-gates": "turbo run test:ga-gates --filter=mcp",
-		"test:soak-gates": "turbo run test:soak-gates --filter=mcp",
-		"test:mechanics-edge-gates": "turbo run test:mechanics-edge-gates --filter=mcp",
-		"test:perf-gates": "turbo run test:perf-gates --filter=mcp",
+		"test:ga-gates": "turbo run test:ga-gates --filter=@bardo/engine",
+		"test:soak-gates": "turbo run test:soak-gates --filter=@bardo/engine",
+		"test:mechanics-edge-gates": "turbo run test:mechanics-edge-gates --filter=@bardo/engine",
+		"test:perf-gates": "turbo run test:perf-gates --filter=@bardo/engine",
 		"test:release-gates": "\"${npm_execpath:-bun}\" run test:ga-gates && \"${npm_execpath:-bun}\" run test:connect-gates",
-		"ga:readiness": "turbo run ga:readiness --filter=mcp",
+		"ga:readiness": "turbo run ga:readiness --filter=@bardo/engine",
 		"validate:deploy-env": "turbo run validate:deploy-env --filter=website",
-		"validate:development-env": "turbo run validate:development-env --filter=website --filter=mcp",
+		"validate:development-env": "turbo run validate:development-env --filter=website",
 		"check:release-health": "turbo run check:release-health --filter=website",
 		"check:react-doctor": "turbo run check:react-doctor --filter=website",
 		"bundle:audit": "turbo run bundle:audit --filter=website",
@@ -40,8 +41,10 @@
 		"dev:exit": "\"${npm_execpath:-bun}\" run require:clean-worktree && \"${npm_execpath:-bun}\" run check && \"${npm_execpath:-bun}\" run build && \"${npm_execpath:-bun}\" run test && \"${npm_execpath:-bun}\" run test:connect-gates && \"${npm_execpath:-bun}\" run ga:readiness && \"${npm_execpath:-bun}\" run check:release-health && \"${npm_execpath:-bun}\" run check:react-doctor && \"${npm_execpath:-bun}\" run bundle:audit",
 		"dev:exit:clean-room": "\"${npm_execpath:-bun}\" run ./scripts/dev-exit-clean-room.ts",
 		"staging:readiness": "\"${npm_execpath:-bun}\" run check && \"${npm_execpath:-bun}\" run build && \"${npm_execpath:-bun}\" run test && \"${npm_execpath:-bun}\" run test:release-gates && \"${npm_execpath:-bun}\" run ga:readiness",
-		"staging:validate-env": "turbo run validate:staging-env --filter=website --filter=mcp",
+		"staging:validate-env": "turbo run validate:staging-env --filter=website",
 		"staging:smoke": "\"${npm_execpath:-bun}\" run ./scripts/staging-smoke.ts",
+		"stress:test-01": "\"${npm_execpath:-bun}\" run ./scripts/stress-bardo-test-01.ts",
+		"release:candidate": "\"${npm_execpath:-bun}\" run build && \"${npm_execpath:-bun}\" run test:release-gates && \"${npm_execpath:-bun}\" run bundle:audit && \"${npm_execpath:-bun}\" run stress:test-01",
 		"validate:toolchain": "\"${npm_execpath:-bun}\" run ./scripts/validate-toolchain-policy.ts",
 		"check": "\"${npm_execpath:-bun}\" run validate:toolchain && turbo run check",
 		"knip": "knip",
@@ -54,14 +57,15 @@
 		"biome:ci": "biome ci .",
 		"biome:write": "biome check --write .",
 		"dev:website": "turbo run dev --filter=website",
-		"dev:mcp": "turbo run dev --filter=mcp",
+		"dev:bridge": "turbo run dev --filter=@bardo/mcp",
 		"prepare": "husky"
 	},
 	"devDependencies": {
+		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@biomejs/biome": "2.4.6",
 		"husky": "^9.1.7",
-		"knip": "^6.2.0",
-		"turbo": "^2.9.3",
+		"knip": "^6.3.1",
+		"turbo": "^2.9.5",
 		"typescript": "5.9.3"
 	}
 }

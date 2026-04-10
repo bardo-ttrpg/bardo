@@ -2,7 +2,6 @@
 	"extends": ["//"],
 	"tasks": {
 		"dev": {
-			"with": ["mcp#dev"],
 			"cache": false,
 			"persistent": true,
 			"interruptible": true
@@ -14,7 +13,17 @@
 		},
 		"build:analyze": {
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["$TURBO_EXTENDS$", ".next/**", "!.next/cache/**"],
+			"outputs": [
+				"$TURBO_EXTENDS$",
+				".next/BUILD_ID",
+				".next/build-manifest.json",
+				".next/routes-manifest.json",
+				".next/app-build-manifest.json",
+				".next/static/chunks/**",
+				".next/static/media/**",
+				".next/diagnostics/**",
+				".next/analyze/**"
+			],
 			"env": [
 				"ANALYZE",
 				"NEXT_BUILD_ANALYZE_ARGS",

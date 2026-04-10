@@ -5,6 +5,11 @@ type CheckReleaseHealthResult = {
 	release: string | undefined;
 };
 
+type ResolvedReleaseUrl = {
+	value: string | undefined;
+	source: "env" | "vercel-preview";
+};
+
 function normalize(value: string | undefined): string | undefined {
 	const trimmed = value?.trim();
 	return trimmed ? trimmed : undefined;
@@ -80,6 +85,74 @@ function resolveReleaseIdentifier(
 	);
 }
 
+function isPreviewRelease(env: Record<string, string | undefined>): boolean {
+	return normalize(env.VERCEL_ENV)?.toLowerCase() === "preview";
+}
+
+function resolvePreviewDeploymentBaseUrl(
+	env: Record<string, string | undefined>,
+): string | undefined {
+	const candidateHost =
+		normalize(env.VERCEL_BRANCH_URL) ??
+		normalize(env.VERCEL_URL) ??
+		normalize(env.VERCEL_PROJECT_PRODUCTION_URL);
+	if (!candidateHost) {
+		return undefined;
+	}
+
+	if (/^https?:\/\//i.test(candidateHost)) {
+		return candidateHost;
+	}
+
+	return `https://${candidateHost}`;
+}
+
+function resolveHttpsUrl(
+	env: Record<string, string | undefined>,
+	label: string,
+	errors: string[],
+	warnings: string[],
+): ResolvedReleaseUrl {
+	const explicitValue = normalize(env[label]);
+	if (explicitValue) {
+		const validatedValue = requireHttpsUrl(explicitValue, label, errors);
+		return {
+			value: validatedValue,
+			source: "env",
+		};
+	}
+
+	if (!isPreviewRelease(env)) {
+		requireHttpsUrl(undefined, label, errors);
+		return {
+			value: undefined,
+			source: "env",
+		};
+	}
+
+	const previewValue = resolvePreviewDeploymentBaseUrl(env);
+	if (!previewValue) {
+		errors.push(
+			`${label} is missing and no Vercel preview deployment URL is available`,
+		);
+		return {
+			value: undefined,
+			source: "vercel-preview",
+		};
+	}
+
+	const validatedValue = requireHttpsUrl(previewValue, label, errors);
+	if (validatedValue) {
+		warnings.push(
+			`${label} is missing; using Vercel preview deployment URL for release health`,
+		);
+	}
+	return {
+		value: validatedValue,
+		source: "vercel-preview",
+	};
+}
+
 export async function checkReleaseHealth(
 	env: Record<string, string | undefined>,
 ): Promise<CheckReleaseHealthResult> {
@@ -101,17 +174,14 @@ export async function checkReleaseHealth(
 		errors,
 	);
 	requireValue(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY", errors);
-	requireHttpsUrl(env.NEXT_PUBLIC_APP_URL, "NEXT_PUBLIC_APP_URL", errors);
-	requireHttpsUrl(env.BARDO_APP_BASE_URL, "BARDO_APP_BASE_URL", errors);
-	requireHttpsUrl(
-		env.BARDO_RUNTIME_STATUS_URL,
-		"BARDO_RUNTIME_STATUS_URL",
-		errors,
-	);
-	requireHttpsUrl(
-		env.BARDO_BRIDGE_SESSION_REFRESH_URL,
+	resolveHttpsUrl(env, "NEXT_PUBLIC_APP_URL", errors, warnings);
+	resolveHttpsUrl(env, "BARDO_APP_BASE_URL", errors, warnings);
+	resolveHttpsUrl(env, "BARDO_RUNTIME_STATUS_URL", errors, warnings);
+	resolveHttpsUrl(
+		env,
 		"BARDO_BRIDGE_SESSION_REFRESH_URL",
 		errors,
+		warnings,
 	);
 
 	const release = resolveReleaseIdentifier(env);

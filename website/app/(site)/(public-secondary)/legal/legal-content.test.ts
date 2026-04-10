@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { listLegalEntries } from "@/content/legal-content";
+import { listLegalEntries } from "../../../../content/legal-content";
 
 const legalIndexSource = readFileSync(
 	new URL("./page.tsx", import.meta.url),

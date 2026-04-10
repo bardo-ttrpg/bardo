@@ -1,32 +1,44 @@
-Use the published installer first, then confirm the CLI can authenticate and start bridge sessions from your machine.
+Install the local bridge first, then authenticate and bootstrap from the workspace that owns the campaign. The default installers fetch a versioned release binary, verify its checksum, and write local `bardo` / `bardo-mcp` shims for you.
 
 ## macOS and Linux
 
 Run `curl -fsSL https://bardo.gg/install | sh`.
 
-The installer clones the repo, installs dependencies with Bun, and writes local command shims for `bardo` and `bardo-mcp`.
+The installer downloads the matching release binary for your platform, verifies it against `SHA256SUMS.txt`, and installs it under your local Bardo directory.
 
 ## Windows
 
 Run `irm https://bardo.gg/install.ps1 | iex` in PowerShell.
 
-The PowerShell installer performs the same repository setup and command shim step for the Windows workflow.
+The PowerShell installer downloads the matching release binary, validates its checksum, and writes `bardo.cmd` plus `bardo-mcp.cmd`.
 
 ## Custom install paths
 
-If you want to override the install location, pass the environment variables to the shell that runs the installer script, not just to `curl`.
+If you need custom paths, pass them into the shell that executes the installer:
 
 - macOS and Linux: `curl -fsSL https://bardo.gg/install | env BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test" BARDO_BIN_DIR="$HOME/.local/bin" sh`
 - Windows PowerShell: `$env:BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test"; $env:BARDO_BIN_DIR="$HOME/.local/bin"; irm https://bardo.gg/install.ps1 | iex`
 
+## Developer fallback
+
+If you intentionally want the old source-based developer path, set `BARDO_INSTALL_MODE=source` before running the installer. This keeps Bun and repo-clone setup available for local development without making it the primary user onboarding path.
+
 ## What happens next
 
-After the install completes, use the CLI from your workspace root:
+From the workspace root:
 
-1. `bardo login`
-2. `bardo init --workspace-root .`
-3. `bardo connect --client codex --workspace-root .`
+```bash
+bardo login
+bardo init
+bardo connect --client codex
+```
 
-The install step only prepares the local bridge. `bardo login` is the step that starts the browser approval flow and stores the bridge credentials for later `connect` calls.
+If `./rulebook.md` exists, `bardo init` preserves it at `.bardo/rules/rulebook.md`, normalizes it into `.bardo/rules/normalized/`, and writes `.bardo/rules/normalized/index.json`.
 
-If you are working from the repository directly, `bun dev` at the repo root launches both the website and the MCP service. That is the fastest way to exercise the current install, approval, and docs surface together during local development.
+If the rulebook lives elsewhere inside the workspace, pass it explicitly:
+
+```bash
+bardo init --rulebook ./rules/core-rulebook.md
+```
+
+If your source starts as a PDF, convert it to Markdown before bootstrap. The importer expects Markdown or plain text, not raw PDF bytes.

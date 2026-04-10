@@ -1,25 +1,45 @@
-Bardo’s tunnel layer can shape agent behavior before the first tool call. The current runtime skill system exists to make connected clients more consistent, more grounded, and less likely to drift away from the uploaded campaign context or ruleset.
+Runtime guidance in Bardo exists to keep local tool use disciplined and evidence-first.
 
-## Built-in skills
+## Built-in guidance
 
-Bardo currently ships built-in runtime skills for the core GM loop, scene handling, ruleset adjudication, and player-safe narration. These are runtime skills, not Codex repo skills, and they are mounted from the MCP side of the product so clients can discover them as part of a live session.
+The bridge is opinionated about a few core behaviors:
 
-The built-in packs are intentionally opinionated. They aim to reinforce the trusted-copilot model: retrieve first, validate before resolving, prefer workspace truth, and keep player-facing narration aligned with what the table should know.
+- read local prep artifacts before continuing play
+- prefer committed state over free-form narration
+- surface uncertainty instead of bluffing
+- keep campaign truth local
 
 ## Client behavior
 
-Skills-capable clients can receive a compact catalog at session start and activate the pieces they need. Clients that do not support runtime skills still receive protected fallback guidance derived from the same Bardo skill content.
+Different clients expose MCP capabilities differently, but the desired behavior is the same: use `init` to prepare the workspace, inspect readiness and current state, then call the runtime tool that matches the next real need.
 
-This means the behavior model stays consistent even when the client feature set changes.
+The agent-facing operating contract is simple:
+
+1. read current state
+2. read player intent
+3. consult relevant rules
+4. resolve outcome
+5. simulate consequences
+6. narrate result
+7. propose state changes
+8. commit valid changes
+
+If the player explicitly corrects canon, use `user_correction` before continuing play.
 
 ## Precedence
 
-Bardo supports built-in skills plus project and user skill directories. Project-level skills override user-level skills, which makes it possible to tune behavior for one campaign or workspace without rewriting the default product guidance.
+Precedence should be understood in this order:
 
-Activated skills are deduplicated so clients do not repeatedly load the same instructions.
+1. explicit user correction
+2. preserved source rules text
+3. current campaign source files
+4. approved committed state
+5. recent validated play result
+6. inference
+7. narration flavor
 
-## How to think about skills
+Narration without a validated commit stays advisory, and inference must not override confirmed facts.
 
-Runtime skills are not a replacement for tools. They are behavioral rails.
+## How to think about runtime skills
 
-Use tools to fetch evidence, inspect rules, preview consequences, and resolve supported mechanics. Use skills to influence how the client plans, narrates, and decides when it should ask for clarification or hand judgment back to the table.
+Runtime guidance is not a replacement for tools. It is there to keep the client honest about what is grounded, what is inferred, and what still needs human judgment. Prefer a safe partial answer over a confident wrong one.

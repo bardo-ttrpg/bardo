@@ -17,7 +17,7 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 async function collectPackageJsonPaths(): Promise<string[]> {
-	const packageDirs = ["website", "mcp"];
+	const packageDirs = ["website"];
 	const packageRoot = join(ROOT_DIR, "packages");
 	const packageRootEntries = await readdir(packageRoot, {
 		withFileTypes: true,
@@ -63,9 +63,6 @@ async function collectLockfiles(): Promise<string[]> {
 		"website/package-lock.json",
 		"website/pnpm-lock.yaml",
 		"website/yarn.lock",
-		"mcp/package-lock.json",
-		"mcp/pnpm-lock.yaml",
-		"mcp/yarn.lock",
 	];
 
 	const lockfiles: string[] = [];

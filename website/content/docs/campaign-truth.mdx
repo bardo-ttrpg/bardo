@@ -1,17 +1,25 @@
-Bardo is opinionated about where authority lives so the product stays simple and predictable.
+Bardo is strict about where authority lives so agents do not confuse hosted account services with campaign truth.
 
 ## Local source of truth
 
-Your workspace remains the canonical source for campaign files and any local file operations. If the answer depends on campaign notes, world state, or other files you control, the local workspace should define it.
+Your workspace is the source of truth. Bardo-managed artifacts live under `.bardo/`, and discovery ignores `.bardo/` on the first pass so user-authored campaign files remain the primary inputs.
 
-## Remote service boundary
+## Hosted service boundary
 
-The hosted side governs bridge approvals, subscription state, rate limits, runtime skill delivery, and bridge session lifecycle. Tool execution still runs locally against your workspace. Those concerns are account- and service-level, not campaign truth.
+The hosted side is limited to:
+
+- bridge approvals
+- auth and token refresh
+- billing and entitlements
+- API-key introspection
+- protected account logic
+
+The hosted side does not own campaign files, write local state, or adjudicate the campaign on your behalf.
 
 ## How to think about the split
 
-Use a simple rule: if a question depends on your files, the answer should come from the local workspace. If it depends on access policy, billing, metering, or tunnel/session behavior, it comes from the remote service.
+If a question depends on files in the workspace, the answer should come from local discovery or from `.bardo/` prep artifacts. If a question depends on subscription state, account identity, or approval flow, it belongs to the hosted side.
 
-The current MCP surface is designed around that split. Read-only reporting, mechanics guidance, planning tools, and sync previews can help an agent reason well, but the underlying campaign truth still lives in the workspace you control.
+## Migration note
 
-<Lore>The campaign remembers what the table agreed was true.</Lore>
+`.bardo/` is the canonical managed root. Legacy `bardo/` workspaces are migrated one way into `.bardo/` and should not be treated as an ongoing dual-layout mode.

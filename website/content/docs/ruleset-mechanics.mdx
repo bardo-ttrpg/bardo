@@ -1,31 +1,28 @@
-Bardo no longer assumes that mechanics only come from a small built-in rules registry. The current system can load workspace-defined mechanics manifests and treat them as first-class rulesets for validation, discovery, and resolution.
+Ruleset mechanics in Bardo start with the normalized rulebook outputs, not with a separate hosted rules engine.
 
-## Workspace rulesets
+## Workspace-defined rules context
 
-Uploaded or workspace-authored rulesets can define action vocabulary, intent aliases, target ranges, modifiers, contested checks, outcome bands, resources, clocks, and consequence chains. That gives Bardo a way to work with the actual game the table uploaded instead of forcing everything through one hardcoded model.
-
-The discovery entry point for agents is `ruleset_mechanics_overview`. It exposes the available rulesets, action types, support level, and consequence structure before the client tries to validate or resolve anything.
+The normalized rules layer gives runtime tools structured access to headings, tagged sections, examples, tables, and exceptions. That makes it easier for a client to ground scene adjudication in the actual campaign rules instead of relying on a tiny built-in rules registry.
 
 ## Support tiers
 
-Each action is treated as `full, partial, or advisory` support.
+The simulation-depth recommendation is an operational hint:
 
-- `full` means Bardo can validate and resolve the action authoritatively.
-- `partial` means Bardo can scaffold the action, but the table still needs to finish the ruling.
-- `advisory` means Bardo can explain the likely procedure, but it should not present the result as authoritative.
+- `light` means the campaign can stay sparse and selective.
+- `standard` means Bardo should keep a balanced amount of continuity structure.
+- `deep` means the rules signal that broader simulation pressure and detailed tracking matter.
 
-This keeps custom rulesets useful even when they are not fully executable yet.
+This is a preparation hint, not a promise that every mechanic auto-resolves.
 
-## Consequence composition and branching
+## Conservative adjudication
 
-Rulesets can now define consequence chains that apply multiple follow-up steps in order. A single action can spend a resource, tick a clock, and then branch into follow-up chains when a later consequence becomes relevant.
+Bardo prefers conservative adjudication over fake certainty:
 
-That branching model matters for fiction-first systems. A narrow success can carry a cost, that cost can create leverage, and that leverage can branch into follow-up chains instead of forcing the agent to invent disconnected consequences. In other words, consequence chains can now branch into follow-up chains instead of stopping after one flat list of effects.
+- use the normalized rules output as evidence
+- surface uncertainty explicitly
+- commit only validated state changes
+- avoid turning speculative narration into canon
 
-## Table decision nodes
+## Table authority
 
-Not every procedure should auto-resolve. Some systems explicitly want a human choice after the mechanics settle.
-
-Bardo supports explicit `ask_the_table` decision nodes inside the consequence plan. Those nodes are surfaced in structured output so an agent can say, in effect, “the rules procedure points here, and now the table needs to choose.”
-
-That is the intended use for high-value human judgment: preserve the procedure, preserve the context, and be honest about where the table still has to decide.
+When the rules or campaign inputs are ambiguous, the runtime should expose the uncertainty and let the table decide. The system is designed to preserve evidence and continuity, not to hide judgment calls behind false authority.

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { timingSafeEqual } from "node:crypto";
 
 /**
  * Creates a validator that checks an Authorization: Bearer <token> header
@@ -9,16 +10,28 @@ import path from "node:path";
  */
 export function createIntrospectionSecretValidator(secret: string | undefined) {
 	const trimmed = secret?.trim() ?? "";
+	const expected = Buffer.from(trimmed);
+	function matches(candidate: string | null | undefined): boolean {
+		if (!candidate || expected.length === 0) {
+			return false;
+		}
+		const actual = Buffer.from(candidate);
+		return actual.length === expected.length && timingSafeEqual(actual, expected);
+	}
 	return (headers: Headers): boolean => {
 		if (!trimmed) {
 			return false;
 		}
 		const customHeader = headers.get("x-bardo-introspection-token")?.trim();
-		if (customHeader && customHeader === trimmed) {
+		if (matches(customHeader)) {
 			return true;
 		}
 		const authorization = headers.get("authorization")?.trim();
-		return authorization === `Bearer ${trimmed}`;
+		return matches(
+			authorization?.startsWith("Bearer ")
+				? authorization.slice("Bearer ".length).trim()
+				: null,
+		);
 	};
 }
 
@@ -68,7 +81,7 @@ export function resolveRequestedWorkspaceRoot(args: {
 
 	const allowlist = parseAllowlist(args.allowlistEnv);
 	if (allowlist.length < 1) {
-		return resolved;
+		return null;
 	}
 
 	const isAllowed = allowlist.some((prefix) => {

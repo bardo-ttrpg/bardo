@@ -1,6 +1,6 @@
 "use client";
 
-import { listConnectionClientAdapters } from "@bardo/mcp/client-adapters";
+import { listConnectionClientAdapters } from "@bardo/shared/client-adapters";
 import { type ReactNode, startTransition, useEffect, useState } from "react";
 import { TransitionLink } from "@/components/transition-link";
 import { BardoViewTransition } from "@/components/view-transition";

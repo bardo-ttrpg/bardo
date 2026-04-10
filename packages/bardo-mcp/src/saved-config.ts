@@ -23,6 +23,23 @@ export type SavedConfigV2 = {
 
 export type SavedConfig = SavedConfigV1 | SavedConfigV2;
 
+function normalizeLegacyBardoUrl(value: string | undefined): string | undefined {
+	if (typeof value !== "string" || value.length === 0) {
+		return undefined;
+	}
+
+	try {
+		const url = new URL(value);
+		if (url.hostname === "app.bardo.ai") {
+			url.hostname = "www.bardo.gg";
+			return url.toString();
+		}
+		return value;
+	} catch {
+		return value;
+	}
+}
+
 export function migrateSavedConfig(raw: unknown): SavedConfig | null {
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
 		return null;
@@ -52,10 +69,12 @@ export function migrateSavedConfig(raw: unknown): SavedConfig | null {
 					: new Date(0).toISOString(),
 			serverName:
 				typeof parsed.serverName === "string" ? parsed.serverName : undefined,
-			statusUrl:
+			statusUrl: normalizeLegacyBardoUrl(
 				typeof parsed.statusUrl === "string" ? parsed.statusUrl : undefined,
-			refreshUrl:
+			),
+			refreshUrl: normalizeLegacyBardoUrl(
 				typeof parsed.refreshUrl === "string" ? parsed.refreshUrl : undefined,
+			),
 			accountLabel:
 				typeof parsed.accountLabel === "string"
 					? parsed.accountLabel
@@ -86,7 +105,8 @@ export function migrateSavedConfig(raw: unknown): SavedConfig | null {
 				: new Date(0).toISOString(),
 		serverName:
 			typeof parsed.serverName === "string" ? parsed.serverName : undefined,
-		statusUrl:
+		statusUrl: normalizeLegacyBardoUrl(
 			typeof parsed.statusUrl === "string" ? parsed.statusUrl : undefined,
+		),
 	};
 }

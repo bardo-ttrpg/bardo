@@ -14,7 +14,7 @@ const withMDX = nextMDX({
 
 const nextConfig: NextConfig = {
 	reactStrictMode: true,
-	transpilePackages: ["@bardo/mcp"],
+	transpilePackages: ["@bardo/shared"],
 	experimental: {
 		turbopackFileSystemCacheForBuild: true,
 		turbopackFileSystemCacheForDev: true,

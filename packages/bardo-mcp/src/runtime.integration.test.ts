@@ -23,6 +23,7 @@ import {
 
 const cleanupPaths: string[] = [];
 const cleanupServers: Array<{ stop: () => void }> = [];
+const BUN_BINARY = Bun.which("bun") ?? process.execPath;
 
 async function createTempDir(prefix: string): Promise<string> {
 	const dir = await mkdtemp(path.join(os.tmpdir(), prefix));
@@ -138,7 +139,7 @@ afterEach(async () => {
 });
 
 describe("bardo mcp serve integration", () => {
-	test("hides bridge-local workspace tools from normal client sessions by default", async () => {
+	test("exposes the stable local-first runtime surface by default while hiding raw workspace CRUD tools", async () => {
 		const cwdWorkspace = await createTempDir("bardo-cwd-");
 		const clientWorkspace = await createTempDir("bardo-root-");
 		const remote = await makeRemoteServer();
@@ -162,7 +163,7 @@ describe("bardo mcp serve integration", () => {
 		}));
 
 		const transport = new StdioClientTransport({
-			command: "bun",
+			command: BUN_BINARY,
 			args: [
 				cliEntry,
 				"mcp",
@@ -185,19 +186,36 @@ describe("bardo mcp serve integration", () => {
 			const tools = await client.listTools();
 			expect(
 				tools.tools.some((tool) => tool.name === "bardo_workspace_bootstrap"),
-			).toBe(false);
-			expect(
-				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
 			).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "init")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "scene_turn")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "player_action")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "user_correction")).toBe(
+				true,
+			);
+			expect(tools.tools.some((tool) => tool.name === "world_sync")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "simulation_tick")).toBe(
+				true,
+			);
+			expect(
+				tools.tools.some((tool) => tool.name === "bardo_workspace_write_text"),
+			).toBe(false);
+			expect(tools.tools.some((tool) => tool.name === "remote_echo_workspace")).toBe(
+				false,
+			);
 		} finally {
 			await client.close();
 		}
 	});
 
-	test("serves local workspace tools only behind the diagnostic escape hatch and still proxies remote tools", async () => {
+	test("returns readable text payloads for local tools so generic MCP clients can understand results", async () => {
 		const cwdWorkspace = await createTempDir("bardo-cwd-");
 		const clientWorkspace = await createTempDir("bardo-root-");
-		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
+		await writeFile(
+			path.join(clientWorkspace, "rulebook.md"),
+			"# Campaign Rulebook\n\nUse grounded canon only.",
+			"utf8",
+		);
 		const remote = await makeRemoteServer();
 		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
@@ -219,7 +237,146 @@ describe("bardo mcp serve integration", () => {
 		}));
 
 		const transport = new StdioClientTransport({
-			command: "bun",
+			command: BUN_BINARY,
+			args: [
+				cliEntry,
+				"mcp",
+				"serve",
+				"--api-key",
+				"test-key",
+				"--url",
+				remote.url,
+			],
+			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
+			stderr: "pipe",
+		});
+
+		try {
+			await client.connect(transport);
+			const status = await client.callTool({
+				name: "bardo_workspace_status",
+				arguments: {},
+			});
+			const text = status.content
+				.filter((part) => part.type === "text")
+				.map((part) => part.text)
+				.join("\n");
+
+			expect(text).toContain("\"initialized\"");
+			expect(text).toContain(clientWorkspace);
+		} finally {
+			await client.close();
+		}
+	});
+
+	test("workspace status includes readiness guidance so agent clients can avoid treating incomplete workspaces as playable", async () => {
+		const cwdWorkspace = await createTempDir("bardo-cwd-");
+		const clientWorkspace = await createTempDir("bardo-root-");
+		await writeFile(
+			path.join(clientWorkspace, "rulebook.md"),
+			"# Campaign Rulebook\n\nUse grounded canon only.",
+			"utf8",
+		);
+		const remote = await makeRemoteServer();
+		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
+
+		const client = new Client(
+			{
+				name: "integration-client",
+				version: "1.0.0",
+			},
+			{
+				capabilities: {
+					roots: {
+						listChanged: true,
+					},
+				},
+			},
+		);
+		client.setRequestHandler(ListRootsRequestSchema, async () => ({
+			roots: [{ uri: pathToFileURL(clientWorkspace).toString(), name: "game" }],
+		}));
+
+		const transport = new StdioClientTransport({
+			command: BUN_BINARY,
+			args: [
+				cliEntry,
+				"mcp",
+				"serve",
+				"--api-key",
+				"test-key",
+				"--url",
+				remote.url,
+			],
+			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
+			stderr: "pipe",
+		});
+
+		try {
+			await client.connect(transport);
+			const init = await client.callTool({
+				name: "init",
+				arguments: {},
+			});
+			expect(init.isError).toBeFalsy();
+
+			const status = await client.callTool({
+				name: "bardo_workspace_status",
+				arguments: {},
+			});
+
+			expect(status.structuredContent).toMatchObject({
+				workspaceRoot: clientWorkspace,
+				readiness: {
+					status: "needs-user-input",
+				},
+			});
+			expect(status.structuredContent).toHaveProperty("currentStateSummary");
+			expect(JSON.stringify(status.content)).toContain("needs-user-input");
+		} finally {
+			await client.close();
+		}
+	});
+
+	test("serves local runtime tools only behind the diagnostic escape hatch", async () => {
+		const cwdWorkspace = await createTempDir("bardo-cwd-");
+		const clientWorkspace = await createTempDir("bardo-root-");
+		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
+		await writeFile(
+			path.join(clientWorkspace, "rulebook.md"),
+			"# Campaign Rulebook\n\nUse grounded canon only.",
+			"utf8",
+		);
+		const remote = await makeRemoteServer();
+		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
+
+		const client = new Client(
+			{
+				name: "integration-client",
+				version: "1.0.0",
+			},
+			{
+				capabilities: {
+					roots: {
+						listChanged: true,
+					},
+				},
+			},
+		);
+		client.setRequestHandler(ListRootsRequestSchema, async () => ({
+			roots: [{ uri: pathToFileURL(clientWorkspace).toString(), name: "game" }],
+		}));
+
+		const transport = new StdioClientTransport({
+			command: BUN_BINARY,
 			args: [
 				cliEntry,
 				"mcp",
@@ -245,9 +402,17 @@ describe("bardo mcp serve integration", () => {
 			expect(
 				tools.tools.some((tool) => tool.name === "bardo_workspace_bootstrap"),
 			).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "init")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "scene_turn")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "user_correction")).toBe(
+				true,
+			);
 			expect(
-				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
+				tools.tools.some((tool) => tool.name === "bardo_workspace_write_text"),
 			).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "remote_echo_workspace")).toBe(
+				false,
+			);
 
 			const bootstrap = await client.callTool({
 				name: "bardo_workspace_bootstrap",
@@ -277,20 +442,7 @@ describe("bardo mcp serve integration", () => {
 			await expect(
 				readFile(path.join(clientWorkspace, "notes/session-1.txt"), "utf8"),
 			).resolves.toContain("The caravan reaches the gate.");
-
-			const remoteEcho = await client.callTool({
-				name: "remote_echo_workspace",
-				arguments: {
-					message: "hello",
-				},
-			});
-			expect(remoteEcho.isError).toBeFalsy();
-			expect(remoteEcho.structuredContent).toMatchObject({
-				message: "hello",
-				workspaceRoot: clientWorkspace,
-			});
-			expect(JSON.stringify(remoteEcho.content)).toContain("remote:hello");
-			expect(remote.getLastWorkspaceRoot()).toBe(clientWorkspace);
+			expect(remote.getLastWorkspaceRoot()).toBeNull();
 		} finally {
 			await client.close();
 		}
@@ -337,7 +489,7 @@ describe("bardo mcp serve integration", () => {
 		}));
 
 		const transport = new StdioClientTransport({
-			command: "bun",
+			command: BUN_BINARY,
 			args: [
 				cliEntry,
 				"mcp",
@@ -394,6 +546,11 @@ describe("bardo mcp serve integration", () => {
 		const clientWorkspace = await createTempDir("bardo-root-");
 		await mkdir(path.join(clientWorkspace, "notes"), { recursive: true });
 		await writeFile(
+			path.join(clientWorkspace, "rulebook.md"),
+			"# Campaign Rulebook\n\nUse grounded canon only.",
+			"utf8",
+		);
+		await writeFile(
 			path.join(clientWorkspace, "notes", "session-2.txt"),
 			"archive me",
 			"utf8",
@@ -419,7 +576,7 @@ describe("bardo mcp serve integration", () => {
 		}));
 
 		const transport = new StdioClientTransport({
-			command: "bun",
+			command: BUN_BINARY,
 			args: [
 				cliEntry,
 				"mcp",

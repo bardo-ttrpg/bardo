@@ -1,0 +1,63 @@
+Bardo runs rules bootstrap before campaign bootstrap. The rules phase is responsible for preserving the rulebook source and turning it into a normalized rules layer inside `.bardo/`.
+
+## Current bootstrap contract
+
+When a Markdown rulebook is available, `bardo init`:
+
+1. Resolves the workspace root and the canonical `.bardo/` root.
+2. Preserves the source copy at `.bardo/rules/rulebook.md`.
+3. Normalizes the rulebook into stable section files under `.bardo/rules/normalized/`.
+4. Writes `.bardo/rules/normalized/index.json`.
+5. Tags sections and recommends `light`, `standard`, or `deep` simulation depth.
+6. Records the rules bootstrap summary in `.bardo/manifest.json`.
+
+If the rulebook is missing, the rules phase cannot complete. That gap is surfaced through the readiness artifacts rather than hidden behind silent defaults.
+
+## Recommended rulebook input
+
+- Prefer `./rulebook.md` in the workspace root.
+- Keep headings, tables, examples, and exception text intact.
+- Convert PDFs to Markdown before bootstrap.
+
+If the file lives elsewhere inside the workspace:
+
+```bash
+bardo init --rulebook ./rules/core-rulebook.md
+```
+
+## Current outputs
+
+```bash
+.bardo/
+  manifest.json
+  rules/
+    rulebook.md
+    normalized/
+      01-character-creation.md
+      02-combat.md
+      03-factions-and-travel.md
+      index.json
+```
+
+The source copy is preserved. The normalized files and `index.json` are Bardo-managed derivatives.
+
+## What normalization keeps
+
+- section titles
+- worked examples
+- tables needed during play
+- explicit exceptions and overrides
+- mechanically relevant procedures
+- useful keywords and tags for retrieval
+
+## Simulation depth recommendation
+
+The recommendation is written into `.bardo/rules/normalized/index.json` and mirrored into `.bardo/manifest.json`.
+
+The value is one of:
+
+- `light`
+- `standard`
+- `deep`
+
+If the signals are weak or mixed, Bardo defaults to `standard`.

@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const WEBSITE_ROOT = process.cwd();
+const WEBSITE_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SOURCE_DIRS = ["app", "components", "lib"] as const;
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/;
 const EXCLUDED_SUFFIXES = [".test.ts", ".test.tsx", ".test.js", ".test.jsx"];

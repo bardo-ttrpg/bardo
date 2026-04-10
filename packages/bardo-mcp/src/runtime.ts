@@ -22,12 +22,18 @@ import {
 	startLocalMcpServer,
 } from "./local-mcp";
 import { normalizePlan, type PlanTier } from "./plan-utils";
+import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
+import { bootstrapImportedRulebook } from "./rules-bootstrap";
 import {
 	migrateSavedConfig,
 	type SavedConfig,
 	type SavedConfigV2,
 } from "./saved-config";
-import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
+import {
+	migrateLegacyWorkspaceRoot,
+	resolveBardoRoot,
+	WORKSPACE_DIRECTORIES,
+} from "./workspace-schema";
 
 const DEFAULT_MCP_URL = "http://127.0.0.1:3000/mcp";
 const DEFAULT_LOGIN_START_URL =
@@ -40,6 +46,10 @@ type Writer = {
 };
 
 type FetchLike = typeof fetch;
+type RulebookBootstrapSummary = {
+	sectionCount?: number;
+	recommendedSimulationDepth?: string;
+};
 
 type LoginCommandOptions = {
 	apiKey: string | null;
@@ -735,9 +745,9 @@ Usage:
   bardo login [--start-url <https-url>]
   bardo login --api-key <key> [--url <mcp-url>]
   bardo logout
-  bardo init [--workspace-root <path>] [--rulebook <path>] [--ruleset <slug>]
-  bardo install --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--config-path <path>] [--dry-run]
-  bardo connect --client <claude|opencode|codex|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--ruleset <slug>] [--rulebook <path>]
+  bardo init [--workspace-root <path>] [--rulebook <markdown-path>] [--ruleset <slug>]
+  bardo install --client <claude|opencode|codex|gemini|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--config-path <path>] [--dry-run]
+  bardo connect --client <claude|opencode|codex|gemini|cursor|windsurf|vscode|kiro|kilo|trae|auto> [--mode <local>] [--ruleset <slug>] [--rulebook <markdown-path>]
   bardo export --output <path> [--workspace-root <path>]
   bardo pack-debug --output <path> [--workspace-root <path>]
   bardo doctor [--workspace-root <path>] [--client <client|auto>] [--json]
@@ -752,6 +762,8 @@ Notes:
   login starts a browser approval flow by default and stores bridge session credentials for the local bridge.
   login also supports direct API keys when you already have a bridge credential for local testing.
   connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
+  If ./rulebook.md exists in the workspace root, init/connect import it automatically into .bardo/rules/rulebook.md as the preserved source copy.
+  Rulebook import expects markdown or text input today; convert PDFs before passing --rulebook.
   install and connect only support local mode in V1; passing --mode remote returns a migration error.
   --status-url lets doctor fetch plan and bridge credential status details from the website runtime status service.
   If you are testing from the source tree, run commands as: bun run --cwd packages/bardo-mcp start -- <command>.
@@ -924,6 +936,7 @@ async function handleInit(
 			options.workspaceRoot,
 			deps.cwd ?? process.cwd(),
 		);
+		await migrateLegacyWorkspaceRoot(workspaceRoot);
 		const bardoRoot = resolveBardoRoot(workspaceRoot, env);
 		const createdDirectories = await ensureWorkspaceDirectories(bardoRoot);
 		const importedRulebooks = await importWorkspaceRulebook({
@@ -939,8 +952,22 @@ async function handleInit(
 			importedRulebooks,
 			nowIso: now,
 		});
+		const manifest = await readExistingJson(path.join(bardoRoot, "manifest.json"));
+		const rulebookBootstrap =
+			typeof manifest?.rulebookBootstrap === "object" &&
+			manifest.rulebookBootstrap !== null
+				? (manifest.rulebookBootstrap as RulebookBootstrapSummary)
+				: null;
+		const summarySuffix =
+			rulebookBootstrap &&
+			typeof rulebookBootstrap.sectionCount === "number" &&
+			typeof rulebookBootstrap.recommendedSimulationDepth === "string"
+				? `; normalized ${String(rulebookBootstrap.sectionCount)} rule section(s) with ${String(
+						rulebookBootstrap.recommendedSimulationDepth,
+				  )} simulation depth`
+				: "";
 		stdout.write(
-			`Initialized Bardo workspace at ${bardoRoot} (${createdDirectories.length} directories ensured)\n`,
+			`Initialized Bardo workspace at ${bardoRoot} (${createdDirectories.length} directories ensured${summarySuffix})\n`,
 		);
 		return 0;
 	} catch (error) {
@@ -962,6 +989,7 @@ async function handleInstall(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		);
+		await migrateLegacyWorkspaceRoot(workspaceRoot);
 		const selection = await resolveAutoInstallClientSelection({
 			client: options.client,
 			workspaceRoot,
@@ -1173,6 +1201,7 @@ async function handleExport(
 			options.workspaceRoot || env.BARDO_WORKSPACE_ROOT || null,
 			deps.cwd ?? process.cwd(),
 		);
+		await migrateLegacyWorkspaceRoot(workspaceRoot);
 		const bardoRoot = resolveBardoRoot(workspaceRoot, env);
 		const outputPath = options.outputPath?.trim();
 		if (!outputPath) {
@@ -1625,6 +1654,46 @@ async function ensureWorkspaceCoreFiles(args: {
 }): Promise<void> {
 	const manifestPath = path.join(args.bardoRoot, "manifest.json");
 	const manifest = await readExistingJson(manifestPath);
+	const importedRulebooks =
+		args.importedRulebooks.length > 0
+			? args.importedRulebooks
+			: Array.isArray(manifest?.importedRulebooks)
+				? manifest.importedRulebooks
+				: [];
+	let rulebookBootstrap =
+		typeof manifest?.rulebookBootstrap === "object" &&
+		manifest.rulebookBootstrap !== null
+			? manifest.rulebookBootstrap
+			: null;
+	const primaryRulebook = importedRulebooks[0] ?? null;
+	if (primaryRulebook) {
+		const sourcePath = path.join(args.bardoRoot, primaryRulebook);
+		const sourceExists = await access(sourcePath)
+			.then(() => true)
+			.catch((error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					error.code === "ENOENT"
+				) {
+					return false;
+				}
+				throw error;
+			});
+		if (sourceExists) {
+			rulebookBootstrap = await bootstrapImportedRulebook({
+				bardoRoot: args.bardoRoot,
+				sourceRelativePath: primaryRulebook,
+				nowIso: args.nowIso,
+			});
+		}
+	}
+	const campaignBootstrap = await bootstrapCampaignWorkspace({
+		workspaceRoot: args.workspaceRoot,
+		bardoRoot: args.bardoRoot,
+		nowIso: args.nowIso,
+	});
 	const nextManifest = {
 		version: 1,
 		createdAtISO:
@@ -1635,47 +1704,20 @@ async function ensureWorkspaceCoreFiles(args: {
 		workspaceRoot: args.workspaceRoot,
 		bardoRoot: args.bardoRoot,
 		ruleset: args.ruleset ?? null,
-		importedRulebooks:
-			args.importedRulebooks.length > 0
-				? args.importedRulebooks
-				: Array.isArray(manifest?.importedRulebooks)
-					? manifest.importedRulebooks
-					: [],
+		importedRulebooks,
+		rulebookBootstrap,
+		campaignBootstrap: {
+			sourceIndexPath: campaignBootstrap.sourceIndexPath,
+			entitiesPath: campaignBootstrap.entitiesPath,
+			currentStatePath: campaignBootstrap.currentStatePath,
+			trackingProfilePath: campaignBootstrap.trackingProfilePath,
+			readinessPath: campaignBootstrap.readinessPath,
+			readiness: campaignBootstrap.readiness,
+		},
 	};
 
 	await writeJsonFile(manifestPath, nextManifest);
-	await ensureFile(
-		path.join(args.bardoRoot, "_settings/settings.md"),
-		renderJsonMarkdown(
-			"Campaign Settings",
-			"Campaign setup settings and preferences.",
-			{ updatedAtISO: args.nowIso },
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "state/current.md"),
-		renderJsonMarkdown(
-			"Campaign State",
-			"Current campaign state and memory snapshot.",
-			{},
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "projections/current-state.md"),
-		renderJsonMarkdown(
-			"Current State Projection",
-			"Derived campaign state projection generated from canonical event log.",
-			{},
-		),
-	);
-	await ensureFile(
-		path.join(args.bardoRoot, "events/history.md"),
-		renderMarkdown(
-			"Campaign History",
-			"Chronological campaign action history log.",
-			"",
-		),
-	);
+	await ensureFile(path.join(args.bardoRoot, "events/state-changes.ndjson"), "");
 	await ensureWorkspaceLocalDocs({
 		bardoRoot: args.bardoRoot,
 		workspaceRoot: args.workspaceRoot,
@@ -1689,30 +1731,6 @@ async function ensureFile(filePath: string, content: string): Promise<void> {
 		await mkdir(path.dirname(filePath), { recursive: true });
 		await writeFile(filePath, content, "utf8");
 	}
-}
-
-function renderMarkdown(
-	title: string,
-	description: string,
-	body: string,
-): string {
-	return `---\ntitle: ${escapeYaml(title)}\ndescription: ${escapeYaml(
-		description,
-	)}\n---\n\n${body}`
-		.trimEnd()
-		.concat("\n");
-}
-
-function renderJsonMarkdown(
-	title: string,
-	description: string,
-	payload: object,
-): string {
-	return renderMarkdown(title, description, JSON.stringify(payload, null, 2));
-}
-
-function escapeYaml(value: string): string {
-	return JSON.stringify(value);
 }
 
 async function readExistingJson(

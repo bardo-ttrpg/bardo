@@ -233,11 +233,11 @@ export function createRuntimeStatusGetHandler(
 			return response;
 		} catch (error) {
 			const status = extractErrorStatus(error);
-			if (status === 401 || status === 403) {
+			if (status === 401 || status === 403 || status === 404) {
 				deps.telemetry.increment("runtime_status_invalid");
 				return NextResponse.json(
 					{ error: "Invalid bridge credential." },
-					{ status: status ?? 401 },
+					{ status: status === 403 ? 403 : 401 },
 				);
 			}
 			deps.telemetry.increment("runtime_status_failed");

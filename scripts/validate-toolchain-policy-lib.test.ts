@@ -28,7 +28,7 @@ describe("validateToolchainPolicy", () => {
 				}),
 				makeManifest("/repo/website/package.json", {
 					scripts: {
-						dev: `next dev --turbopack -p \${PORT:-3001}`,
+						dev: `bun run ./scripts/run-dev.ts --turbopack`,
 						build:
 							"bun run validate:deploy-env && bun run check:release-health && next build --turbopack",
 						"build:analyze":

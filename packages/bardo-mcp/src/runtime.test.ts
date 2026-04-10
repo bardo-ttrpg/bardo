@@ -696,7 +696,7 @@ describe("bardo runtime", () => {
 		}
 	});
 
-	test("init scaffolds a canonical bardo workspace and imports a rulebook", async () => {
+test("init scaffolds the canonical .bardo workspace and imports a rulebook", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 		const rulebookPath = path.join(workspaceRoot, "shadowdark-rulebook.md");
@@ -722,7 +722,7 @@ describe("bardo runtime", () => {
 			expect(exitCode).toBe(0);
 			expect(stdout.read()).toContain("Initialized Bardo workspace");
 
-			const bardoRoot = path.join(workspaceRoot, "bardo");
+			const bardoRoot = path.join(workspaceRoot, ".bardo");
 			const manifest = JSON.parse(
 				await readFile(path.join(bardoRoot, "manifest.json"), "utf8"),
 			) as {
@@ -734,26 +734,119 @@ describe("bardo runtime", () => {
 			expect(manifest.workspaceRoot).toBe(workspaceRoot);
 
 			await expect(
-				readFile(
-					path.join(bardoRoot, "rules/sources/rulebook/shadowdark-rulebook.md"),
-					"utf8",
-				),
+				readFile(path.join(bardoRoot, "rules/rulebook.md"), "utf8"),
 			).resolves.toContain("Shadowdark");
 			await expect(
-				readFile(path.join(bardoRoot, "events/history.md"), "utf8"),
-			).resolves.toContain("Campaign History");
-			await expect(
-				readFile(path.join(bardoRoot, "state/current.md"), "utf8"),
-			).resolves.toContain("{}");
-			await expect(
-				readFile(path.join(bardoRoot, "projections/current-state.md"), "utf8"),
-			).resolves.toContain("Current State Projection");
-			await expect(
 				readFile(path.join(bardoRoot, "docs/quickstart.md"), "utf8"),
-			).resolves.toContain("projections/current-state.md");
+			).resolves.toContain("state/current-state.json");
 			await expect(
 				readFile(path.join(bardoRoot, "docs/credits-and-billing.md"), "utf8"),
 			).resolves.toContain("1 accepted MCP tool call = 1 credit");
+			await expect(
+				readFile(path.join(bardoRoot, "rules/normalized/index.json"), "utf8"),
+			).resolves.toContain('"recommendedSimulationDepth"');
+			await expect(
+				readFile(path.join(bardoRoot, "manifests/source-index.json"), "utf8"),
+			).resolves.toContain('"sources"');
+			await expect(
+				readFile(path.join(bardoRoot, "manifests/readiness.json"), "utf8"),
+			).resolves.toContain('"status"');
+			await expect(
+				readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8"),
+			).resolves.toBe("");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("init auto-imports workspace-root rulebook.md when --rulebook is omitted", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const rulebookPath = path.join(workspaceRoot, "rulebook.md");
+
+		await writeFile(
+			rulebookPath,
+			"# Workspace Rulebook\n\nConverted markdown source.",
+			"utf8",
+		);
+
+		try {
+			const stdout = createWriter();
+			const stderr = createWriter();
+			const exitCode = await runCli(["init"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			await expect(
+				readFile(path.join(workspaceRoot, ".bardo/rules/rulebook.md"), "utf8"),
+			).resolves.toContain("Workspace Rulebook");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("init fails when neither --rulebook nor workspace-root rulebook.md is present", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			const stdout = createWriter();
+			const stderr = createWriter();
+			const exitCode = await runCli(["init"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stdout.read()).toBe("");
+			expect(stderr.read()).toContain("rulebook.md");
+			await expect(
+				readFile(path.join(workspaceRoot, ".bardo/rules/rulebook.md"), "utf8"),
+			).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("init rejects PDF rulebook imports and asks for markdown conversion", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const rulebookPath = path.join(workspaceRoot, "shadowdark-rulebook.pdf");
+
+		await writeFile(rulebookPath, "%PDF-not-really", "utf8");
+
+		try {
+			const stdout = createWriter();
+			const stderr = createWriter();
+			const exitCode = await runCli(["init", "--rulebook", rulebookPath], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderr.read()).toContain("Convert PDFs to Markdown");
+			await expect(
+				readFile(
+					path.join(workspaceRoot, ".bardo/rules/rulebook.pdf"),
+					"utf8",
+				),
+			).rejects.toMatchObject({
+				code: "ENOENT",
+			});
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -766,6 +859,11 @@ describe("bardo runtime", () => {
 		const stdout = createWriter();
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			await runCli(
 				["login", "--api-key", "test-key", "--url", "https://example.com/mcp"],
 				{
@@ -805,7 +903,7 @@ describe("bardo runtime", () => {
 			expect(payload.auth.source).toBe("config");
 			expect(payload.workspace.initialized).toBe(true);
 			expect(payload.workspace.bardoRoot).toBe(
-				path.join(workspaceRoot, "bardo"),
+				path.join(workspaceRoot, ".bardo"),
 			);
 			expect(payload.connectivity.health.ok).toBe(true);
 			expect(payload.connectivity.health.status).toBe(200);
@@ -841,6 +939,7 @@ describe("bardo runtime", () => {
 
 			expect(payload.some((client) => client.id === "kiro")).toBe(true);
 			expect(payload.some((client) => client.id === "kilo")).toBe(true);
+			expect(payload.some((client) => client.id === "gemini")).toBe(true);
 			expect(payload.some((client) => client.id === "generic")).toBe(true);
 			expect(payload.find((client) => client.id === "vscode")).toMatchObject({
 				id: "vscode",
@@ -848,6 +947,15 @@ describe("bardo runtime", () => {
 				tier: "tier1",
 				autoInstall: true,
 				defaultConfigPath: ".vscode/settings.json",
+				supportsLocal: true,
+				supportsRemote: false,
+			});
+			expect(payload.find((client) => client.id === "gemini")).toMatchObject({
+				id: "gemini",
+				label: "Gemini CLI",
+				tier: "tier1",
+				autoInstall: true,
+				defaultConfigPath: ".gemini/settings.json",
 				supportsLocal: true,
 				supportsRemote: false,
 			});
@@ -2348,6 +2456,46 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
+	test("install writes a Gemini workspace config using saved credentials", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "http://127.0.0.1:3000/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "gemini"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			await expect(
+				readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
+			).resolves.toContain('"mcpServers"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("install writes a Trae workspace config using saved credentials", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
@@ -2523,6 +2671,11 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		const stderr = createWriter();
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			const exitCode = await runCli(
 				[
 					"connect",
@@ -2550,13 +2703,66 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(stdout.read()).toContain("Connected Bardo to Kilo Code");
 
 			await expect(
-				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
 			).resolves.toContain('"ruleset": "shadowdark"');
 			await expect(
 				readFile(path.join(workspaceRoot, ".kilocode/mcp.json"), "utf8"),
 			).resolves.toContain('"mcpServers"');
 			await expect(
 				readFile(path.join(workspaceRoot, ".kilocode/mcp.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect logs in, bootstraps the workspace, and installs a Gemini config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"gemini",
+					"--api-key",
+					"bardo_live_connect",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Saved Bardo credentials");
+			expect(stdout.read()).toContain("Initialized Bardo workspace");
+			expect(stdout.read()).toContain("Connected Bardo to Gemini CLI");
+
+			await expect(
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
+			).resolves.toContain('"ruleset": "shadowdark"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
+			).resolves.toContain('"mcpServers"');
+			await expect(
+				readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
 			).resolves.toContain('"bardo"');
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -2571,6 +2777,11 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		const stderr = createWriter();
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			await mkdir(path.join(workspaceRoot, ".kiro/settings"), {
 				recursive: true,
 			});
@@ -2604,7 +2815,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(stderr.read()).toBe("");
 			expect(stdout.read()).toContain("Connected Bardo to Kiro");
 			await expect(
-				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
 			).resolves.toContain('"ruleset": "shadowdark"');
 			await expect(
 				readFile(path.join(workspaceRoot, ".kiro/settings/mcp.json"), "utf8"),
@@ -2623,6 +2834,11 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		const configPath = path.join(homeDir, ".config/bardo/config.json");
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			await mkdir(path.dirname(configPath), { recursive: true });
 			await writeFile(
 				configPath,
@@ -2885,7 +3101,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				code: "ENOENT",
 			});
 			await expect(
-				readFile(path.join(workspaceRoot, "bardo/manifest.json"), "utf8"),
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
 			).rejects.toMatchObject({
 				code: "ENOENT",
 			});
@@ -2920,10 +3136,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(stderr.read()).toContain("workspace");
 			await expect(
 				readFile(
-					path.join(
-						workspaceRoot,
-						"bardo/rules/sources/rulebook/shadowdark.md",
-					),
+					path.join(workspaceRoot, ".bardo/rules/rulebook.md"),
 					"utf8",
 				),
 			).rejects.toMatchObject({
@@ -3053,12 +3266,145 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
-	test("export copies the bardo workspace into the target directory", async () => {
+	test("install writes a merge-safe OpenCode workspace config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "bardo_live_saved",
+						url: "http://127.0.0.1:3000/mcp",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, "opencode.json"),
+				JSON.stringify(
+					{
+						theme: "opencode",
+						mcp: {
+							existing: {
+								type: "local",
+								command: ["uvx", "existing-tool"],
+								enabled: true,
+							},
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["install", "--client", "opencode"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+
+			expect(exitCode).toBe(0);
+			const config = JSON.parse(
+				await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			) as {
+				instructions?: string[];
+				mcp: Record<
+					string,
+					{ type: string; command: string[]; enabled: boolean }
+				>;
+			};
+			expect(config.mcp.existing.command).toEqual(["uvx", "existing-tool"]);
+			expect(config.mcp.bardo.type).toBe("local");
+			expect(config.mcp.bardo.enabled).toBe(true);
+			expect(config.mcp.bardo.command).toContain("bardo");
+			expect(config.mcp.bardo.command).toContain("--workspace-root");
+			expect(config.instructions).toEqual(
+				expect.arrayContaining([
+					".bardo/docs/agent-contract.md",
+					".bardo/docs/clients/opencode.md",
+				]),
+			);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("connect logs in, bootstraps the workspace, and installs an OpenCode config", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
+			const exitCode = await runCli(
+				[
+					"connect",
+					"--client",
+					"opencode",
+					"--api-key",
+					"bardo_live_connect",
+					"--url",
+					"http://127.0.0.1:3000/mcp",
+					"--ruleset",
+					"shadowdark",
+				],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout,
+					stderr,
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(stderr.read()).toBe("");
+			expect(stdout.read()).toContain("Saved Bardo credentials");
+			expect(stdout.read()).toContain("Initialized Bardo workspace");
+			expect(stdout.read()).toContain("Connected Bardo to OpenCode");
+
+			await expect(
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
+			).resolves.toContain('"ruleset": "shadowdark"');
+			await expect(
+				readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			).resolves.toContain('"mcp"');
+			await expect(
+				readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			).resolves.toContain('"bardo"');
+			await expect(
+				readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+			).resolves.toContain('"instructions"');
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+test("export copies the .bardo workspace into the target directory", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 		const exportRoot = await createTempDir("bardo-export-");
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			await runCli(["init", "--ruleset", "shadowdark"], {
 				cwd: workspaceRoot,
 				homeDir,
@@ -3075,7 +3421,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 
 			expect(exitCode).toBe(0);
 			await expect(
-				readFile(path.join(exportRoot, "bardo/manifest.json"), "utf8"),
+				readFile(path.join(exportRoot, ".bardo/manifest.json"), "utf8"),
 			).resolves.toContain('"ruleset": "shadowdark"');
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -3090,6 +3436,11 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		const outputPath = path.join(workspaceRoot, "bardo-debug.json");
 
 		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Workspace Rulebook\n\nConverted markdown source.",
+				"utf8",
+			);
 			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
 			await writeFile(
 				path.join(homeDir, ".config/bardo/config.json"),

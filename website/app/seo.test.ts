@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { listLegalEntries } from "@/content/legal-content";
-import { listBlogEntries, listDocsEntries } from "@/content/site-content";
-import { getDocsBreadcrumbJsonLd, getLegalBreadcrumbJsonLd } from "@/lib/site-seo";
+import { listLegalEntries } from "../content/legal-content";
+import { listBlogEntries, listDocsEntries } from "../content/site-content";
+import { getDocsBreadcrumbJsonLd, getLegalBreadcrumbJsonLd } from "../lib/site-seo";
 import manifest from "./manifest";
 import robots from "./robots";
 import sitemap from "./sitemap";

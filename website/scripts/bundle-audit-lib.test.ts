@@ -70,6 +70,23 @@ describe("auditBundleArtifacts", () => {
 		]);
 	});
 
+	test("fails if client chunks contain the engine package", () => {
+		const result = auditBundleArtifacts({
+			analyzeArtifacts: ["client.html"],
+			clientChunks: [
+				{
+					path: "static/chunks/app-dashboard.js",
+					bytes: 25_000,
+					contents: 'import "@bardo/engine";',
+				},
+			],
+		});
+
+		expect(result.errors).toEqual([
+			"Client bundle leaked @bardo/engine into static/chunks/app-dashboard.js.",
+		]);
+	});
+
 	test("warns when public chunks pull Clerk or framer-motion", () => {
 		const result = auditBundleArtifacts({
 			analyzeArtifacts: ["client.html"],
