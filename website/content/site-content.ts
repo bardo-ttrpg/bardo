@@ -69,7 +69,8 @@ const rawDocsEntries = [
 		slugSegments: ["install"],
 		href: "/docs/install",
 		title: "Install Bardo",
-		description: "Install the local bridge and prepare the workspace for .bardo bootstrap.",
+		description:
+			"Install the local bridge and prepare the workspace for .bardo bootstrap.",
 		navigationLabel: "Install",
 		eyebrow: "Get Started",
 		group: "get-started",
@@ -157,7 +158,10 @@ const rawDocsEntries = [
 			{ id: "install-codex", title: "Install Codex" },
 			{ id: "connect-bardo", title: "Connect Bardo" },
 			{ id: "what-bardo-writes", title: "What Bardo writes" },
-			{ id: "cli-and-desktop-app-guidance", title: "CLI and desktop app guidance" },
+			{
+				id: "cli-and-desktop-app-guidance",
+				title: "CLI and desktop app guidance",
+			},
 			{ id: "use-bardo-well-in-codex", title: "Use Bardo well in Codex" },
 		],
 		lastModified: "2026-04-10T00:00:00.000Z",
@@ -228,7 +232,8 @@ const rawDocsEntries = [
 		slugSegments: ["campaign-truth"],
 		href: "/docs/campaign-truth",
 		title: "Campaign Truth",
-		description: "Clarify workspace truth, the .bardo root, and the hosted service boundary.",
+		description:
+			"Clarify workspace truth, the .bardo root, and the hosted service boundary.",
 		navigationLabel: "Campaign Truth",
 		eyebrow: "Product Model",
 		group: "product-model",
@@ -275,7 +280,10 @@ const rawDocsEntries = [
 		group: "product-model",
 		order: 3,
 		sections: [
-			{ id: "workspace-defined-rules-context", title: "Workspace-defined rules context" },
+			{
+				id: "workspace-defined-rules-context",
+				title: "Workspace-defined rules context",
+			},
 			{ id: "support-tiers", title: "Support tiers" },
 			{ id: "conservative-adjudication", title: "Conservative adjudication" },
 			{ id: "table-authority", title: "Table authority" },

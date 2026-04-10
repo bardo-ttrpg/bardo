@@ -49,7 +49,11 @@ function resolveReleaseArtifacts(version: string): ReleaseArtifact[] {
 			arch: "arm64",
 			filename: `bardo-${version}-darwin-arm64`,
 		},
-		{ platform: "darwin", arch: "x64", filename: `bardo-${version}-darwin-x64` },
+		{
+			platform: "darwin",
+			arch: "x64",
+			filename: `bardo-${version}-darwin-x64`,
+		},
 		{
 			platform: "windows",
 			arch: "x64",

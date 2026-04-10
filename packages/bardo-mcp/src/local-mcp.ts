@@ -12,6 +12,9 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
+import { createRuntimeToolHandlers } from "@bardo/engine/runtime-tools";
+import { migrateLegacyWorkspaceRoot } from "@bardo/engine/workspace";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -20,9 +23,6 @@ import {
 	ListToolsRequestSchema,
 	RootsListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
-import { createRuntimeToolHandlers } from "@bardo/engine/runtime-tools";
-import { migrateLegacyWorkspaceRoot } from "@bardo/engine/workspace";
 import type { PlanTier } from "./plan-utils";
 import { bootstrapImportedRulebook } from "./rules-bootstrap";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
@@ -870,7 +870,10 @@ export async function ensureWorkspaceCoreFiles(args: {
 			2,
 		),
 	);
-	await ensureFile(path.join(args.bardoRoot, "events/state-changes.ndjson"), "");
+	await ensureFile(
+		path.join(args.bardoRoot, "events/state-changes.ndjson"),
+		"",
+	);
 }
 
 export async function maybeImportRulebook(args: {
@@ -1416,8 +1419,8 @@ function localToolDefinitions(
 					importedRulebooks,
 					ruleset: typeof args.ruleset === "string" ? args.ruleset : null,
 					rulebookBootstrap:
-						(await readExistingJson(path.join(bardoRoot, "manifest.json")))?.rulebookBootstrap ??
-						null,
+						(await readExistingJson(path.join(bardoRoot, "manifest.json")))
+							?.rulebookBootstrap ?? null,
 				};
 			},
 		},

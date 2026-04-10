@@ -696,7 +696,7 @@ describe("bardo runtime", () => {
 		}
 	});
 
-test("init scaffolds the canonical .bardo workspace and imports a rulebook", async () => {
+	test("init scaffolds the canonical .bardo workspace and imports a rulebook", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 		const rulebookPath = path.join(workspaceRoot, "shadowdark-rulebook.md");
@@ -840,10 +840,7 @@ test("init scaffolds the canonical .bardo workspace and imports a rulebook", asy
 			expect(exitCode).toBe(1);
 			expect(stderr.read()).toContain("Convert PDFs to Markdown");
 			await expect(
-				readFile(
-					path.join(workspaceRoot, ".bardo/rules/rulebook.pdf"),
-					"utf8",
-				),
+				readFile(path.join(workspaceRoot, ".bardo/rules/rulebook.pdf"), "utf8"),
 			).rejects.toMatchObject({
 				code: "ENOENT",
 			});
@@ -3135,10 +3132,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			expect(exitCode).toBe(1);
 			expect(stderr.read()).toContain("workspace");
 			await expect(
-				readFile(
-					path.join(workspaceRoot, ".bardo/rules/rulebook.md"),
-					"utf8",
-				),
+				readFile(path.join(workspaceRoot, ".bardo/rules/rulebook.md"), "utf8"),
 			).rejects.toMatchObject({
 				code: "ENOENT",
 			});
@@ -3394,7 +3388,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 		}
 	});
 
-test("export copies the .bardo workspace into the target directory", async () => {
+	test("export copies the .bardo workspace into the target directory", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");
 		const exportRoot = await createTempDir("bardo-export-");

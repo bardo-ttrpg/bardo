@@ -102,7 +102,10 @@ export async function bootstrapCampaignWorkspace(
 		gaps: string[];
 	};
 }> {
-	const rulesIndexPath = path.join(args.bardoRoot, "rules/normalized/index.json");
+	const rulesIndexPath = path.join(
+		args.bardoRoot,
+		"rules/normalized/index.json",
+	);
 	const hasRulesBootstrap = await stat(rulesIndexPath)
 		.then(() => true)
 		.catch((error: unknown) => {
@@ -124,16 +127,13 @@ export async function bootstrapCampaignWorkspace(
 	const readinessPath = "manifests/readiness.json";
 
 	if (!hasRulesBootstrap) {
-		await ensureJsonFile(
-			path.join(args.bardoRoot, readinessPath),
-			{
-				status: "needs-user-input" satisfies CampaignBootstrapReadiness,
-				gaps: [
-					"Rules bootstrap must complete before campaign bootstrap can begin.",
-				],
-				updatedAtISO: args.nowIso,
-			},
-		);
+		await ensureJsonFile(path.join(args.bardoRoot, readinessPath), {
+			status: "needs-user-input" satisfies CampaignBootstrapReadiness,
+			gaps: [
+				"Rules bootstrap must complete before campaign bootstrap can begin.",
+			],
+			updatedAtISO: args.nowIso,
+		});
 		return {
 			sourceIndexPath,
 			entitiesPath,
@@ -155,7 +155,10 @@ export async function bootstrapCampaignWorkspace(
 		sources: sourceEntries,
 	});
 	const currentState = deriveCurrentState(extracted);
-	const trackingProfile = deriveTrackingProfile(extracted.entities, currentState);
+	const trackingProfile = deriveTrackingProfile(
+		extracted.entities,
+		currentState,
+	);
 	const gaps = deriveReadinessGaps(extracted, currentState);
 	const readiness: CampaignBootstrapReadiness =
 		gaps.length === 0
@@ -239,7 +242,8 @@ async function walkWorkspace(
 		const relativePath = path
 			.relative(rootPath, nextPath)
 			.replaceAll("\\", "/");
-		const role = entry.name === "rulebook.md" ? "rules-source" : "campaign-file";
+		const role =
+			entry.name === "rulebook.md" ? "rules-source" : "campaign-file";
 		if (details.size > MAX_CAMPAIGN_SOURCE_BYTES) {
 			results.push({
 				relativePath,
@@ -318,7 +322,9 @@ async function extractCampaignData(args: {
 				});
 			}
 
-			const possibleLocation = parsePrefixedValue(trimmed, ["Possible location:"]);
+			const possibleLocation = parsePrefixedValue(trimmed, [
+				"Possible location:",
+			]);
 			if (possibleLocation) {
 				locations.push(possibleLocation);
 				currentLocationCandidates.push({
@@ -331,7 +337,10 @@ async function extractCampaignData(args: {
 				);
 			}
 
-			for (const inferred of inferLocationCandidates(trimmed, source.relativePath)) {
+			for (const inferred of inferLocationCandidates(
+				trimmed,
+				source.relativePath,
+			)) {
 				locations.push(inferred.value);
 				currentLocationCandidates.push(inferred);
 			}
@@ -442,13 +451,12 @@ async function extractCampaignData(args: {
 	};
 }
 
-function inferLocationCandidates(
-	line: string,
-	source: string,
-): Candidate[] {
+function inferLocationCandidates(line: string, source: string): Candidate[] {
 	const candidates: Candidate[] = [];
-	const arrived = /\b(?:reached|arrived at|now in|currently in)\s+([A-Z][A-Za-z' -]{1,40}?)(?:[.,;]| by\b| after\b| before\b|$)/g;
-	const departed = /\b(?:left|from)\s+([A-Z][A-Za-z' -]{1,40}?)(?:[.,;]| by\b| after\b| before\b|$)/g;
+	const arrived =
+		/\b(?:reached|arrived at|now in|currently in)\s+([A-Z][A-Za-z' -]{1,40}?)(?:[.,;]| by\b| after\b| before\b|$)/g;
+	const departed =
+		/\b(?:left|from)\s+([A-Z][A-Za-z' -]{1,40}?)(?:[.,;]| by\b| after\b| before\b|$)/g;
 	for (const match of line.matchAll(arrived)) {
 		const value = normalizeEntity(match[1]);
 		if (value) {
@@ -523,9 +531,11 @@ function inferClockName(value: string): string | null {
 	return match ? normalizeEntity(match[1]) : null;
 }
 
-function deriveCurrentState(extracted: ExtractedCampaignData): CurrentStateModel {
-	const rankedLocations = [...extracted.currentLocationCandidates].sort((left, right) =>
-		right.strength - left.strength,
+function deriveCurrentState(
+	extracted: ExtractedCampaignData,
+): CurrentStateModel {
+	const rankedLocations = [...extracted.currentLocationCandidates].sort(
+		(left, right) => right.strength - left.strength,
 	);
 	const currentLocation = rankedLocations[0]?.value ?? null;
 	const uncertainties = [...extracted.uncertainties];
@@ -605,7 +615,9 @@ function stripTrailingContext(value: string): string {
 
 function unique(values: string[]): string[] {
 	return Array.from(
-		new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)),
+		new Set(
+			values.map((value) => value.trim()).filter((value) => value.length > 0),
+		),
 	);
 }
 

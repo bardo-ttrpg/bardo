@@ -1,5 +1,5 @@
-import path from "node:path";
 import { mkdir, rename, stat } from "node:fs/promises";
+import path from "node:path";
 
 export const BARDO_ROOT_DIRNAME = ".bardo";
 export const MIGRATED_ROOT_DIRNAME = "bardo";

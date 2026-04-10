@@ -47,17 +47,17 @@ describe("project cleanup and tooling setup", () => {
 			"turbo run dev --filter=@bardo/mcp",
 		);
 		expect(rootPackageJson.scripts?.["stress:test-01"]).toBe(
-			"\"${npm_execpath:-bun}\" run ./scripts/stress-bardo-test-01.ts",
+			'"${npm_execpath:-bun}" run ./scripts/stress-bardo-test-01.ts',
 		);
 		expect(rootPackageJson.scripts?.["release:candidate"]).toBe(
-			"\"${npm_execpath:-bun}\" run build && \"${npm_execpath:-bun}\" run test:release-gates && \"${npm_execpath:-bun}\" run bundle:audit && \"${npm_execpath:-bun}\" run stress:test-01",
+			'"${npm_execpath:-bun}" run build && "${npm_execpath:-bun}" run test:release-gates && "${npm_execpath:-bun}" run bundle:audit && "${npm_execpath:-bun}" run stress:test-01',
 		);
 		expect(websitePackageJson.scripts?.["bundle:audit"]).toBe(
-			"\"${npm_execpath:-bun}\" run ./scripts/bundle-audit.ts",
+			'"${npm_execpath:-bun}" run ./scripts/bundle-audit.ts',
 		);
 		expect(websiteTurboJson.tasks?.dev?.with).toBeUndefined();
 		expect(bridgePackageJson.scripts?.dev).toBe(
-			"\"${npm_execpath:-bun}\" --watch run src/cli.ts",
+			'"${npm_execpath:-bun}" --watch run src/cli.ts',
 		);
 		expect(knipJson.workspaces).not.toHaveProperty("mcp");
 		expect(existsSync(join(repoRoot, "mcp"))).toBe(false);
@@ -71,16 +71,22 @@ describe("project cleanup and tooling setup", () => {
 
 		expect(cleanupScript).not.toContain("$ROOT_DIR/mcp/.turbo");
 		expect(cleanupScript).toContain("$ROOT_DIR/packages/bardo-mcp/.turbo");
-		expect(cleanupScript).toContain("$ROOT_DIR/packages/bardo-mcp/dist/release");
+		expect(cleanupScript).toContain(
+			"$ROOT_DIR/packages/bardo-mcp/dist/release",
+		);
 		expect(validateToolchainPolicy).not.toContain('"website", "mcp"');
 		expect(validateToolchainPolicy).not.toContain('"mcp/package-lock.json"');
-		expect(validateToolchainPolicy).toContain('const packageDirs = ["website"];');
+		expect(validateToolchainPolicy).toContain(
+			'const packageDirs = ["website"];',
+		);
 	});
 
 	test("keeps inspector and staging docs aligned to the bridge-first local runtime", () => {
 		const inspectorDoc = readFromRepo("docs/mcp-inspector.md");
 		const stagingChecklist = readFromRepo("docs/staging-smoke-checklist.md");
-		const releaseChecklist = readFromRepo("docs/release-candidate-checklist.md");
+		const releaseChecklist = readFromRepo(
+			"docs/release-candidate-checklist.md",
+		);
 		const recoveryRunbook = readFromRepo("docs/recovery-runbook.md");
 		const stagingSmoke = readFromRepo("scripts/staging-smoke.ts");
 		const stressHarness = readFromRepo("scripts/stress-bardo-test-01.ts");

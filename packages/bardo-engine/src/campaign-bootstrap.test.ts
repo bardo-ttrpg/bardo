@@ -16,7 +16,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await writeFile(
 				path.join(bardoRoot, "rules/normalized/index.json"),
 				JSON.stringify({
@@ -47,15 +49,17 @@ describe("bootstrapCampaignWorkspace", () => {
 			expect(result.readiness.status).toBe("ready");
 			expect(result.sourceIndexPath).toBe("manifests/source-index.json");
 			expect(result.currentStatePath).toBe("state/current-state.json");
-			expect(result.trackingProfilePath).toBe("simulation/tracking-profile.json");
+			expect(result.trackingProfilePath).toBe(
+				"simulation/tracking-profile.json",
+			);
 			expect(result.readinessPath).toBe("manifests/readiness.json");
 
 			const sourceIndex = JSON.parse(
 				await readFile(path.join(bardoRoot, result.sourceIndexPath), "utf8"),
 			) as { sources: Array<{ relativePath: string; role: string }> };
-			expect(sourceIndex.sources.some((entry) => entry.role === "campaign-file")).toBe(
-				true,
-			);
+			expect(
+				sourceIndex.sources.some((entry) => entry.role === "campaign-file"),
+			).toBe(true);
 
 			const currentState = JSON.parse(
 				await readFile(path.join(bardoRoot, result.currentStatePath), "utf8"),
@@ -103,7 +107,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await writeFile(
 				path.join(bardoRoot, "rules/normalized/index.json"),
 				JSON.stringify({
@@ -176,9 +182,7 @@ describe("bootstrapCampaignWorkspace", () => {
 			) as { status: CampaignBootstrapReadiness; gaps: string[] };
 			expect(readiness.status).toBe("ready-with-gaps");
 			expect(readiness.gaps).toEqual(
-				expect.arrayContaining([
-					expect.stringContaining("contradictory"),
-				]),
+				expect.arrayContaining([expect.stringContaining("contradictory")]),
 			);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -192,7 +196,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await writeFile(
 				path.join(bardoRoot, "rules/normalized/index.json"),
 				JSON.stringify({
@@ -242,7 +248,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await writeFile(
 				path.join(bardoRoot, "rules/normalized/index.json"),
 				JSON.stringify({
@@ -283,7 +291,10 @@ describe("bootstrapCampaignWorkspace", () => {
 				npcAttitudes: Record<string, string>;
 			};
 			const trackingProfile = JSON.parse(
-				await readFile(path.join(bardoRoot, result.trackingProfilePath), "utf8"),
+				await readFile(
+					path.join(bardoRoot, result.trackingProfilePath),
+					"utf8",
+				),
 			) as {
 				strong: string[];
 				light: string[];
@@ -293,7 +304,9 @@ describe("bootstrapCampaignWorkspace", () => {
 				expect.arrayContaining(["The ferryman answers to the Guild of Keys."]),
 			);
 			expect(currentState.factionConsequences).toEqual(
-				expect.arrayContaining(["Guild of Keys tightened patrols in Ash Court."]),
+				expect.arrayContaining([
+					"Guild of Keys tightened patrols in Ash Court.",
+				]),
 			);
 			expect(currentState.clockProgress).toEqual(
 				expect.arrayContaining(["Eclipse Clock advanced to 2/6."]),
@@ -319,7 +332,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await writeFile(
 				path.join(bardoRoot, "rules/normalized/index.json"),
 				JSON.stringify({
@@ -363,7 +378,9 @@ describe("bootstrapCampaignWorkspace", () => {
 			) as { status: CampaignBootstrapReadiness; gaps: string[] };
 			expect(readiness.gaps).toEqual(
 				expect.arrayContaining([
-					expect.stringContaining("Skipped oversized source oversized-notes.md"),
+					expect.stringContaining(
+						"Skipped oversized source oversized-notes.md",
+					),
 				]),
 			);
 		} finally {
@@ -378,7 +395,9 @@ describe("bootstrapCampaignWorkspace", () => {
 		const bardoRoot = resolveBardoRoot(workspaceRoot);
 
 		try {
-			await mkdir(path.join(bardoRoot, "rules/normalized"), { recursive: true });
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
 			await mkdir(path.join(workspaceRoot, "workspaces"), { recursive: true });
 			await mkdir(path.join(workspaceRoot, "bin"), { recursive: true });
 			await writeFile(
@@ -443,9 +462,9 @@ describe("bootstrapCampaignWorkspace", () => {
 				await readFile(path.join(bardoRoot, result.readinessPath), "utf8"),
 			) as { status: CampaignBootstrapReadiness; gaps: string[] };
 			expect(readiness.status).toBe("ready");
-			expect(
-				readiness.gaps.some((gap) => gap.includes("rulebook.md")),
-			).toBe(false);
+			expect(readiness.gaps.some((gap) => gap.includes("rulebook.md"))).toBe(
+				false,
+			);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}

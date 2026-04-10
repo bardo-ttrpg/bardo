@@ -177,12 +177,7 @@ export async function checkReleaseHealth(
 	resolveHttpsUrl(env, "NEXT_PUBLIC_APP_URL", errors, warnings);
 	resolveHttpsUrl(env, "BARDO_APP_BASE_URL", errors, warnings);
 	resolveHttpsUrl(env, "BARDO_RUNTIME_STATUS_URL", errors, warnings);
-	resolveHttpsUrl(
-		env,
-		"BARDO_BRIDGE_SESSION_REFRESH_URL",
-		errors,
-		warnings,
-	);
+	resolveHttpsUrl(env, "BARDO_BRIDGE_SESSION_REFRESH_URL", errors, warnings);
 
 	const release = resolveReleaseIdentifier(env);
 	if (!release) {

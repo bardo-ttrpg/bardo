@@ -23,7 +23,9 @@ export type SavedConfigV2 = {
 
 export type SavedConfig = SavedConfigV1 | SavedConfigV2;
 
-function normalizeLegacyBardoUrl(value: string | undefined): string | undefined {
+function normalizeLegacyBardoUrl(
+	value: string | undefined,
+): string | undefined {
 	if (typeof value !== "string" || value.length === 0) {
 		return undefined;
 	}

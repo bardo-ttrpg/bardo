@@ -148,7 +148,13 @@ async function copyFixture(name: string, destination: string): Promise<void> {
 async function startSupportServer(version: string) {
 	const port = await awaitAvailablePort();
 	const baseUrl = `http://127.0.0.1:${port}`;
-	const releaseRoot = path.join(REPO_ROOT, "packages", "bardo-mcp", "dist", "release");
+	const releaseRoot = path.join(
+		REPO_ROOT,
+		"packages",
+		"bardo-mcp",
+		"dist",
+		"release",
+	);
 	const accessToken = "bardo_bridge_access_stress";
 	const refreshToken = "bardo_bridge_refresh_stress";
 
@@ -363,7 +369,10 @@ async function main() {
 				},
 			});
 			const bardoBin = path.join(binDir, "bardo");
-			assert((await stat(bardoBin)).isFile(), "Installed bardo binary wrapper is missing.");
+			assert(
+				(await stat(bardoBin)).isFile(),
+				"Installed bardo binary wrapper is missing.",
+			);
 			return `installed ${bardoBin}`;
 		});
 
@@ -397,7 +406,13 @@ async function main() {
 			});
 			await runCommand({
 				command: bardoBin,
-				commandArgs: ["connect", "--client", "codex", "--ruleset", "shadowdark"],
+				commandArgs: [
+					"connect",
+					"--client",
+					"codex",
+					"--ruleset",
+					"shadowdark",
+				],
 				cwd: workspaceRoot,
 				env: commonEnv(workspaceRoot),
 			});
@@ -413,10 +428,22 @@ async function main() {
 				connectivity: { health: { ok: boolean } };
 				account: { ok: boolean; plan: string | null };
 			};
-			assert(doctorPayload.workspace.initialized, "Doctor reported an uninitialized workspace.");
-			assert(doctorPayload.connectivity.health.ok, "Doctor reported failing local health.");
-			assert(doctorPayload.account.ok, "Doctor could not confirm account status.");
-			assert(doctorPayload.account.plan === "solo", "Doctor did not preserve the staged plan.");
+			assert(
+				doctorPayload.workspace.initialized,
+				"Doctor reported an uninitialized workspace.",
+			);
+			assert(
+				doctorPayload.connectivity.health.ok,
+				"Doctor reported failing local health.",
+			);
+			assert(
+				doctorPayload.account.ok,
+				"Doctor could not confirm account status.",
+			);
+			assert(
+				doctorPayload.account.plan === "solo",
+				"Doctor did not preserve the staged plan.",
+			);
 
 			const clients = await runCommand({
 				command: bardoBin,
@@ -436,7 +463,10 @@ async function main() {
 					"utf8",
 				),
 			) as { status: string };
-			assert(readiness.status === "ready", "Ready fixture did not bootstrap to ready.");
+			assert(
+				readiness.status === "ready",
+				"Ready fixture did not bootstrap to ready.",
+			);
 
 			await withMcpClient({
 				bardoBin,
@@ -460,80 +490,107 @@ async function main() {
 					const sceneTurn = await client.callTool({
 						name: "scene_turn",
 						arguments: {
-							playerIntent: "Scout the collapsed bridge without altering canon.",
+							playerIntent:
+								"Scout the collapsed bridge without altering canon.",
 						},
 					});
-					assert(!sceneTurn.isError, "scene_turn failed in the ready workspace.");
+					assert(
+						!sceneTurn.isError,
+						"scene_turn failed in the ready workspace.",
+					);
 				},
 			});
 
 			return "login, init, connect, doctor, clients list, and scene_turn all succeeded";
 		});
 
-		await recordScenario(results, "opencode client config and discovery", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "opencode");
-			await copyFixture("ready", workspaceRoot);
+		await recordScenario(
+			results,
+			"opencode client config and discovery",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "opencode");
+				await copyFixture("ready", workspaceRoot);
 
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["login"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["connect", "--client", "opencode", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
+				await runCommand({
+					command: bardoBin,
+					commandArgs: ["login"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+				await runCommand({
+					command: bardoBin,
+					commandArgs: [
+						"connect",
+						"--client",
+						"opencode",
+						"--ruleset",
+						"shadowdark",
+					],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
 
-			const doctor = await runCommand({
-				command: bardoBin,
-				commandArgs: ["doctor", "--client", "opencode", "--json"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-			const doctorPayload = JSON.parse(doctor.stdout) as {
-				client: {
-					configExists: boolean;
-					configValid: boolean;
-					hasBardoServer: boolean;
-				} | null;
-			};
-			assert(doctorPayload.client?.configExists, "Doctor did not find opencode.json.");
-			assert(doctorPayload.client?.configValid, "Doctor reported an invalid OpenCode config.");
-			assert(
-				doctorPayload.client?.hasBardoServer,
-				"Doctor did not detect the Bardo OpenCode server entry.",
-			);
+				const doctor = await runCommand({
+					command: bardoBin,
+					commandArgs: ["doctor", "--client", "opencode", "--json"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+				const doctorPayload = JSON.parse(doctor.stdout) as {
+					client: {
+						configExists: boolean;
+						configValid: boolean;
+						hasBardoServer: boolean;
+					} | null;
+				};
+				assert(
+					doctorPayload.client?.configExists,
+					"Doctor did not find opencode.json.",
+				);
+				assert(
+					doctorPayload.client?.configValid,
+					"Doctor reported an invalid OpenCode config.",
+				);
+				assert(
+					doctorPayload.client?.hasBardoServer,
+					"Doctor did not detect the Bardo OpenCode server entry.",
+				);
 
-			const opencodeConfig = JSON.parse(
-				await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
-			) as {
-				mcp: Record<
-					string,
-					{ type: string; command: string[]; enabled: boolean }
-				>;
-			};
-			assert(opencodeConfig.mcp.bardo.type === "local", "OpenCode config was not local.");
-			assert(opencodeConfig.mcp.bardo.enabled, "OpenCode config left Bardo disabled.");
+				const opencodeConfig = JSON.parse(
+					await readFile(path.join(workspaceRoot, "opencode.json"), "utf8"),
+				) as {
+					mcp: Record<
+						string,
+						{ type: string; command: string[]; enabled: boolean }
+					>;
+				};
+				assert(
+					opencodeConfig.mcp.bardo.type === "local",
+					"OpenCode config was not local.",
+				);
+				assert(
+					opencodeConfig.mcp.bardo.enabled,
+					"OpenCode config left Bardo disabled.",
+				);
 
-			const mcpList = await runCommand({
-				command: "bunx",
-				commandArgs: ["-y", "opencode-ai", "mcp", "list"],
-				cwd: workspaceRoot,
-				env: {
-					...commonEnv(workspaceRoot),
-					PATH: `${binDir}:${process.env.PATH ?? ""}`,
-				},
-			});
-			assert(
-				mcpList.stdout.includes("bardo") && mcpList.stdout.includes("connected"),
-				"OpenCode did not discover the connected local Bardo server.",
-			);
+				const mcpList = await runCommand({
+					command: "bunx",
+					commandArgs: ["-y", "opencode-ai", "mcp", "list"],
+					cwd: workspaceRoot,
+					env: {
+						...commonEnv(workspaceRoot),
+						PATH: `${binDir}:${process.env.PATH ?? ""}`,
+					},
+				});
+				assert(
+					mcpList.stdout.includes("bardo") &&
+						mcpList.stdout.includes("connected"),
+					"OpenCode did not discover the connected local Bardo server.",
+				);
 
-			return "connect writes opencode.json and OpenCode discovers the local Bardo MCP";
-		});
+				return "connect writes opencode.json and OpenCode discovers the local Bardo MCP";
+			},
+		);
 
 		await recordScenario(
 			results,
@@ -546,7 +603,9 @@ async function main() {
 					gemini: ".gemini/settings.json",
 				} as const;
 
-				for (const [client, relativeConfigPath] of Object.entries(clientConfigs)) {
+				for (const [client, relativeConfigPath] of Object.entries(
+					clientConfigs,
+				)) {
 					const workspaceRoot = path.join(workspacesRoot, `client-${client}`);
 					await copyFixture("ready", workspaceRoot);
 
@@ -614,7 +673,10 @@ async function main() {
 				cwd: workspaceRoot,
 				env: commonEnv(workspaceRoot),
 			});
-			assert(result.status !== 0, "Init unexpectedly succeeded without a rulebook.");
+			assert(
+				result.status !== 0,
+				"Init unexpectedly succeeded without a rulebook.",
+			);
 			assert(
 				`${result.stdout}\n${result.stderr}`.includes(
 					"Rules bootstrap requires rulebook.md",
@@ -624,31 +686,42 @@ async function main() {
 			return "init fails closed when rulebook.md is missing";
 		});
 
-		await recordScenario(results, "invalid rulebook override failure", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "invalid-rulebook");
-			await mkdir(workspaceRoot, { recursive: true });
-			await writeFile(path.join(workspaceRoot, "rulebook.pdf"), "not a pdf", "utf8");
-			const result = await runCommandAllowFailure({
-				command: bardoBin,
-				commandArgs: [
-					"init",
-					"--ruleset",
-					"shadowdark",
-					"--rulebook",
-					"./rulebook.pdf",
-				],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-			assert(result.status !== 0, "Init unexpectedly accepted a PDF rulebook override.");
-			assert(
-				`${result.stdout}\n${result.stderr}`.includes(
-					"supports markdown or text sources only",
-				),
-				"Invalid rulebook failure did not explain the supported source types.",
-			);
-			return "unsupported rulebook override is rejected";
-		});
+		await recordScenario(
+			results,
+			"invalid rulebook override failure",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "invalid-rulebook");
+				await mkdir(workspaceRoot, { recursive: true });
+				await writeFile(
+					path.join(workspaceRoot, "rulebook.pdf"),
+					"not a pdf",
+					"utf8",
+				);
+				const result = await runCommandAllowFailure({
+					command: bardoBin,
+					commandArgs: [
+						"init",
+						"--ruleset",
+						"shadowdark",
+						"--rulebook",
+						"./rulebook.pdf",
+					],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+				assert(
+					result.status !== 0,
+					"Init unexpectedly accepted a PDF rulebook override.",
+				);
+				assert(
+					`${result.stdout}\n${result.stderr}`.includes(
+						"supports markdown or text sources only",
+					),
+					"Invalid rulebook failure did not explain the supported source types.",
+				);
+				return "unsupported rulebook override is rejected";
+			},
+		);
 
 		await recordScenario(results, "legacy layout migration", async () => {
 			const workspaceRoot = path.join(workspacesRoot, "legacy-migration");
@@ -672,7 +745,9 @@ async function main() {
 			});
 
 			assert(
-				(await stat(path.join(workspaceRoot, ".bardo", "legacy-marker.txt"))).isFile(),
+				(
+					await stat(path.join(workspaceRoot, ".bardo", "legacy-marker.txt"))
+				).isFile(),
 				"Legacy bardo/ contents were not migrated into .bardo/.",
 			);
 			assert(
@@ -682,262 +757,309 @@ async function main() {
 			return "legacy bardo/ root migrated one-way into .bardo/";
 		});
 
-		await recordScenario(results, "messy workspace readiness and runtime", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "messy");
-			await copyFixture("messy", workspaceRoot);
+		await recordScenario(
+			results,
+			"messy workspace readiness and runtime",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "messy");
+				await copyFixture("messy", workspaceRoot);
 
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["init", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-
-			const readiness = JSON.parse(
-				await readFile(
-					path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
-					"utf8",
-				),
-			) as { status: string; gaps: string[] };
-			assert(
-				readiness.status === "ready-with-gaps",
-				"Messy workspace should produce ready-with-gaps readiness.",
-			);
-			assert(
-				readiness.gaps.some((gap) => gap.includes("contradictory")),
-				"Messy workspace did not surface contradictory location gaps.",
-			);
-
-			await withMcpClient({
-				bardoBin,
-				workspaceRoot,
-				callback: async (client) => {
-					const validSync = await client.callTool({
-						name: "world_sync",
-						arguments: {
-							currentLocation: "River Market",
-							activeQuests: ["Find the ferryman before the eclipse"],
-							relevantFactions: ["Dock Wardens"],
-						},
-					});
-					assert(!validSync.isError, "Grounded world_sync unexpectedly failed.");
-					assert(
-						readCommittedFlag(validSync.structuredContent) === true,
-						"Grounded world_sync did not commit canon conservatively.",
-					);
-
-					const invalidSync = await client.callTool({
-						name: "world_sync",
-						arguments: {
-							currentLocation: "Moonlit Vault",
-						},
-					});
-					assert(
-						!invalidSync.isError,
-						"Ungrounded world_sync should return uncertainty, not crash.",
-					);
-					assert(
-						readCommittedFlag(invalidSync.structuredContent) === false,
-						"Ungrounded world_sync should not commit canon.",
-					);
-				},
-			});
-
-			return "messy readiness stayed explicit and runtime only committed grounded canon";
-		});
-
-		await recordScenario(results, "user correction precedence and continuity", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "correction-flow");
-			await copyFixture("ready", workspaceRoot);
-
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["init", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-
-			await withMcpClient({
-				bardoBin,
-				workspaceRoot,
-				callback: async (client) => {
-					const correction = await client.callTool({
-						name: "user_correction",
-						arguments: {
-							correction:
-								"The party reached Ash Court already; River Market was stale narration.",
-							currentLocation: "Ash Court",
-						},
-					});
-					assert(!correction.isError, "user_correction should succeed.");
-					assert(
-						readCommittedFlag(correction.structuredContent) === true,
-						"user_correction did not commit the corrected canon.",
-					);
-
-					const conflictingSync = await client.callTool({
-						name: "world_sync",
-						arguments: {
-							currentLocation: "River Market",
-						},
-					});
-					assert(
-						!conflictingSync.isError,
-						"Conflicting world_sync should fail conservatively instead of crashing.",
-					);
-					assert(
-						readCommittedFlag(conflictingSync.structuredContent) === false,
-						"Conflicting world_sync should not override explicit user correction.",
-					);
-				},
-			});
-
-			return "explicit user correction outranked later conflicting runtime sync";
-		});
-
-		await recordScenario(results, "incomplete workspace readiness", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "incomplete");
-			await copyFixture("incomplete", workspaceRoot);
-
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["init", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-
-			const readiness = JSON.parse(
-				await readFile(
-					path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
-					"utf8",
-				),
-			) as { status: string; gaps: string[] };
-			assert(
-				readiness.status === "needs-user-input",
-				"Incomplete workspace should remain needs-user-input.",
-			);
-			assert(
-				readiness.gaps.some((gap) => gap.includes("Current location is missing")),
-				"Incomplete workspace did not preserve the missing-location gap.",
-			);
-			return "incomplete workspace stays blocked instead of inventing readiness";
-		});
-
-		await recordScenario(results, "oversized and unsupported input handling", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "oversized");
-			await copyFixture("ready", workspaceRoot);
-			await writeFile(
-				path.join(workspaceRoot, "oversized-notes.md"),
-				"# Oversized\n\n" + "lore ".repeat(140_000),
-				"utf8",
-			);
-			await writeFile(
-				path.join(workspaceRoot, "ignored-art.png"),
-				Buffer.from([0, 1, 2, 3, 4, 5]),
-			);
-
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["init", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-
-			const readiness = JSON.parse(
-				await readFile(
-					path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
-					"utf8",
-				),
-			) as { status: string; gaps: string[] };
-			assert(
-				readiness.status === "ready-with-gaps",
-				"Oversized workspace should remain bootstrapped with explicit gaps.",
-			);
-			assert(
-				readiness.gaps.some((gap) => gap.includes("Skipped oversized source")),
-				"Oversized file was not surfaced as a readiness gap.",
-			);
-
-			const sourceIndex = JSON.parse(
-				await readFile(
-					path.join(workspaceRoot, ".bardo", "manifests", "source-index.json"),
-					"utf8",
-				),
-			) as { sources: Array<{ relativePath: string }> };
-			assert(
-				!sourceIndex.sources.some((source) => source.relativePath === "ignored-art.png"),
-				"Unsupported binary files should be ignored by the first-pass discovery index.",
-			);
-			return "oversized files are skipped safely and unsupported binaries are ignored";
-		});
-
-		await recordScenario(results, "corrupted artifact fails closed", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "corrupted");
-			await copyFixture("ready", workspaceRoot);
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["init", "--ruleset", "shadowdark"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-			await writeFile(
-				path.join(workspaceRoot, ".bardo", "state", "current-state.json"),
-				"{ this is not valid json",
-				"utf8",
-			);
-
-			await withMcpClient({
-				bardoBin,
-				workspaceRoot,
-				callback: async (client) => {
-					const result = await client.callTool({
-						name: "scene_turn",
-						arguments: { playerIntent: "Advance carefully." },
-					});
-					assert(
-						result.isError,
-						"Corrupted artifacts should fail closed instead of succeeding.",
-					);
-				},
-			});
-			return "corrupted runtime artifacts stop play instead of mutating canon";
-		});
-
-		await recordScenario(results, "repeated init/connect idempotency", async () => {
-			const workspaceRoot = path.join(workspacesRoot, "idempotent");
-			await copyFixture("ready", workspaceRoot);
-			await runCommand({
-				command: bardoBin,
-				commandArgs: ["login"],
-				cwd: workspaceRoot,
-				env: commonEnv(workspaceRoot),
-			});
-
-			for (let index = 0; index < 2; index += 1) {
 				await runCommand({
 					command: bardoBin,
 					commandArgs: ["init", "--ruleset", "shadowdark"],
 					cwd: workspaceRoot,
 					env: commonEnv(workspaceRoot),
 				});
+
+				const readiness = JSON.parse(
+					await readFile(
+						path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
+						"utf8",
+					),
+				) as { status: string; gaps: string[] };
+				assert(
+					readiness.status === "ready-with-gaps",
+					"Messy workspace should produce ready-with-gaps readiness.",
+				);
+				assert(
+					readiness.gaps.some((gap) => gap.includes("contradictory")),
+					"Messy workspace did not surface contradictory location gaps.",
+				);
+
+				await withMcpClient({
+					bardoBin,
+					workspaceRoot,
+					callback: async (client) => {
+						const validSync = await client.callTool({
+							name: "world_sync",
+							arguments: {
+								currentLocation: "River Market",
+								activeQuests: ["Find the ferryman before the eclipse"],
+								relevantFactions: ["Dock Wardens"],
+							},
+						});
+						assert(
+							!validSync.isError,
+							"Grounded world_sync unexpectedly failed.",
+						);
+						assert(
+							readCommittedFlag(validSync.structuredContent) === true,
+							"Grounded world_sync did not commit canon conservatively.",
+						);
+
+						const invalidSync = await client.callTool({
+							name: "world_sync",
+							arguments: {
+								currentLocation: "Moonlit Vault",
+							},
+						});
+						assert(
+							!invalidSync.isError,
+							"Ungrounded world_sync should return uncertainty, not crash.",
+						);
+						assert(
+							readCommittedFlag(invalidSync.structuredContent) === false,
+							"Ungrounded world_sync should not commit canon.",
+						);
+					},
+				});
+
+				return "messy readiness stayed explicit and runtime only committed grounded canon";
+			},
+		);
+
+		await recordScenario(
+			results,
+			"user correction precedence and continuity",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "correction-flow");
+				await copyFixture("ready", workspaceRoot);
+
 				await runCommand({
 					command: bardoBin,
-					commandArgs: ["connect", "--client", "codex", "--ruleset", "shadowdark"],
+					commandArgs: ["init", "--ruleset", "shadowdark"],
 					cwd: workspaceRoot,
 					env: commonEnv(workspaceRoot),
 				});
-			}
 
-			const manifest = JSON.parse(
-				await readFile(path.join(workspaceRoot, ".bardo", "manifest.json"), "utf8"),
-			) as { importedRulebooks?: string[] };
-			assert(
-				Array.isArray(manifest.importedRulebooks) &&
-					manifest.importedRulebooks.includes("rules/rulebook.md"),
-				"Repeated init/connect cycles lost the preserved rulebook import.",
-			);
-			return "repeated init/connect cycles remain stable";
-		});
+				await withMcpClient({
+					bardoBin,
+					workspaceRoot,
+					callback: async (client) => {
+						const correction = await client.callTool({
+							name: "user_correction",
+							arguments: {
+								correction:
+									"The party reached Ash Court already; River Market was stale narration.",
+								currentLocation: "Ash Court",
+							},
+						});
+						assert(!correction.isError, "user_correction should succeed.");
+						assert(
+							readCommittedFlag(correction.structuredContent) === true,
+							"user_correction did not commit the corrected canon.",
+						);
+
+						const conflictingSync = await client.callTool({
+							name: "world_sync",
+							arguments: {
+								currentLocation: "River Market",
+							},
+						});
+						assert(
+							!conflictingSync.isError,
+							"Conflicting world_sync should fail conservatively instead of crashing.",
+						);
+						assert(
+							readCommittedFlag(conflictingSync.structuredContent) === false,
+							"Conflicting world_sync should not override explicit user correction.",
+						);
+					},
+				});
+
+				return "explicit user correction outranked later conflicting runtime sync";
+			},
+		);
+
+		await recordScenario(
+			results,
+			"incomplete workspace readiness",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "incomplete");
+				await copyFixture("incomplete", workspaceRoot);
+
+				await runCommand({
+					command: bardoBin,
+					commandArgs: ["init", "--ruleset", "shadowdark"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+
+				const readiness = JSON.parse(
+					await readFile(
+						path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
+						"utf8",
+					),
+				) as { status: string; gaps: string[] };
+				assert(
+					readiness.status === "needs-user-input",
+					"Incomplete workspace should remain needs-user-input.",
+				);
+				assert(
+					readiness.gaps.some((gap) =>
+						gap.includes("Current location is missing"),
+					),
+					"Incomplete workspace did not preserve the missing-location gap.",
+				);
+				return "incomplete workspace stays blocked instead of inventing readiness";
+			},
+		);
+
+		await recordScenario(
+			results,
+			"oversized and unsupported input handling",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "oversized");
+				await copyFixture("ready", workspaceRoot);
+				await writeFile(
+					path.join(workspaceRoot, "oversized-notes.md"),
+					"# Oversized\n\n" + "lore ".repeat(140_000),
+					"utf8",
+				);
+				await writeFile(
+					path.join(workspaceRoot, "ignored-art.png"),
+					Buffer.from([0, 1, 2, 3, 4, 5]),
+				);
+
+				await runCommand({
+					command: bardoBin,
+					commandArgs: ["init", "--ruleset", "shadowdark"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+
+				const readiness = JSON.parse(
+					await readFile(
+						path.join(workspaceRoot, ".bardo", "manifests", "readiness.json"),
+						"utf8",
+					),
+				) as { status: string; gaps: string[] };
+				assert(
+					readiness.status === "ready-with-gaps",
+					"Oversized workspace should remain bootstrapped with explicit gaps.",
+				);
+				assert(
+					readiness.gaps.some((gap) =>
+						gap.includes("Skipped oversized source"),
+					),
+					"Oversized file was not surfaced as a readiness gap.",
+				);
+
+				const sourceIndex = JSON.parse(
+					await readFile(
+						path.join(
+							workspaceRoot,
+							".bardo",
+							"manifests",
+							"source-index.json",
+						),
+						"utf8",
+					),
+				) as { sources: Array<{ relativePath: string }> };
+				assert(
+					!sourceIndex.sources.some(
+						(source) => source.relativePath === "ignored-art.png",
+					),
+					"Unsupported binary files should be ignored by the first-pass discovery index.",
+				);
+				return "oversized files are skipped safely and unsupported binaries are ignored";
+			},
+		);
+
+		await recordScenario(
+			results,
+			"corrupted artifact fails closed",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "corrupted");
+				await copyFixture("ready", workspaceRoot);
+				await runCommand({
+					command: bardoBin,
+					commandArgs: ["init", "--ruleset", "shadowdark"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+				await writeFile(
+					path.join(workspaceRoot, ".bardo", "state", "current-state.json"),
+					"{ this is not valid json",
+					"utf8",
+				);
+
+				await withMcpClient({
+					bardoBin,
+					workspaceRoot,
+					callback: async (client) => {
+						const result = await client.callTool({
+							name: "scene_turn",
+							arguments: { playerIntent: "Advance carefully." },
+						});
+						assert(
+							result.isError,
+							"Corrupted artifacts should fail closed instead of succeeding.",
+						);
+					},
+				});
+				return "corrupted runtime artifacts stop play instead of mutating canon";
+			},
+		);
+
+		await recordScenario(
+			results,
+			"repeated init/connect idempotency",
+			async () => {
+				const workspaceRoot = path.join(workspacesRoot, "idempotent");
+				await copyFixture("ready", workspaceRoot);
+				await runCommand({
+					command: bardoBin,
+					commandArgs: ["login"],
+					cwd: workspaceRoot,
+					env: commonEnv(workspaceRoot),
+				});
+
+				for (let index = 0; index < 2; index += 1) {
+					await runCommand({
+						command: bardoBin,
+						commandArgs: ["init", "--ruleset", "shadowdark"],
+						cwd: workspaceRoot,
+						env: commonEnv(workspaceRoot),
+					});
+					await runCommand({
+						command: bardoBin,
+						commandArgs: [
+							"connect",
+							"--client",
+							"codex",
+							"--ruleset",
+							"shadowdark",
+						],
+						cwd: workspaceRoot,
+						env: commonEnv(workspaceRoot),
+					});
+				}
+
+				const manifest = JSON.parse(
+					await readFile(
+						path.join(workspaceRoot, ".bardo", "manifest.json"),
+						"utf8",
+					),
+				) as { importedRulebooks?: string[] };
+				assert(
+					Array.isArray(manifest.importedRulebooks) &&
+						manifest.importedRulebooks.includes("rules/rulebook.md"),
+					"Repeated init/connect cycles lost the preserved rulebook import.",
+				);
+				return "repeated init/connect cycles remain stable";
+			},
+		);
 	} finally {
 		supportServer.stop();
 	}

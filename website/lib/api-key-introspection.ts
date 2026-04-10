@@ -1,5 +1,5 @@
-import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
+import path from "node:path";
 
 /**
  * Creates a validator that checks an Authorization: Bearer <token> header
@@ -16,7 +16,9 @@ export function createIntrospectionSecretValidator(secret: string | undefined) {
 			return false;
 		}
 		const actual = Buffer.from(candidate);
-		return actual.length === expected.length && timingSafeEqual(actual, expected);
+		return (
+			actual.length === expected.length && timingSafeEqual(actual, expected)
+		);
 	}
 	return (headers: Headers): boolean => {
 		if (!trimmed) {

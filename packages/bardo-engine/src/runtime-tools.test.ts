@@ -77,13 +77,19 @@ async function seedRuntimeArtifacts(
 		}),
 		"utf8",
 	);
-	await writeFile(path.join(bardoRoot, "events/state-changes.ndjson"), "", "utf8");
+	await writeFile(
+		path.join(bardoRoot, "events/state-changes.ndjson"),
+		"",
+		"utf8",
+	);
 	return { bardoRoot };
 }
 
 describe("runtime tools", () => {
 	test("rejects direct commits that are not explicitly validated", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -106,7 +112,9 @@ describe("runtime tools", () => {
 	});
 
 	test("world_sync commits only grounded changes from campaign artifacts", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -129,7 +137,10 @@ describe("runtime tools", () => {
 			});
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as { currentLocation: string };
 			expect(currentState.currentLocation).toBe("Ash Court");
 
@@ -137,9 +148,9 @@ describe("runtime tools", () => {
 				path.join(bardoRoot, "events/state-changes.ndjson"),
 				"utf8",
 			);
-			expect(eventLog).toContain("\"validated\":true");
+			expect(eventLog).toContain('"validated":true');
 			expect(eventLog).toContain(
-				"\"canonBasis\":\"approved-resolved-consequence\"",
+				'"canonBasis":"approved-resolved-consequence"',
 			);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -147,7 +158,9 @@ describe("runtime tools", () => {
 	});
 
 	test("world_sync rejects ungrounded locations instead of mutating canon", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -166,13 +179,14 @@ describe("runtime tools", () => {
 				committed: false,
 			});
 			expect(result.uncertainties).toEqual(
-				expect.arrayContaining([
-					expect.stringContaining("Moonlit Vault"),
-				]),
+				expect.arrayContaining([expect.stringContaining("Moonlit Vault")]),
 			);
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as { currentLocation: string };
 			expect(currentState.currentLocation).toBe("River Market");
 
@@ -187,7 +201,9 @@ describe("runtime tools", () => {
 	});
 
 	test("player_action does not auto-commit canon from narration alone", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -208,13 +224,14 @@ describe("runtime tools", () => {
 				confidence: "conservative",
 			});
 			expect(result.uncertainties).toEqual(
-				expect.arrayContaining([
-					expect.stringContaining("validated"),
-				]),
+				expect.arrayContaining([expect.stringContaining("validated")]),
 			);
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as { recentEvents: string[] };
 			expect(currentState.recentEvents).toEqual([]);
 
@@ -229,7 +246,9 @@ describe("runtime tools", () => {
 	});
 
 	test("scene_turn surfaces the most relevant grounded rules for the current intent", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -281,9 +300,7 @@ describe("runtime tools", () => {
 				]),
 			);
 			expect(result.gmGuidance).toEqual(
-				expect.arrayContaining([
-					expect.stringContaining("Combat Procedure"),
-				]),
+				expect.arrayContaining([expect.stringContaining("Combat Procedure")]),
 			);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -291,7 +308,9 @@ describe("runtime tools", () => {
 	});
 
 	test("scene_turn ignores stop-word noise when ranking relevant rules", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -350,7 +369,9 @@ describe("runtime tools", () => {
 	});
 
 	test("scene_turn prefers no close rule match over a broad tag-only match", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -397,7 +418,9 @@ describe("runtime tools", () => {
 	});
 
 	test("player_action returns rule guidance when canon cannot advance yet", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -448,7 +471,9 @@ describe("runtime tools", () => {
 	});
 
 	test("blocked canon changes tell agents not to narrate unsupported proposals as fact", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -476,7 +501,9 @@ describe("runtime tools", () => {
 			});
 			expect(result.agentInstructions).toEqual(
 				expect.arrayContaining([
-					expect.stringContaining("Do not narrate blocked proposals as established fact"),
+					expect.stringContaining(
+						"Do not narrate blocked proposals as established fact",
+					),
 				]),
 			);
 		} finally {
@@ -485,7 +512,9 @@ describe("runtime tools", () => {
 	});
 
 	test("world_sync validates quest, faction, and event updates against campaign artifacts", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -523,7 +552,10 @@ describe("runtime tools", () => {
 			});
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as {
 				currentLocation: string;
 				activeQuests: string[];
@@ -542,7 +574,9 @@ describe("runtime tools", () => {
 	});
 
 	test("world_sync fails closed on contradictory grounded proposals", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -582,7 +616,10 @@ describe("runtime tools", () => {
 			);
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as { currentLocation: string; activeQuests: string[] };
 			expect(currentState.currentLocation).toBe("River Market");
 			expect(currentState.activeQuests).toEqual(["Find the ferryman"]);
@@ -592,7 +629,9 @@ describe("runtime tools", () => {
 	});
 
 	test("scene_turn fails closed on corrupted runtime artifacts", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -632,12 +671,17 @@ describe("runtime tools", () => {
 	});
 
 	test("user_correction commits explicit corrections at the highest precedence and blocks later conflicting syncs", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
 			const handlers = createRuntimeToolHandlers();
-			const correction = await requireRuntimeHandler(handlers, "user_correction")(
+			const correction = await requireRuntimeHandler(
+				handlers,
+				"user_correction",
+			)(
 				{
 					correction:
 						"The party is already at Ash Court; River Market was outdated session narration.",
@@ -668,7 +712,10 @@ describe("runtime tools", () => {
 			]);
 
 			const correctedState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as {
 				currentLocation: string;
 				activeCorrections: string[];
@@ -676,9 +723,7 @@ describe("runtime tools", () => {
 			};
 			expect(correctedState.currentLocation).toBe("Ash Court");
 			expect(correctedState.activeCorrections).toEqual(
-				expect.arrayContaining([
-					expect.stringContaining("Ash Court"),
-				]),
+				expect.arrayContaining([expect.stringContaining("Ash Court")]),
 			);
 			expect(correctedState.factsRevealed).toEqual(
 				expect.arrayContaining([
@@ -686,7 +731,10 @@ describe("runtime tools", () => {
 				]),
 			);
 
-			const conflictingSync = await requireRuntimeHandler(handlers, "world_sync")(
+			const conflictingSync = await requireRuntimeHandler(
+				handlers,
+				"world_sync",
+			)(
 				{ currentLocation: "River Market" },
 				{
 					workspaceRoot,
@@ -711,20 +759,25 @@ describe("runtime tools", () => {
 				path.join(bardoRoot, "events/state-changes.ndjson"),
 				"utf8",
 			);
-			expect(eventLog).toContain("\"canonBasis\":\"explicit-user-correction\"");
-			expect(eventLog).toContain("\"eventType\":\"user_correction\"");
+			expect(eventLog).toContain('"canonBasis":"explicit-user-correction"');
+			expect(eventLog).toContain('"eventType":"user_correction"');
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});
 
 	test("user_correction durably records a plain-language correction even without structured field overrides", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
 			const handlers = createRuntimeToolHandlers();
-			const correction = await requireRuntimeHandler(handlers, "user_correction")(
+			const correction = await requireRuntimeHandler(
+				handlers,
+				"user_correction",
+			)(
 				{
 					correction: "The ferryman is Maro, not Tavin.",
 				},
@@ -744,7 +797,10 @@ describe("runtime tools", () => {
 			});
 
 			const correctedState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as {
 				activeCorrections: string[];
 				currentLocation: string;
@@ -758,7 +814,7 @@ describe("runtime tools", () => {
 				path.join(bardoRoot, "events/state-changes.ndjson"),
 				"utf8",
 			);
-			expect(eventLog).toContain("\"canonBasis\":\"explicit-user-correction\"");
+			expect(eventLog).toContain('"canonBasis":"explicit-user-correction"');
 			expect(eventLog).toContain("The ferryman is Maro, not Tavin.");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -766,7 +822,9 @@ describe("runtime tools", () => {
 	});
 
 	test("simulation_tick commits validated world consequences for factions, NPC continuity, and clocks", async () => {
-		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-runtime-"));
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
 		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
 
 		try {
@@ -788,7 +846,9 @@ describe("runtime tools", () => {
 			const result = await requireRuntimeHandler(handlers, "simulation_tick")(
 				{
 					tickLabel: "Off-screen faction progress",
-					factionConsequences: ["Guild of Keys tightened patrols in Ash Court."],
+					factionConsequences: [
+						"Guild of Keys tightened patrols in Ash Court.",
+					],
 					npcAttitudes: { Mira: "wary" },
 					clockProgress: ["Eclipse Clock advanced to 2/6."],
 					factsRevealed: ["The ferryman answers to the Guild of Keys."],
@@ -811,7 +871,10 @@ describe("runtime tools", () => {
 			});
 
 			const currentState = JSON.parse(
-				await readFile(path.join(bardoRoot, "state/current-state.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
 			) as {
 				factionConsequences: string[];
 				clockProgress: string[];
@@ -821,7 +884,9 @@ describe("runtime tools", () => {
 				npcAttitudes: Record<string, string>;
 			};
 			expect(currentState.factionConsequences).toEqual(
-				expect.arrayContaining(["Guild of Keys tightened patrols in Ash Court."]),
+				expect.arrayContaining([
+					"Guild of Keys tightened patrols in Ash Court.",
+				]),
 			);
 			expect(currentState.clockProgress).toEqual(
 				expect.arrayContaining(["Eclipse Clock advanced to 2/6."]),

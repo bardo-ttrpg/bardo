@@ -1,12 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	rm,
+	writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { bootstrapImportedRulebook } from "./rules-bootstrap";
 
 describe("bootstrapImportedRulebook", () => {
 	test("creates normalized rule files, metadata, tags, and a depth recommendation", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-rules-bootstrap-"));
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-rules-bootstrap-"),
+		);
 		const bardoRoot = path.join(root, ".bardo");
 		const sourceRelativePath = "rules/rulebook.md";
 		const sourcePath = path.join(bardoRoot, sourceRelativePath);
@@ -63,7 +72,9 @@ describe("bootstrapImportedRulebook", () => {
 			expect(result.recommendedSimulationDepth).toBe("deep");
 			expect(result.indexPath).toBe("rules/normalized/index.json");
 
-			const normalizedEntries = await readdir(path.join(bardoRoot, "rules/normalized"));
+			const normalizedEntries = await readdir(
+				path.join(bardoRoot, "rules/normalized"),
+			);
 			expect(normalizedEntries).toEqual([
 				"01-character-creation.md",
 				"02-combat.md",
@@ -81,7 +92,10 @@ describe("bootstrapImportedRulebook", () => {
 			expect(combatRaw).not.toContain("LANTERN REALMS CORE RULES");
 
 			const index = JSON.parse(
-				await readFile(path.join(bardoRoot, "rules/normalized/index.json"), "utf8"),
+				await readFile(
+					path.join(bardoRoot, "rules/normalized/index.json"),
+					"utf8",
+				),
 			) as {
 				recommendedSimulationDepth: string;
 				simulationSignals: string[];
@@ -118,7 +132,9 @@ describe("bootstrapImportedRulebook", () => {
 	});
 
 	test("defaults simulation depth to standard when signals are low confidence", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-rules-bootstrap-"));
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-rules-bootstrap-"),
+		);
 		const bardoRoot = path.join(root, ".bardo");
 		const sourceRelativePath = "rules/rulebook.md";
 		const sourcePath = path.join(bardoRoot, sourceRelativePath);
@@ -151,7 +167,9 @@ describe("bootstrapImportedRulebook", () => {
 	});
 
 	test("replaces stale normalized files on re-run", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "bardo-rules-bootstrap-"));
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-rules-bootstrap-"),
+		);
 		const bardoRoot = path.join(root, ".bardo");
 		const sourceRelativePath = "rules/rulebook.md";
 		const sourcePath = path.join(bardoRoot, sourceRelativePath);
@@ -160,9 +178,17 @@ describe("bootstrapImportedRulebook", () => {
 			await mkdir(path.dirname(sourcePath), { recursive: true });
 			await writeFile(
 				sourcePath,
-				["# First Book", "", "## One", "", "Alpha.", "", "## Two", "", "Beta."].join(
-					"\n",
-				),
+				[
+					"# First Book",
+					"",
+					"## One",
+					"",
+					"Alpha.",
+					"",
+					"## Two",
+					"",
+					"Beta.",
+				].join("\n"),
 				"utf8",
 			);
 			await bootstrapImportedRulebook({
@@ -183,7 +209,9 @@ describe("bootstrapImportedRulebook", () => {
 			});
 
 			expect(result.sectionCount).toBe(1);
-			const normalizedEntries = await readdir(path.join(bardoRoot, "rules/normalized"));
+			const normalizedEntries = await readdir(
+				path.join(bardoRoot, "rules/normalized"),
+			);
 			expect(normalizedEntries).toEqual(["01-one.md", "index.json"]);
 		} finally {
 			await rm(root, { recursive: true, force: true });

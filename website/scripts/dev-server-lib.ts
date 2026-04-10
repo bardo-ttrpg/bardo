@@ -27,7 +27,10 @@ export function parseRequestedPort(
 	return parsed;
 }
 
-async function isPortAvailable(port: number, host = "127.0.0.1"): Promise<boolean> {
+async function isPortAvailable(
+	port: number,
+	host = "127.0.0.1",
+): Promise<boolean> {
 	return await new Promise((resolve) => {
 		const server = createServer();
 		server.once("error", () => resolve(false));

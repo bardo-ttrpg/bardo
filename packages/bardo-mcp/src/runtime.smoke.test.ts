@@ -302,7 +302,10 @@ describe("bardo runtime smoke gate", () => {
 			expect(stdout.read()).toContain("Connected Bardo to Gemini CLI");
 
 			const config = JSON.parse(
-				await readFile(path.join(workspaceRoot, ".gemini/settings.json"), "utf8"),
+				await readFile(
+					path.join(workspaceRoot, ".gemini/settings.json"),
+					"utf8",
+				),
 			) as {
 				mcpServers: Record<string, { command: string; args: string[] }>;
 			};

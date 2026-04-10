@@ -215,8 +215,7 @@ describe("docs content", () => {
 		).toBe(true);
 		expect(
 			searchDocsEntries("table authority").some(
-				(entry) =>
-					entry.href === "/docs/ruleset-mechanics#table-authority",
+				(entry) => entry.href === "/docs/ruleset-mechanics#table-authority",
 			),
 		).toBe(true);
 	});
@@ -252,14 +251,16 @@ describe("docs content", () => {
 	});
 
 	test("documents client-specific Bardo setup for current supported clients", () => {
-		expect(opencodeDocSource).toContain("does not set OpenCode’s `model` field");
+		expect(opencodeDocSource).toContain(
+			"does not set OpenCode’s `model` field",
+		);
 		expect(opencodeDocSource).toContain("opencode.json");
 		expect(opencodeDocSource).toContain("bardo connect --client opencode");
 		expect(geminiDocSource).toContain("bardo connect --client gemini");
 		expect(geminiDocSource).toContain(".gemini/settings.json");
 		expect(geminiDocSource).toContain("folder trust");
-		expect(geminiDocSource).toContain("\"mcpServers\"");
-		expect(geminiDocSource).toContain("\"command\": \"bardo\"");
+		expect(geminiDocSource).toContain('"mcpServers"');
+		expect(geminiDocSource).toContain('"command": "bardo"');
 	});
 
 	test("documents the rulebook bootstrap pipeline and generated outputs", () => {

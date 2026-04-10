@@ -186,7 +186,10 @@ const TERM_TO_TAGS = new Map<string, string[]>([
 	["travel", ["travel", "survival", "location"]],
 ]);
 
-export function createRuntimeToolHandlers(): Record<string, RuntimeToolHandler> {
+export function createRuntimeToolHandlers(): Record<
+	string,
+	RuntimeToolHandler
+> {
 	return {
 		init: async (_args, context) => {
 			const nowIso = context.nowIso ?? new Date().toISOString();
@@ -465,7 +468,10 @@ export function createRuntimeToolHandlers(): Record<string, RuntimeToolHandler> 
 					uncertainties: validation.uncertainties,
 					consultedArtifacts: validation.consultedArtifacts,
 					canonPrecedence: validation.precedence,
-					nextSteps: buildNextSteps(validation, deriveReadinessGuidance(artifacts.readiness)),
+					nextSteps: buildNextSteps(
+						validation,
+						deriveReadinessGuidance(artifacts.readiness),
+					),
 					agentInstructions: buildAgentInstructions({
 						mode: "blocked",
 					}),
@@ -530,7 +536,10 @@ export function createRuntimeToolHandlers(): Record<string, RuntimeToolHandler> 
 						uncertainties: validation.uncertainties,
 						consultedArtifacts: validation.consultedArtifacts,
 						canonPrecedence: validation.precedence,
-						nextSteps: buildNextSteps(validation, deriveReadinessGuidance(artifacts.readiness)),
+						nextSteps: buildNextSteps(
+							validation,
+							deriveReadinessGuidance(artifacts.readiness),
+						),
 						agentInstructions: buildAgentInstructions({
 							mode: "blocked",
 						}),
@@ -651,7 +660,9 @@ export async function commitStateChangingEvent(args: {
 		activeQuests:
 			args.event.changes.activeQuests ?? currentState.activeQuests ?? [],
 		relevantFactions:
-			args.event.changes.relevantFactions ?? currentState.relevantFactions ?? [],
+			args.event.changes.relevantFactions ??
+			currentState.relevantFactions ??
+			[],
 		recentEvents: unique([
 			...(currentState.recentEvents ?? []),
 			...(args.event.changes.recentEvents ?? []),
@@ -711,7 +722,9 @@ export async function commitStateChangingEvent(args: {
 	});
 	await writeFile(
 		eventLogPath,
-		existingLog.length > 0 ? `${existingLog.trimEnd()}\n${nextLine}\n` : `${nextLine}\n`,
+		existingLog.length > 0
+			? `${existingLog.trimEnd()}\n${nextLine}\n`
+			: `${nextLine}\n`,
 		"utf8",
 	);
 }
@@ -730,8 +743,8 @@ async function loadRuntimeArtifacts(
 
 	const rules = normalizeRuleIndex(
 		await readJsonFile<Record<string, unknown>>(
-		rulesIndexPath,
-		"rules bootstrap index",
+			rulesIndexPath,
+			"rules bootstrap index",
 		),
 		rulesIndexPath,
 	);
@@ -742,7 +755,10 @@ async function loadRuntimeArtifacts(
 		),
 	);
 	const readiness = normalizeReadiness(
-		await readJsonFile<Partial<ReadinessReport>>(readinessPath, "readiness report"),
+		await readJsonFile<Partial<ReadinessReport>>(
+			readinessPath,
+			"readiness report",
+		),
 		readinessPath,
 	);
 	const currentState = normalizeCurrentState(
@@ -753,7 +769,10 @@ async function loadRuntimeArtifacts(
 	);
 	const explicitCorrections = await loadExplicitCorrections(eventLogPath);
 
-	if (options.requireReadyForMutation && readiness.status === "needs-user-input") {
+	if (
+		options.requireReadyForMutation &&
+		readiness.status === "needs-user-input"
+	) {
 		throw new Error(
 			"Campaign readiness is needs-user-input. Finish bootstrap gaps before committing canon.",
 		);
@@ -786,10 +805,7 @@ async function loadCurrentState(bardoRoot: string): Promise<CurrentStateModel> {
 	);
 }
 
-async function readJsonFile<T>(
-	filePath: string,
-	label: string,
-): Promise<T> {
+async function readJsonFile<T>(filePath: string, label: string): Promise<T> {
 	const raw = await readFile(filePath, "utf8").catch((error: unknown) => {
 		if (
 			typeof error === "object" &&
@@ -853,7 +869,7 @@ function normalizeCurrentState(
 	return {
 		currentLocation:
 			typeof raw.currentLocation === "string" || raw.currentLocation === null
-				? raw.currentLocation ?? null
+				? (raw.currentLocation ?? null)
 				: null,
 		activeQuests: toStringArray(raw.activeQuests),
 		relevantFactions: toStringArray(raw.relevantFactions),
@@ -938,16 +954,15 @@ function validateStateProposal(args: {
 	const uncertainties: string[] = [];
 	const proposal = args.proposal;
 	if (!hasProposedChanges(proposal)) {
-		uncertainties.push(
-			"No grounded state change was proposed for validation.",
-		);
+		uncertainties.push("No grounded state change was proposed for validation.");
 	}
 
 	conflicts.push(
 		...detectExplicitCorrectionConflicts({
 			proposal,
 			explicitCorrections: args.artifacts.explicitCorrections,
-			allowExplicitCorrectionOverride: args.allowExplicitCorrectionOverride ?? false,
+			allowExplicitCorrectionOverride:
+				args.allowExplicitCorrectionOverride ?? false,
 		}),
 	);
 
@@ -965,7 +980,9 @@ function validateStateProposal(args: {
 			uncertainties.push(
 				`Refusing to commit "${proposal.currentLocation}" because it is not grounded in the campaign prep artifacts.`,
 			);
-		} else if (proposal.currentLocation !== args.artifacts.currentState.currentLocation) {
+		} else if (
+			proposal.currentLocation !== args.artifacts.currentState.currentLocation
+		) {
 			effectiveChanges.currentLocation = proposal.currentLocation;
 		}
 	}
@@ -1024,7 +1041,10 @@ function validateStateProposal(args: {
 				`Recent event proposals are not grounded in campaign artifacts: ${unknownEvents.join(", ")}.`,
 			);
 		} else if (
-			!sameStringArray(proposal.recentEvents, args.artifacts.currentState.recentEvents)
+			!sameStringArray(
+				proposal.recentEvents,
+				args.artifacts.currentState.recentEvents,
+			)
 		) {
 			effectiveChanges.recentEvents = proposal.recentEvents;
 		}
@@ -1055,7 +1075,10 @@ function validateStateProposal(args: {
 				knownFactions.length > 0 &&
 				!knownFactions.some((faction) => normalizeKey(value).includes(faction)),
 		);
-		if (unknownConsequences.length > 0 && !args.allowExplicitCorrectionOverride) {
+		if (
+			unknownConsequences.length > 0 &&
+			!args.allowExplicitCorrectionOverride
+		) {
 			conflicts.push(
 				`Faction consequences must name a grounded faction: ${unknownConsequences.join(", ")}.`,
 			);
@@ -1126,8 +1149,7 @@ function validateStateProposal(args: {
 	}
 
 	return {
-		validated:
-			conflicts.length === 0 && hasProposedChanges(effectiveChanges),
+		validated: conflicts.length === 0 && hasProposedChanges(effectiveChanges),
 		effectiveChanges,
 		conflicts,
 		uncertainties,
@@ -1224,11 +1246,13 @@ function selectRelevantRules(
 	artifacts: RuntimeArtifacts,
 ): RelevantRule[] {
 	const primaryTokens = extractQueryTokens(query);
-	const contextualTokens = extractQueryTokens([
-		artifacts.currentState.currentLocation ?? "",
-		...artifacts.currentState.activeQuests,
-		...artifacts.currentState.relevantFactions,
-	].join(" ")).filter((token) => !primaryTokens.includes(token));
+	const contextualTokens = extractQueryTokens(
+		[
+			artifacts.currentState.currentLocation ?? "",
+			...artifacts.currentState.activeQuests,
+			...artifacts.currentState.relevantFactions,
+		].join(" "),
+	).filter((token) => !primaryTokens.includes(token));
 	if (primaryTokens.length === 0 && contextualTokens.length === 0) {
 		return [];
 	}
@@ -1318,12 +1342,17 @@ function selectRelevantRules(
 			return bestScore > 0 && section.score >= Math.max(6, bestScore - 6);
 		})
 		.slice(0, 3)
-		.map(({ directScore: _directScore, tagScore: _tagScore, ...section }) => section);
+		.map(
+			({ directScore: _directScore, tagScore: _tagScore, ...section }) =>
+				section,
+		);
 }
 
 function deriveReadinessGuidance(readiness: ReadinessReport): string[] {
 	if (readiness.status === "ready" && readiness.gaps.length === 0) {
-		return ["Campaign prep is ready. Canon can advance once a grounded change is validated."];
+		return [
+			"Campaign prep is ready. Canon can advance once a grounded change is validated.",
+		];
 	}
 
 	const guidance = readiness.gaps.map((gap) => `Resolve readiness gap: ${gap}`);
@@ -1519,7 +1548,9 @@ async function loadExplicitCorrections(
 		throw error;
 	});
 	const overlay: StateChangeEvent["changes"] = {};
-	for (const line of raw.split(/\r?\n/).filter((entry) => entry.trim().length > 0)) {
+	for (const line of raw
+		.split(/\r?\n/)
+		.filter((entry) => entry.trim().length > 0)) {
 		let parsed: Record<string, unknown>;
 		try {
 			parsed = JSON.parse(line) as Record<string, unknown>;
@@ -1530,7 +1561,10 @@ async function loadExplicitCorrections(
 				}`,
 			);
 		}
-		if (parsed.validated !== true || parsed.canonBasis !== "explicit-user-correction") {
+		if (
+			parsed.validated !== true ||
+			parsed.canonBasis !== "explicit-user-correction"
+		) {
 			continue;
 		}
 		const changes =

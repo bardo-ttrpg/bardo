@@ -189,7 +189,9 @@ describe("bardo mcp serve integration", () => {
 			).toBe(true);
 			expect(tools.tools.some((tool) => tool.name === "init")).toBe(true);
 			expect(tools.tools.some((tool) => tool.name === "scene_turn")).toBe(true);
-			expect(tools.tools.some((tool) => tool.name === "player_action")).toBe(true);
+			expect(tools.tools.some((tool) => tool.name === "player_action")).toBe(
+				true,
+			);
 			expect(tools.tools.some((tool) => tool.name === "user_correction")).toBe(
 				true,
 			);
@@ -200,9 +202,9 @@ describe("bardo mcp serve integration", () => {
 			expect(
 				tools.tools.some((tool) => tool.name === "bardo_workspace_write_text"),
 			).toBe(false);
-			expect(tools.tools.some((tool) => tool.name === "remote_echo_workspace")).toBe(
-				false,
-			);
+			expect(
+				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
+			).toBe(false);
 		} finally {
 			await client.close();
 		}
@@ -266,7 +268,7 @@ describe("bardo mcp serve integration", () => {
 				.map((part) => part.text)
 				.join("\n");
 
-			expect(text).toContain("\"initialized\"");
+			expect(text).toContain('"initialized"');
 			expect(text).toContain(clientWorkspace);
 		} finally {
 			await client.close();
@@ -410,9 +412,9 @@ describe("bardo mcp serve integration", () => {
 			expect(
 				tools.tools.some((tool) => tool.name === "bardo_workspace_write_text"),
 			).toBe(true);
-			expect(tools.tools.some((tool) => tool.name === "remote_echo_workspace")).toBe(
-				false,
-			);
+			expect(
+				tools.tools.some((tool) => tool.name === "remote_echo_workspace"),
+			).toBe(false);
 
 			const bootstrap = await client.callTool({
 				name: "bardo_workspace_bootstrap",

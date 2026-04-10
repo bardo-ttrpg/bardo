@@ -1,6 +1,7 @@
 import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
 import {
 	type AutoInstallConnectionClient,
 	buildInstallConfigContent,
@@ -22,7 +23,6 @@ import {
 	startLocalMcpServer,
 } from "./local-mcp";
 import { normalizePlan, type PlanTier } from "./plan-utils";
-import { bootstrapCampaignWorkspace } from "@bardo/engine/campaign-bootstrap";
 import { bootstrapImportedRulebook } from "./rules-bootstrap";
 import {
 	migrateSavedConfig,
@@ -952,7 +952,9 @@ async function handleInit(
 			importedRulebooks,
 			nowIso: now,
 		});
-		const manifest = await readExistingJson(path.join(bardoRoot, "manifest.json"));
+		const manifest = await readExistingJson(
+			path.join(bardoRoot, "manifest.json"),
+		);
 		const rulebookBootstrap =
 			typeof manifest?.rulebookBootstrap === "object" &&
 			manifest.rulebookBootstrap !== null
@@ -964,7 +966,7 @@ async function handleInit(
 			typeof rulebookBootstrap.recommendedSimulationDepth === "string"
 				? `; normalized ${String(rulebookBootstrap.sectionCount)} rule section(s) with ${String(
 						rulebookBootstrap.recommendedSimulationDepth,
-				  )} simulation depth`
+					)} simulation depth`
 				: "";
 		stdout.write(
 			`Initialized Bardo workspace at ${bardoRoot} (${createdDirectories.length} directories ensured${summarySuffix})\n`,
@@ -1717,7 +1719,10 @@ async function ensureWorkspaceCoreFiles(args: {
 	};
 
 	await writeJsonFile(manifestPath, nextManifest);
-	await ensureFile(path.join(args.bardoRoot, "events/state-changes.ndjson"), "");
+	await ensureFile(
+		path.join(args.bardoRoot, "events/state-changes.ndjson"),
+		"",
+	);
 	await ensureWorkspaceLocalDocs({
 		bardoRoot: args.bardoRoot,
 		workspaceRoot: args.workspaceRoot,
@@ -2078,18 +2083,14 @@ function resolveApprovedInteractivePayload(
 		statusUrl:
 			typeof pollBody.statusUrl === "string" ? pollBody.statusUrl : undefined,
 		refreshUrl:
-			typeof pollBody.refreshUrl === "string"
-				? pollBody.refreshUrl
-				: undefined,
+			typeof pollBody.refreshUrl === "string" ? pollBody.refreshUrl : undefined,
 		accountLabel:
 			typeof pollBody.accountLabel === "string"
 				? pollBody.accountLabel
 				: undefined,
 		plan: normalizePlan(pollBody.plan) ?? undefined,
 		serverName:
-			typeof pollBody.serverName === "string"
-				? pollBody.serverName
-				: undefined,
+			typeof pollBody.serverName === "string" ? pollBody.serverName : undefined,
 	};
 }
 

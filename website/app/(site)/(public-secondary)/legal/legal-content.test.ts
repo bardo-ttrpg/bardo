@@ -35,9 +35,12 @@ describe("legal content", () => {
 			"/legal/data-use",
 			"/legal/security",
 		]);
-		expect(
-			listLegalEntries().map((entry) => entry.navigationLabel),
-		).toEqual(["Terms", "Privacy", "Data Use", "Security"]);
+		expect(listLegalEntries().map((entry) => entry.navigationLabel)).toEqual([
+			"Terms",
+			"Privacy",
+			"Data Use",
+			"Security",
+		]);
 		expect(legalIndexSource).toContain('permanentRedirect("/legal/terms")');
 		expect(privacySource).toContain("What Bardo collects");
 		expect(termsSource).toContain("Acceptable use");

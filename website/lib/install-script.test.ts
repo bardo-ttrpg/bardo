@@ -8,7 +8,9 @@ describe("install scripts", () => {
 	test("renders a unix installer that prefers release binaries with checksum verification", () => {
 		const script = renderUnixInstallScript();
 
-		expect(script).toContain("https://github.com/armando-andre/bardo/releases/download/");
+		expect(script).toContain(
+			"https://github.com/armando-andre/bardo/releases/download/",
+		);
 		expect(script).toContain("SHA256SUMS.txt");
 		expect(script).toContain("sha256sum");
 		expect(script).toContain("BARDO_INSTALL_MODE");
@@ -20,7 +22,9 @@ describe("install scripts", () => {
 	test("renders a powershell installer that prefers release binaries with checksum verification", () => {
 		const script = renderPowerShellInstallScript();
 
-		expect(script).toContain("https://github.com/armando-andre/bardo/releases/download/");
+		expect(script).toContain(
+			"https://github.com/armando-andre/bardo/releases/download/",
+		);
 		expect(script).toContain("SHA256SUMS.txt");
 		expect(script).toContain("Get-FileHash");
 		expect(script).toContain("$installMode");
@@ -33,7 +37,9 @@ describe("install scripts", () => {
 		const unixScript = renderUnixInstallScript();
 		const powershellScript = renderPowerShellInstallScript();
 
-		expect(unixScript).toContain(`INSTALL_MODE="\${BARDO_INSTALL_MODE:-binary}"`);
+		expect(unixScript).toContain(
+			`INSTALL_MODE="\${BARDO_INSTALL_MODE:-binary}"`,
+		);
 		expect(unixScript).toContain('if [ "$INSTALL_MODE" = "source" ]');
 		expect(unixScript).toContain("install_from_source");
 		expect(unixScript).toContain("bun install --frozen-lockfile");

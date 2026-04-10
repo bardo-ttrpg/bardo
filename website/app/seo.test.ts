@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { listLegalEntries } from "../content/legal-content";
 import { listBlogEntries, listDocsEntries } from "../content/site-content";
-import { getDocsBreadcrumbJsonLd, getLegalBreadcrumbJsonLd } from "../lib/site-seo";
+import {
+	getDocsBreadcrumbJsonLd,
+	getLegalBreadcrumbJsonLd,
+} from "../lib/site-seo";
 import manifest from "./manifest";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -129,7 +132,9 @@ describe("SEO and production metadata", () => {
 		for (const expected of expectedRoutes) {
 			expect(entries.includes(expected)).toBe(true);
 		}
-		expect(entries.includes("https://www.bardo.gg/legal/ai-policy")).toBe(false);
+		expect(entries.includes("https://www.bardo.gg/legal/ai-policy")).toBe(
+			false,
+		);
 	});
 
 	test("publishes a web manifest aligned with the public product surface", () => {

@@ -29,7 +29,7 @@ const STOP_WORDS = new Set([
 	"or",
 	"that",
 	"the",
-		"their",
+	"their",
 	"there",
 	"these",
 	"this",
@@ -94,20 +94,38 @@ const TAG_PATTERNS: Array<{ tag: string; patterns: RegExp[] }> = [
 		tag: "character-creation",
 		patterns: [/\bcharacter creation\b/i, /\bcreate(?:s|d)? a character\b/i],
 	},
-	{ tag: "core-resolution", patterns: [/\bresolution\b/i, /\bskill check\b/i, /\btest\b/i, /\broll\b/i] },
-	{ tag: "core-concepts", patterns: [/\bcore concepts?\b/i, /\bfundamentals?\b/i] },
-	{ tag: "attribute", patterns: [/\battributes?\b/i, /\bability scores?\b/i, /\bstats?\b/i] },
+	{
+		tag: "core-resolution",
+		patterns: [/\bresolution\b/i, /\bskill check\b/i, /\btest\b/i, /\broll\b/i],
+	},
+	{
+		tag: "core-concepts",
+		patterns: [/\bcore concepts?\b/i, /\bfundamentals?\b/i],
+	},
+	{
+		tag: "attribute",
+		patterns: [/\battributes?\b/i, /\bability scores?\b/i, /\bstats?\b/i],
+	},
 	{ tag: "skill", patterns: [/\bskills?\b/i, /\bproficienc(?:y|ies)\b/i] },
 	{ tag: "background", patterns: [/\bbackgrounds?\b/i, /\borigins?\b/i] },
-	{ tag: "class", patterns: [/\bclasses?\b/i, /\barchetypes?\b/i, /\bjobs?\b/i] },
+	{
+		tag: "class",
+		patterns: [/\bclasses?\b/i, /\barchetypes?\b/i, /\bjobs?\b/i],
+	},
 	{ tag: "species", patterns: [/\bspecies\b/i, /\brace\b/i] },
 	{ tag: "ancestry", patterns: [/\bancestr(?:y|ies)\b/i, /\blineage\b/i] },
 	{ tag: "combat", patterns: [/\bcombat\b/i, /\bbattle\b/i] },
 	{ tag: "initiative", patterns: [/\binitiative\b/i, /\bturn order\b/i] },
 	{ tag: "attack", patterns: [/\battacks?\b/i, /\bstrike\b/i, /\bto hit\b/i] },
 	{ tag: "damage", patterns: [/\bdamage\b/i, /\bwounds?\b/i] },
-	{ tag: "defense", patterns: [/\bdefen[cs]e\b/i, /\barmor class\b/i, /\bac\b/i] },
-	{ tag: "movement", patterns: [/\bmovement\b/i, /\bspeed\b/i, /\bposition(?:ing)?\b/i] },
+	{
+		tag: "defense",
+		patterns: [/\bdefen[cs]e\b/i, /\barmor class\b/i, /\bac\b/i],
+	},
+	{
+		tag: "movement",
+		patterns: [/\bmovement\b/i, /\bspeed\b/i, /\bposition(?:ing)?\b/i],
+	},
 	{ tag: "condition", patterns: [/\bconditions?\b/i] },
 	{ tag: "status-effect", patterns: [/\bstatus effects?\b/i] },
 	{ tag: "magic", patterns: [/\bmagic\b/i, /\bspellcasting\b/i] },
@@ -127,22 +145,34 @@ const TAG_PATTERNS: Array<{ tag: string; patterns: RegExp[] }> = [
 	{ tag: "advancement", patterns: [/\badvancement\b/i, /\bprogression\b/i] },
 	{ tag: "leveling", patterns: [/\blevel(?:ing|ling)?\b/i, /\blevel up\b/i] },
 	{ tag: "experience", patterns: [/\bexperience\b/i, /\bxp\b/i] },
-	{ tag: "social", patterns: [/\bsocial\b/i, /\binfluence\b/i, /\bpersuasion\b/i] },
+	{
+		tag: "social",
+		patterns: [/\bsocial\b/i, /\binfluence\b/i, /\bpersuasion\b/i],
+	},
 	{ tag: "reputation", patterns: [/\breputation\b/i, /\brenown\b/i] },
 	{ tag: "faction", patterns: [/\bfactions?\b/i, /\bguilds?\b/i] },
 	{ tag: "law", patterns: [/\blaw\b/i, /\blegal\b/i] },
 	{ tag: "religion", patterns: [/\breligion\b/i, /\bfaith\b/i, /\bchurch\b/i] },
-	{ tag: "economy", patterns: [/\beconom(?:y|ic)\b/i, /\btrade\b/i, /\bmarket\b/i] },
+	{
+		tag: "economy",
+		patterns: [/\beconom(?:y|ic)\b/i, /\btrade\b/i, /\bmarket\b/i],
+	},
 	{ tag: "world", patterns: [/\bworld\b/i, /\bsetting\b/i, /\blore\b/i] },
 	{ tag: "location", patterns: [/\blocations?\b/i, /\bregions?\b/i] },
-	{ tag: "settlement", patterns: [/\bsettlements?\b/i, /\btowns?\b/i, /\bcities\b/i] },
+	{
+		tag: "settlement",
+		patterns: [/\bsettlements?\b/i, /\btowns?\b/i, /\bcities\b/i],
+	},
 	{ tag: "npc", patterns: [/\bnpcs?\b/i, /\bnon-player characters?\b/i] },
 	{ tag: "creature", patterns: [/\bcreatures?\b/i] },
 	{ tag: "monster", patterns: [/\bmonsters?\b/i] },
 	{ tag: "enemy", patterns: [/\benemies\b/i, /\badversaries\b/i] },
 	{ tag: "boss", patterns: [/\bboss(?:es)?\b/i] },
 	{ tag: "quest", patterns: [/\bquests?\b/i, /\bmissions?\b/i] },
-	{ tag: "glossary", patterns: [/\bglossary\b/i, /\bterms\b/i, /\bdefinitions\b/i] },
+	{
+		tag: "glossary",
+		patterns: [/\bglossary\b/i, /\bterms\b/i, /\bdefinitions\b/i],
+	},
 ];
 
 function sha256(input: string): string {
@@ -313,19 +343,24 @@ function deriveSections(raw: string, fallbackTitle: string): RawSection[] {
 		];
 	}
 	const preambleStart =
-		headings.find((heading) => heading.title === documentTitle)?.lineIndex ?? -1;
+		headings.find((heading) => heading.title === documentTitle)?.lineIndex ??
+		-1;
 	const preamble = trimSectionBody(
-		lines.slice(Math.max(0, preambleStart + 1), firstSplit.lineIndex).join("\n"),
+		lines
+			.slice(Math.max(0, preambleStart + 1), firstSplit.lineIndex)
+			.join("\n"),
 	);
 	const significantPreamble = preamble.length >= 120 ? preamble : null;
-	const carriedPreamble = preamble.length > 0 && preamble.length < 120 ? preamble : null;
+	const carriedPreamble =
+		preamble.length > 0 && preamble.length < 120 ? preamble : null;
 
 	const sections = splitHeadings.map((heading, index) => {
 		const nextLine = splitHeadings[index + 1]?.lineIndex ?? lines.length;
 		const rawBody = trimSectionBody(
 			lines.slice(heading.lineIndex + 1, nextLine).join("\n"),
 		);
-		const prefix = index === 0 && carriedPreamble ? `${carriedPreamble}\n\n` : "";
+		const prefix =
+			index === 0 && carriedPreamble ? `${carriedPreamble}\n\n` : "";
 		return {
 			title: heading.title,
 			parentHeading: heading.parentHeading,
@@ -348,16 +383,21 @@ function deriveSections(raw: string, fallbackTitle: string): RawSection[] {
 }
 
 function toSlug(input: string): string {
-	return input
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.replace(/-{2,}/g, "-")
-		.slice(0, 80) || "section";
+	return (
+		input
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.replace(/-{2,}/g, "-")
+			.slice(0, 80) || "section"
+	);
 }
 
 function detectTables(content: string): boolean {
-	return /^\|.+\|\s*$/m.test(content) && /^\|(?:\s*:?-{3,}:?\s*\|)+\s*$/m.test(content);
+	return (
+		/^\|.+\|\s*$/m.test(content) &&
+		/^\|(?:\s*:?-{3,}:?\s*\|)+\s*$/m.test(content)
+	);
 }
 
 function detectExamples(content: string): boolean {
@@ -365,14 +405,21 @@ function detectExamples(content: string): boolean {
 }
 
 function detectExceptions(content: string): boolean {
-	return /\bexception\b/i.test(content) || /\bunless\b/i.test(content) || /\boverride\b/i.test(content);
+	return (
+		/\bexception\b/i.test(content) ||
+		/\bunless\b/i.test(content) ||
+		/\boverride\b/i.test(content)
+	);
 }
 
 function sentenceSummary(content: string, fallbackTitle: string): string {
 	const bodyLines = content
 		.split("\n")
 		.map((line) => line.trim())
-		.filter((line) => line.length > 0 && !line.startsWith("#") && !line.startsWith("|"));
+		.filter(
+			(line) =>
+				line.length > 0 && !line.startsWith("#") && !line.startsWith("|"),
+		);
 	for (const line of bodyLines) {
 		const sentence = line.match(/[^.!?]+[.!?]?/)?.[0]?.trim();
 		if (sentence && sentence.length >= 24) {
@@ -395,7 +442,9 @@ function extractKeywords(title: string, content: string): string[] {
 	boost(title, 3);
 	boost(content, 1);
 	return [...counts.entries()]
-		.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+		.sort(
+			(left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+		)
 		.slice(0, 6)
 		.map(([token]) => token);
 }
@@ -422,7 +471,11 @@ function deriveDomainTags(title: string, content: string): string[] {
 	return tags;
 }
 
-function deriveCrossReferences(content: string, titles: string[], ownTitle: string): string[] {
+function deriveCrossReferences(
+	content: string,
+	titles: string[],
+	ownTitle: string,
+): string[] {
 	const normalizedContent = content.toLowerCase();
 	const matches = titles.filter((title) => {
 		if (title === ownTitle) {
@@ -439,7 +492,8 @@ function limitTags(args: {
 	hasExamples: boolean;
 	hasExceptions: boolean;
 }): string[] {
-	const tags = args.domainTags.length > 0 ? [...args.domainTags] : ["core-concepts"];
+	const tags =
+		args.domainTags.length > 0 ? [...args.domainTags] : ["core-concepts"];
 	for (const extra of [
 		args.hasTables ? "table" : null,
 		args.hasExamples ? "example" : null,
@@ -527,7 +581,9 @@ function inferSimulationProfile(entries: SectionIndexEntry[]): {
 		recommendedSimulationDepth = "light";
 		signals.push("rules emphasis is mostly immediate action resolution");
 	} else {
-		signals.push("signals are mixed or sparse, so bootstrap defaults to standard");
+		signals.push(
+			"signals are mixed or sparse, so bootstrap defaults to standard",
+		);
 	}
 
 	const likelyGameSystemStructure =
@@ -581,7 +637,9 @@ function renderNormalizedSectionMarkdown(args: {
 	return `${frontmatter.join("\n")}# ${args.title}\n\n${args.content.trim()}\n`;
 }
 
-async function clearManagedNormalizedOutputs(normalizedRoot: string): Promise<void> {
+async function clearManagedNormalizedOutputs(
+	normalizedRoot: string,
+): Promise<void> {
 	const entries = await readdir(normalizedRoot, { withFileTypes: true }).catch(
 		(error: unknown) => {
 			if (
@@ -615,7 +673,10 @@ export async function bootstrapImportedRulebook(args: {
 }): Promise<RulebookBootstrapResult> {
 	const sourcePath = path.join(args.bardoRoot, args.sourceRelativePath);
 	const raw = await readFile(sourcePath, "utf8");
-	const fallbackTitle = path.basename(args.sourceRelativePath, path.extname(args.sourceRelativePath));
+	const fallbackTitle = path.basename(
+		args.sourceRelativePath,
+		path.extname(args.sourceRelativePath),
+	);
 	const rawSections = deriveSections(raw, fallbackTitle);
 	const titles = rawSections.map((section) => section.title);
 	const normalizedRoot = path.join(args.bardoRoot, NORMALIZED_RULES_DIR);
@@ -637,7 +698,11 @@ export async function bootstrapImportedRulebook(args: {
 		});
 		const filename = `${String(index + 1).padStart(2, "0")}-${toSlug(section.title)}.md`;
 		const summary = sentenceSummary(section.body, section.title);
-		const crossReferences = deriveCrossReferences(section.body, titles, section.title);
+		const crossReferences = deriveCrossReferences(
+			section.body,
+			titles,
+			section.title,
+		);
 		const entry: SectionIndexEntry = {
 			order: index + 1,
 			title: section.title,
@@ -648,7 +713,9 @@ export async function bootstrapImportedRulebook(args: {
 			hasTables,
 			hasExamples,
 			hasExceptions,
-			...(section.parentHeading ? { parentHeading: section.parentHeading } : {}),
+			...(section.parentHeading
+				? { parentHeading: section.parentHeading }
+				: {}),
 			...(crossReferences.length > 0 ? { crossReferences } : {}),
 		};
 		sections.push(entry);
