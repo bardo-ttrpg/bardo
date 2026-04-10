@@ -72,9 +72,9 @@ describe("bootstrapImportedRulebook", () => {
 			expect(result.recommendedSimulationDepth).toBe("deep");
 			expect(result.indexPath).toBe("rules/normalized/index.json");
 
-			const normalizedEntries = await readdir(
-				path.join(bardoRoot, "rules/normalized"),
-			);
+			const normalizedEntries = (
+				await readdir(path.join(bardoRoot, "rules/normalized"))
+			).sort();
 			expect(normalizedEntries).toEqual([
 				"01-character-creation.md",
 				"02-combat.md",
@@ -209,9 +209,9 @@ describe("bootstrapImportedRulebook", () => {
 			});
 
 			expect(result.sectionCount).toBe(1);
-			const normalizedEntries = await readdir(
-				path.join(bardoRoot, "rules/normalized"),
-			);
+			const normalizedEntries = (
+				await readdir(path.join(bardoRoot, "rules/normalized"))
+			).sort();
 			expect(normalizedEntries).toEqual(["01-one.md", "index.json"]);
 		} finally {
 			await rm(root, { recursive: true, force: true });
