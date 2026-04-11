@@ -78,6 +78,11 @@ export default function OpenGraphImage() {
 				<span>Local Truth</span>
 			</div>
 		</div>,
-		size,
+		{
+			...size,
+			headers: {
+				"Cross-Origin-Resource-Policy": "cross-origin",
+			},
+		},
 	);
 }

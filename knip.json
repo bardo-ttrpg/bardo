@@ -1,6 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@latest/schema.json",
-	"ignoreDependencies": ["turbo"],
+	"ignoreDependencies": ["turbo", "husky"],
 	"workspaces": {
 		".": {
 			"entry": ["scripts/**/*.{js,cjs,mjs,ts}"],

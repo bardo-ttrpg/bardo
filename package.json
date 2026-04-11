@@ -60,7 +60,7 @@
 		"biome:write": "biome check --write .",
 		"dev:website": "\"${npm_execpath:-bun}\" run ./scripts/run-turbo.ts dev --filter=website",
 		"dev:bridge": "\"${npm_execpath:-bun}\" run ./scripts/run-turbo.ts dev --filter=@bardo/mcp",
-		"prepare": "husky"
+		"prepare": "\"${npm_execpath:-bun}\" run ./scripts/prepare-husky.ts"
 	},
 	"devDependencies": {
 		"@modelcontextprotocol/sdk": "^1.29.0",

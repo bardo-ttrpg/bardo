@@ -78,6 +78,11 @@ export default function TwitterImage() {
 				<span>Local Files</span>
 			</div>
 		</div>,
-		size,
+		{
+			...size,
+			headers: {
+				"Cross-Origin-Resource-Policy": "cross-origin",
+			},
+		},
 	);
 }
