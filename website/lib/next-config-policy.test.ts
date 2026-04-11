@@ -29,7 +29,7 @@ describe("resolveSecurityHeaders", () => {
 
 		expect(csp?.value).toContain("script-src 'self' 'unsafe-inline' https:");
 		expect(csp?.value).not.toContain("'unsafe-eval'");
-		expect(csp?.value).not.toContain("worker-src 'self' blob:");
+		expect(csp?.value).toContain("worker-src 'self' blob: https:");
 		expect(csp?.value).toContain("upgrade-insecure-requests");
 	});
 

@@ -44,15 +44,7 @@ function ResolvedHomePrimaryAction() {
 
 	if (actionState === "pending") {
 		return (
-			<Button
-				size="sm"
-				variant="outline"
-				disabled
-				aria-busy="true"
-				className={`${homeActionOutlineClassName} text-muted-foreground opacity-100`}
-			>
-				Account
-			</Button>
+			<PrimaryHomeLink href="/dashboard">Account</PrimaryHomeLink>
 		);
 	}
 

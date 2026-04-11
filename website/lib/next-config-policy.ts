@@ -58,6 +58,9 @@ export function resolveSecurityHeaders(
 	const connectSrc = isProduction
 		? "connect-src 'self' https:"
 		: "connect-src 'self' http: https: ws: wss:";
+	// Clerk's production client uses a blob-backed worker during bootstrap.
+	// If worker-src falls back to script-src, auth can fail to initialize and
+	// leave sign-in/dashboard flows stuck in a loading state.
 	const cspParts = [
 		"default-src 'self'",
 		"base-uri 'self'",
@@ -68,11 +71,9 @@ export function resolveSecurityHeaders(
 		"style-src 'self' 'unsafe-inline' https:",
 		scriptSrc,
 		connectSrc,
+		"worker-src 'self' blob: https:",
 		"frame-src 'self' https:",
 	];
-	if (!isProduction) {
-		cspParts.push("worker-src 'self' blob:");
-	}
 	if (isProduction) {
 		cspParts.push("upgrade-insecure-requests");
 	}
