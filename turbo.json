@@ -123,6 +123,9 @@
 		"check:react-doctor": {
 			"outputs": []
 		},
+		"check:vercel-doctor": {
+			"outputs": []
+		},
 		"build:analyze": {
 			"outputs": ["dist/**"]
 		},

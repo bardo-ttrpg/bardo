@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
 import { TransitionLink } from "@/components/transition-link";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { resolveSubscriptionDetailsRenderState } from "./billing-cta-state";
 import SubscriptionDetailsAction from "./subscription-details-action";
 
@@ -27,16 +27,12 @@ export default function SubscriptionDetailsCta({
 
 function EnabledSubscriptionDetailsCta({ className }: { className: string }) {
 	const { isLoaded, isSignedIn } = useAuth();
-	const [isHydrated, setIsHydrated] = useState(false);
+	const isHydrated = useHydrated();
 	const renderState = resolveSubscriptionDetailsRenderState({
 		isHydrated,
 		isLoaded: isLoaded ?? false,
 		isSignedIn: isSignedIn ?? false,
 	});
-
-	useEffect(() => {
-		setIsHydrated(true);
-	}, []);
 
 	return (
 		<div className="mt-4 flex justify-center">

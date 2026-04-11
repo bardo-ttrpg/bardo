@@ -6,6 +6,7 @@ import {
 	readExistingWebsiteDevServer,
 	resolveWebsiteDevPort,
 } from "./dev-server-lib";
+import { normalizeNextEnvFile } from "./next-env-lib";
 
 const cwd = process.cwd();
 const existingServer = await readExistingWebsiteDevServer(cwd);
@@ -58,4 +59,5 @@ const exitCode = await new Promise<number>((resolve, reject) => {
 	});
 });
 
+await normalizeNextEnvFile(cwd);
 process.exit(exitCode);

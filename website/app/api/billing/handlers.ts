@@ -54,13 +54,20 @@ export function createBillingGetHandler(
 
 		const billing = await deps.readBillingSnapshot(userId);
 
-		return NextResponse.json({
-			billing,
-			accessPolicy: {
-				subscribed: billing.plan === "solo",
-				mcpPeriodLimit: mcpPeriodLimitForPlan(billing.plan),
+		return NextResponse.json(
+			{
+				billing,
+				accessPolicy: {
+					subscribed: billing.plan === "solo",
+					mcpPeriodLimit: mcpPeriodLimitForPlan(billing.plan),
+				},
 			},
-		});
+			{
+				headers: {
+					"Cache-Control": "private, no-store, max-age=0",
+				},
+			},
+		);
 	};
 }
 

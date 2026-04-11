@@ -1,11 +1,18 @@
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
-type TransitionLinkProps = ComponentProps<typeof Link>;
+type TransitionLinkProps = Omit<ComponentProps<typeof Link>, "prefetch"> & {
+	prefetch?: boolean;
+};
 
 export function TransitionLink({
+	prefetch = false,
 	transitionTypes = ["bardo-route"],
 	...props
 }: TransitionLinkProps) {
-	return <Link transitionTypes={transitionTypes} {...props} />;
+	if (prefetch) {
+		return <Link prefetch={true} transitionTypes={transitionTypes} {...props} />;
+	}
+
+	return <Link prefetch={false} transitionTypes={transitionTypes} {...props} />;
 }

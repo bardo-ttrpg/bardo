@@ -1,12 +1,14 @@
 {
 	"$schema": "https://unpkg.com/knip@latest/schema.json",
+	"ignoreDependencies": ["turbo"],
 	"workspaces": {
 		".": {
-			"entry": ["scripts/**/*.ts", "*.config.{js,cjs,mjs,ts}"],
-			"project": ["scripts/**/*.{js,ts}"]
+			"entry": ["scripts/**/*.{js,cjs,mjs,ts}"],
+			"project": ["scripts/**/*.{js,cjs,mjs,ts}"]
 		},
 		"website": {
 			"entry": [
+				"*.{test,spec}.{js,jsx,ts,tsx}",
 				"app/**/*.{test,spec}.{js,jsx,ts,tsx}",
 				"lib/**/*.{test,spec}.{js,jsx,ts,tsx}",
 				"scripts/**/*.ts",
@@ -14,8 +16,19 @@
 			],
 			"project": ["**/*.{js,jsx,ts,tsx,mdx}"]
 		},
-		"packages/*": {
-			"entry": ["scripts/**/*.ts", "src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+		"packages/bardo-engine": {
+			"entry": ["src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+			"project": ["**/*.{js,jsx,ts,tsx}"]
+		},
+		"packages/bardo-shared": {
+			"entry": ["src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+			"project": ["**/*.{js,jsx,ts,tsx}"]
+		},
+		"packages/bardo-mcp": {
+			"entry": [
+				"scripts/**/*.ts",
+				"src/**/*.{test,spec}.{js,jsx,ts,tsx}"
+			],
 			"project": ["**/*.{js,jsx,ts,tsx}"]
 		}
 	}

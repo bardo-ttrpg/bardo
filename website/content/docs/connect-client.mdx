@@ -1,4 +1,4 @@
-Connect the client to the local bridge after the workspace is prepared.
+Connect your AI client after the workspace is prepared. This keeps the setup simple: login, init, connect, then open the client in the same workspace.
 
 ## Connection flow
 
@@ -6,7 +6,9 @@ Connect the client to the local bridge after the workspace is prepared.
 2. Approve the browser session.
 3. Run `bardo init` if the workspace has not been prepared yet.
 4. Run `bardo connect --client codex` or the matching client flag.
-5. Open the client, inspect readiness/current state, then use the local runtime tools.
+5. Open the client from the same workspace.
+
+Expected result: Bardo writes the client config file for that workspace, and the client can see the local Bardo connection the next time it starts.
 
 ## Client-specific guides
 
@@ -43,16 +45,18 @@ bardo init --rulebook ./rules/core-rulebook.md
 
 ## What you approve
 
-The browser approval confirms account access for the bridge session. The hosted side enforces approvals, billing, entitlements, status checks, and token refresh. It does not own campaign truth.
+The browser approval confirms account access for the bridge session. The hosted side handles approvals, billing, entitlements, status checks, and token refresh. It does not own your campaign truth.
 
 ## What stays local
 
-Workspace discovery, rules bootstrap, campaign bootstrap, and runtime tool execution stay on your machine. The generated `.bardo/` artifacts are the local prep layer that clients should read before continuing play.
+Workspace discovery, rules bootstrap, campaign bootstrap, and local play state stay on your machine. The generated `.bardo/` artifacts are the prep layer your client should rely on before continuing play.
 
-When the player explicitly corrects a fact, use `user_correction` so the correction becomes the highest-precedence local truth instead of staying buried in chat history.
+If the table explicitly corrects a fact, record that correction through Bardo instead of leaving it buried in chat history.
 
 ## Session hygiene
 
-Treat `429` responses from hosted routes as backpressure on approvals or status checks. The fix is to back off and retry, not to spam the bridge. Normal play and canon ownership remain local even when the hosted layer is temporarily unavailable.
+Treat `429` responses from hosted routes as backpressure on approvals or status checks. Wait, retry, and avoid hammering the bridge.
 
-Agents should behave like conservative TTRPG GMs: read the prep artifacts first, surface uncertainty, prefer safe partial answers, and avoid inventing canon when readiness or evidence is weak.
+Troubleshooting:
+- If the client does not see Bardo, restart the client after `bardo connect`.
+- If readiness is not `ready`, fix the missing campaign inputs before expecting richer play.

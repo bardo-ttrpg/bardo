@@ -1,8 +1,8 @@
-Use this guide for the [Codex product](https://openai.com/codex/) and the current [OpenAI Codex docs](https://developers.openai.com/codex/cli). Bardo’s first-class Codex integration is config-based and writes a workspace-local Codex MCP entry.
+Use this guide for [Codex](https://openai.com/codex/) in the CLI or desktop app.
 
 ## Install Codex
 
-Follow the current Codex install or sign-in flow from the [Codex docs hub](https://developers.openai.com/codex). The Codex docs currently split guidance across App, IDE Extension, and CLI pages, while configuration lives under the same docs tree.
+Follow the current install or sign-in flow from the [Codex docs](https://developers.openai.com/codex/cli), then open the same local workspace you want Bardo to manage.
 
 ## Connect Bardo
 
@@ -14,27 +14,18 @@ bardo init
 bardo connect --client codex
 ```
 
-This writes `.codex/config.toml` in the workspace root.
+Expected result: Bardo writes `.codex/config.toml` in the workspace root.
 
 ## What Bardo writes
 
-Bardo adds a local `mcp_servers.bardo` entry that starts:
-
-```bash
-bardo mcp serve --url http://127.0.0.1:3000/mcp --workspace-root .
-```
-
-The exact command is generated for you in `.codex/config.toml`, so you do not need to hand-edit MCP configuration for the normal Codex flow.
+Bardo writes the workspace MCP config for Codex automatically, so normal setup does not require manual editing.
 
 ## CLI and desktop app guidance
 
-Start with Codex in the same local workspace where you ran `bardo connect --client codex`. That is the safest path because Bardo’s Codex integration is workspace-config based.
-
-For the desktop app, keep using the same checked-out workspace so the local `.codex/config.toml` and `.bardo/` artifacts remain valid. Bardo does not need a separate remote gameplay service for the app.
+Start Codex in the same workspace where you ran `bardo connect --client codex`. Use that same workspace in the desktop app too.
 
 ## Use Bardo well in Codex
 
-- call `bardo_workspace_status` first
-- read `.bardo/manifests/readiness.json` and `.bardo/state/current-state.json`
-- use `scene_turn` for grounded GM narration
-- use `user_correction` whenever a player correction should outrank older canon
+Troubleshooting:
+- Restart Codex after connecting if the Bardo integration does not show up right away.
+- If play feels too thin, add better campaign notes and run `bardo init` again.

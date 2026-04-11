@@ -23,6 +23,8 @@ const dashboardLayoutSource = readFileSync(
 	new URL("./(site)/dashboard/layout.tsx", import.meta.url),
 	"utf8",
 );
+const iconRoutePath = new URL("./icon.tsx", import.meta.url);
+const appleIconRoutePath = new URL("./apple-icon.tsx", import.meta.url);
 
 describe("Clerk provider placement", () => {
 	test("keeps the root layout free of Clerk and scopes the provider to auth-aware surfaces", () => {
@@ -50,7 +52,8 @@ describe("Clerk provider placement", () => {
 	test("defines canonical, social, and robots metadata at the root layout", () => {
 		expect(rootLayoutSource).toContain("metadataBase");
 		expect(rootLayoutSource).toContain("manifest");
-		expect(rootLayoutSource).toContain("icons");
+		expect(existsSync(iconRoutePath)).toBe(true);
+		expect(existsSync(appleIconRoutePath)).toBe(true);
 		expect(rootLayoutSource).toContain("openGraph");
 		expect(rootLayoutSource).toContain("twitter");
 		expect(rootLayoutSource).toContain("robots");

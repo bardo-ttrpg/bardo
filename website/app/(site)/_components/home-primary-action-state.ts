@@ -1,4 +1,4 @@
-export type HomePrimaryActionState = "dashboard" | "pending" | "sign_up";
+type HomePrimaryActionState = "dashboard" | "pending" | "sign_up";
 
 export function resolveHomePrimaryActionState({
 	clerkEnabled,

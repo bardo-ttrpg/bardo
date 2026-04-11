@@ -1,11 +1,11 @@
-Use this guide for [Claude Code](https://claude.com/product/claude-code) and the [Claude desktop app](https://claude.com/download). Anthropic’s current MCP reference is the [Claude Code MCP docs](https://code.claude.com/docs/en/mcp).
+Use this guide for [Claude Code](https://claude.com/product/claude-code) and the [Claude desktop app](https://claude.com/download).
 
 ## Install Claude
 
 - Install Claude Code from the current Claude Code product flow.
 - Install the Claude desktop app if you want the desktop experience as well.
 
-The Claude download page currently states that Claude Code runs directly in the desktop app, so the cleanest Bardo path is to set up the Claude Code integration first and then use it from the desktop app when you want that UI.
+The cleanest path is to set up Claude Code first, then use the same workspace in the desktop app when you want that interface.
 
 ## Connect Bardo
 
@@ -17,18 +17,16 @@ bardo init
 bardo connect --client claude
 ```
 
-This writes `.mcp.json` in the workspace root.
+Expected result: Bardo writes `.mcp.json` in the workspace root.
 
 ## What Bardo writes
 
-Bardo installs a local stdio MCP entry for the `bardo` server. That matches Anthropic’s documented Claude Code MCP shape, where project-local MCP servers can live in `.mcp.json`.
+Bardo writes the workspace-local Claude MCP config for you, so you do not need to set it up by hand.
 
 ## Use Bardo well in Claude
 
-- start with `bardo_workspace_status`
-- read readiness and current state before continuing play
-- use `scene_turn` for conservative narration
-- use `player_action`, `world_sync`, and `simulation_tick` only for grounded canon changes
-- use `user_correction` for explicit table corrections
+Keep Claude pointed at the same workspace where you ran `bardo connect --client claude`.
 
-If you are already using Claude Desktop, keep the same workspace open there. Bardo’s truth still lives in the local `.bardo/` prep layer, not in Claude chat history.
+Troubleshooting:
+- Restart Claude after connecting if the tools do not appear.
+- If the workspace is not ready, fix the inputs first instead of asking Claude to fill gaps by guessing.

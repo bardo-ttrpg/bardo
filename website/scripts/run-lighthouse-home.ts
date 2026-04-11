@@ -6,13 +6,6 @@ import { fileURLToPath } from "node:url";
 const websiteDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const projectRoot = dirname(websiteDir);
 const artifactsDir = join(websiteDir, ".lighthouse");
-const lighthouseCliPath = join(
-	websiteDir,
-	"node_modules",
-	"lighthouse",
-	"cli",
-	"index.js",
-);
 const port = process.env.PORT ?? "3301";
 const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -145,12 +138,6 @@ const htmlReportPath = join(artifactsDir, "home.report.html");
 const jsonReportPath = join(artifactsDir, "home.report.json");
 const chromeProfileDir = join(artifactsDir, "chrome-profile");
 
-if (!existsSync(lighthouseCliPath)) {
-	throw new Error(
-		"[lighthouse] Missing local Lighthouse CLI. Run `bun install` in the website workspace first.",
-	);
-}
-
 const server = spawnCommand(process.execPath, ["run", "start"], {
 	cwd: websiteDir,
 	env: {
@@ -171,7 +158,8 @@ try {
 	await waitForHttp(baseUrl, 60_000);
 
 	const sharedArgs = [
-		lighthouseCliPath,
+		"x",
+		"lighthouse@latest",
 		baseUrl,
 		`--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage --user-data-dir=${chromeProfileDir}`,
 		"--quiet",
@@ -179,7 +167,7 @@ try {
 	];
 
 	await runBuffered(
-		"node",
+		process.execPath,
 		[...sharedArgs, "--output=json", `--output-path=${jsonReportPath}`],
 		{
 			cwd: websiteDir,
@@ -190,7 +178,7 @@ try {
 		},
 	);
 	await runBuffered(
-		"node",
+		process.execPath,
 		[...sharedArgs, "--output=html", `--output-path=${htmlReportPath}`],
 		{
 			cwd: websiteDir,

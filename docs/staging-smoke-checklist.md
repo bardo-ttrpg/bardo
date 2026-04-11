@@ -61,6 +61,10 @@ Before promotion, run the destructive clean-room harness:
 
 Do not promote if any of these are failing:
 
+- `bun run knip`
+- React Doctor
+- Vercel Doctor
+- `bun run check:production-health`
 - website auth flow
 - Clerk Billing checkout or customer portal
 - browser-approved bridge session flow

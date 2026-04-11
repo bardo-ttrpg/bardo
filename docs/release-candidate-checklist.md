@@ -23,11 +23,15 @@ Use this before calling a build staging-ready.
 
 ## Validation gates
 
-1. Run `bun run test:release-gates`.
-2. Run `bun run bundle:audit`.
-3. Run `bun run stress:test-01`.
-4. Run `bun run staging:smoke` against the real staging deployment after env validation.
-5. Re-run the Replacement Audit Plan and do not waive blocking findings.
+1. Run `bun run knip`.
+2. Run `bun run check:react-doctor`.
+3. Run `bun run check:vercel-doctor`.
+4. Run `bun run check:production-health`.
+5. Run `bun run test:release-gates`.
+6. Run `bun run bundle:audit`.
+7. Run `bun run stress:test-01`.
+8. Run `bun run staging:smoke` against the real staging deployment after env validation.
+9. Re-run the Replacement Audit Plan and do not waive blocking findings.
 
 ## Promotion decision
 

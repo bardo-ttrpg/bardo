@@ -1,16 +1,3 @@
-const PAGE_PROXY_MATCHER_SOURCE =
-	"/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)";
-
-export const PAGE_PROXY_MATCHER = {
-	source: PAGE_PROXY_MATCHER_SOURCE,
-	missing: [
-		{ type: "header", key: "next-router-prefetch" },
-		{ type: "header", key: "purpose", value: "prefetch" },
-	] as const,
-};
-
-export const API_PROXY_MATCHER = "/(api|trpc)(.*)";
-
 export function shouldUseClerkOnlyProxyPathname(pathname: string): boolean {
 	return (
 		pathname === "/api" ||

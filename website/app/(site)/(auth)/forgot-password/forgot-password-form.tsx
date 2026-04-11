@@ -3,10 +3,69 @@
 import { useSignIn } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useReducer } from "react";
 import { TransitionLink } from "@/components/transition-link";
 
 type ForgotPasswordStep = "request" | "verify" | "complete";
+
+type ForgotPasswordState = {
+	step: ForgotPasswordStep;
+	identifier: string;
+	code: string;
+	password: string;
+	submitting: boolean;
+	error: string | null;
+	statusMessage: string | null;
+};
+
+type ForgotPasswordAction =
+	| { type: "setIdentifier"; value: string }
+	| { type: "setCode"; value: string }
+	| { type: "setPassword"; value: string }
+	| { type: "submit_start" }
+	| { type: "submit_finish" }
+	| { type: "set_error"; value: string | null }
+	| { type: "set_status"; value: string | null }
+	| { type: "set_step"; value: ForgotPasswordStep };
+
+const initialForgotPasswordState: ForgotPasswordState = {
+	step: "request",
+	identifier: "",
+	code: "",
+	password: "",
+	submitting: false,
+	error: null,
+	statusMessage: null,
+};
+
+function forgotPasswordReducer(
+	state: ForgotPasswordState,
+	action: ForgotPasswordAction,
+): ForgotPasswordState {
+	switch (action.type) {
+		case "setIdentifier":
+			return { ...state, identifier: action.value };
+		case "setCode":
+			return { ...state, code: action.value };
+		case "setPassword":
+			return { ...state, password: action.value };
+		case "submit_start":
+			return {
+				...state,
+				submitting: true,
+				error: null,
+				statusMessage: null,
+			};
+		case "submit_finish":
+			return { ...state, submitting: false };
+		case "set_error":
+			return { ...state, error: action.value };
+		case "set_status":
+			return { ...state, statusMessage: action.value };
+		case "set_step":
+			return { ...state, step: action.value };
+	}
+}
 
 function normalizeIdentifier(value: string) {
 	return value.trim();
@@ -47,13 +106,12 @@ export function ForgotPasswordForm() {
 	const router = useRouter();
 	const { isLoaded, signIn, setActive } =
 		useSignIn() as unknown as ResetPasswordFlow;
-	const [step, setStep] = useState<ForgotPasswordStep>("request");
-	const [identifier, setIdentifier] = useState("");
-	const [code, setCode] = useState("");
-	const [password, setPassword] = useState("");
-	const [submitting, setSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [statusMessage, setStatusMessage] = useState<string | null>(null);
+	const [state, dispatch] = useReducer(
+		forgotPasswordReducer,
+		initialForgotPasswordState,
+	);
+	const { step, identifier, code, password, submitting, error, statusMessage } =
+		state;
 	const fieldClassName =
 		"w-full border border-border bg-background px-4 py-3 font-ui text-sm text-foreground outline-none transition-colors focus:border-foreground";
 	const actionClassName =
@@ -63,21 +121,22 @@ export function ForgotPasswordForm() {
 		event.preventDefault();
 		if (!isLoaded || !signIn) return;
 
-		setSubmitting(true);
-		setError(null);
-		setStatusMessage(null);
+		dispatch({ type: "submit_start" });
 
 		try {
 			await signIn.create({
 				strategy: "reset_password_email_code",
 				identifier: normalizeIdentifier(identifier),
 			});
-			setStep("verify");
-			setStatusMessage("Verification code sent. Check your inbox.");
+			dispatch({ type: "set_step", value: "verify" });
+			dispatch({
+				type: "set_status",
+				value: "Verification code sent. Check your inbox.",
+			});
 		} catch (caught) {
-			setError(formatError(caught));
+			dispatch({ type: "set_error", value: formatError(caught) });
 		} finally {
-			setSubmitting(false);
+			dispatch({ type: "submit_finish" });
 		}
 	}
 
@@ -85,9 +144,7 @@ export function ForgotPasswordForm() {
 		event.preventDefault();
 		if (!isLoaded || !signIn) return;
 
-		setSubmitting(true);
-		setError(null);
-		setStatusMessage(null);
+		dispatch({ type: "submit_start" });
 
 		try {
 			const result = await signIn.attemptFirstFactor({
@@ -98,19 +155,24 @@ export function ForgotPasswordForm() {
 
 			if (result.status === "complete") {
 				await setActive({ session: result.createdSessionId });
-				setStep("complete");
-				setStatusMessage("Password updated. Redirecting to your dashboard.");
+				dispatch({ type: "set_step", value: "complete" });
+				dispatch({
+					type: "set_status",
+					value: "Password updated. Redirecting to your dashboard.",
+				});
 				router.replace("/dashboard");
 				return;
 			}
 
-			setError(
-				"Password reset is still incomplete. Please request a new code.",
-			);
+			dispatch({
+				type: "set_error",
+				value:
+					"Password reset is still incomplete. Please request a new code.",
+			});
 		} catch (caught) {
-			setError(formatError(caught));
+			dispatch({ type: "set_error", value: formatError(caught) });
 		} finally {
-			setSubmitting(false);
+			dispatch({ type: "submit_finish" });
 		}
 	}
 
@@ -129,7 +191,9 @@ export function ForgotPasswordForm() {
 							id="identifier"
 							type="email"
 							value={identifier}
-							onChange={(event) => setIdentifier(event.target.value)}
+							onChange={(event) =>
+								dispatch({ type: "setIdentifier", value: event.target.value })
+							}
 							className={fieldClassName}
 							placeholder="you@example.com"
 							autoComplete="email"
@@ -156,7 +220,9 @@ export function ForgotPasswordForm() {
 							id="code"
 							type="text"
 							value={code}
-							onChange={(event) => setCode(event.target.value)}
+							onChange={(event) =>
+								dispatch({ type: "setCode", value: event.target.value })
+							}
 							className={fieldClassName}
 							autoComplete="one-time-code"
 							required
@@ -173,7 +239,9 @@ export function ForgotPasswordForm() {
 							id="password"
 							type="password"
 							value={password}
-							onChange={(event) => setPassword(event.target.value)}
+							onChange={(event) =>
+								dispatch({ type: "setPassword", value: event.target.value })
+							}
 							className={fieldClassName}
 							autoComplete="new-password"
 							required

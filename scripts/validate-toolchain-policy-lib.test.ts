@@ -10,7 +10,7 @@ function makeManifest(
 ): ToolchainPackageManifest {
 	return {
 		path,
-		packageManager: "bun@1.3.10",
+		packageManager: "bun@1.3.11",
 		scripts: {},
 		...overrides,
 	};
@@ -23,7 +23,8 @@ describe("validateToolchainPolicy", () => {
 			packageJsons: [
 				makeManifest("/repo/package.json", {
 					scripts: {
-						check: "bun run validate:toolchain && turbo run check",
+						check:
+							'bun run validate:toolchain && bun run ./scripts/run-turbo.ts check',
 					},
 				}),
 				makeManifest("/repo/website/package.json", {

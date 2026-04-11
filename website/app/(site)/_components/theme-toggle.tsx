@@ -2,8 +2,8 @@
 
 import { MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 
 type ViewTransitionDocument = Document & {
@@ -14,13 +14,8 @@ type ViewTransitionDocument = Document & {
 
 export function ThemeToggle({ className }: { className?: string }) {
 	const { resolvedTheme, setTheme } = useTheme();
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-	}, []);
-
-	const isDark = !mounted || resolvedTheme !== "light";
+	const isHydrated = useHydrated();
+	const isDark = !isHydrated || resolvedTheme !== "light";
 	const nextTheme = isDark ? "light" : "dark";
 
 	function handleToggle() {

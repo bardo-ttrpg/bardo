@@ -1,26 +1,26 @@
-Bardo is a local-first campaign runtime. The workspace is the source of truth, `.bardo/` is the only Bardo-managed root, and the hosted side stays focused on auth, approvals, billing, entitlements, and protected account logic.
+Bardo keeps your campaign on your machine. Your workspace is the source of truth, `.bardo/` is the only Bardo-managed folder, and the hosted side only handles account, approval, and billing tasks.
 
 ## What Bardo covers
 
-- Install the local bridge on the machine that holds your campaign files.
-- Run `bardo login`, `bardo init`, and `bardo connect` from the workspace root.
-- Generate a strict `.bardo/` prep layer with rules bootstrap and campaign bootstrap outputs.
-- Use local runtime tools such as `scene_turn`, `player_action`, `user_correction`, `world_sync`, and `simulation_tick`.
-- Keep the hosted boundary narrow and predictable.
+- Install the local bridge on the machine that holds your campaign.
+- Prepare the workspace with `bardo login`, `bardo init`, and `bardo connect`.
+- Build a local `.bardo/` prep layer that keeps play grounded in your files.
+- Keep account, approval, and billing logic outside your campaign files.
 
 ## Recommended path
 
 1. Install the CLI bridge locally.
-2. Put `rulebook.md` in the workspace root if you want the default rules bootstrap path.
+2. Put `rulebook.md` in the workspace root if you want the default setup path.
 3. Run `bardo login`.
 4. Run `bardo init`.
-5. Read `.bardo/manifests/readiness.json` and `.bardo/state/current-state.json`.
+5. Check readiness in `.bardo/manifests/readiness.json`.
 6. Run `bardo connect --client <your-client>`.
-7. Use the runtime tools against the local prep artifacts.
-8. If the player explicitly corrects canon, use `user_correction` instead of hand-editing generated state.
+7. Open your AI client and start from the workspace you just prepared.
 
-`rulebook.md` on its own is enough to make Bardo safe and conservative, but not enough to imply a richly prepared world. Expect `ready-with-gaps` or limited continuity until campaign notes outside `.bardo/` provide grounded state.
+Expected result: you should have a `.bardo/` folder, a readiness file, and a connected client that can work from the local campaign context instead of guessing.
+
+`rulebook.md` on its own is enough to make Bardo safe and conservative, but not enough to create a rich world automatically. If your campaign notes are still thin, expect `ready-with-gaps` and simpler play until you add more grounded source material.
 
 ## What stays outside docs
 
-The website does not try to mirror every internal artifact. It documents the stable boundary: local workspace ownership, the generated `.bardo/` outputs, the public CLI entrypoints, and the hosted routes that remain server-backed.
+This website only covers the stable user path: install, prepare, connect, and use Bardo safely. It does not try to teach every internal runtime detail.

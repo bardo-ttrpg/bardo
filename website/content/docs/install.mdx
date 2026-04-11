@@ -1,16 +1,16 @@
-Install the local bridge first, then authenticate and bootstrap from the workspace that owns the campaign. The default installers fetch a versioned release binary, verify its checksum, and write local `bardo` / `bardo-mcp` shims for you.
+Install Bardo on the same machine that holds your campaign files. The default installer downloads the release binary, checks its checksum, and adds the `bardo` command for you.
 
 ## macOS and Linux
 
 Run `curl -fsSL https://bardo.gg/install | sh`.
 
-The installer downloads the matching release binary for your platform, verifies it against `SHA256SUMS.txt`, and installs it under your local Bardo directory.
+Expected result: the installer finishes without errors and `bardo --help` works in a new shell.
 
 ## Windows
 
 Run `irm https://bardo.gg/install.ps1 | iex` in PowerShell.
 
-The PowerShell installer downloads the matching release binary, validates its checksum, and writes `bardo.cmd` plus `bardo-mcp.cmd`.
+Expected result: PowerShell installs Bardo and `bardo --help` works in a new terminal.
 
 ## Custom install paths
 
@@ -21,7 +21,7 @@ If you need custom paths, pass them into the shell that executes the installer:
 
 ## Developer fallback
 
-If you intentionally want the old source-based developer path, set `BARDO_INSTALL_MODE=source` before running the installer. This keeps Bun and repo-clone setup available for local development without making it the primary user onboarding path.
+If you intentionally want the old source-based developer path, set `BARDO_INSTALL_MODE=source` before running the installer. This is for development only, not normal user setup.
 
 ## What happens next
 
@@ -42,3 +42,7 @@ bardo init --rulebook ./rules/core-rulebook.md
 ```
 
 If your source starts as a PDF, convert it to Markdown before bootstrap. The importer expects Markdown or plain text, not raw PDF bytes.
+
+Troubleshooting:
+- If `bardo` is not found, open a new shell and try again.
+- If the installer reports a checksum problem, stop there and rerun the official installer instead of forcing it.

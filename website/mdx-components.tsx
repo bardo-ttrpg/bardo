@@ -1,9 +1,5 @@
 import Link from "next/link";
-import {
-	type ComponentPropsWithoutRef,
-	createElement,
-	type ReactNode,
-} from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 function Lore({ children }: { children?: ReactNode }) {
@@ -57,35 +53,33 @@ function createHeading<Tag extends "h2" | "h3">(
 		...props
 	}: ComponentPropsWithoutRef<Tag>) {
 		const resolvedId = id ?? slugifyHeading(children);
+		const HeadingTag = tag as "h2" | "h3";
 
-		return createElement(
-			tag,
-			{
-				id: resolvedId,
-				className: cn(
+		return (
+			<HeadingTag
+				id={resolvedId}
+				className={cn(
 					"group/heading scroll-mt-24 tracking-[-0.03em]",
 					baseClassName,
 					className,
-				),
-				...props,
-			},
-			createElement(
-				"a",
-				{
-					href: `#${resolvedId}`,
-					className: "inline-flex items-center gap-2 no-underline",
-				},
-				createElement("span", null, children),
-				createElement(
-					"span",
-					{
-						"aria-hidden": "true",
-						className:
-							"ui-label opacity-0 transition-opacity group-hover/heading:opacity-100",
-					},
-					"#",
-				),
-			),
+				)}
+				{...props}
+			>
+				<span>{children}</span>
+					<a
+						href={`#${resolvedId}`}
+						aria-label={`Link to ${resolvedId}`}
+						className="ml-2 inline-flex items-center no-underline"
+					>
+						<span className="sr-only">{`Link to ${resolvedId}`}</span>
+						<span
+							aria-hidden="true"
+							className="ui-label opacity-0 transition-opacity group-hover/heading:opacity-100"
+						>
+						#
+					</span>
+				</a>
+			</HeadingTag>
 		);
 	};
 }
@@ -94,14 +88,20 @@ export function useMDXComponents(
 	components: ComponentsMap = {},
 ): ComponentsMap {
 	return {
-		h1: (props: ComponentPropsWithoutRef<"h1">) => (
+		h1: ({
+			children,
+			className,
+			...props
+		}: ComponentPropsWithoutRef<"h1">) => (
 			<h1
 				className={cn(
 					"font-reading-heading text-4xl text-foreground sm:text-5xl",
-					props.className,
+					className,
 				)}
 				{...props}
-			/>
+			>
+				{children}
+			</h1>
 		),
 		h2: createHeading(
 			"h2",
@@ -127,7 +127,14 @@ export function useMDXComponents(
 			);
 
 			if (isInternalHref(href)) {
-				return <Link href={href ?? "/"} className={linkClassName} {...props} />;
+				return (
+					<Link
+						href={href ?? "/"}
+						prefetch={false}
+						className={linkClassName}
+						{...props}
+					/>
+				);
 			}
 
 			return (

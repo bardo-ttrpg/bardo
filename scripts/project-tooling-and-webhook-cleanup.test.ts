@@ -35,16 +35,16 @@ describe("project cleanup and tooling setup", () => {
 
 		expect(rootPackageJson.workspaces).toEqual(["website", "packages/*"]);
 		expect(rootPackageJson.scripts?.["staging:validate-env"]).toBe(
-			"turbo run validate:staging-env --filter=website",
+			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts validate:staging-env --filter=website',
 		);
 		expect(rootPackageJson.scripts?.["ga:readiness"]).toBe(
-			"turbo run ga:readiness --filter=@bardo/engine",
+			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts ga:readiness --filter=@bardo/engine',
 		);
 		expect(rootPackageJson.scripts?.["typecheck:unused-report"]).toBe(
-			"turbo run typecheck:unused-report --filter=website",
+			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts typecheck:unused-report --filter=website',
 		);
 		expect(rootPackageJson.scripts?.["dev:bridge"]).toBe(
-			"turbo run dev --filter=@bardo/mcp",
+			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts dev --filter=@bardo/mcp',
 		);
 		expect(rootPackageJson.scripts?.["stress:test-01"]).toBe(
 			'"${npm_execpath:-bun}" run ./scripts/stress-bardo-test-01.ts',
@@ -68,6 +68,7 @@ describe("project cleanup and tooling setup", () => {
 		const validateToolchainPolicy = readFromRepo(
 			"scripts/validate-toolchain-policy.ts",
 		);
+		const turboRunner = readFromRepo("scripts/run-turbo.ts");
 
 		expect(cleanupScript).not.toContain("$ROOT_DIR/mcp/.turbo");
 		expect(cleanupScript).toContain("$ROOT_DIR/packages/bardo-mcp/.turbo");
@@ -79,6 +80,7 @@ describe("project cleanup and tooling setup", () => {
 		expect(validateToolchainPolicy).toContain(
 			'const packageDirs = ["website"];',
 		);
+		expect(turboRunner).toContain('spawn("turbo", ["run", task, ...rest]');
 	});
 
 	test("keeps inspector and staging docs aligned to the bridge-first local runtime", () => {

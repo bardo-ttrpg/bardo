@@ -60,7 +60,6 @@ describe("SEO and production metadata", () => {
 		expect(rootLayoutSource).toContain("referrer");
 		expect(rootLayoutSource).toContain("publisher");
 		expect(rootLayoutSource).toContain("manifest");
-		expect(rootLayoutSource).toContain("icons");
 	});
 
 	test("ships file-based discovery routes for robots, sitemap, manifest, icons, og, twitter, and not found", () => {
@@ -73,8 +72,10 @@ describe("SEO and production metadata", () => {
 		expect(existsSync(new URL("./twitter-image.tsx", import.meta.url))).toBe(
 			true,
 		);
-		expect(existsSync(new URL("./icon.svg", import.meta.url))).toBe(true);
-		expect(existsSync(new URL("./apple-icon.png", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(
+			true,
+		);
 		expect(existsSync(new URL("./not-found.tsx", import.meta.url))).toBe(true);
 	});
 
@@ -141,7 +142,7 @@ describe("SEO and production metadata", () => {
 		const data = manifest();
 		expect(data.name).toBe("Bardo");
 		expect(data.start_url).toBe("/");
-		expect(data.icons?.some((icon) => icon.src === "/apple-icon.png")).toBe(
+		expect(data.icons?.some((icon) => icon.src === "/apple-icon")).toBe(
 			true,
 		);
 	});

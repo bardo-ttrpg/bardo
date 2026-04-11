@@ -9,13 +9,13 @@ export type DocsSection = {
 
 export type DocsGroupId = "get-started" | "product-model";
 
-export type DocsGroup = {
+type DocsGroup = {
 	id: DocsGroupId;
 	label: string;
 	order: number;
 };
 
-export type DocsEntry = {
+type DocsEntry = {
 	slugSegments: readonly string[];
 	href: string;
 	title: string;
@@ -344,10 +344,6 @@ function slugKey(segments: readonly string[]) {
 
 export function listDocsEntries() {
 	return docsEntries;
-}
-
-export function listDocsGroups() {
-	return docsGroups;
 }
 
 export function getDocsEntryBySlug(slugSegments: readonly string[] = []) {

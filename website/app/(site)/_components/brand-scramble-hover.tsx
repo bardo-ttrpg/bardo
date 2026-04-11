@@ -14,7 +14,7 @@ export function BrandScrambleHover({
 	className?: string;
 	scrambleSpeed?: number;
 }) {
-	const [displayText, setDisplayText] = useState(text);
+	const [displayText, setDisplayText] = useState<string | null>(null);
 	const animationFrameRef = useRef<number | null>(null);
 	const hoverCapableRef = useRef(false);
 	const isAnimatingRef = useRef(false);
@@ -26,7 +26,7 @@ export function BrandScrambleHover({
 		const sync = () => {
 			hoverCapableRef.current = mediaQuery.matches;
 			if (!mediaQuery.matches) {
-				setDisplayText(text);
+				setDisplayText(null);
 			}
 		};
 
@@ -39,7 +39,7 @@ export function BrandScrambleHover({
 				cancelAnimationFrame(animationFrameRef.current);
 			}
 		};
-	}, [text]);
+	}, []);
 
 	function stopAnimation() {
 		if (animationFrameRef.current !== null) {
@@ -93,7 +93,7 @@ export function BrandScrambleHover({
 				return;
 			}
 
-			setDisplayText(text);
+			setDisplayText(null);
 			animationFrameRef.current = null;
 			isAnimatingRef.current = false;
 		};
@@ -121,7 +121,7 @@ export function BrandScrambleHover({
 			<span className="invisible col-start-1 row-start-1 select-none">
 				{text}
 			</span>
-			<span className="col-start-1 row-start-1">{displayText}</span>
+			<span className="col-start-1 row-start-1">{displayText ?? text}</span>
 		</span>
 	);
 }

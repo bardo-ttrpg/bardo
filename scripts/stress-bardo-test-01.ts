@@ -573,12 +573,12 @@ async function main() {
 					"OpenCode config left Bardo disabled.",
 				);
 
-				const mcpList = await runCommand({
-					command: "bunx",
-					commandArgs: ["-y", "opencode-ai", "mcp", "list"],
-					cwd: workspaceRoot,
-					env: {
-						...commonEnv(workspaceRoot),
+					const mcpList = await runCommand({
+						command: process.execPath,
+						commandArgs: ["x", "-y", "opencode-ai", "mcp", "list"],
+						cwd: workspaceRoot,
+						env: {
+							...commonEnv(workspaceRoot),
 						PATH: `${binDir}:${process.env.PATH ?? ""}`,
 					},
 				});

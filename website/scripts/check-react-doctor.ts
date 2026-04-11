@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { normalizeNextEnvFile } from "./next-env-lib";
 
 const EXCLUDED_NAMES = new Set([".git", ".next", "node_modules"]);
 
@@ -71,6 +72,7 @@ try {
 			return !EXCLUDED_NAMES.has(basename(source));
 		},
 	});
+	await normalizeNextEnvFile(tempProjectDir);
 	await runCommand("git", ["init"], {
 		cwd: tempProjectDir,
 		stdio: "ignore",
@@ -80,6 +82,7 @@ try {
 		stdio: "ignore",
 	});
 	const reactDoctorArgs = [
+		"x",
 		"react-doctor@latest",
 		tempProjectDir,
 		"--yes",
@@ -87,7 +90,7 @@ try {
 		"--fail-on",
 		"warning",
 	];
-	const firstPass = await runCommandBuffered("bunx", reactDoctorArgs, {
+	const firstPass = await runCommandBuffered(process.execPath, reactDoctorArgs, {
 		cwd: tempProjectDir,
 	});
 	const lintWasIncomplete =
@@ -101,7 +104,7 @@ try {
 			"[react-doctor] Falling back to --no-lint because the lint phase could not complete cleanly.",
 		);
 		const fallbackPass = await runCommandBuffered(
-			"bunx",
+			process.execPath,
 			[...reactDoctorArgs, "--no-lint"],
 			{
 				cwd: tempProjectDir,

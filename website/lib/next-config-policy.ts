@@ -99,6 +99,18 @@ export function resolveSecurityHeaders(
 			value:
 				"accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
 		},
+		{
+			key: "Cross-Origin-Opener-Policy",
+			value: "same-origin",
+		},
+		{
+			key: "Cross-Origin-Resource-Policy",
+			value: "same-origin",
+		},
+		{
+			key: "X-DNS-Prefetch-Control",
+			value: "off",
+		},
 	];
 	if (isProduction) {
 		headers.push({

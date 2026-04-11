@@ -1,36 +1,17 @@
 "use client";
 
 import { listConnectionClientAdapters } from "@bardo/shared/client-adapters";
-import { type ReactNode, startTransition, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { TransitionLink } from "@/components/transition-link";
 import { BardoViewTransition } from "@/components/view-transition";
+import type {
+	BillingViewState,
+	DashboardViewData,
+} from "@/lib/billing-view-data";
 import { cn } from "@/lib/utils";
 import CheckoutButton from "./_billing/checkout-button";
 import SubscriptionDetailsCta from "./_billing/subscription-details-button";
 import { DashboardSignOutButton } from "./signout-button";
-
-type BillingState = {
-	plan: string;
-	creditsTotal: number;
-	creditsUsed: number;
-	creditsRemaining: number;
-	periodStart: number;
-	mcpCallsTotal: number;
-	mcpCallsThisPeriod: number;
-	subscriptionStatus: string;
-	subscriptionId: string | null;
-	billingInterval: "month" | "year" | null;
-	currentPeriodEnd: number | null;
-	cancelAtPeriodEnd: boolean;
-};
-
-type DashboardData = {
-	billing: BillingState | null;
-	accessPolicy: {
-		subscribed: boolean;
-		mcpPeriodLimit: number;
-	};
-};
 
 function formatDate(value: number | null | undefined): string {
 	if (!value) return "Not scheduled";
@@ -75,7 +56,7 @@ export function BillingPlanCard({
 	mcpPeriodLimit,
 }: {
 	billingLoading: boolean;
-	billing: BillingState | null;
+	billing: BillingViewState | null;
 	mcpPeriodLimit: number;
 }) {
 	return (
@@ -124,7 +105,7 @@ export function BillingPlanCard({
 	);
 }
 
-function ConnectBridgeCard({ billing }: { billing: BillingState | null }) {
+function ConnectBridgeCard({ billing }: { billing: BillingViewState | null }) {
 	const paid = isPaidPlan(billing?.plan);
 
 	return (
@@ -167,7 +148,7 @@ function BillingActionsCard({
 	clerkEnabled,
 	clerkPlanId,
 }: {
-	billing: BillingState | null;
+	billing: BillingViewState | null;
 	clerkEnabled: boolean;
 	clerkPlanId: string | null;
 }) {
@@ -199,45 +180,15 @@ function BillingActionsCard({
 export function DashboardClient({
 	clerkEnabled,
 	clerkPlanId,
+	initialDashboardData,
 }: {
 	clerkEnabled: boolean;
 	clerkPlanId: string | null;
+	initialDashboardData: DashboardViewData | null;
 }) {
-	const [dashboardData, setDashboardData] = useState<DashboardData | null>(
-		null,
-	);
-	const [billingLoading, setBillingLoading] = useState(true);
-
-	useEffect(() => {
-		const controller = new AbortController();
-
-		void (async () => {
-			try {
-				const response = await fetch("/api/billing", {
-					cache: "no-store",
-					signal: controller.signal,
-				});
-				if (!response.ok) {
-					return;
-				}
-				const payload = (await response.json()) as DashboardData;
-				startTransition(() => {
-					setDashboardData(payload);
-				});
-			} catch {
-				// Keep the dashboard usable even when the billing request fails.
-			} finally {
-				startTransition(() => {
-					setBillingLoading(false);
-				});
-			}
-		})();
-
-		return () => controller.abort();
-	}, []);
-
-	const billing = dashboardData?.billing ?? null;
-	const mcpPeriodLimit = dashboardData?.accessPolicy.mcpPeriodLimit ?? 0;
+	const billing = initialDashboardData?.billing ?? null;
+	const mcpPeriodLimit = initialDashboardData?.accessPolicy.mcpPeriodLimit ?? 0;
+	const billingLoading = false;
 
 	return (
 		<div className="mx-auto max-w-5xl px-6 pb-16 pt-8 sm:pb-24 sm:pt-8 lg:pt-10">

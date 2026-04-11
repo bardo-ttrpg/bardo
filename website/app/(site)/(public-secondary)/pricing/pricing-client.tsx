@@ -3,8 +3,9 @@
 import { useAuth } from "@clerk/nextjs";
 import NumberFlow, { continuous, NumberFlowGroup } from "@number-flow/react";
 import { CheckIcon, XIcon } from "lucide-react";
-import { type ReactNode, startTransition, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
+import type { BillingViewState } from "@/lib/billing-view-data";
 import { cn } from "@/lib/utils";
 import CheckoutButton from "../../dashboard/_billing/checkout-button";
 import SubscriptionDetailsAction from "../../dashboard/_billing/subscription-details-action";
@@ -12,21 +13,13 @@ import SubscriptionDetailsAction from "../../dashboard/_billing/subscription-det
 type PricingClientProps = {
 	clerkEnabled: boolean;
 	clerkPlanId: string | null;
+	initialBilling: PricingBillingState | null;
 };
 
-type PricingBillingState = {
-	plan: "free" | "solo";
-	subscriptionStatus:
-		| "incomplete"
-		| "incomplete_expired"
-		| "trialing"
-		| "active"
-		| "past_due"
-		| "canceled"
-		| "unpaid"
-		| "paused";
-	billingInterval: "month" | "year" | null;
-};
+type PricingBillingState = Pick<
+	BillingViewState,
+	"plan" | "subscriptionStatus" | "billingInterval"
+>;
 
 const pricingToggleClassName =
 	"ui-button rounded-full px-4 py-2 text-sm transition-colors";
@@ -64,12 +57,14 @@ export function shouldShowManageSubscription({
 export function PricingClient({
 	clerkEnabled,
 	clerkPlanId,
+	initialBilling,
 }: PricingClientProps) {
 	return (
 		<OptionalClerkProvider enabled={clerkEnabled}>
 			<PricingClientContent
 				clerkEnabled={clerkEnabled}
 				clerkPlanId={clerkPlanId}
+				initialBilling={initialBilling}
 			/>
 		</OptionalClerkProvider>
 	);
@@ -156,11 +151,11 @@ function AnimatedPricingValue({
 function PricingClientContent({
 	clerkEnabled,
 	clerkPlanId,
+	initialBilling,
 }: PricingClientProps) {
 	const { isLoaded, isSignedIn } = useAuth();
 	const [billingPeriod, setBillingPeriod] = useState<"month" | "year">("month");
-	const [billing, setBilling] = useState<PricingBillingState | null>(null);
-	const [billingLoading, setBillingLoading] = useState(false);
+	const billing = isLoaded && isSignedIn ? initialBilling : null;
 	const monthlyPrice = 20;
 	const yearlyMonthlyEquivalent = 16;
 	const displayedPrice =
@@ -173,50 +168,6 @@ function PricingClientContent({
 		billing,
 		billingPeriod,
 	});
-
-	useEffect(() => {
-		if (!clerkEnabled || !isLoaded || !isSignedIn) {
-			startTransition(() => {
-				setBilling(null);
-				setBillingLoading(false);
-			});
-			return;
-		}
-
-		const controller = new AbortController();
-		startTransition(() => {
-			setBillingLoading(true);
-		});
-
-		void (async () => {
-			try {
-				const response = await fetch("/api/billing", {
-					cache: "no-store",
-					signal: controller.signal,
-				});
-
-				if (!response.ok) {
-					return;
-				}
-
-				const payload = (await response.json()) as {
-					billing: PricingBillingState | null;
-				};
-
-				startTransition(() => {
-					setBilling(payload.billing ?? null);
-				});
-			} catch {
-				// Keep the public pricing page usable if the billing lookup fails.
-			} finally {
-				startTransition(() => {
-					setBillingLoading(false);
-				});
-			}
-		})();
-
-		return () => controller.abort();
-	}, [clerkEnabled, isLoaded, isSignedIn]);
 
 	return (
 		<div className="flex flex-col gap-10">
@@ -276,7 +227,7 @@ function PricingClientContent({
 										</PricingCtaLabel>
 									}
 								/>
-							) : billingLoading && isSignedIn ? (
+							) : !isLoaded && isSignedIn ? (
 								<button
 									type="button"
 									className={pricingPrimaryActionClassName}

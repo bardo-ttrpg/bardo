@@ -36,7 +36,7 @@ export function PublicPageShell({
 	);
 }
 
-export function SiteBrandHeader({ className }: { className?: string }) {
+function SiteBrandHeader({ className }: { className?: string }) {
 	return (
 		<header
 			className={cn("flex items-center justify-between gap-4", className)}
@@ -80,67 +80,6 @@ export function PublicPageHeader({
 				{description}
 			</p>
 		</header>
-	);
-}
-
-export function RouteList({
-	items,
-}: {
-	items: Array<{ href: string; label: string; description: string }>;
-}) {
-	return (
-		<ul className="flex flex-col gap-4 pl-0">
-			{items.map((item) => (
-				<li key={item.href} className="list-none">
-					<TransitionLink
-						href={item.href}
-						className="interactive-link font-reading-body text-foreground"
-					>
-						{item.label}
-					</TransitionLink>{" "}
-					<span className="font-reading-body text-muted-foreground">
-						{item.description}
-					</span>
-				</li>
-			))}
-		</ul>
-	);
-}
-
-export function InlineLinkNav({
-	links,
-	className,
-}: {
-	links: Array<{ href: string; label: string }>;
-	className?: string;
-}) {
-	return (
-		<nav className={cn("flex flex-wrap gap-5", className)}>
-			{links.map((link) => (
-				<TransitionLink
-					key={link.href}
-					href={link.href}
-					className="interactive-link ui-nav text-foreground"
-				>
-					{link.label}
-				</TransitionLink>
-			))}
-		</nav>
-	);
-}
-
-export function ProseSection({
-	title,
-	children,
-}: {
-	title: string;
-	children: ReactNode;
-}) {
-	return (
-		<section className="flex flex-col gap-4">
-			<h2 className="font-reading-heading text-3xl text-foreground">{title}</h2>
-			<div className="prose-reading flex flex-col gap-4">{children}</div>
-		</section>
 	);
 }
 

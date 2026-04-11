@@ -1,8 +1,9 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { TransitionLink } from "@/components/transition-link";
+import { useHydrated } from "@/hooks/use-hydrated";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import { resolveCheckoutRenderState } from "./billing-cta-state";
 import CheckoutAction from "./checkout-action";
@@ -63,7 +64,7 @@ function EnabledCheckoutButton({
 	className: string;
 }) {
 	const { isLoaded, isSignedIn } = useAuth();
-	const [isHydrated, setIsHydrated] = useState(false);
+	const isHydrated = useHydrated();
 	const resolvedPlanId = planId ?? "";
 	const renderState = resolveCheckoutRenderState({
 		isHydrated,
@@ -71,11 +72,6 @@ function EnabledCheckoutButton({
 		isSignedIn: isSignedIn ?? false,
 		isUnavailable,
 	});
-
-	useEffect(() => {
-		setIsHydrated(true);
-	}, []);
-
 	return (
 		<div>
 			{renderState === "sign_in" ? (

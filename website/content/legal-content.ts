@@ -104,7 +104,3 @@ export function listLegalEntries() {
 export function getLegalEntryBySlug(slug: string) {
 	return legalEntries.find((entry) => entry.slug === slug) ?? null;
 }
-
-export function getLegalEntryByHref(href: string) {
-	return legalEntries.find((entry) => entry.href === href) ?? null;
-}
