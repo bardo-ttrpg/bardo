@@ -25,4 +25,30 @@ describe("resolveProxyLocalhostRedirectTarget", () => {
 			}),
 		).toBe("localhost");
 	});
+
+	test("redirects raw production vercel hosts to the configured app domain", () => {
+		expect(
+			resolveProxyLocalhostRedirectTarget({
+				forwardedHostHeader: "bardo-oldhash-armando-andre-projects.vercel.app",
+				hostHeader: "bardo-oldhash-armando-andre-projects.vercel.app",
+				requestUrl:
+					"https://bardo-oldhash-armando-andre-projects.vercel.app/sign-in",
+				nextUrlHost: "bardo-oldhash-armando-andre-projects.vercel.app",
+				appUrl: "https://www.bardo.gg",
+			}),
+		).toBe("www.bardo.gg");
+	});
+
+	test("keeps preview-style vercel hosts when the configured app url is also on vercel", () => {
+		expect(
+			resolveProxyLocalhostRedirectTarget({
+				forwardedHostHeader: "bardo-preview-armando-andre-projects.vercel.app",
+				hostHeader: "bardo-preview-armando-andre-projects.vercel.app",
+				requestUrl:
+					"https://bardo-preview-armando-andre-projects.vercel.app/sign-in",
+				nextUrlHost: "bardo-preview-armando-andre-projects.vercel.app",
+				appUrl: "https://bardo-git-main-armando-andre-projects.vercel.app",
+			}),
+		).toBeNull();
+	});
 });

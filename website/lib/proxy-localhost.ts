@@ -11,6 +11,21 @@ type ResolveProxyLocalhostRedirectTargetArgs = {
 	appUrl: string | null | undefined;
 };
 
+function parseAppUrlHostname(appUrl: string | null | undefined): string | null {
+	const normalized = appUrl?.trim();
+	if (!normalized) return null;
+
+	try {
+		return new URL(normalized).hostname;
+	} catch {
+		return null;
+	}
+}
+
+function isVercelDeploymentHostname(hostname: string | null): boolean {
+	return typeof hostname === "string" && hostname.endsWith(".vercel.app");
+}
+
 function normalizeHost(host: string | null): string | null {
 	const value = host?.split(",")[0]?.trim();
 	return value ? value : null;
@@ -48,9 +63,25 @@ export function resolveProxyLocalhostRedirectTarget(
 		return null;
 	}
 
-	return shouldRedirectToCanonicalLocalhost({
+	const localhostRedirectTarget = shouldRedirectToCanonicalLocalhost({
 		requestHostname,
 		requestUrlHostname,
 		appUrl: args.appUrl,
 	});
+	if (localhostRedirectTarget) {
+		return localhostRedirectTarget;
+	}
+
+	const appHostname = parseAppUrlHostname(args.appUrl);
+	if (
+		isVercelDeploymentHostname(requestHostname) &&
+		isVercelDeploymentHostname(requestUrlHostname) &&
+		appHostname &&
+		!isVercelDeploymentHostname(appHostname) &&
+		requestUrlHostname !== appHostname
+	) {
+		return appHostname;
+	}
+
+	return null;
 }
