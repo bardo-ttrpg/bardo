@@ -1,5 +1,5 @@
-import { createPrivateMetadata } from "@/lib/site-metadata";
 import { permanentRedirect } from "next/navigation";
+import { createPrivateMetadata } from "@/lib/site-metadata";
 
 export const metadata = createPrivateMetadata("Legal");
 

@@ -66,16 +66,16 @@ function createHeading<Tag extends "h2" | "h3">(
 				{...props}
 			>
 				<span>{children}</span>
-					<a
-						href={`#${resolvedId}`}
-						aria-label={`Link to ${resolvedId}`}
-						className="ml-2 inline-flex items-center no-underline"
+				<a
+					href={`#${resolvedId}`}
+					aria-label={`Link to ${resolvedId}`}
+					className="ml-2 inline-flex items-center no-underline"
+				>
+					<span className="sr-only">{`Link to ${resolvedId}`}</span>
+					<span
+						aria-hidden="true"
+						className="ui-label opacity-0 transition-opacity group-hover/heading:opacity-100"
 					>
-						<span className="sr-only">{`Link to ${resolvedId}`}</span>
-						<span
-							aria-hidden="true"
-							className="ui-label opacity-0 transition-opacity group-hover/heading:opacity-100"
-						>
 						#
 					</span>
 				</a>
@@ -88,11 +88,7 @@ export function useMDXComponents(
 	components: ComponentsMap = {},
 ): ComponentsMap {
 	return {
-		h1: ({
-			children,
-			className,
-			...props
-		}: ComponentPropsWithoutRef<"h1">) => (
+		h1: ({ children, className, ...props }: ComponentPropsWithoutRef<"h1">) => (
 			<h1
 				className={cn(
 					"font-reading-heading text-4xl text-foreground sm:text-5xl",

@@ -1,6 +1,6 @@
-import { createPublicMetadata } from "@/lib/site-metadata";
 import { BardoViewTransition } from "@/components/view-transition";
 import { readPricingBillingForCurrentUser } from "@/lib/billing-view-data";
+import { createPublicMetadata } from "@/lib/site-metadata";
 import { PublicPageShell } from "../../_components/site-shells";
 import { resolveBillingClerkConfig } from "../../dashboard/_billing/billing-clerk-config";
 import { PricingClient } from "./pricing-client";

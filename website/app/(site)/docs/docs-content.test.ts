@@ -250,18 +250,18 @@ describe("docs content", () => {
 		expect(installDocSource).toContain("checksum");
 	});
 
-		test("documents client-specific Bardo setup for current supported clients", () => {
-			expect(opencodeDocSource).toContain(
-				"does not set OpenCode's `model` field",
-			);
-			expect(opencodeDocSource).toContain("opencode.json");
-			expect(opencodeDocSource).toContain("bardo connect --client opencode");
-			expect(geminiDocSource).toContain("bardo connect --client gemini");
-			expect(geminiDocSource).toContain(".gemini/settings.json");
-			expect(geminiDocSource).toContain("trust the workspace");
-			expect(geminiDocSource).toContain("Restart Gemini CLI");
-			expect(geminiDocSource).toContain("missing campaign material");
-		});
+	test("documents client-specific Bardo setup for current supported clients", () => {
+		expect(opencodeDocSource).toContain(
+			"does not set OpenCode's `model` field",
+		);
+		expect(opencodeDocSource).toContain("opencode.json");
+		expect(opencodeDocSource).toContain("bardo connect --client opencode");
+		expect(geminiDocSource).toContain("bardo connect --client gemini");
+		expect(geminiDocSource).toContain(".gemini/settings.json");
+		expect(geminiDocSource).toContain("trust the workspace");
+		expect(geminiDocSource).toContain("Restart Gemini CLI");
+		expect(geminiDocSource).toContain("missing campaign material");
+	});
 
 	test("documents the rulebook bootstrap pipeline and generated outputs", () => {
 		expect(rulesBootstrapDocSource).toContain("rulebook.md");
@@ -276,10 +276,12 @@ describe("docs content", () => {
 		expect(mechanicsDocSource).toContain("table decide");
 	});
 
-		test("documents the explicit correction flow and latest canon precedence", () => {
-			expect(mcpSurfaceDocSource).toContain("user_correction");
-			expect(mcpSurfaceDocSource).toContain("validated local state-changing events");
-			expect(runtimeSkillsDocSource).toContain("explicit user correction");
-			expect(runtimeSkillsDocSource).toContain("safe partial answer");
-		});
+	test("documents the explicit correction flow and latest canon precedence", () => {
+		expect(mcpSurfaceDocSource).toContain("user_correction");
+		expect(mcpSurfaceDocSource).toContain(
+			"validated local state-changing events",
+		);
+		expect(runtimeSkillsDocSource).toContain("explicit user correction");
+		expect(runtimeSkillsDocSource).toContain("safe partial answer");
+	});
 });

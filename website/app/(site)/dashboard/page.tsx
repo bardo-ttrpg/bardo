@@ -1,5 +1,5 @@
-import { createPrivateMetadata } from "@/lib/site-metadata";
 import { readDashboardViewDataForCurrentUser } from "@/lib/billing-view-data";
+import { createPrivateMetadata } from "@/lib/site-metadata";
 import { resolveBillingClerkConfig } from "./_billing/billing-clerk-config";
 import { DashboardClient } from "./dashboard-client";
 

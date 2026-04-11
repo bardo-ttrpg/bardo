@@ -11,7 +11,9 @@ export function TransitionLink({
 	...props
 }: TransitionLinkProps) {
 	if (prefetch) {
-		return <Link prefetch={true} transitionTypes={transitionTypes} {...props} />;
+		return (
+			<Link prefetch={true} transitionTypes={transitionTypes} {...props} />
+		);
 	}
 
 	return <Link prefetch={false} transitionTypes={transitionTypes} {...props} />;

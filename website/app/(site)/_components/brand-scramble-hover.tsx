@@ -115,7 +115,10 @@ export function BrandScrambleHover({
 	return (
 		<span
 			aria-hidden="true"
-			className={cn("relative inline-grid whitespace-nowrap leading-none", className)}
+			className={cn(
+				"relative inline-grid whitespace-nowrap leading-none",
+				className,
+			)}
 			onPointerEnter={startAnimation}
 		>
 			<span className="invisible col-start-1 row-start-1 select-none">

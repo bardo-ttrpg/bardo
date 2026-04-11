@@ -166,8 +166,7 @@ export function ForgotPasswordForm() {
 
 			dispatch({
 				type: "set_error",
-				value:
-					"Password reset is still incomplete. Please request a new code.",
+				value: "Password reset is still incomplete. Please request a new code.",
 			});
 		} catch (caught) {
 			dispatch({ type: "set_error", value: formatError(caught) });

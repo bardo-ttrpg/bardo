@@ -90,9 +90,13 @@ try {
 		"--fail-on",
 		"warning",
 	];
-	const firstPass = await runCommandBuffered(process.execPath, reactDoctorArgs, {
-		cwd: tempProjectDir,
-	});
+	const firstPass = await runCommandBuffered(
+		process.execPath,
+		reactDoctorArgs,
+		{
+			cwd: tempProjectDir,
+		},
+	);
 	const lintWasIncomplete =
 		firstPass.stdout.includes("Lint checks failed (non-fatal, skipping).") ||
 		firstPass.stdout.includes("results are incomplete") ||

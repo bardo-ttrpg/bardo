@@ -109,7 +109,9 @@ async function main() {
 			process.exit(result.exitCode);
 		}
 
-		const diagnosticsPath = extractDiagnosticsPath(`${result.stdout}\n${result.stderr}`);
+		const diagnosticsPath = extractDiagnosticsPath(
+			`${result.stdout}\n${result.stderr}`,
+		);
 		if (!diagnosticsPath) {
 			return;
 		}

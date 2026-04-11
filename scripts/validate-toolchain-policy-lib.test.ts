@@ -24,7 +24,7 @@ describe("validateToolchainPolicy", () => {
 				makeManifest("/repo/package.json", {
 					scripts: {
 						check:
-							'bun run validate:toolchain && bun run ./scripts/run-turbo.ts check',
+							"bun run validate:toolchain && bun run ./scripts/run-turbo.ts check",
 					},
 				}),
 				makeManifest("/repo/website/package.json", {

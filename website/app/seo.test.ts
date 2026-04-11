@@ -73,9 +73,7 @@ describe("SEO and production metadata", () => {
 			true,
 		);
 		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(true);
-		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(
-			true,
-		);
+		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(true);
 		expect(existsSync(new URL("./not-found.tsx", import.meta.url))).toBe(true);
 	});
 
@@ -142,9 +140,7 @@ describe("SEO and production metadata", () => {
 		const data = manifest();
 		expect(data.name).toBe("Bardo");
 		expect(data.start_url).toBe("/");
-		expect(data.icons?.some((icon) => icon.src === "/apple-icon")).toBe(
-			true,
-		);
+		expect(data.icons?.some((icon) => icon.src === "/apple-icon")).toBe(true);
 	});
 
 	test("keeps the landing page copy untouched while adding structured data and niche-targeted metadata", () => {
