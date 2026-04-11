@@ -10,6 +10,7 @@ export function shouldUseClerkOnlyProxyPathname(pathname: string): boolean {
 export function shouldRunClerkForPagePathname(pathname: string): boolean {
 	return (
 		pathname === "/" ||
+		pathname === "/pricing" ||
 		pathname.startsWith("/dashboard") ||
 		pathname === "/sign-in" ||
 		pathname.startsWith("/sign-in/") ||

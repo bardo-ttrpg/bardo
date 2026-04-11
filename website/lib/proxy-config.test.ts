@@ -19,6 +19,7 @@ describe("shouldUseClerkOnlyProxyPathname", () => {
 describe("shouldRunClerkForPagePathname", () => {
 	test("runs Clerk on auth-aware routes only", () => {
 		expect(shouldRunClerkForPagePathname("/")).toBe(true);
+		expect(shouldRunClerkForPagePathname("/pricing")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/dashboard")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/dashboard/connect/bridge/abc")).toBe(
 			true,

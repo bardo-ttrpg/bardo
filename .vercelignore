@@ -2,6 +2,10 @@
 .github
 .agents
 .codex
+.env
+.env.*
+**/.env
+**/.env.*
 .playwright-browsers
 .turbo
 opensrc
