@@ -1,6 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 
 const repoRoot = resolve(dirname(import.meta.dir), ".");
 const gitDirectory = resolve(repoRoot, ".git");
