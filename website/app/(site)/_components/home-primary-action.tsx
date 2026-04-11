@@ -43,9 +43,7 @@ function ResolvedHomePrimaryAction() {
 	}
 
 	if (actionState === "pending") {
-		return (
-			<PrimaryHomeLink href="/dashboard">Account</PrimaryHomeLink>
-		);
+		return <PrimaryHomeLink href="/dashboard">Account</PrimaryHomeLink>;
 	}
 
 	return <PrimaryHomeLink href="/sign-up">Sign Up</PrimaryHomeLink>;
