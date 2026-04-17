@@ -70,7 +70,7 @@ export default async function SitePage() {
 	return (
 		<PublicPageShell className="max-w-5xl pb-8 pt-8 text-balance sm:pb-10 sm:pt-8 lg:pb-20 lg:pt-4">
 			<script type="application/ld+json">{landingPageJsonLd}</script>
-			<BardoViewTransition name="bardo-page-region">
+			<BardoViewTransition name="bardo-page-region" variant="fade">
 				<section className={homeSectionClassName}>
 					<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
 
@@ -83,7 +83,7 @@ export default async function SitePage() {
 
 					<div className="flex flex-wrap items-center gap-4 pt-2">
 						<Button asChild size="sm" className={homeActionClassName}>
-							<TransitionLink href="/docs/install">
+							<TransitionLink href="/docs">
 								Start Playing
 							</TransitionLink>
 						</Button>

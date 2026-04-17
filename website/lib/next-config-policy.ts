@@ -1,4 +1,10 @@
-const LOCALHOST_DEV_ORIGINS = ["127.0.0.1", "localhost", "::1", "[::1]"];
+const LOCALHOST_DEV_ORIGINS = [
+	"127.0.0.1",
+	"localhost",
+	"::1",
+	"[::1]",
+	"evidently-exciting-ostrich.ngrok-free.app",
+];
 
 type SecurityHeader = {
 	key: string;

@@ -22,10 +22,6 @@ const signUpSource = readFileSync(
 	new URL("./(site)/(auth)/sign-up/[[...sign-up]]/page.tsx", import.meta.url),
 	"utf8",
 );
-const forgotPasswordSource = readFileSync(
-	new URL("./(site)/(auth)/forgot-password/page.tsx", import.meta.url),
-	"utf8",
-);
 const dashboardPageSource = readFileSync(
 	new URL("./(site)/dashboard/page.tsx", import.meta.url),
 	"utf8",
@@ -80,7 +76,6 @@ describe("SEO and production metadata", () => {
 	test("keeps private routes out of search indexes", () => {
 		expect(signInSource).toContain("createPrivateMetadata");
 		expect(signUpSource).toContain("createPrivateMetadata");
-		expect(forgotPasswordSource).toContain("createPrivateMetadata");
 		expect(dashboardPageSource).toContain("createPrivateMetadata");
 	});
 
@@ -106,7 +101,6 @@ describe("SEO and production metadata", () => {
 						"/dashboard",
 						"/sign-in",
 						"/sign-up",
-						"/forgot-password",
 					]),
 				}),
 			]),

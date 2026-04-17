@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BillingPlanCard } from "./dashboard-client";
 
 describe("BillingPlanCard", () => {
-	test("renders remaining credits and next reset timing from Clerk billing data", () => {
+	test("renders subscription summary from Clerk billing data", () => {
 		const html = renderToStaticMarkup(
 			<BillingPlanCard
 				billingLoading={false}
@@ -25,9 +25,11 @@ describe("BillingPlanCard", () => {
 			/>,
 		);
 
-		expect(html).toContain("Credits remaining");
-		expect(html).toContain("24,988");
-		expect(html).toContain("Next reset");
+		expect(html).toContain("Subscription:");
+		expect(html).toContain("Status:");
+		expect(html).toContain("MCP Total Calls:");
+		expect(html).toContain("42");
+		expect(html).toContain("Reset:");
 		expect(html).toContain(
 			new Date(Date.UTC(2026, 2, 31, 0, 0, 0)).toLocaleString(),
 		);

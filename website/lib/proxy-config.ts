@@ -14,8 +14,6 @@ export function shouldRunClerkForPagePathname(pathname: string): boolean {
 		pathname.startsWith("/dashboard") ||
 		pathname === "/sign-in" ||
 		pathname.startsWith("/sign-in/") ||
-		pathname === "/forgot-password" ||
-		pathname.startsWith("/forgot-password/") ||
 		pathname === "/sign-up" ||
 		pathname.startsWith("/sign-up/")
 	);

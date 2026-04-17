@@ -12,8 +12,7 @@ function shouldShowSiteHeader(pathname: string | null) {
 	return !(
 		pathname.startsWith("/docs") ||
 		pathname.startsWith("/sign-in") ||
-		pathname.startsWith("/sign-up") ||
-		pathname.startsWith("/forgot-password")
+		pathname.startsWith("/sign-up")
 	);
 }
 

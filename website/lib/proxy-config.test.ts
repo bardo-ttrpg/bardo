@@ -27,7 +27,6 @@ describe("shouldRunClerkForPagePathname", () => {
 		expect(shouldRunClerkForPagePathname("/blog")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/sign-in")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/sign-up")).toBe(true);
-		expect(shouldRunClerkForPagePathname("/forgot-password")).toBe(true);
 		expect(shouldRunClerkForPagePathname("/docs/install")).toBe(false);
 		expect(shouldRunClerkForPagePathname("/legal/privacy")).toBe(false);
 	});
