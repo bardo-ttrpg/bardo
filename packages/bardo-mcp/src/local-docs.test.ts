@@ -88,6 +88,15 @@ describe("ensureWorkspaceLocalDocs", () => {
 			);
 			expect(skill).toContain(".bardo/docs/quickstart.md");
 			expect(skill).toContain("Read `bardo_workspace_status` before");
+			expect(skill).toContain("- `scene_turn`");
+			expect(skill).toContain("- `player_action`");
+			expect(skill).toContain("- `world_sync`");
+			expect(skill).toContain("- `simulation_tick`");
+			expect(skill).toContain("- `user_correction`");
+			expect(skill).toContain("If `committed` is `false`");
+			expect(skill).toContain("If `eventId` and `stateHash` are present");
+			expect(skill).toContain("do not teach the full internal runtime recipe");
+			expect(skill).not.toContain("validator heuristics");
 			expect(
 				(await stat(path.join(workspaceRoot, ".agents/skills/bardo-runtime"))).isDirectory(),
 			).toBe(true);

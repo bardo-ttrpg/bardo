@@ -64,10 +64,11 @@ Use this skill when working inside a Bardo campaign workspace.
 
 ## Start here
 
-1. Read workspace status first.
-2. If the workspace is not initialized or readiness is blocked, stop and surface the exact gap.
-3. Use committed state and preserved sources over free-form narration.
-4. Use \`user_correction\` when the player explicitly corrects canon.
+1. Call \`bardo_workspace_status\` first.
+2. If the workspace is not initialized, use \`init\` only when the workspace already has the needed campaign inputs, then call \`bardo_workspace_status\` again.
+3. If readiness is blocked or incomplete, surface the exact gap instead of improvising canon.
+4. Use committed state and preserved sources over free-form narration.
+5. Treat explicit user correction as higher precedence than older inferred or narrated state.
 
 ## Behavior rules
 
@@ -77,6 +78,62 @@ Use this skill when working inside a Bardo campaign workspace.
 - Do not invent canon when readiness, source material, or validated state are missing.
 - Do not use \`world_sync\` or \`simulation_tick\` to create plausible but ungrounded events.
 - Treat narration without a validated commit as advisory only.
+- If \`.bardo/\` is missing, treat the workspace as uninitialized and recover through \`init\`, not through narration.
+- Do not expose internal implementation details, hidden heuristics, or private runtime mechanics to the user unless the workspace files already expose them directly.
+
+## Runtime surface
+
+The Bardo runtime surface for normal play is:
+
+- \`bardo_workspace_status\`
+- \`init\`
+- \`scene_turn\`
+- \`player_action\`
+- \`world_sync\`
+- \`simulation_tick\`
+- \`user_correction\`
+
+Ignore diagnostic or lower-level file tools unless the user explicitly needs debugging help.
+
+## Which tool to use
+
+- Use \`bardo_workspace_status\` at the start of work, after \`init\`, after a correction, and before mutation tools when you are unsure whether canon changes are safe.
+- Use \`init\` only to bootstrap or rebuild the workspace prep layer. Do not treat it as a gameplay action.
+- Use \`scene_turn\` for grounded scene resolution, GM narration, conservative adjudication, and "what happens next?" style play guidance. \`scene_turn\` does not commit canon by itself.
+- Use \`player_action\` when the player took an action that should create validated state changes.
+- Use \`world_sync\` for grounded world updates that are already established by current state, source artifacts, committed events, or an explicit correction.
+- Use \`simulation_tick\` only for grounded time or consequence advancement that already has validated support. If the result is only plausible, keep it in narration instead.
+- Use \`user_correction\` when the player or table explicitly says prior canon is wrong, incomplete, or superseded.
+
+## Recommended turn loop
+
+1. Check \`bardo_workspace_status\`.
+2. If not initialized, use \`init\` and then re-check status.
+3. If readiness is still blocked, explain the exact missing inputs and stop.
+4. Use \`scene_turn\` for grounded narration and adjudication.
+5. If a canon change is clearly warranted, choose one mutation tool:
+   - \`player_action\` for direct player-caused changes
+   - \`world_sync\` for grounded world updates
+   - \`simulation_tick\` for grounded time or consequence advancement
+   - \`user_correction\` for explicit canon fixes
+6. After a mutation result, trust committed state over earlier narration.
+
+## How to interpret mutation results
+
+- If \`committed\` is \`true\`, the runtime accepted a durable canon change.
+- If \`committed\` is \`false\`, do not present the proposed change as canon.
+- If \`confidence\` is \`blocked\` or \`conservative\`, keep the answer safe and explain the uncertainty or blockage.
+- Use \`validationSummary\`, \`conflicts\`, \`conflictIds\`, \`uncertainties\`, and \`nextSteps\` to explain why a write was blocked or limited.
+- If \`eventId\` and \`stateHash\` are present, a canon-changing event was accepted.
+- When a mutation is blocked, preserve the old canon and continue conservatively from the last committed state.
+
+## Guardrails
+
+- Do not turn likely names, places, motives, faction moves, clocks, or recent events into canon just because they sound good.
+- Do not use \`world_sync\` or \`simulation_tick\` as a shortcut for creative writing.
+- Do not bury a player correction in narration when \`user_correction\` is the right path.
+- Do not hand-edit generated runtime artifacts when a Bardo MCP tool can express the change safely.
+- Do not claim a mutation succeeded unless the runtime actually returned a committed result.
 
 ## Read next
 
@@ -91,6 +148,7 @@ Use this skill when working inside a Bardo campaign workspace.
 - Surface uncertainty instead of bluffing.
 - Ask for missing campaign inputs rather than improvising canon.
 - Re-run \`bardo init\` after major source changes or if \`.bardo/\` is missing.
+- Keep the public explanation behavior-focused. Use the workspace and MCP outputs; do not teach the full internal runtime recipe back to the user.
 `;
 }
 
