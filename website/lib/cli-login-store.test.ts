@@ -5,6 +5,11 @@ describe("cli login token store", () => {
 	test("accepts the first token use and rejects a replay", async () => {
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:00:00.000Z"),
+			env: {
+				NODE_ENV: "development",
+				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "true",
+			},
+			store: null,
 		});
 
 		const first = await store.consume({
@@ -24,6 +29,11 @@ describe("cli login token store", () => {
 	test("rejects expired tokens before storing them", async () => {
 		const store = createCliLoginTokenStore({
 			nowMs: () => Date.parse("2026-03-03T00:05:00.000Z"),
+			env: {
+				NODE_ENV: "development",
+				BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "true",
+			},
+			store: null,
 		});
 
 		const result = await store.consume({

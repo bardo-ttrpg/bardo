@@ -25,6 +25,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { PlanTier } from "./plan-utils";
 import { bootstrapImportedRulebook } from "./rules-bootstrap";
+import { normalizeRuntimeManifest } from "./runtime-manifest";
 import { resolveBardoRoot, WORKSPACE_DIRECTORIES } from "./workspace-schema";
 
 type Writer = {
@@ -687,6 +688,15 @@ function deriveWorkspaceStatusNextSteps(
 	];
 }
 
+function buildWorkspaceMutationGuardrails(): string[] {
+	return [
+		"Use world_sync and simulation_tick only for updates already grounded in current state, source artifacts, committed events, or explicit user correction.",
+		"Do not invent plausible recentEvents, faction moves, NPC reactions, or travel outcomes just because they seem likely.",
+		"Use user_correction when the player is explicitly introducing or correcting canon.",
+		"Keep guesses and likely consequences in narration until Bardo can validate them.",
+	];
+}
+
 async function hashImportedRulebooks(args: {
 	bardoRoot: string;
 	importedRulebooks: string[];
@@ -728,7 +738,9 @@ export async function detectRulebookHashDrift(args: {
 	}>;
 }> {
 	const manifestPath = path.join(args.bardoRoot, "manifest.json");
-	const manifest = await readExistingJson(manifestPath);
+	const manifest = normalizeRuntimeManifest(
+		await readExistingJson(manifestPath),
+	);
 	if (!manifest) {
 		return { detected: false, warnings: [] };
 	}
@@ -788,7 +800,9 @@ export async function ensureWorkspaceCoreFiles(args: {
 	importedRulebooks: string[];
 }): Promise<void> {
 	const manifestPath = path.join(args.bardoRoot, "manifest.json");
-	const manifest = await readExistingJson(manifestPath);
+	const manifest = normalizeRuntimeManifest(
+		await readExistingJson(manifestPath),
+	);
 	const importedRulebooks =
 		args.importedRulebooks.length > 0
 			? args.importedRulebooks
@@ -861,6 +875,13 @@ export async function ensureWorkspaceCoreFiles(args: {
 					readinessPath: campaignBootstrap.readinessPath,
 					readiness: campaignBootstrap.readiness,
 				},
+				runtimeArtifacts: {
+					conflictsPath: "manifests/conflicts.json",
+					diagnosticsPath: "manifests/diagnostics.json",
+					turnTracePath: "logs/turn-trace.ndjson",
+					snapshotsDirectory: "snapshots",
+					snapshotIndexPath: "snapshots/index.json",
+				},
 				capabilityManifest: toStringArray(manifest?.capabilityManifest),
 				supplements: Array.isArray(manifest?.supplements)
 					? manifest.supplements
@@ -873,6 +894,63 @@ export async function ensureWorkspaceCoreFiles(args: {
 	await ensureFile(
 		path.join(args.bardoRoot, "events/state-changes.ndjson"),
 		"",
+	);
+	await ensureFile(
+		path.join(args.bardoRoot, "manifests/conflicts.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				conflicts: [],
+			},
+			null,
+			2,
+		),
+	);
+	await ensureFile(
+		path.join(args.bardoRoot, "manifests/diagnostics.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				readinessStatus: campaignBootstrap.readiness.status,
+				latestEventId: null,
+				latestStateHash: null,
+				latestSnapshotId: null,
+				latestSnapshotPath: null,
+				snapshotCount: 0,
+				recentEventIds: [],
+				activeConflictIds: [],
+				correctionEventIds: [],
+				integrity: {
+					status: "valid",
+					currentStateHash: null,
+					eventLogHash: null,
+					latestSnapshotHash: null,
+				},
+				replayStatus: {
+					canReplayFromEventZero: true,
+					canReplayFromLatestSnapshot: false,
+					lastReplayMode: null,
+				},
+			},
+			null,
+			2,
+		),
+	);
+	await ensureFile(path.join(args.bardoRoot, "logs/turn-trace.ndjson"), "");
+	await mkdir(path.join(args.bardoRoot, "snapshots"), { recursive: true });
+	await ensureFile(
+		path.join(args.bardoRoot, "snapshots/index.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				snapshots: [],
+			},
+			null,
+			2,
+		),
 	);
 }
 
@@ -1264,7 +1342,7 @@ function localToolDefinitions(
 			name: "bardo_workspace_status",
 			title: "Workspace Status",
 			description:
-				"Return the active workspace root, initialization state, readiness summary, and current-state highlights so agents can decide whether play can continue safely.",
+				"Return the active workspace root, initialization state, readiness summary, current-state highlights, and mutation guardrails so agents know when play can continue and when canon writes would be unsafe.",
 			inputSchema: {
 				type: "object",
 				properties: {},
@@ -1320,6 +1398,7 @@ function localToolDefinitions(
 					readiness,
 					currentStateSummary,
 					nextSteps: deriveWorkspaceStatusNextSteps(readiness.status),
+					mutationGuardrails: buildWorkspaceMutationGuardrails(),
 					rulebookHashDrift,
 				};
 			},
@@ -1585,7 +1664,7 @@ function localToolDefinitions(
 			name: "world_sync",
 			title: "Synchronize World State",
 			description:
-				"Commit validated world-state changes to the local runtime artifacts without handing ownership to a remote gameplay service.",
+				"Commit validated world-state changes to the local runtime artifacts. Use only for updates already grounded in current state, source artifacts, committed events, or explicit user correction; not for inventing plausible follow-on events.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -1649,7 +1728,7 @@ function localToolDefinitions(
 			name: "simulation_tick",
 			title: "Advance Simulation",
 			description:
-				"Advance the local world simulation through validated state-changing events grounded in the prep artifacts and current state.",
+				"Advance the local world simulation through validated state-changing events grounded in prep artifacts and current state. Do not use this to invent plausible new faction moves or recent events that are not already grounded.",
 			inputSchema: {
 				type: "object",
 				properties: {
