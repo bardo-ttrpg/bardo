@@ -1,9 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BillingPlanCard } from "./dashboard-client";
 
 describe("BillingPlanCard", () => {
-	test("renders subscription summary from Clerk billing data", () => {
+	test("renders subscription summary from Clerk billing data", async () => {
+		mock.module("./_billing/checkout-button", () => ({
+			default: () => null,
+		}));
+		mock.module("./_billing/subscription-details-button", () => ({
+			default: () => null,
+		}));
+		mock.module("./signout-button", () => ({
+			DashboardSignOutButton: () => null,
+		}));
+
+		const { BillingPlanCard } = await import("./dashboard-client");
 		const html = renderToStaticMarkup(
 			<BillingPlanCard
 				billingLoading={false}
@@ -25,11 +35,12 @@ describe("BillingPlanCard", () => {
 			/>,
 		);
 
-		expect(html).toContain("Subscription:");
+		expect(html).toContain("Access:");
 		expect(html).toContain("Status:");
-		expect(html).toContain("MCP Total Calls:");
+		expect(html).toContain("MCP calls this period:");
 		expect(html).toContain("42");
-		expect(html).toContain("Reset:");
+		expect(html).toContain("Credits remaining:");
+		expect(html).toContain("Next reset:");
 		expect(html).toContain(
 			new Date(Date.UTC(2026, 2, 31, 0, 0, 0)).toLocaleString(),
 		);

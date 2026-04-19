@@ -6,25 +6,20 @@ export const size = {
 };
 export const contentType = "image/png";
 
+const iconStyle = {
+	alignItems: "center",
+	background: "#101010",
+	borderRadius: 14,
+	color: "#f5f1e8",
+	display: "flex",
+	fontSize: 38,
+	fontWeight: 800,
+	height: "100%",
+	justifyContent: "center",
+	letterSpacing: "-0.08em",
+	width: "100%",
+} as const;
+
 export default function Icon() {
-	return new ImageResponse(
-		<div
-			style={{
-				alignItems: "center",
-				background: "#101010",
-				borderRadius: 14,
-				color: "#f5f1e8",
-				display: "flex",
-				fontSize: 38,
-				fontWeight: 800,
-				height: "100%",
-				justifyContent: "center",
-				letterSpacing: "-0.08em",
-				width: "100%",
-			}}
-		>
-			B
-		</div>,
-		size,
-	);
+	return new ImageResponse(<div style={iconStyle}>B</div>, size);
 }
