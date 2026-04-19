@@ -41,8 +41,9 @@ export default function SecurityPage() {
 				</p>
 				<p>
 					This page is a high-level overview only. It should not be read as a
-					promise of specific certifications, audit results, or formal security
-					commitments that Bardo does not publicly publish.
+					promise of specific certifications, audit results, penetration-test
+					claims, or formal security commitments that Bardo does not publicly
+					publish.
 				</p>
 			</LegalSection>
 			<LegalSection
@@ -64,7 +65,8 @@ export default function SecurityPage() {
 				<p>
 					Bardo will update this page if the public security posture or hosted
 					service boundary changes materially. Questions about security can be
-					sent through the main Bardo support channels.
+					sent through the main Bardo support channels, but this page remains a
+					high-level overview only.
 				</p>
 			</LegalSection>
 		</LegalEntryContent>

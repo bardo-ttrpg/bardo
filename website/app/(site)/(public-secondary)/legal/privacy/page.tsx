@@ -23,14 +23,15 @@ export default function PrivacyPage() {
 			>
 				<p>
 					Bardo keeps the hosted website surface intentionally small. The hosted
-					layer may process the account, authentication, subscription, approval,
-					and metering information required to operate sign-in, billing, and
-					protected dashboard routes.
+					layer may process account, authentication, subscription, billing,
+					approval, and session-status information needed to operate sign-in,
+					protected dashboard routes, bridge approvals, and related account
+					workflows.
 				</p>
 				<p>
-					The exact data involved depends on the workflow you use. For example,
-					account access and billing depend on identity and subscription state,
-					while bridge approval flows depend on session and status data.
+					That hosted data exists for account operation only. Bard Studio does
+					not use the website to collect or host your local campaign canon as a
+					normal part of the product.
 				</p>
 			</LegalSection>
 			<LegalSection
@@ -43,9 +44,10 @@ export default function PrivacyPage() {
 					workflows, and support bridge approval or status checks.
 				</p>
 				<p>
-					This privacy page describes the Bardo-hosted surface only. Third-party
-					clients, model providers, and other tools you connect may have their
-					own separate privacy practices.
+					Bardo has no sale of user data, and it does not use your hosted
+					account data to turn the service into a hosted copy of your local
+					campaign workspace. Third-party clients, model providers, and other
+					tools you connect have their own separate privacy practices.
 				</p>
 			</LegalSection>
 			<LegalSection id="what-stays-local" title="What stays local">
@@ -57,7 +59,8 @@ export default function PrivacyPage() {
 				</p>
 				<p>
 					The Bardo website does not need your local campaign files in order to
-					run account access, billing, or approval workflows.
+					run account access, billing, approval workflows, or bridge status
+					checks.
 				</p>
 			</LegalSection>
 			<LegalSection
@@ -65,9 +68,9 @@ export default function PrivacyPage() {
 				title="Retention and requests"
 			>
 				<p>
-					Bardo retains hosted data only as needed to operate the website and
-					account layer, comply with obligations, and troubleshoot service
-					issues. Retention may vary by workflow and dependency.
+					Bardo retains hosted data only as needed to operate the service,
+					support accounts and subscriptions, comply with legal obligations, and
+					troubleshoot issues. Retention can vary by workflow and dependency.
 				</p>
 				<p>
 					Questions about privacy or data handling can be directed through the

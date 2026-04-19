@@ -10,6 +10,15 @@ Connect your AI client after the workspace is prepared. This keeps the setup sim
 
 Expected result: Bardo writes the client config file for that workspace, and the client can see the local Bardo connection the next time it starts.
 
+## why this is needed
+
+Bardo uses a local MCP endpoint so the client can work directly from your local workspace and `.bardo/` prep layer. The browser approval is still necessary because Bardo needs hosted account approval, billing, entitlements, and bridge-session checks before the local bridge starts serving the client.
+
+This is the split:
+
+- hosted side: sign-in, browser approval, billing, entitlements, token refresh, runtime status
+- local side: workspace discovery, rules bootstrap, campaign bootstrap, current state, committed canon, scene resolution
+
 ## Client-specific guides
 
 - [OpenCode](/docs/clients/opencode)
@@ -47,9 +56,15 @@ bardo init --rulebook ./rules/core-rulebook.md
 
 The browser approval confirms account access for the bridge session. The hosted side handles approvals, billing, entitlements, status checks, and token refresh. It does not own your campaign truth.
 
-## What stays local
+## Local MCP endpoint
+
+After approval, your client talks to the local MCP endpoint exposed by the Bardo bridge. That endpoint exists so the client can use workspace files and `.bardo/` artifacts without sending your campaign into a hosted gameplay service.
+
+## what stays local
 
 Workspace discovery, rules bootstrap, campaign bootstrap, and local play state stay on your machine. The generated `.bardo/` artifacts are the prep layer your client should rely on before continuing play.
+
+If `.bardo/` goes missing, stop and re-run `bardo init`. Bardo is designed to fail closed instead of silently recreating canon during a turn.
 
 If the table explicitly corrects a fact, record that correction through Bardo instead of leaving it buried in chat history.
 
@@ -60,3 +75,4 @@ Treat `429` responses from hosted routes as backpressure on approvals or status 
 Troubleshooting:
 - If the client does not see Bardo, restart the client after `bardo connect`.
 - If readiness is not `ready`, fix the missing campaign inputs before expecting richer play.
+- If the workspace lost `.bardo/`, rebuild it with `bardo init` before resuming play.
