@@ -8,6 +8,7 @@ Symptoms:
 - `bardo init` fails
 - `.bardo/manifests/readiness.json` is missing
 - rules bootstrap or campaign bootstrap outputs are partial
+- `.bardo/` was deleted or is otherwise missing after the workspace was already in use
 
 Checks:
 1. Confirm `rulebook.md` exists at the workspace root, or confirm the operator intentionally passed `--rulebook`.
@@ -17,9 +18,10 @@ Checks:
 
 Recovery:
 1. Fix the missing or invalid rulebook input first.
-2. Remove only the incomplete generated artifacts under `.bardo/` if the failure happened mid-bootstrap.
-3. Re-run `bardo init`.
-4. If the workspace has contradictory notes, preserve them and resolve the readiness gaps instead of force-editing generated state.
+2. If `.bardo/` is missing, treat the workspace as uninitialized. Bardo should fail closed until bootstrap is run again.
+3. Remove only the incomplete generated artifacts under `.bardo/` if the failure happened mid-bootstrap.
+4. Re-run `bardo init`.
+5. If the workspace has contradictory notes, preserve them and resolve the readiness gaps instead of force-editing generated state.
 
 ## Failed migration
 
