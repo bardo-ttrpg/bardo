@@ -1,4 +1,3 @@
-import { mcpPeriodLimitForPlan } from "./api-keys";
 import {
 	type BillingSnapshot,
 	createBillingAdminClient,
@@ -21,14 +20,6 @@ export type BillingViewState = Pick<
 	| "cancelAtPeriodEnd"
 >;
 
-export type DashboardViewData = {
-	billing: BillingViewState | null;
-	accessPolicy: {
-		subscribed: boolean;
-		mcpPeriodLimit: number;
-	};
-};
-
 function toBillingViewState(snapshot: BillingSnapshot): BillingViewState {
 	return {
 		plan: snapshot.plan,
@@ -46,9 +37,9 @@ function toBillingViewState(snapshot: BillingSnapshot): BillingViewState {
 	};
 }
 
-export async function readDashboardViewDataForCurrentUser(
-	route = "/dashboard",
-): Promise<DashboardViewData | null> {
+export async function readPricingBillingForCurrentUser(
+	route = "/pricing",
+): Promise<BillingViewState | null> {
 	const userId = await resolveOptionalUserId(route);
 	if (!userId) {
 		return null;
@@ -57,19 +48,5 @@ export async function readDashboardViewDataForCurrentUser(
 	const billing = toBillingViewState(
 		await createBillingAdminClient().readBillingSnapshot(userId),
 	);
-
-	return {
-		billing,
-		accessPolicy: {
-			subscribed: billing.plan === "solo",
-			mcpPeriodLimit: mcpPeriodLimitForPlan(billing.plan),
-		},
-	};
-}
-
-export async function readPricingBillingForCurrentUser(
-	route = "/pricing",
-): Promise<BillingViewState | null> {
-	const dashboardData = await readDashboardViewDataForCurrentUser(route);
-	return dashboardData?.billing ?? null;
+	return billing;
 }

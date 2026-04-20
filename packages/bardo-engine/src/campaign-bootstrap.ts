@@ -1,5 +1,25 @@
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+	buildBeforeAfterSummary,
+	buildFactionPressure,
+	buildWorldClockStates,
+	computeStateHash,
+	createBlankCurrentState,
+	createDiagnosticsManifest,
+	createEntityCatalog,
+	createFieldMetadataEntry,
+	createRuntimeEventId,
+	createSnapshotRecord,
+	findEntityId,
+	normalizeCurrentState,
+	type ConfidenceClass,
+	type EntityCatalog,
+	type RuntimeCurrentState,
+	type RuntimeEventRecord,
+	RUNTIME_ARTIFACT_PATHS,
+	RUNTIME_SCHEMA_VERSION,
+} from "./runtime-contracts";
 
 export type CampaignBootstrapReadiness =
 	| "ready"
@@ -59,6 +79,7 @@ type Candidate = {
 
 type ExtractedCampaignData = {
 	entities: EntityIndex;
+	entitySourcePaths: Partial<Record<keyof EntityCatalog, Record<string, string[]>>>;
 	currentLocationCandidates: Candidate[];
 	uncertainties: string[];
 	gaps: string[];
@@ -128,6 +149,7 @@ export async function bootstrapCampaignWorkspace(
 
 	if (!hasRulesBootstrap) {
 		await ensureJsonFile(path.join(args.bardoRoot, readinessPath), {
+			schemaVersion: RUNTIME_SCHEMA_VERSION,
 			status: "needs-user-input" satisfies CampaignBootstrapReadiness,
 			gaps: [
 				"Rules bootstrap must complete before campaign bootstrap can begin.",
@@ -154,7 +176,14 @@ export async function bootstrapCampaignWorkspace(
 		workspaceRoot: args.workspaceRoot,
 		sources: sourceEntries,
 	});
-	const currentState = deriveCurrentState(extracted);
+	const entityCatalog = createEntityCatalog({
+		...extracted.entities,
+		sourcePaths: extracted.entitySourcePaths,
+	});
+	const currentState = deriveCurrentState(extracted, {
+		nowIso: args.nowIso,
+		catalog: entityCatalog,
+	});
 	const trackingProfile = deriveTrackingProfile(
 		extracted.entities,
 		currentState,
@@ -168,11 +197,14 @@ export async function bootstrapCampaignWorkspace(
 				: "needs-user-input";
 
 	await ensureJsonFile(path.join(args.bardoRoot, sourceIndexPath), {
+		schemaVersion: RUNTIME_SCHEMA_VERSION,
 		sources: sourceEntries,
 		updatedAtISO: args.nowIso,
 	});
 	await ensureJsonFile(path.join(args.bardoRoot, entitiesPath), {
+		schemaVersion: RUNTIME_SCHEMA_VERSION,
 		...extracted.entities,
+		records: entityCatalog,
 		updatedAtISO: args.nowIso,
 	});
 	await ensureJsonFile(path.join(args.bardoRoot, currentStatePath), {
@@ -180,13 +212,28 @@ export async function bootstrapCampaignWorkspace(
 		updatedAtISO: args.nowIso,
 	});
 	await ensureJsonFile(path.join(args.bardoRoot, trackingProfilePath), {
+		schemaVersion: RUNTIME_SCHEMA_VERSION,
 		...trackingProfile,
 		updatedAtISO: args.nowIso,
 	});
 	await ensureJsonFile(path.join(args.bardoRoot, readinessPath), {
+		schemaVersion: RUNTIME_SCHEMA_VERSION,
 		status: readiness,
 		gaps,
 		updatedAtISO: args.nowIso,
+	});
+	await writeInitialRuntimeSupportArtifacts({
+		bardoRoot: args.bardoRoot,
+		nowIso: args.nowIso,
+		currentState,
+		readiness,
+		entityCatalog,
+		consultedArtifacts: [
+			"rules/normalized/index.json",
+			...sourceEntries
+				.filter((entry) => entry.status === "included")
+				.map((entry) => entry.relativePath),
+		],
 	});
 
 	return {
@@ -280,6 +327,7 @@ async function extractCampaignData(args: {
 	const factionConsequences: string[] = [];
 	const clockProgress: string[] = [];
 	const npcAttitudes: Record<string, string> = {};
+	const entitySourcePaths = createEmptyEntitySourcePaths();
 	const gaps = args.sources
 		.filter((source) => source.role === "campaign-file")
 		.map((source) => source.skippedReason)
@@ -313,6 +361,11 @@ async function extractCampaignData(args: {
 			]);
 			if (explicitCurrent) {
 				locations.push(explicitCurrent);
+				recordEntitySource(
+					entitySourcePaths.locations,
+					explicitCurrent,
+					source.relativePath,
+				);
 				currentLocationCandidates.push({
 					value: explicitCurrent,
 					strength: trimmed.toLowerCase().startsWith("current location:")
@@ -327,6 +380,11 @@ async function extractCampaignData(args: {
 			]);
 			if (possibleLocation) {
 				locations.push(possibleLocation);
+				recordEntitySource(
+					entitySourcePaths.locations,
+					possibleLocation,
+					source.relativePath,
+				);
 				currentLocationCandidates.push({
 					value: possibleLocation,
 					strength: 1,
@@ -342,10 +400,20 @@ async function extractCampaignData(args: {
 				source.relativePath,
 			)) {
 				locations.push(inferred.value);
+				recordEntitySource(
+					entitySourcePaths.locations,
+					inferred.value,
+					source.relativePath,
+				);
 				currentLocationCandidates.push(inferred);
 			}
 			for (const referencedLocation of inferReferencedLocations(trimmed)) {
 				locations.push(referencedLocation);
+				recordEntitySource(
+					entitySourcePaths.locations,
+					referencedLocation,
+					source.relativePath,
+				);
 			}
 
 			const quest = parsePrefixedValue(trimmed, [
@@ -356,6 +424,11 @@ async function extractCampaignData(args: {
 			]);
 			if (quest) {
 				quests.push(quest);
+				recordEntitySource(
+					entitySourcePaths.quests,
+					quest,
+					source.relativePath,
+				);
 			}
 
 			const faction = parsePrefixedValue(trimmed, [
@@ -363,12 +436,24 @@ async function extractCampaignData(args: {
 				"Faction:",
 			]);
 			if (faction) {
-				factions.push(stripTrailingContext(faction));
+				const normalizedFaction = stripTrailingContext(faction);
+				factions.push(normalizedFaction);
+				recordEntitySource(
+					entitySourcePaths.factions,
+					normalizedFaction,
+					source.relativePath,
+				);
 			}
 
 			const event = parsePrefixedText(trimmed, ["Recent event:", "Event:"]);
 			if (event) {
-				recentEvents.push(normalizeFreeformValue(event));
+				const normalizedEvent = normalizeFreeformValue(event);
+				recentEvents.push(normalizedEvent);
+				recordEntitySource(
+					entitySourcePaths.recentEvents,
+					normalizedEvent,
+					source.relativePath,
+				);
 			}
 
 			const fact = parsePrefixedText(trimmed, ["Fact revealed:", "Fact:"]);
@@ -376,6 +461,11 @@ async function extractCampaignData(args: {
 				const normalizedFact = normalizeFreeformValue(fact);
 				facts.push(normalizedFact);
 				factsRevealed.push(normalizedFact);
+				recordEntitySource(
+					entitySourcePaths.facts,
+					normalizedFact,
+					source.relativePath,
+				);
 			}
 
 			const consequence = parsePrefixedText(trimmed, [
@@ -389,12 +479,22 @@ async function extractCampaignData(args: {
 			const character = parsePrefixedValue(trimmed, ["Character:", "NPC:"]);
 			if (character) {
 				characters.push(character);
+				recordEntitySource(
+					entitySourcePaths.characters,
+					character,
+					source.relativePath,
+				);
 			}
 
 			const npcAttitude = parseNpcAttitude(trimmed);
 			if (npcAttitude) {
 				characters.push(npcAttitude.name);
 				npcAttitudes[npcAttitude.name] = npcAttitude.attitude;
+				recordEntitySource(
+					entitySourcePaths.characters,
+					npcAttitude.name,
+					source.relativePath,
+				);
 			}
 
 			const clock = parsePrefixedText(trimmed, [
@@ -408,6 +508,11 @@ async function extractCampaignData(args: {
 				const clockName = inferClockName(normalizedClock);
 				if (clockName) {
 					clocks.push(clockName);
+					recordEntitySource(
+						entitySourcePaths.clocks,
+						clockName,
+						source.relativePath,
+					);
 				}
 			}
 
@@ -441,6 +546,7 @@ async function extractCampaignData(args: {
 			facts: unique(facts),
 			clocks: unique(clocks),
 		},
+		entitySourcePaths,
 		currentLocationCandidates,
 		uncertainties: unique(uncertainties),
 		gaps,
@@ -533,7 +639,11 @@ function inferClockName(value: string): string | null {
 
 function deriveCurrentState(
 	extracted: ExtractedCampaignData,
-): CurrentStateModel {
+	args: {
+		nowIso: string;
+		catalog: EntityCatalog;
+	},
+): RuntimeCurrentState {
 	const rankedLocations = [...extracted.currentLocationCandidates].sort(
 		(left, right) => right.strength - left.strength,
 	);
@@ -550,20 +660,58 @@ function deriveCurrentState(
 		);
 	}
 
-	return {
-		currentLocation,
-		activeQuests: extracted.entities.quests,
-		relevantFactions: extracted.entities.factions,
-		recentEvents: extracted.entities.recentEvents,
-		uncertainties: unique(uncertainties),
-		factsRevealed: extracted.factsRevealed,
-		factionConsequences: extracted.factionConsequences,
-		npcAttitudes: extracted.npcAttitudes,
-		clockProgress: extracted.clockProgress,
-		resourcesSpent: [],
-		damageTaken: [],
-		activeCorrections: [],
-	};
+	return normalizeCurrentState(
+		{
+			schemaVersion: RUNTIME_SCHEMA_VERSION,
+			currentLocation,
+			activeQuests: extracted.entities.quests,
+			relevantFactions: extracted.entities.factions,
+			recentEvents: extracted.entities.recentEvents,
+			uncertainties: unique(uncertainties),
+			factsRevealed: extracted.factsRevealed,
+			factionConsequences: extracted.factionConsequences,
+			npcAttitudes: extracted.npcAttitudes,
+			clockProgress: extracted.clockProgress,
+			resourcesSpent: [],
+			damageTaken: [],
+			activeCorrections: [],
+			worldTime: {
+				currentDateTimeISO: args.nowIso,
+				lastAdvancedByEventId: null,
+			},
+			activeClocks: buildWorldClockStates({
+				clockProgress: extracted.clockProgress,
+				catalog: args.catalog,
+			}),
+			unresolvedConsequences: extracted.factionConsequences,
+			factionPressure: buildFactionPressure({
+				factions: extracted.entities.factions,
+				consequences: extracted.factionConsequences,
+				catalog: args.catalog,
+			}),
+			correctionSupersededEventIds: [],
+			fieldMetadata: currentLocation
+				? {
+						currentLocation: createFieldMetadataEntry({
+							entityId: findEntityId(
+								args.catalog,
+								"locations",
+								currentLocation,
+							),
+							confidence: resolveCurrentLocationConfidence(rankedLocations),
+							sourceType: "campaign-file",
+							sourcePath: rankedLocations[0]?.source ?? null,
+							updatedAtISO: args.nowIso,
+						}),
+					}
+				: {},
+			updatedAtISO: args.nowIso,
+		},
+		{
+			nowIso: args.nowIso,
+			catalog: args.catalog,
+		},
+	);
 }
 
 function deriveTrackingProfile(
@@ -572,18 +720,19 @@ function deriveTrackingProfile(
 ): TrackingProfile {
 	const strong = ["currentLocation", "activeQuests", "recentEvents"];
 	if (entities.factions.length > 0) {
-		strong.push("factionConsequences");
+		strong.push("factionConsequences", "factionPressure");
 	}
 	if (entities.clocks.length > 0) {
-		strong.push("clockProgress");
+		strong.push("clockProgress", "activeClocks", "deadlines");
 	}
 	if (currentState.uncertainties.length > 0) {
 		strong.push("openUncertainties");
 	}
+	strong.push("unresolvedConsequences");
 	return {
 		strong,
-		light: ["npcContinuity", "travelPressure", "rumorThreads"],
-		onDemand: ["minorLore", "sceneFlavor", "inventoryColor"],
+		light: ["npcContinuity", "travelPressure", "rumorThreads", "stableLore"],
+		onDemand: ["minorLore", "sceneFlavor", "inventoryColor", "sceneProps"],
 	};
 }
 
@@ -621,7 +770,233 @@ function unique(values: string[]): string[] {
 	);
 }
 
+function createEmptyEntitySourcePaths(): Partial<
+	Record<keyof EntityCatalog, Record<string, string[]>>
+> {
+	return {
+		characters: {},
+		locations: {},
+		quests: {},
+		factions: {},
+		recentEvents: {},
+		facts: {},
+		clocks: {},
+	};
+}
+
+function recordEntitySource(
+	record: Record<string, string[]> | undefined,
+	value: string,
+	sourcePath: string,
+): void {
+	if (!record) {
+		return;
+	}
+	record[value] = unique([...(record[value] ?? []), sourcePath]);
+}
+
+function resolveCurrentLocationConfidence(
+	rankedLocations: Candidate[],
+): ConfidenceClass {
+	return rankedLocations.length > 1 ? "probable" : "confirmed";
+}
+
 async function ensureJsonFile(filePath: string, value: unknown): Promise<void> {
 	await mkdir(path.dirname(filePath), { recursive: true });
 	await writeFile(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+async function writeInitialRuntimeSupportArtifacts(args: {
+	bardoRoot: string;
+	nowIso: string;
+	currentState: RuntimeCurrentState;
+	readiness: CampaignBootstrapReadiness;
+	entityCatalog: EntityCatalog;
+	consultedArtifacts: string[];
+}): Promise<void> {
+	const bootstrapEvent = createBootstrapEventRecord({
+		nowIso: args.nowIso,
+		currentState: args.currentState,
+		entityCatalog: args.entityCatalog,
+		consultedArtifacts: args.consultedArtifacts,
+	});
+	const eventLogPayload = `${JSON.stringify(bootstrapEvent)}\n`;
+	const eventLogPath = path.join(args.bardoRoot, "events/state-changes.ndjson");
+	await mkdir(path.dirname(eventLogPath), { recursive: true });
+	await writeFile(eventLogPath, eventLogPayload, "utf8");
+
+	const stateHash = computeStateHash(args.currentState);
+	const snapshot = createSnapshotRecord({
+		currentState: args.currentState,
+		stateHash,
+		createdAtISO: args.nowIso,
+		eventId: bootstrapEvent.eventId,
+		eventIndex: 1,
+		reason: "bootstrap",
+	});
+	const snapshotPayload = JSON.stringify(snapshot, null, 2);
+	const snapshotRelativePath = path
+		.join(RUNTIME_ARTIFACT_PATHS.snapshotsDirectory, "000000-bootstrap.json")
+		.replaceAll("\\", "/");
+	await ensureJsonFile(
+		path.join(args.bardoRoot, RUNTIME_ARTIFACT_PATHS.snapshotIndex),
+		{
+			schemaVersion: RUNTIME_SCHEMA_VERSION,
+			updatedAtISO: args.nowIso,
+			snapshots: [
+				{
+					snapshotId: snapshot.snapshotId,
+					path: snapshotRelativePath,
+					createdAtISO: snapshot.createdAtISO,
+					stateHash: snapshot.stateHash,
+					reason: snapshot.reason,
+					replayPosition: snapshot.replayPosition,
+				},
+			],
+		},
+	);
+	await mkdir(
+		path.join(args.bardoRoot, RUNTIME_ARTIFACT_PATHS.snapshotsDirectory),
+		{ recursive: true },
+	);
+	await writeFile(
+		path.join(args.bardoRoot, RUNTIME_ARTIFACT_PATHS.latestSnapshot),
+		snapshotPayload,
+		"utf8",
+	);
+	await writeFile(
+		path.join(args.bardoRoot, snapshotRelativePath),
+		snapshotPayload,
+		"utf8",
+	);
+	await ensureJsonFile(
+		path.join(args.bardoRoot, RUNTIME_ARTIFACT_PATHS.diagnostics),
+		createDiagnosticsManifest({
+			updatedAtISO: args.nowIso,
+			readinessStatus: args.readiness,
+			latestEventId: bootstrapEvent.eventId,
+			latestStateHash: stateHash,
+			latestSnapshotId: snapshot.snapshotId,
+			latestSnapshotPath: snapshotRelativePath,
+			snapshotCount: 1,
+			recentEventIds: [bootstrapEvent.eventId],
+			activeConflictIds: [],
+			correctionEventIds: [],
+			integrity: {
+				status: "valid",
+				currentStateHash: stateHash,
+				eventLogHash: computeStateHash(eventLogPayload),
+				latestSnapshotHash: computeStateHash(snapshotPayload),
+			},
+			replayStatus: {
+				canReplayFromEventZero: true,
+				canReplayFromLatestSnapshot: true,
+				lastReplayMode: null,
+			},
+		}),
+	);
+}
+
+function createBootstrapEventRecord(args: {
+	nowIso: string;
+	currentState: RuntimeCurrentState;
+	entityCatalog: EntityCatalog;
+	consultedArtifacts: string[];
+}): RuntimeEventRecord {
+	const blankState = normalizeCurrentState(createBlankCurrentState(null), {
+		nowIso: null,
+		catalog: args.entityCatalog,
+	});
+	return {
+		schemaVersion: RUNTIME_SCHEMA_VERSION,
+		type: "bootstrap_initialized",
+		eventId: createRuntimeEventId(),
+		eventType: "bootstrap",
+		actorType: "system-bootstrap",
+		actorSource: "bootstrap",
+		atISO: args.nowIso,
+		causalParentEventId: null,
+		affectedEntityIds: deriveBootstrapAffectedEntityIds({
+			currentState: args.currentState,
+			catalog: args.entityCatalog,
+		}),
+		summary: "Initial canon bootstrapped from campaign sources.",
+		beforeAfterSummary: buildBeforeAfterSummary({
+			currentState: blankState,
+			nextState: args.currentState,
+		}),
+		changes: {
+			bootstrapState: args.currentState,
+		},
+		validated: true,
+		canonBasis: "campaign-artifacts",
+		consultedArtifacts: unique(args.consultedArtifacts),
+		precedence: [
+			"preserved source rules text",
+			"current campaign source files",
+			"approved committed state",
+		],
+		conflictIds: [],
+		conflicts: [],
+		uncertainties: args.currentState.uncertainties,
+		stateHashBefore: computeStateHash(blankState),
+		stateHashAfter: computeStateHash(args.currentState),
+		correctionLinkage: null,
+	};
+}
+
+function deriveBootstrapAffectedEntityIds(args: {
+	currentState: RuntimeCurrentState;
+	catalog: EntityCatalog;
+}): string[] {
+	const affected: string[] = [];
+	if (args.currentState.currentLocation) {
+		const locationId = findEntityId(
+			args.catalog,
+			"locations",
+			args.currentState.currentLocation,
+		);
+		if (locationId) {
+			affected.push(locationId);
+		}
+	}
+	for (const quest of args.currentState.activeQuests) {
+		const questId = findEntityId(args.catalog, "quests", quest);
+		if (questId) {
+			affected.push(questId);
+		}
+	}
+	for (const faction of args.currentState.relevantFactions) {
+		const factionId = findEntityId(args.catalog, "factions", faction);
+		if (factionId) {
+			affected.push(factionId);
+		}
+	}
+	for (const fact of args.currentState.factsRevealed) {
+		const factId = findEntityId(args.catalog, "facts", fact);
+		if (factId) {
+			affected.push(factId);
+		}
+	}
+	for (const recentEvent of args.currentState.recentEvents) {
+		const eventId = findEntityId(args.catalog, "recentEvents", recentEvent);
+		if (eventId) {
+			affected.push(eventId);
+		}
+	}
+	for (const clock of args.currentState.activeClocks) {
+		const clockId =
+			args.catalog.clocks.find((entry) => entry.id === clock.id)?.id ??
+			findEntityId(args.catalog, "clocks", clock.name);
+		if (clockId) {
+			affected.push(clockId);
+		}
+	}
+	for (const name of Object.keys(args.currentState.npcAttitudes)) {
+		const characterId = findEntityId(args.catalog, "characters", name);
+		if (characterId) {
+			affected.push(characterId);
+		}
+	}
+	return unique(affected);
 }

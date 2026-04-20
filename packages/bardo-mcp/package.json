@@ -23,16 +23,16 @@
 		"access": "public"
 	},
 	"scripts": {
-		"dev": "\"${npm_execpath:-bun}\" --watch run src/cli.ts",
-		"start": "\"${npm_execpath:-bun}\" run src/cli.ts",
-		"build": "\"${npm_execpath:-bun}\" run build:release",
+		"dev": "bun --watch run src/cli.ts",
+		"start": "bun run src/cli.ts",
+		"build": "bun run build:release",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"typecheck": "tsc --noEmit",
-		"check": "\"${npm_execpath:-bun}\" run lint && \"${npm_execpath:-bun}\" run typecheck",
-		"test": "\"${npm_execpath:-bun}\" test",
-		"test:runtime-smoke": "\"${npm_execpath:-bun}\" test src/runtime.smoke.test.ts",
-		"build:release": "\"${npm_execpath:-bun}\" run ./scripts/build-release-binaries.ts",
+		"check": "bun run lint && bun run typecheck",
+		"test": "bun test",
+		"test:runtime-smoke": "bun test src/runtime.smoke.test.ts",
+		"build:release": "bun run ./scripts/build-release-binaries.ts",
 		"ci": "biome ci ."
 	},
 	"devDependencies": {

@@ -26,7 +26,7 @@ describe("resolveRouteUserId", () => {
 		const result = await resolveRouteUserId("/api/billing", {
 			authFn: (async () => ({
 				userId: "user_123",
-			})) as typeof import("@clerk/nextjs/server").auth,
+			})) as unknown as typeof import("@clerk/nextjs/server").auth,
 		});
 
 		expect(result).toEqual({ userId: "user_123" });
@@ -40,7 +40,7 @@ describe("resolveRouteUserId", () => {
 				throw new Error(
 					"Clerk: auth() was called but Clerk can't detect usage of clerkMiddleware().",
 				);
-			}) as typeof import("@clerk/nextjs/server").auth,
+			}) as unknown as typeof import("@clerk/nextjs/server").auth,
 			logger: { warn },
 		});
 
@@ -67,7 +67,7 @@ describe("resolveOptionalUserId", () => {
 				throw new Error(
 					"Clerk: auth() was called but Clerk can't detect usage of clerkMiddleware().",
 				);
-			}) as typeof import("@clerk/nextjs/server").auth,
+			}) as unknown as typeof import("@clerk/nextjs/server").auth,
 			logger: { warn },
 		});
 

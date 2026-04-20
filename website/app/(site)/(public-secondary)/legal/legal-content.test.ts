@@ -42,10 +42,11 @@ describe("legal content", () => {
 			"Security",
 		]);
 		expect(legalIndexSource).toContain('permanentRedirect("/legal/terms")');
-		expect(privacySource).toContain("What Bardo collects");
-		expect(termsSource).toContain("Acceptable use");
-		expect(dataUseSource).toContain("third-party client");
-		expect(securitySource).toContain("Security by design");
+		expect(privacySource).toContain("no sale of user data");
+		expect(termsSource).toContain("No refunds");
+		expect(termsSource).toContain("AS IS");
+		expect(dataUseSource).toContain("local campaign files stay local");
+		expect(securitySource).toContain("high-level overview only");
 		expect(aiPolicySource).toContain('permanentRedirect("/legal/terms")');
 	});
 

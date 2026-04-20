@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import type { BridgeSessionCredentialBundle } from "./bridge-session-auth";
 import { createCliDeviceSessionService } from "./cli-device-session";
 
 describe("cli device session service", () => {
@@ -10,23 +11,24 @@ describe("cli device session service", () => {
 			expiresAtISO: "2026-03-03T00:10:00.000Z",
 			intervalMs: 3000,
 		};
+		const approvedPayload: BridgeSessionCredentialBundle = {
+			accessToken: "access-token",
+			refreshToken: "refresh-token",
+			expiresAt: "2026-03-03T00:10:00.000Z",
+			statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+			refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
+			plan: "solo",
+			accountLabel: "Armando",
+			serverName: "bardo",
+			issuedAtISO: "2026-03-03T00:00:00.000Z",
+		};
 		const store = {
 			startSession: mock(async () => session),
 			pollSession: mock(async ({ attempt }: { attempt: number }) =>
 				attempt === 1
 					? { status: "pending" as const, intervalMs: session.intervalMs }
 					: attempt === 2
-						? {
-								status: "approved" as const,
-								payload: {
-									apiKey: "bardo_live_test",
-									mcpUrl: "https://mcp.bardo.ai/mcp",
-									statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
-									serverName: "bardo",
-									issuedAtISO: "2026-03-03T00:00:00.000Z",
-									expiresAtISO: "2026-03-03T00:10:00.000Z",
-								},
-							}
+						? { status: "approved" as const, payload: approvedPayload }
 						: { status: "consumed" as const },
 			),
 			approveSession: mock(async () => ({ ok: true as const })),
@@ -49,14 +51,7 @@ describe("cli device session service", () => {
 
 		const approved = await service.approve({
 			sessionId: started.sessionId,
-			payload: {
-				apiKey: "bardo_live_test",
-				mcpUrl: "https://mcp.bardo.ai/mcp",
-				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
-				serverName: "bardo",
-				issuedAtISO: "2026-03-03T00:00:00.000Z",
-				expiresAtISO: "2026-03-03T00:10:00.000Z",
-			},
+			payload: approvedPayload,
 		});
 		expect(approved).toEqual({ ok: true });
 
@@ -67,7 +62,8 @@ describe("cli device session service", () => {
 		expect(firstPoll).toMatchObject({
 			status: "approved",
 			payload: {
-				apiKey: "bardo_live_test",
+				accessToken: "access-token",
+				plan: "solo",
 			},
 		});
 

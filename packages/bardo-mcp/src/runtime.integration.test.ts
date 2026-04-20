@@ -342,7 +342,88 @@ describe("bardo mcp serve integration", () => {
 				},
 			});
 			expect(status.structuredContent).toHaveProperty("currentStateSummary");
+			expect(status.structuredContent).toHaveProperty("mutationGuardrails");
 			expect(JSON.stringify(status.content)).toContain("needs-user-input");
+		} finally {
+			await client.close();
+		}
+	});
+
+	test("workspace status fails closed when .bardo is removed after initialization", async () => {
+		const cwdWorkspace = await createTempDir("bardo-cwd-");
+		const clientWorkspace = await createTempDir("bardo-root-");
+		await writeFile(
+			path.join(clientWorkspace, "rulebook.md"),
+			"# Campaign Rulebook\n\nUse grounded canon only.",
+			"utf8",
+		);
+		const remote = await makeRemoteServer();
+		const cliEntry = fileURLToPath(new URL("./cli.ts", import.meta.url));
+
+		const client = new Client(
+			{
+				name: "integration-client",
+				version: "1.0.0",
+			},
+			{
+				capabilities: {
+					roots: {
+						listChanged: true,
+					},
+				},
+			},
+		);
+		client.setRequestHandler(ListRootsRequestSchema, async () => ({
+			roots: [{ uri: pathToFileURL(clientWorkspace).toString(), name: "game" }],
+		}));
+
+		const transport = new StdioClientTransport({
+			command: BUN_BINARY,
+			args: [
+				cliEntry,
+				"mcp",
+				"serve",
+				"--api-key",
+				"test-key",
+				"--url",
+				remote.url,
+			],
+			cwd: cwdWorkspace,
+			env: {
+				...process.env,
+				BARDO_REMOTE_PROXY_ENABLED: "true",
+			},
+			stderr: "pipe",
+		});
+
+		try {
+			await client.connect(transport);
+			const init = await client.callTool({
+				name: "init",
+				arguments: {},
+			});
+			expect(init.isError).toBeFalsy();
+
+			await rm(path.join(clientWorkspace, ".bardo"), {
+				recursive: true,
+				force: true,
+			});
+
+			const status = await client.callTool({
+				name: "bardo_workspace_status",
+				arguments: {},
+			});
+
+			expect(status.structuredContent).toMatchObject({
+				workspaceRoot: clientWorkspace,
+				initialized: false,
+				readiness: {
+					status: "needs-user-input",
+					gaps: expect.arrayContaining([
+						expect.stringContaining("Run init before continuing play."),
+					]),
+				},
+			});
 		} finally {
 			await client.close();
 		}

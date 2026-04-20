@@ -21,30 +21,31 @@ export function BlogSidebarNav({
 			aria-label="Blog posts"
 			className="flex flex-col gap-2 border-b border-border pb-6 lg:border-b-0 lg:pb-0"
 		>
-			<div className="flex flex-col">
+			<ul className="flex flex-col">
 				{entries.map((item) => {
 					const isCurrentPage = item.href === pathname;
 
 					return (
-						<TransitionLink
-							key={item.href}
-							href={item.href}
-							className="rounded-none bg-transparent py-2 transition-colors hover:bg-transparent lg:py-2"
-						>
-							<span
-								className={cn(
-									"ui-nav",
-									isCurrentPage
-										? "font-medium !text-foreground"
-										: "!text-muted-foreground hover:!text-foreground",
-								)}
+						<li key={item.href}>
+							<TransitionLink
+								href={item.href}
+								className="rounded-none bg-transparent py-2 transition-colors hover:bg-transparent lg:py-2"
 							>
-								{item.title}
-							</span>
-						</TransitionLink>
+								<span
+									className={cn(
+										"ui-nav",
+										isCurrentPage
+											? "font-medium !text-foreground"
+											: "!text-muted-foreground hover:!text-foreground",
+									)}
+								>
+									{item.title}
+								</span>
+							</TransitionLink>
+						</li>
 					);
 				})}
-			</div>
+			</ul>
 		</nav>
 	);
 }

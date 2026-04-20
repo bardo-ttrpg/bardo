@@ -2,6 +2,7 @@
 
 import { CheckoutButton as ClerkCheckoutButton } from "@clerk/nextjs/experimental";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 
 type CheckoutActionProps = {
@@ -21,11 +22,11 @@ export default function CheckoutAction({
 		<ClerkCheckoutButton
 			planId={planId}
 			planPeriod={planPeriod}
-			newSubscriptionRedirectUrl="/dashboard?checkout=success"
+			newSubscriptionRedirectUrl="/dashboard"
 		>
-			<button type="button" className={className}>
+			<Button variant="default" className={className}>
 				{label}
-			</button>
+			</Button>
 		</ClerkCheckoutButton>
 	);
 }

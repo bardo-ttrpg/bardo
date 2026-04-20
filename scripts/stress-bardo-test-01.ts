@@ -18,7 +18,8 @@ type CommandResult = {
 	stderr: string;
 };
 
-const SANDBOX_ROOT = "/home/armando/projects/bardo-test-01";
+const SANDBOX_ROOT =
+	process.env.BARDO_STRESS_ROOT?.trim() || "/home/armando/projects/test-bardo-01";
 const REPO_ROOT = "/home/armando/projects/bardo";
 const FIXTURE_ROOT = path.join(REPO_ROOT, "scripts", "stress-fixtures");
 const PACKAGE_JSON_PATH = path.join(
@@ -379,8 +380,13 @@ async function main() {
 		const bardoBin = path.join(binDir, "bardo");
 		const commonEnv = (workspaceRoot: string): NodeJS.ProcessEnv => ({
 			...process.env,
+			BARDO_ACCESS_TOKEN: undefined,
+			BARDO_API_KEY: undefined,
 			BARDO_CONFIG_DIR: path.join(workspaceRoot, ".config", "bardo"),
 			BARDO_LOGIN_START_URL: `${supportServer.baseUrl}/api/connect/bridge-session/start`,
+			BARDO_MCP_URL: undefined,
+			BARDO_RUNTIME_STATUS_URL: undefined,
+			BARDO_BRIDGE_SESSION_REFRESH_URL: undefined,
 		});
 
 		await recordScenario(results, "ready workspace cli flow", async () => {

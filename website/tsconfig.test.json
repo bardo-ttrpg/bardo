@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["bun", "node", "react/canary"]
+	},
+	"include": [
+		"next-env.d.ts",
+		"**/*.d.ts",
+		"**/*.test.ts",
+		"**/*.test.tsx",
+		"**/*.test.js",
+		"**/*.test.jsx"
+	],
+	"exclude": ["node_modules", ".next"]
+}

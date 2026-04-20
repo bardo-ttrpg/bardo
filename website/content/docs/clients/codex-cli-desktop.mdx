@@ -18,7 +18,7 @@ Expected result: Bardo writes `.codex/config.toml` in the workspace root.
 
 ## What Bardo writes
 
-Bardo writes the workspace MCP config for Codex automatically, so normal setup does not require manual editing.
+Bardo writes the workspace MCP config for Codex automatically, so normal setup does not require manual editing. Codex then talks to the local Bardo bridge from the same workspace instead of relying on a hosted gameplay API.
 
 ## CLI and desktop app guidance
 
@@ -29,3 +29,4 @@ Start Codex in the same workspace where you ran `bardo connect --client codex`. 
 Troubleshooting:
 - Restart Codex after connecting if the Bardo integration does not show up right away.
 - If play feels too thin, add better campaign notes and run `bardo init` again.
+- If `.bardo/` is missing, re-run `bardo init` before asking Codex to continue play.

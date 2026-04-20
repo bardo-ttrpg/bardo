@@ -12,8 +12,7 @@ function shouldShowSiteHeader(pathname: string | null) {
 	return !(
 		pathname.startsWith("/docs") ||
 		pathname.startsWith("/sign-in") ||
-		pathname.startsWith("/sign-up") ||
-		pathname.startsWith("/forgot-password")
+		pathname.startsWith("/sign-up")
 	);
 }
 
@@ -22,7 +21,7 @@ export function SiteLayoutChrome({ children }: { children: ReactNode }) {
 	const showHeader = shouldShowSiteHeader(pathname);
 
 	return (
-		<div className="min-h-screen">
+		<div className="min-h-svh">
 			{showHeader ? <SiteBrandHeaderFrame /> : null}
 			{children}
 		</div>

@@ -6,17 +6,20 @@ export const siteConfig = {
 	creator: "Bardo",
 	publisher: "Bardo",
 	description:
-		"Play solo tabletop role-playing games with an AI-guided game master replacement that keeps your campaign files local.",
+		"Play solo tabletop role-playing games with a local-first AI game master that keeps campaign files on your machine and grounds play in your real world state.",
 	ogDescription:
-		"Bardo connects your AI client to local campaign files so you can play solo tabletop RPGs without a human GM at the table.",
+		"Bardo connects your AI client to local campaign files so you can play solo tabletop RPGs with a grounded AI game master and local-first campaign truth.",
 	keywords: [
 		"bardo",
 		"solo tabletop RPG",
 		"solo tabletop role-playing game",
 		"solo RPG with AI",
 		"AI dungeon master",
+		"AI game master",
 		"AI tabletop RPG assistant",
 		"GM-less RPG",
+		"local-first tabletop RPG",
+		"TTRPG MCP server",
 		"tabletop RPG MCP",
 		"local campaign files",
 	],

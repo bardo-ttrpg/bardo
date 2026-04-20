@@ -18,7 +18,7 @@ Expected result: Bardo writes `opencode.json` in the workspace root.
 
 ## What Bardo writes
 
-Bardo adds the workspace config OpenCode needs and keeps the setup local to this project.
+Bardo adds the workspace config OpenCode needs and keeps the setup local to this project. OpenCode talks to the local Bardo bridge after browser approval completes.
 
 ## Use Bardo well in OpenCode
 
@@ -27,3 +27,4 @@ Start OpenCode in the same workspace, let it load the Bardo connection, and begi
 Troubleshooting:
 - If OpenCode does not pick up the new config, restart it from the workspace root.
 - If Bardo says the workspace is incomplete, fix that first instead of trying to improvise around it.
+- If `.bardo/` disappears, rebuild it with `bardo init` before continuing.

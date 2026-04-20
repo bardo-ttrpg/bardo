@@ -23,7 +23,6 @@ export default function robots(): MetadataRoute.Robots {
 					"/dashboard",
 					"/sign-in",
 					"/sign-up",
-					"/forgot-password",
 				],
 			},
 		],

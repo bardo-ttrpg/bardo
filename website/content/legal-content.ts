@@ -26,9 +26,9 @@ const legalEntries = [
 		navigationLabel: "Terms",
 		eyebrow: "Legal / Terms",
 		description:
-			"Terms that govern access to the Bardo website, dashboard, billing surface, and bridge approval workflows.",
+			"Terms for using the Bardo SaaS, account system, billing, bridge approvals, and related website features.",
 		summary:
-			"These terms cover the public website, account access, and hosted workflows around approvals, billing, and service operations.",
+			"These terms cover the hosted Bardo service, payment terms, user responsibility, and the limits of Bard Studio's responsibility.",
 		effectiveDate: LEGAL_EFFECTIVE_DATE,
 		lastUpdated: LEGAL_EFFECTIVE_DATE,
 		sections: [
@@ -45,9 +45,9 @@ const legalEntries = [
 		navigationLabel: "Privacy",
 		eyebrow: "Legal / Privacy",
 		description:
-			"Privacy summary for the Bardo website, account access, billing state, and bridge approval requests.",
+			"Privacy summary for Bardo account data, subscription handling, session state, and the local-first product boundary.",
 		summary:
-			"This page describes what Bardo collects to operate the hosted account layer and what stays outside that hosted surface.",
+			"This page explains the small set of hosted data Bardo uses, what stays local, and that Bardo does not sell user data.",
 		effectiveDate: LEGAL_EFFECTIVE_DATE,
 		lastUpdated: LEGAL_EFFECTIVE_DATE,
 		sections: [
@@ -64,9 +64,9 @@ const legalEntries = [
 		navigationLabel: "Data Use",
 		eyebrow: "Legal / Data Use",
 		description:
-			"Product data-boundary summary for local files, hosted account services, and third-party AI clients.",
+			"Data-boundary summary for local campaign files, hosted account services, and third-party AI clients or models.",
 		summary:
-			"This page explains the practical split between local campaign data, the Bardo hosted layer, and the external clients or models you choose to use.",
+			"This page explains the practical split between local campaign truth, hosted account data, and any external tools you choose to connect.",
 		effectiveDate: LEGAL_EFFECTIVE_DATE,
 		lastUpdated: LEGAL_EFFECTIVE_DATE,
 		sections: [
@@ -83,9 +83,9 @@ const legalEntries = [
 		navigationLabel: "Security",
 		eyebrow: "Legal / Security",
 		description:
-			"Security overview for Bardo's local-first product boundary, hosted approvals, and public website surface.",
+			"Security overview for Bardo's local-first boundary, hosted account surface, and shared-responsibility model.",
 		summary:
-			"This page explains the security model at a high level without claiming audits, certifications, or guarantees Bardo does not publicly offer.",
+			"This page explains Bardo's security model at a high level without promising certifications, audits, or guarantees that are not publicly offered.",
 		effectiveDate: LEGAL_EFFECTIVE_DATE,
 		lastUpdated: LEGAL_EFFECTIVE_DATE,
 		sections: [

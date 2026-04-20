@@ -19,27 +19,29 @@ export default function TermsPage() {
 		<LegalEntryContent entry={entry}>
 			<LegalSection id="scope" title="Scope of the service">
 				<p>
-					These terms govern access to the public Bardo website, the protected
-					dashboard, and the hosted workflows used for account access, bridge
-					approvals, billing, metering, and related status checks.
+					These terms govern your use of the public Bardo website, the protected
+					dashboard, the hosted account layer, subscription billing, bridge
+					approvals, and the related service workflows Bard Studio provides.
 				</p>
 				<p>
-					Bardo is designed to work with local campaign or workspace files
-					without turning the public website into the source of truth for that
-					content. The hosted service exists to support access control and the
-					account layer around those local workflows.
+					Bardo is a software tool and SaaS service, not a game line, rules
+					publisher, or hosted gameplay authority. You decide how you use Bardo
+					with your chosen tabletop role-playing games, clients, prompts, and
+					local files.
 				</p>
 			</LegalSection>
 			<LegalSection id="accounts-and-access" title="Accounts and access">
 				<p>
-					You are responsible for the credentials, clients, machines, and local
-					environments connected to your Bardo account. Keep your local
-					workspaces, secrets, and approval flows under your control.
+					You are responsible for the account, credentials, payment method,
+					connected clients, machines, and local environments tied to your Bardo
+					account. Keep your local workspaces, secrets, and approval flows under
+					your control.
 				</p>
 				<p>
-					If you use a third-party client or model provider alongside Bardo, you
-					are also responsible for complying with that provider&apos;s terms and
-					policies.
+					You may only subscribe or use paid service features if you are legally
+					allowed to do so. If a minor uses your account or payment method, that
+					responsibility stays with the account holder or authorized adult, not
+					with Bard Studio.
 				</p>
 			</LegalSection>
 			<LegalSection id="acceptable-use" title="Acceptable use">
@@ -50,23 +52,30 @@ export default function TermsPage() {
 				</p>
 				<p>
 					AI-assisted outputs and actions still require human review. You remain
-					responsible for the prompts you send, the tools you connect, and the
-					decisions you make based on generated output.
+					responsible for the prompts you send, the tools and TTRPG systems you
+					connect, the local files you expose, and the decisions you make based
+					on generated output.
 				</p>
 			</LegalSection>
-			<LegalSection
-				id="changes-and-availability"
-				title="Changes and availability"
-			>
+			<LegalSection id="changes-and-availability" title="Changes and availability">
 				<p>
 					Bardo may update, improve, or remove parts of the public website or
 					hosted account surface over time. When those changes materially affect
 					these terms, this page will be updated.
 				</p>
 				<p>
-					Bardo does not promise uninterrupted availability. Temporary outages,
-					maintenance, or dependency-related interruptions can occur while the
-					service is being operated and improved.
+					Bardo is provided on an <strong>AS IS</strong> and <strong>AS AVAILABLE</strong> basis.
+					No refunds apply except where the law requires otherwise. Bard Studio
+					does not promise uninterrupted service, refunds, specific
+					gameplay outcomes, or error-free operation. Except where the law does
+					not allow it, paid subscriptions are non-refundable, and Bard Studio is
+					not responsible for indirect, incidental, or consequential damages
+					arising from your use of the service.
+				</p>
+				<p>
+					If you use a third-party client, model provider, payment provider, or
+					other external service alongside Bardo, you are also responsible for
+					complying with that provider&apos;s terms and policies.
 				</p>
 			</LegalSection>
 		</LegalEntryContent>

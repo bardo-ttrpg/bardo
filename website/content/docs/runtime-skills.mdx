@@ -13,6 +13,8 @@ The bridge is opinionated about a few core behaviors:
 
 Different clients expose MCP capabilities differently, but the desired behavior is the same: use `init` to prepare the workspace, inspect readiness and current state, then call the runtime tool that matches the next real need.
 
+Current workspaces also generate a local Agent Skill under `.agents/skills/bardo-runtime/`. That skill is the portable, project-level entrypoint for connected clients that support progressive skill loading, while `.bardo/docs/` remains the deeper local reference layer.
+
 The agent-facing operating contract is simple:
 
 1. read current state

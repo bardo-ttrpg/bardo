@@ -405,6 +405,84 @@ describe("local MCP workspace roots", () => {
 		}
 	});
 
+	test("records the expanded runtime artifact contract in manifest.json", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
+		const bardoRoot = path.join(workspaceRoot, ".bardo");
+
+		try {
+			const mod = (await import("./local-mcp")) as Record<string, unknown>;
+			expect(typeof mod.ensureWorkspaceCoreFiles).toBe("function");
+
+			const ensureWorkspaceCoreFiles = mod.ensureWorkspaceCoreFiles as (args: {
+				bardoRoot: string;
+				workspaceRoot: string;
+				ruleset: string | null;
+				nowIso: string;
+				importedRulebooks: string[];
+			}) => Promise<void>;
+
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(bardoRoot, "rules/normalized/index.json"),
+				JSON.stringify({
+					recommendedSimulationDepth: "standard",
+					sections: [],
+				}),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, "campaign-notes.md"),
+				[
+					"# Campaign Notes",
+					"",
+					"Current location: River Market",
+					"Quest: Find the ferryman",
+				].join("\n"),
+				"utf8",
+			);
+
+			await ensureWorkspaceCoreFiles({
+				bardoRoot,
+				workspaceRoot,
+				ruleset: "shadowdark",
+				nowIso: "2026-04-10T12:00:00.000Z",
+				importedRulebooks: [],
+			});
+
+			const manifest = JSON.parse(
+				await readFile(path.join(bardoRoot, "manifest.json"), "utf8"),
+			) as {
+				runtimeArtifacts?: {
+					conflictsPath?: string;
+					diagnosticsPath?: string;
+					turnTracePath?: string;
+					snapshotsDirectory?: string;
+					snapshotIndexPath?: string;
+				};
+				campaignBootstrap?: {
+					sourceIndexPath?: string;
+					currentStatePath?: string;
+				};
+			};
+
+			expect(manifest.campaignBootstrap).toMatchObject({
+				sourceIndexPath: "manifests/source-index.json",
+				currentStatePath: "state/current-state.json",
+			});
+			expect(manifest.runtimeArtifacts).toMatchObject({
+				conflictsPath: "manifests/conflicts.json",
+				diagnosticsPath: "manifests/diagnostics.json",
+				turnTracePath: "logs/turn-trace.ndjson",
+				snapshotsDirectory: "snapshots",
+				snapshotIndexPath: "snapshots/index.json",
+			});
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("writes rulebook bootstrap metadata when an imported source exists", async () => {
 		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "bardo-mcp-"));
 		const bardoRoot = path.join(workspaceRoot, ".bardo");

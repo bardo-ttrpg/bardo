@@ -1,5 +1,7 @@
 Install Bardo on the same machine that holds your campaign files. The default installer downloads the release binary, checks its checksum, and adds the `bardo` command for you.
 
+Bardo installs a local bridge. That bridge is the local MCP server your AI client talks to while you play. The website is still involved for sign-in, approval, billing, and account status, but your campaign truth and runtime state stay local. The hosted side only handles account workflows, not hosted gameplay truth.
+
 ## macOS and Linux
 
 Run `curl -fsSL https://bardo.gg/install | sh`.
@@ -33,6 +35,8 @@ bardo init
 bardo connect --client codex
 ```
 
+`bardo login` opens a browser approval flow. That approval gives the local bridge the account credentials it needs to start the local MCP endpoint for your client. It does not upload your campaign into a hosted gameplay backend.
+
 If `./rulebook.md` exists, `bardo init` preserves it at `.bardo/rules/rulebook.md`, normalizes it into `.bardo/rules/normalized/`, and writes `.bardo/rules/normalized/index.json`.
 
 If the rulebook lives elsewhere inside the workspace, pass it explicitly:
@@ -43,6 +47,9 @@ bardo init --rulebook ./rules/core-rulebook.md
 
 If your source starts as a PDF, convert it to Markdown before bootstrap. The importer expects Markdown or plain text, not raw PDF bytes.
 
+If `.bardo/` is deleted later, Bardo does not silently recreate canon during play. Re-run `bardo init` from the workspace root before continuing.
+
 Troubleshooting:
 - If `bardo` is not found, open a new shell and try again.
 - If the installer reports a checksum problem, stop there and rerun the official installer instead of forcing it.
+- If you are unsure why the browser step exists, remember: the bridge is local, but account approval and billing are hosted.

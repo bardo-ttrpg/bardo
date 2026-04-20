@@ -60,7 +60,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
 	colorScheme: "dark light",
-	themeColor: "#171717",
+	themeColor: [
+		{ media: "(prefers-color-scheme: light)", color: "#fafafa" },
+		{ media: "(prefers-color-scheme: dark)", color: "#171717" },
+	],
 };
 const SHOW_SPEED_INSIGHTS = process.env.VERCEL === "1";
 const SHOW_ANALYTICS = process.env.VERCEL === "1";

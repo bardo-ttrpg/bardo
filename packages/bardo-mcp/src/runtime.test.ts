@@ -92,6 +92,9 @@ describe("bardo runtime", () => {
 		expect(stderr.read()).toBe("");
 		expect(stdout.read()).toContain("Usage:");
 		expect(stdout.read()).toContain("bardo login");
+		expect(stdout.read()).toContain("browser approval flow");
+		expect(stdout.read()).toContain("local bridge");
+		expect(stdout.read()).toContain("local MCP endpoint");
 	});
 
 	test("login stores config under XDG_CONFIG_HOME when it is set", async () => {
@@ -753,7 +756,7 @@ describe("bardo runtime", () => {
 			).resolves.toContain('"status"');
 			await expect(
 				readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8"),
-			).resolves.toBe("");
+			).resolves.toContain('"eventType":"bootstrap"');
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -904,6 +907,116 @@ describe("bardo runtime", () => {
 			);
 			expect(payload.connectivity.health.ok).toBe(true);
 			expect(payload.connectivity.health.status).toBe(200);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor fails closed when an initialized workspace loses .bardo mid-campaign", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Shadowdark\n\nCore rules for the campaign.",
+				"utf8",
+			);
+			await runCli(
+				["login", "--api-key", "test-key", "--url", "https://example.com/mcp"],
+				{
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				},
+			);
+
+			const initExitCode = await runCli(["init"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout: createWriter(),
+				stderr: createWriter(),
+			});
+			expect(initExitCode).toBe(0);
+
+			await rm(path.join(workspaceRoot, ".bardo"), {
+				recursive: true,
+				force: true,
+			});
+
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async () =>
+					new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				workspace: { initialized: boolean; bardoRoot: string };
+			};
+			expect(payload.workspace.initialized).toBe(false);
+			expect(payload.workspace.bardoRoot).toBe(path.join(workspaceRoot, ".bardo"));
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("re-running init recreates .bardo after it is removed", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+
+		try {
+			await writeFile(
+				path.join(workspaceRoot, "rulebook.md"),
+				"# Shadowdark\n\nCore rules for the campaign.",
+				"utf8",
+			);
+
+			expect(
+				await runCli(["init"], {
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				}),
+			).toBe(0);
+
+			await rm(path.join(workspaceRoot, ".bardo"), {
+				recursive: true,
+				force: true,
+			});
+
+			expect(
+				await runCli(["init"], {
+					cwd: workspaceRoot,
+					homeDir,
+					stdout: createWriter(),
+					stderr: createWriter(),
+				}),
+			).toBe(0);
+
+			await expect(
+				readFile(path.join(workspaceRoot, ".bardo/manifest.json"), "utf8"),
+			).resolves.toContain('"workspaceRoot"');
+			await expect(
+				readFile(
+					path.join(
+						workspaceRoot,
+						".agents/skills/bardo-runtime/SKILL.md",
+					),
+					"utf8",
+				),
+			).resolves.toContain("name: bardo-runtime");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
