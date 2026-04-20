@@ -147,36 +147,78 @@
 		line-height: 1.75;
 	}
 
-	@media (prefers-reduced-motion: no-preference) {
-		:root:not([data-theme-transition])::view-transition-group(bardo-page-region) {
-			animation-duration: 220ms;
-			animation-timing-function: var(--motion-ease-standard);
+	@supports (view-transition-name: none) {
+		@view-transition {
+			navigation: auto;
 		}
 
-		:root:not([data-theme-transition])::view-transition-old(bardo-page-region) {
-			animation: theme-fade-out 220ms ease-out both;
+		.bardo-persistent-surface {
+			view-transition-name: none;
 		}
 
-		:root:not([data-theme-transition])::view-transition-new(bardo-page-region) {
-			animation: theme-fade-in 220ms ease-out both;
+		.bardo-page-region {
+			contain: layout;
+			view-transition-name: bardo-page-region;
 		}
 
-		:root[data-theme-transition]::view-transition-old(root),
-		:root[data-theme-transition]::view-transition-new(root) {
-			mix-blend-mode: normal;
-			animation-fill-mode: both;
-		}
+		@media (prefers-reduced-motion: no-preference) {
+			:root:not([data-theme-transition])::view-transition-group(
+				bardo-page-region
+			) {
+				animation-duration: 220ms;
+				animation-timing-function: var(--motion-ease-standard);
+			}
 
-		:root[data-theme-transition]::view-transition-old(root) {
-			animation-duration: 220ms;
-			animation-name: theme-fade-out;
-			animation-timing-function: ease-out;
-		}
+			:root:not([data-theme-transition])::view-transition-old(
+				bardo-page-region
+			) {
+				animation: theme-fade-out 220ms ease-out both;
+			}
 
-		:root[data-theme-transition]::view-transition-new(root) {
-			animation-duration: 220ms;
-			animation-name: theme-fade-in;
-			animation-timing-function: ease-out;
+			:root:not([data-theme-transition])::view-transition-new(
+				bardo-page-region
+			) {
+				animation: theme-fade-in 220ms ease-out both;
+			}
+
+			html:active-view-transition-type(dashboard-entry)::view-transition-group(
+				bardo-page-region
+			) {
+				animation-duration: 420ms;
+				animation-timing-function: cubic-bezier(0.18, 1, 0.32, 1);
+			}
+
+			html:active-view-transition-type(dashboard-entry)::view-transition-old(
+				bardo-page-region
+			) {
+				animation: dashboard-surface-exit 260ms cubic-bezier(0.32, 0, 0.67, 0)
+					both;
+			}
+
+			html:active-view-transition-type(dashboard-entry)::view-transition-new(
+				bardo-page-region
+			) {
+				animation: dashboard-surface-enter 420ms
+					cubic-bezier(0.18, 1, 0.32, 1) both;
+			}
+
+			:root[data-theme-transition]::view-transition-old(root),
+			:root[data-theme-transition]::view-transition-new(root) {
+				mix-blend-mode: normal;
+				animation-fill-mode: both;
+			}
+
+			:root[data-theme-transition]::view-transition-old(root) {
+				animation-duration: 220ms;
+				animation-name: theme-fade-out;
+				animation-timing-function: ease-out;
+			}
+
+			:root[data-theme-transition]::view-transition-new(root) {
+				animation-duration: 220ms;
+				animation-name: theme-fade-in;
+				animation-timing-function: ease-out;
+			}
 		}
 	}
 
@@ -219,70 +261,6 @@
 	::selection {
 		@apply bg-foreground text-background;
 	}
-
-	.bardo-clerk-checkbox {
-		appearance: none;
-		-webkit-appearance: none;
-		display: inline-grid;
-		place-content: center;
-		inline-size: 1rem;
-		block-size: 1rem;
-		border-width: 1px;
-		border-style: solid;
-		border-color: var(--input);
-		border-radius: calc(var(--radius) - 6px);
-		background-color: transparent;
-		box-shadow: none;
-		transition:
-			background-color var(--motion-duration-fast) ease,
-			border-color var(--motion-duration-fast) ease,
-			transform var(--motion-duration-fast) var(--motion-ease-standard);
-	}
-
-	.bardo-clerk-checkbox::after {
-		content: "";
-		inline-size: 0.55rem;
-		block-size: 0.55rem;
-		background-color: var(--checkbox-accent-foreground);
-		clip-path: polygon(
-			14% 44%,
-			0 59%,
-			40% 100%,
-			100% 26%,
-			84% 11%,
-			39% 66%
-		);
-		transform: scale(0);
-		transform-origin: center;
-		transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
-	}
-
-	.bardo-clerk-checkbox:checked {
-		border-color: var(--checkbox-accent);
-		background-color: var(--checkbox-accent);
-	}
-
-	.bardo-clerk-checkbox:checked::after {
-		transform: scale(1);
-	}
-
-	.bardo-clerk-checkbox:hover {
-		transform: translateY(-0.5px);
-	}
-
-	.bardo-clerk-checkbox:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-
-	.bardo-clerk-checkbox:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 2px;
-	}
-
-	.bardo-persistent-surface {
-		view-transition-name: none;
-	}
 }
 
 @keyframes theme-fade-in {
@@ -302,6 +280,34 @@
 
 	to {
 		opacity: 0;
+	}
+}
+
+@keyframes dashboard-surface-enter {
+	from {
+		opacity: 0;
+		transform: translateY(1rem) scale(0.985);
+		filter: blur(10px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: blur(0);
+	}
+}
+
+@keyframes dashboard-surface-exit {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: blur(0);
+	}
+
+	to {
+		opacity: 0.12;
+		transform: translateY(-0.55rem) scale(0.992);
+		filter: blur(3px);
 	}
 }
 
@@ -402,6 +408,21 @@
 		animation: pricing-copy-fade 260ms var(--motion-ease-standard);
 	}
 
+	.auth-view-shell {
+		margin-inline: auto;
+		display: flex;
+		width: 100%;
+		max-width: 32rem;
+		justify-content: center;
+		padding-inline: 1rem;
+	}
+
+	.auth-clerk-frame {
+		width: 100%;
+		min-height: 42rem;
+		contain: layout paint;
+	}
+
 	.interactive-link {
 		position: relative;
 		display: inline-block;
@@ -478,6 +499,14 @@
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
+	}
+
+	@supports (view-transition-name: none) {
+		::view-transition-group(*),
+		::view-transition-old(*),
+		::view-transition-new(*) {
+			animation-duration: 1ms !important;
+		}
 	}
 
 	*,

@@ -37,7 +37,12 @@ function ResolvedHomePrimaryAction() {
 				size="sm"
 				className={homeActionOutlineClassName}
 			>
-				<TransitionLink href="/dashboard">Dashboard</TransitionLink>
+				<TransitionLink
+					href="/dashboard"
+					transitionTypes={["bardo-route", "dashboard-entry"]}
+				>
+					Dashboard
+				</TransitionLink>
 			</Button>
 		);
 	}
@@ -63,7 +68,16 @@ function PrimaryHomeLink({
 			size="sm"
 			className={homeActionOutlineClassName}
 		>
-			<TransitionLink href={href}>{children}</TransitionLink>
+			<TransitionLink
+				href={href}
+				transitionTypes={
+					href === "/dashboard"
+						? ["bardo-route", "dashboard-entry"]
+						: ["bardo-route"]
+				}
+			>
+				{children}
+			</TransitionLink>
 		</Button>
 	);
 }

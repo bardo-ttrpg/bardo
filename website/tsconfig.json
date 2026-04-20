@@ -8,7 +8,7 @@
 		],
 		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"incremental": true,
-		"types": ["node", "react/canary"],
+		"types": ["bun", "node", "react/canary"],
 		"paths": {
 			"@/*": ["./*"]
 		}

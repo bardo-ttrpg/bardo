@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 import { TransitionLink } from "@/components/transition-link";
+import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
 import { resolveCheckoutRenderState } from "./billing-cta-state";
@@ -28,14 +29,9 @@ export default function CheckoutButton({
 
 	if (!clerkEnabled) {
 		return (
-			<div>
-				<button type="button" className={className} disabled>
-					{label}
-				</button>
-				<p className="font-reading-body mt-2 text-muted-foreground">
-					Billing is unavailable. Clerk auth is not configured.
-				</p>
-			</div>
+			<p className="font-reading-body mt-2 text-muted-foreground">
+				Billing is unavailable. Clerk auth is not configured.
+			</p>
 		);
 	}
 
@@ -73,16 +69,16 @@ function EnabledCheckoutButton({
 		isUnavailable,
 	});
 	return (
-		<div>
-			{renderState === "sign_in" ? (
-				<TransitionLink href="/sign-in" className={className}>
-					{label}
-				</TransitionLink>
-			) : null}
+		<div className="py-8">
 			{renderState === "disabled_unavailable" ? (
-				<button type="button" className={className} disabled>
+				<Button variant="ghost" className={className} disabled>
 					{label}
-				</button>
+				</Button>
+			) : null}
+			{renderState === "sign_in" ? (
+				<Button asChild className={className}>
+					<TransitionLink href="/sign-in">{label}</TransitionLink>
+				</Button>
 			) : null}
 			{renderState === "checkout" ? (
 				<CheckoutAction

@@ -2,6 +2,7 @@
 
 import { SubscriptionDetailsButton } from "@clerk/nextjs/experimental";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function SubscriptionDetailsAction({
 	className,
@@ -12,9 +13,9 @@ export default function SubscriptionDetailsAction({
 }) {
 	return (
 		<SubscriptionDetailsButton>
-			<button type="button" className={className}>
+			<Button type="button" className={className}>
 				{label}
-			</button>
+			</Button>
 		</SubscriptionDetailsButton>
 	);
 }

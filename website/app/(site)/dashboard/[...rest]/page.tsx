@@ -1,5 +1,5 @@
 import { createPrivateMetadata } from "@/lib/site-metadata";
-import { DashboardClient } from "./dashboard-client";
+import { DashboardClient } from "../dashboard-client";
 
 export const metadata = createPrivateMetadata("Dashboard");
 

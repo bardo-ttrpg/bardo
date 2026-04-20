@@ -18,16 +18,14 @@ export function LegalLayoutShell({
 }) {
 	return (
 		<main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 pb-10 pt-8 sm:px-8 sm:pb-12 sm:pt-8 lg:pb-16 lg:pt-10">
-			<div className="flex flex-col gap-10">
-				<div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-14">
-					<aside className="bardo-persistent-surface lg:sticky lg:top-10 lg:self-start">
-						<LegalSidebarNav entries={entries} />
-					</aside>
-					<BardoViewTransition name="bardo-page-region">
-						<div className="min-w-0">{children}</div>
-					</BardoViewTransition>
-				</div>
-			</div>
+			<section className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-14">
+				<aside className="bardo-persistent-surface lg:sticky lg:top-10 lg:self-start">
+					<LegalSidebarNav entries={entries} />
+				</aside>
+				<BardoViewTransition name="bardo-page-region">
+					<section className="bardo-page-region min-w-0">{children}</section>
+				</BardoViewTransition>
+			</section>
 		</main>
 	);
 }
@@ -42,7 +40,7 @@ export function LegalEntryContent({
 	const breadcrumbJsonLd = JSON.stringify(getLegalBreadcrumbJsonLd(entry));
 
 	return (
-		<div className="min-w-0">
+		<section className="min-w-0">
 			<script type="application/ld+json">{breadcrumbJsonLd}</script>
 			<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
 				<div className="flex flex-col gap-3">
@@ -71,7 +69,7 @@ export function LegalEntryContent({
 			<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-8 text-foreground">
 				{children}
 			</article>
-		</div>
+		</section>
 	);
 }
 
@@ -86,12 +84,12 @@ export function LegalSection({
 }) {
 	return (
 		<section id={id} className="scroll-mt-24">
-			<div className="flex flex-col gap-4">
+			<header className="flex flex-col gap-4">
 				<h2 className="font-reading-heading text-3xl text-foreground">
 					{title}
 				</h2>
-				<div className="flex flex-col gap-4">{children}</div>
-			</div>
+			</header>
+			<div className="mt-4 flex flex-col gap-4">{children}</div>
 		</section>
 	);
 }

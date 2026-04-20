@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { createIntrospectionTelemetry } from "../../../../lib/introspection-telemetry";
 import { createIntrospectionVerifyCache } from "../../../../lib/introspection-verify-cache";
+import type { PlanTier } from "../../../../lib/user-billing";
 import { createIntrospectPostHandler } from "./handlers";
 
 function buildRequest(secret: string, apiKey: string): Request {
@@ -144,7 +145,6 @@ describe("POST /api/auth/introspect-key", () => {
 						verifyCalls += 1;
 						return {
 							id: "key_1",
-							subject: null,
 							claims: { workspacePath: "./customers/user_1" },
 							scopes: ["mcp"],
 						};
@@ -184,7 +184,7 @@ describe("POST /api/auth/introspect-key", () => {
 	});
 
 	test("uses the high-water pre-auth budget tier before key verification", async () => {
-		let seenPreAuthPlan: string | null = null;
+		let seenPreAuthPlan: PlanTier | null = null;
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
 		const cache = createIntrospectionVerifyCache({
 			validTtlMs: 60_000,
@@ -248,7 +248,7 @@ describe("POST /api/auth/introspect-key", () => {
 
 		expect(response.status).toBe(200);
 		expect(body.valid).toBe(true);
-		expect(seenPreAuthPlan).toBe("solo");
+		expect(seenPreAuthPlan === "solo").toBe(true);
 	});
 
 	test("caches invalid verification errors and short-circuits repeat calls", async () => {
@@ -296,10 +296,9 @@ describe("POST /api/auth/introspect-key", () => {
 			}),
 			mcpPeriodLimitResolver: () => 100,
 			tracing: {
-				withRequestSpan: async (_args, callback) =>
-					await callback({ setAttribute() {} }),
-				withClerkVerifySpan: async (callback) => await callback(),
-				withPlanLookupSpan: async (callback) => await callback(),
+				withRequestSpan: (_args, callback) => callback({ setAttribute() {} }),
+				withClerkVerifySpan: (callback) => callback(),
+				withPlanLookupSpan: (callback) => callback(),
 				captureException: () => {},
 				logInfo: () => {},
 				logWarn,
@@ -383,10 +382,9 @@ describe("POST /api/auth/introspect-key", () => {
 			}),
 			mcpPeriodLimitResolver: () => 100,
 			tracing: {
-				withRequestSpan: async (_args, callback) =>
-					await callback({ setAttribute() {} }),
-				withClerkVerifySpan: async (callback) => await callback(),
-				withPlanLookupSpan: async (callback) => await callback(),
+				withRequestSpan: (_args, callback) => callback({ setAttribute() {} }),
+				withClerkVerifySpan: (callback) => callback(),
+				withPlanLookupSpan: (callback) => callback(),
 				captureException: () => {},
 				logInfo: () => {},
 				logWarn,
@@ -455,7 +453,6 @@ describe("POST /api/auth/introspect-key", () => {
 						verifyCalls += 1;
 						return {
 							id: "key_budget_1",
-							subject: null,
 							claims: { workspacePath: "./customers/user_budget" },
 							scopes: ["mcp"],
 						};
@@ -537,7 +534,6 @@ describe("POST /api/auth/introspect-key", () => {
 						verifyCalls += 1;
 						return {
 							id: "key_preauth_1",
-							subject: null,
 							claims: { workspacePath: "./customers/user_preauth" },
 							scopes: ["mcp"],
 						};

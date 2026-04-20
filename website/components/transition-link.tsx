@@ -10,21 +10,13 @@ export function TransitionLink({
 	transitionTypes = ["bardo-route"],
 	...props
 }: TransitionLinkProps) {
-	if (prefetch) {
-		return (
-			<Link
-				{...props}
-				prefetch={true}
-				transitionTypes={transitionTypes}
-			/>
-		);
-	}
-
 	return (
 		<Link
 			{...props}
-			prefetch={false}
-			transitionTypes={transitionTypes}
+			prefetch={prefetch}
+			transitionTypes={
+				transitionTypes.length > 0 ? transitionTypes : undefined
+			}
 		/>
 	);
 }

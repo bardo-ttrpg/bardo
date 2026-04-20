@@ -19,12 +19,17 @@ export default function SignInPage() {
 
 	return (
 		<BardoViewTransition name="bardo-page-region" variant="fade">
-			<SignIn
-				appearance={clerkAppearance}
-				routing="hash"
-				signUpUrl="/sign-up"
-				fallbackRedirectUrl="/dashboard"
-			/>
+			<main className="auth-view-shell bardo-page-region">
+				<section className="auth-clerk-frame" aria-label="Sign in">
+					<SignIn
+						appearance={clerkAppearance}
+						path="/sign-in"
+						routing="path"
+						signUpUrl="/sign-up"
+						fallbackRedirectUrl="/dashboard"
+					/>
+				</section>
+			</main>
 		</BardoViewTransition>
 	);
 }

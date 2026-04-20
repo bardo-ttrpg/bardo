@@ -1,5 +1,6 @@
 import { SignUp } from "@clerk/nextjs";
 import { BardoViewTransition } from "@/components/view-transition";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPrivateMetadata } from "@/lib/site-metadata";
 import { ClerkMissingKeysNotice } from "../../_components/auth-shell";
@@ -18,11 +19,17 @@ export default function SignUpPage() {
 
 	return (
 		<BardoViewTransition name="bardo-page-region" variant="fade">
-			<SignUp
-				routing="hash"
-				signInUrl="/sign-in"
-				fallbackRedirectUrl="/dashboard"
-			/>
+			<main className="auth-view-shell bardo-page-region">
+				<section className="auth-clerk-frame" aria-label="Sign up">
+					<SignUp
+						appearance={clerkAppearance}
+						path="/sign-up"
+						routing="path"
+						signInUrl="/sign-in"
+						fallbackRedirectUrl="/dashboard"
+					/>
+				</section>
+			</main>
 		</BardoViewTransition>
 	);
 }

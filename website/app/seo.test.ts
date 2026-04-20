@@ -34,6 +34,10 @@ const docsPageSource = readFileSync(
 	new URL("./(site)/docs/[[...slug]]/page.tsx", import.meta.url),
 	"utf8",
 );
+const pricingPageSource = readFileSync(
+	new URL("./(site)/(public-secondary)/pricing/page.tsx", import.meta.url),
+	"utf8",
+);
 const legalShellSource = readFileSync(
 	new URL(
 		"./(site)/(public-secondary)/legal/_components/legal-shell.tsx",
@@ -68,7 +72,8 @@ describe("SEO and production metadata", () => {
 		expect(existsSync(new URL("./twitter-image.tsx", import.meta.url))).toBe(
 			true,
 		);
-		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./icon.png", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(false);
 		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(true);
 		expect(existsSync(new URL("./not-found.tsx", import.meta.url))).toBe(true);
 	});
@@ -81,10 +86,11 @@ describe("SEO and production metadata", () => {
 
 	test("publishes a robots policy for the public minimal surface", () => {
 		const policy = robots();
-		const publicRules = policy.rules.find((rule) => rule.userAgent === "*");
+		const rules = Array.isArray(policy.rules) ? policy.rules : [policy.rules];
+		const publicRules = rules.find((rule) => rule.userAgent === "*");
 		expect(policy.host).toBe("www.bardo.gg");
 		expect(policy.sitemap).toBe("https://www.bardo.gg/sitemap.xml");
-		expect(policy.rules).toEqual(
+		expect(rules).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
 					userAgent: "*",
@@ -144,8 +150,18 @@ describe("SEO and production metadata", () => {
 		expect(homeSource).toContain('type="application/ld+json"');
 		expect(siteSeoSource).toContain("SoftwareApplication");
 		expect(siteSeoSource).toContain("WebSite");
+		expect(siteSeoSource).toContain("Organization");
 		expect(siteSeoSource).toContain("solo tabletop RPG");
 		expect(siteSeoSource).toContain("AI dungeon master");
+		expect(siteSeoSource).toContain("AI game master");
+	});
+
+	test("adds pricing metadata and structured data for subscription discovery", () => {
+		expect(pricingPageSource).toContain('type="application/ld+json"');
+		expect(pricingPageSource).toContain("pricingSeo");
+		expect(siteSeoSource).toContain("getPricingPageJsonLd");
+		expect(siteSeoSource).toContain("Bardo Solo Monthly");
+		expect(siteSeoSource).toContain("Bardo Solo Yearly");
 	});
 
 	test("adds docs breadcrumb structured data from the docs manifest", () => {

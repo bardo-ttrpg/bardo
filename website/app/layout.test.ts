@@ -23,7 +23,8 @@ const dashboardLayoutSource = readFileSync(
 	new URL("./(site)/dashboard/layout.tsx", import.meta.url),
 	"utf8",
 );
-const iconRoutePath = new URL("./icon.tsx", import.meta.url);
+const iconFilePath = new URL("./icon.png", import.meta.url);
+const legacyIconRoutePath = new URL("./icon.tsx", import.meta.url);
 const appleIconRoutePath = new URL("./apple-icon.tsx", import.meta.url);
 
 describe("Clerk provider placement", () => {
@@ -52,7 +53,8 @@ describe("Clerk provider placement", () => {
 	test("defines canonical, social, and robots metadata at the root layout", () => {
 		expect(rootLayoutSource).toContain("metadataBase");
 		expect(rootLayoutSource).toContain("manifest");
-		expect(existsSync(iconRoutePath)).toBe(true);
+		expect(existsSync(iconFilePath)).toBe(true);
+		expect(existsSync(legacyIconRoutePath)).toBe(false);
 		expect(existsSync(appleIconRoutePath)).toBe(true);
 		expect(rootLayoutSource).toContain("openGraph");
 		expect(rootLayoutSource).toContain("twitter");
@@ -63,7 +65,8 @@ describe("Clerk provider placement", () => {
 	test("keeps the root layout visually stripped down", () => {
 		expect(rootLayoutSource).not.toContain('backgroundColor: "#080a09"');
 		expect(rootLayoutSource).toContain('colorScheme: "dark light"');
-		expect(rootLayoutSource).toContain('themeColor: "#171717"');
+		expect(rootLayoutSource).toContain("prefers-color-scheme: light");
+		expect(rootLayoutSource).toContain('color: "#171717"');
 		expect(rootLayoutSource).toContain("siteHeading.variable");
 		expect(rootLayoutSource).toContain("siteUi.variable");
 	});
@@ -91,6 +94,9 @@ describe("Clerk provider placement", () => {
 		expect(globalStylesSource).toContain("--font-ui");
 		expect(globalStylesSource).toContain("--font-code");
 		expect(globalStylesSource).toContain("--motion-duration-base");
+		expect(globalStylesSource).toContain("@view-transition");
+		expect(globalStylesSource).toContain(".bardo-page-region");
+		expect(globalStylesSource).toContain("dashboard-entry");
 		expect(globalStylesSource).toContain(".landing-footer-link");
 		expect(globalStylesSource).toContain(
 			"@media (prefers-reduced-motion: reduce)",

@@ -16,6 +16,12 @@ describe("auth surface", () => {
 		expect(signUpSource).toContain("createPrivateMetadata");
 		expect(signInSource).toContain("<SignIn");
 		expect(signUpSource).toContain("<SignUp");
+		expect(signInSource).toContain('routing="path"');
+		expect(signUpSource).toContain('routing="path"');
+		expect(signInSource).toContain('path="/sign-in"');
+		expect(signUpSource).toContain('path="/sign-up"');
+		expect(signInSource).not.toContain('routing="hash"');
+		expect(signUpSource).not.toContain('routing="hash"');
 		expect(signUpSource).not.toContain("/legal/terms");
 		expect(signInSource).not.toContain("/forgot-password");
 		expect(signInSource).toContain('variant="fade"');
@@ -28,7 +34,10 @@ describe("auth surface", () => {
 		).toBe(false);
 		expect(
 			existsSync(
-				new URL("./(auth)/forgot-password/forgot-password-form.tsx", import.meta.url),
+				new URL(
+					"./(auth)/forgot-password/forgot-password-form.tsx",
+					import.meta.url,
+				),
 			),
 		).toBe(false);
 	});

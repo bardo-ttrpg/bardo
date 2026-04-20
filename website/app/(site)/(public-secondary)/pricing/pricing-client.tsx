@@ -5,21 +5,20 @@ import NumberFlow, { continuous, NumberFlowGroup } from "@number-flow/react";
 import { CheckIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
-import type { BillingViewState } from "@/lib/billing-view-data";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import CheckoutButton from "../../dashboard/_billing/checkout-button";
 import SubscriptionDetailsAction from "../../dashboard/_billing/subscription-details-action";
+import {
+	type PricingBillingState,
+	shouldShowManageSubscription,
+} from "./pricing-helpers";
 
 type PricingClientProps = {
 	clerkEnabled: boolean;
 	clerkPlanId: string | null;
 	initialBilling: PricingBillingState | null;
 };
-
-type PricingBillingState = Pick<
-	BillingViewState,
-	"plan" | "subscriptionStatus" | "billingInterval"
->;
 
 const pricingToggleClassName =
 	"ui-button rounded-full px-4 py-2 text-sm transition-colors";
@@ -43,16 +42,6 @@ const pricingCons = [
 	"Needs repeated reminders.",
 	"Breaks immersion when continuity slips.",
 ] as const;
-
-export function shouldShowManageSubscription({
-	billing,
-	billingPeriod,
-}: {
-	billing: PricingBillingState | null;
-	billingPeriod: "month" | "year";
-}) {
-	return billing?.plan === "solo" && billing.billingInterval === billingPeriod;
-}
 
 export function PricingClient({
 	clerkEnabled,
@@ -170,41 +159,54 @@ function PricingClientContent({
 	});
 
 	return (
-		<div className="flex flex-col gap-10">
-			<div className="flex justify-center">
-				<div className="inline-flex rounded-full border border-border bg-muted/40 p-1">
-					<button
+		<section className="bardo-page-region flex flex-col gap-10" aria-labelledby="pricing-plan-heading">
+			<header className="flex justify-center">
+				<nav
+					aria-label="Billing period"
+					className="inline-flex rounded-full border border-border bg-muted/40 p-1"
+				>
+					<Button
 						type="button"
 						onClick={() => setBillingPeriod("month")}
 						aria-pressed={billingPeriod === "month"}
-						className={`${pricingToggleClassName} ${
+						variant="ghost"
+						className={cn(
+							pricingToggleClassName,
 							billingPeriod === "month"
 								? "bg-foreground text-background"
-								: "text-muted-foreground hover:text-foreground"
-						}`}
+								: "text-muted-foreground hover:text-foreground",
+						)}
 					>
 						Monthly
-					</button>
-					<button
+					</Button>
+					<Button
 						type="button"
 						onClick={() => setBillingPeriod("year")}
 						aria-pressed={billingPeriod === "year"}
-						className={`${pricingToggleClassName} ${
+						variant="ghost"
+						className={cn(
+							pricingToggleClassName,
 							billingPeriod === "year"
 								? "bg-foreground text-background"
-								: "text-muted-foreground hover:text-foreground"
-						}`}
+								: "text-muted-foreground hover:text-foreground",
+						)}
 					>
 						Yearly
-					</button>
-				</div>
-			</div>
+					</Button>
+				</nav>
+			</header>
 
 			<section className="grid gap-8">
-				<div className="w-full rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
+				<article className="w-full rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
 					<div className="flex flex-col gap-6">
-						<div className="space-y-3">
+						<header className="flex flex-col gap-3">
 							<p className="ui-label">Bardo Solo</p>
+							<h1
+								id="pricing-plan-heading"
+								className="sr-only"
+							>
+								Bardo Solo pricing
+							</h1>
 							<AnimatedPricingValue
 								amount={displayedPrice}
 								billingPeriod={billingPeriod}
@@ -215,9 +217,9 @@ function PricingClientContent({
 								value={pricingDescription}
 								className="font-reading-body text-muted-foreground"
 							/>
-						</div>
+						</header>
 
-						<div className="space-y-3">
+						<div className="flex flex-col gap-3">
 							{shouldManageCurrentPlan ? (
 								<SubscriptionDetailsAction
 									className={pricingPrimaryActionClassName}
@@ -228,13 +230,14 @@ function PricingClientContent({
 									}
 								/>
 							) : !isLoaded && isSignedIn ? (
-								<button
+								<Button
 									type="button"
+									variant="default"
 									className={pricingPrimaryActionClassName}
 									disabled
 								>
 									Loading billing...
-								</button>
+								</Button>
 							) : (
 								<CheckoutButton
 									clerkEnabled={clerkEnabled}
@@ -257,12 +260,12 @@ function PricingClientContent({
 								/>
 							)}
 
-							<div className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
-								<section className="space-y-4">
+							<section className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
+								<section className="flex flex-col gap-4">
 									<h2 className="font-reading-heading text-2xl text-foreground">
 										Using Bardo MCP
 									</h2>
-									<ul className="space-y-3">
+									<ul className="flex flex-col gap-3">
 										{pricingPros.map((item) => (
 											<li
 												key={item}
@@ -276,11 +279,11 @@ function PricingClientContent({
 										))}
 									</ul>
 								</section>
-								<section className="space-y-4">
+								<section className="flex flex-col gap-4">
 									<h2 className="font-reading-heading text-2xl text-foreground">
 										No Bardo MCP
 									</h2>
-									<ul className="space-y-3">
+									<ul className="flex flex-col gap-3">
 										{pricingCons.map((item) => (
 											<li
 												key={item}
@@ -294,11 +297,11 @@ function PricingClientContent({
 										))}
 									</ul>
 								</section>
-							</div>
+							</section>
 						</div>
 					</div>
-				</div>
+				</article>
 			</section>
-		</div>
+		</section>
 	);
 }
