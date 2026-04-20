@@ -159,7 +159,10 @@ function PricingClientContent({
 	});
 
 	return (
-		<section className="bardo-page-region flex flex-col gap-10" aria-labelledby="pricing-plan-heading">
+		<section
+			className="bardo-page-region flex flex-col gap-10"
+			aria-labelledby="pricing-plan-heading"
+		>
 			<header className="flex justify-center">
 				<nav
 					aria-label="Billing period"
@@ -198,13 +201,10 @@ function PricingClientContent({
 
 			<section className="grid gap-8">
 				<article className="w-full rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
-					<div className="flex flex-col gap-6">
-						<header className="flex flex-col gap-3">
+					<div className="flex flex-col">
+						<header className="flex flex-col gap-2">
 							<p className="ui-label">Bardo Solo</p>
-							<h1
-								id="pricing-plan-heading"
-								className="sr-only"
-							>
+							<h1 id="pricing-plan-heading" className="sr-only">
 								Bardo Solo pricing
 							</h1>
 							<AnimatedPricingValue
