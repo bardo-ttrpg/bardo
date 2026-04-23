@@ -21,7 +21,8 @@ Run this after every meaningful staging deployment.
 3. Approve it through `/api/connect/bridge-session/approve` while signed in.
 4. Confirm a second `/api/connect/bridge-session/poll` returns `approved`.
 5. Confirm `/api/connect/runtime-status` succeeds with the approved bridge access token.
-6. Confirm an unsubscribed account gets a clean denial at approval time.
+6. Confirm missing, malformed, or expired runtime-status credentials return `200` with `valid: false` instead of a Clerk middleware `401`.
+7. Confirm an unsubscribed account gets a clean denial at approval time.
 
 ## Local Runtime
 
@@ -34,7 +35,7 @@ From a clean local workspace:
 5. `bardo doctor --json` reports healthy MCP connectivity.
 6. `bardo clients list --json` returns the expected client matrix.
 7. `.bardo/manifests/readiness.json` and `.bardo/state/current-state.json` exist after bootstrap.
-8. One protected runtime-status check succeeds for a paid account and fails cleanly for an unpaid one.
+8. One runtime-status check succeeds for a paid account and returns `valid: false` for an invalid or inactive credential.
 
 ## Pre-Staging Gauntlet
 

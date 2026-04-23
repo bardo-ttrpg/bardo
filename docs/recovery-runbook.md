@@ -66,10 +66,11 @@ Checks:
 1. Confirm `/api/connect/runtime-status` is reachable.
 2. Confirm access tokens are being sent and validated server-side.
 3. Confirm the website still serves the correct API key introspection and auth configuration.
+4. Confirm invalid credentials return `200` with `valid: false`; `401` responses on this route usually mean Clerk middleware is intercepting a custom bridge token before the handler runs.
 
 Recovery:
 1. Keep local `.bardo/` truth untouched.
-2. Restore the hosted status path or token validation path.
+2. Restore the hosted status path, token validation path, or proxy bypass for custom-token connect routes.
 3. Re-run `bardo doctor --json` after recovery and confirm account status resumes without changing local canon.
 
 ## Partial hosted degradation
