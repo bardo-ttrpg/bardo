@@ -13,26 +13,26 @@ describe("clerk-billing", () => {
 
 	test("resolves plan ids from env keys", () => {
 		const env = {
-			CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+			CLERK_BILLING_PLAN_PRO: "cplan_pro",
 		};
 
-		expect(getClerkPlanId("solo", env)).toBe("cplan_solo");
+		expect(getClerkPlanId("pro", env)).toBe("cplan_pro");
 	});
 
 	test("returns null when plan id is missing", () => {
-		expect(getClerkPlanId("solo", {})).toBeNull();
+		expect(getClerkPlanId("pro", {})).toBeNull();
 	});
 
 	test("billing is configured only when all plan ids exist", () => {
 		expect(
 			isClerkBillingConfigured({
-				CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+				CLERK_BILLING_PLAN_PRO: "cplan_pro",
 			}),
 		).toBe(true);
 
 		expect(
 			isClerkBillingConfigured({
-				CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+				CLERK_BILLING_PLAN_PRO: "cplan_pro",
 			}),
 		).toBe(true);
 	});

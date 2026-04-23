@@ -8,25 +8,25 @@ import type { PlanTier } from "./user-billing";
 export function maxApiKeysForPlan(plan: PlanTier): number {
 	switch (plan) {
 		case "free":
-			return 1;
-		case "solo":
+			return 0;
+		case "pro":
 			return 5;
 	}
 }
 
 const DEFAULT_MCP_PERIOD_LIMIT: Record<PlanTier, number> = {
-	free: 100,
-	solo: 25_000,
+	free: 0,
+	pro: 25_000,
 };
 
 const DEFAULT_DAILY_USER_VERIFICATION_LIMIT: Record<PlanTier, number> = {
-	free: 500,
-	solo: 7_500,
+	free: 0,
+	pro: 7_500,
 };
 
 const DEFAULT_DAILY_KEY_VERIFICATION_LIMIT: Record<PlanTier, number> = {
-	free: 500,
-	solo: 2_000,
+	free: 0,
+	pro: 2_000,
 };
 
 function readPositiveLimit(
@@ -51,14 +51,11 @@ export function dailyUserVerificationLimitForPlan(
 ): number {
 	switch (plan) {
 		case "free":
+			return DEFAULT_DAILY_USER_VERIFICATION_LIMIT.free;
+		case "pro":
 			return readPositiveLimit(
-				env.BARDO_DAILY_USER_VERIFICATIONS_FREE,
-				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.free,
-			);
-		case "solo":
-			return readPositiveLimit(
-				env.BARDO_DAILY_USER_VERIFICATIONS_SOLO,
-				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.solo,
+				env.BARDO_DAILY_USER_VERIFICATIONS_PRO,
+				DEFAULT_DAILY_USER_VERIFICATION_LIMIT.pro,
 			);
 	}
 }
@@ -72,14 +69,11 @@ export function dailyKeyVerificationLimitForPlan(
 ): number {
 	switch (plan) {
 		case "free":
+			return DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.free;
+		case "pro":
 			return readPositiveLimit(
-				env.BARDO_DAILY_KEY_VERIFICATIONS_FREE,
-				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.free,
-			);
-		case "solo":
-			return readPositiveLimit(
-				env.BARDO_DAILY_KEY_VERIFICATIONS_SOLO,
-				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.solo,
+				env.BARDO_DAILY_KEY_VERIFICATIONS_PRO,
+				DEFAULT_DAILY_KEY_VERIFICATION_LIMIT.pro,
 			);
 	}
 }
@@ -94,14 +88,11 @@ export function mcpPeriodLimitForPlan(
 ): number {
 	switch (plan) {
 		case "free":
+			return DEFAULT_MCP_PERIOD_LIMIT.free;
+		case "pro":
 			return readPositiveLimit(
-				env.BARDO_MCP_PERIOD_LIMIT_FREE,
-				DEFAULT_MCP_PERIOD_LIMIT.free,
-			);
-		case "solo":
-			return readPositiveLimit(
-				env.BARDO_MCP_PERIOD_LIMIT_SOLO,
-				DEFAULT_MCP_PERIOD_LIMIT.solo,
+				env.BARDO_MCP_PERIOD_LIMIT_PRO,
+				DEFAULT_MCP_PERIOD_LIMIT.pro,
 			);
 	}
 }

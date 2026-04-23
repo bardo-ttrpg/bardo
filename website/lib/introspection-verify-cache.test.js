@@ -13,7 +13,7 @@ describe("createIntrospectionVerifyCache", () => {
 		cache.setValid("ak_test", {
 			subjectId: "user_123",
 			keyId: "key_123",
-			plan: "solo",
+			plan: "pro",
 			scopes: ["mcp"],
 			workspacePath: "./customers/user_123",
 		});
@@ -24,7 +24,7 @@ describe("createIntrospectionVerifyCache", () => {
 			value: {
 				subjectId: "user_123",
 				keyId: "key_123",
-				plan: "solo",
+				plan: "pro",
 				scopes: ["mcp"],
 				workspacePath: "./customers/user_123",
 				billingUnavailable: false,

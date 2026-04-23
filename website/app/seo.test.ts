@@ -72,9 +72,15 @@ describe("SEO and production metadata", () => {
 		expect(existsSync(new URL("./twitter-image.tsx", import.meta.url))).toBe(
 			true,
 		);
+		expect(existsSync(new URL("./favicon.ico", import.meta.url))).toBe(true);
 		expect(existsSync(new URL("./icon.png", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./apple-icon.png", import.meta.url))).toBe(
+			false,
+		);
 		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(false);
-		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(
+			false,
+		);
 		expect(existsSync(new URL("./not-found.tsx", import.meta.url))).toBe(true);
 	});
 
@@ -140,7 +146,8 @@ describe("SEO and production metadata", () => {
 		const data = manifest();
 		expect(data.name).toBe("Bardo");
 		expect(data.start_url).toBe("/");
-		expect(data.icons?.some((icon) => icon.src === "/apple-icon")).toBe(true);
+		expect(data.icons?.some((icon) => icon.src === "/icon.png")).toBe(true);
+		expect(data.icons?.some((icon) => icon.src === "/apple-icon")).toBe(false);
 	});
 
 	test("keeps the landing page copy untouched while adding structured data and niche-targeted metadata", () => {
@@ -160,8 +167,8 @@ describe("SEO and production metadata", () => {
 		expect(pricingPageSource).toContain('type="application/ld+json"');
 		expect(pricingPageSource).toContain("pricingSeo");
 		expect(siteSeoSource).toContain("getPricingPageJsonLd");
-		expect(siteSeoSource).toContain("Bardo Solo Monthly");
-		expect(siteSeoSource).toContain("Bardo Solo Yearly");
+		expect(siteSeoSource).toContain("Bardo Pro Monthly");
+		expect(siteSeoSource).toContain("Bardo Pro Yearly");
 	});
 
 	test("adds docs breadcrumb structured data from the docs manifest", () => {

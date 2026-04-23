@@ -46,7 +46,10 @@ describe("ensureWorkspaceLocalDocs", () => {
 				"utf8",
 			);
 			const skill = await readFile(
-				path.join(workspaceRoot, ".agents/skills/bardo-runtime/SKILL.md"),
+				path.join(
+					workspaceRoot,
+					".agents/skills/bardo-runtime/SKILL.md",
+				),
 				"utf8",
 			);
 
@@ -80,7 +83,9 @@ describe("ensureWorkspaceLocalDocs", () => {
 			expect(credits).toContain("1 accepted MCP tool call = 1 credit");
 			expect(credits).not.toContain("MCP resources");
 			expect(skill).toContain("name: bardo-runtime");
-			expect(skill).toContain("description: Guides an MCP-capable agent");
+			expect(skill).toContain(
+				"description: Guides an MCP-capable agent",
+			);
 			expect(skill).toContain(".bardo/docs/quickstart.md");
 			expect(skill).toContain("Read `bardo_workspace_status` before");
 			expect(skill).toContain("- `scene_turn`");
@@ -93,9 +98,7 @@ describe("ensureWorkspaceLocalDocs", () => {
 			expect(skill).toContain("do not teach the full internal runtime recipe");
 			expect(skill).not.toContain("validator heuristics");
 			expect(
-				(
-					await stat(path.join(workspaceRoot, ".agents/skills/bardo-runtime"))
-				).isDirectory(),
+				(await stat(path.join(workspaceRoot, ".agents/skills/bardo-runtime"))).isDirectory(),
 			).toBe(true);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });

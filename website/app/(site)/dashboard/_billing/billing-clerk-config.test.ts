@@ -8,13 +8,13 @@ describe("resolveBillingClerkConfig", () => {
 				publishableKey: "pk_test_123",
 				secretKey: "sk_test_123",
 				env: {
-					CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+					CLERK_BILLING_PLAN_PRO: "cplan_pro",
 				},
 			}),
 		).toEqual({
 			clerkEnabled: true,
 			clerkPlanIds: {
-				solo: "cplan_solo",
+				pro: "cplan_pro",
 			},
 		});
 	});
@@ -29,7 +29,7 @@ describe("resolveBillingClerkConfig", () => {
 		).toEqual({
 			clerkEnabled: true,
 			clerkPlanIds: {
-				solo: null,
+				pro: null,
 			},
 		});
 	});

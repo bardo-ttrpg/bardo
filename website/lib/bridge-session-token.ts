@@ -3,7 +3,7 @@ const TOKEN_VERSION = 1;
 type BaseBridgeTokenPayload = {
 	sessionId: string;
 	userId: string;
-	plan: "free" | "solo";
+	plan: "free" | "pro";
 	accountLabel: string;
 	issuedAtISO: string;
 	expiresAtISO: string;
@@ -26,6 +26,8 @@ type EncodedPayload = BridgeTokenPayload & {
 type DecodeOptions = {
 	now?: Date;
 };
+
+type DecodedPlan = BaseBridgeTokenPayload["plan"] | "solo";
 
 function toBase64Url(bytes: Uint8Array): string {
 	return Buffer.from(bytes)
@@ -68,8 +70,8 @@ function ensureSecret(secret: string): string {
 	return trimmed;
 }
 
-function isValidPlan(value: unknown): value is BaseBridgeTokenPayload["plan"] {
-	return value === "free" || value === "solo";
+function isValidPlan(value: unknown): value is DecodedPlan {
+	return value === "free" || value === "pro" || value === "solo";
 }
 
 function parseTokenPayload(
@@ -93,12 +95,13 @@ function parseTokenPayload(
 	if (Date.parse(raw.expiresAtISO) <= now.getTime()) {
 		throw new Error("bridge session token expired");
 	}
+	const decodedPlan = raw.plan as DecodedPlan;
 
 	return {
 		tokenType: raw.tokenType,
 		sessionId: raw.sessionId,
 		userId: raw.userId,
-		plan: raw.plan,
+		plan: decodedPlan === "solo" ? "pro" : decodedPlan,
 		accountLabel: raw.accountLabel,
 		issuedAtISO: raw.issuedAtISO,
 		expiresAtISO: raw.expiresAtISO,

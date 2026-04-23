@@ -4,7 +4,6 @@ import {
 	buildBeforeAfterSummary,
 	buildFactionPressure,
 	buildWorldClockStates,
-	type ConfidenceClass,
 	computeStateHash,
 	createBlankCurrentState,
 	createDiagnosticsManifest,
@@ -12,13 +11,14 @@ import {
 	createFieldMetadataEntry,
 	createRuntimeEventId,
 	createSnapshotRecord,
-	type EntityCatalog,
 	findEntityId,
 	normalizeCurrentState,
-	RUNTIME_ARTIFACT_PATHS,
-	RUNTIME_SCHEMA_VERSION,
+	type ConfidenceClass,
+	type EntityCatalog,
 	type RuntimeCurrentState,
 	type RuntimeEventRecord,
+	RUNTIME_ARTIFACT_PATHS,
+	RUNTIME_SCHEMA_VERSION,
 } from "./runtime-contracts";
 
 export type CampaignBootstrapReadiness =
@@ -79,9 +79,7 @@ type Candidate = {
 
 type ExtractedCampaignData = {
 	entities: EntityIndex;
-	entitySourcePaths: Partial<
-		Record<keyof EntityCatalog, Record<string, string[]>>
-	>;
+	entitySourcePaths: Partial<Record<keyof EntityCatalog, Record<string, string[]>>>;
 	currentLocationCandidates: Candidate[];
 	uncertainties: string[];
 	gaps: string[];

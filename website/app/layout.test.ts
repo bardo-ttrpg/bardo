@@ -23,10 +23,6 @@ const dashboardLayoutSource = readFileSync(
 	new URL("./(site)/dashboard/layout.tsx", import.meta.url),
 	"utf8",
 );
-const iconFilePath = new URL("./icon.png", import.meta.url);
-const legacyIconRoutePath = new URL("./icon.tsx", import.meta.url);
-const appleIconRoutePath = new URL("./apple-icon.tsx", import.meta.url);
-
 describe("Clerk provider placement", () => {
 	test("keeps the root layout free of Clerk and scopes the provider to auth-aware surfaces", () => {
 		expect(rootLayoutSource).not.toContain("OptionalClerkProvider");
@@ -53,9 +49,15 @@ describe("Clerk provider placement", () => {
 	test("defines canonical, social, and robots metadata at the root layout", () => {
 		expect(rootLayoutSource).toContain("metadataBase");
 		expect(rootLayoutSource).toContain("manifest");
-		expect(existsSync(iconFilePath)).toBe(true);
-		expect(existsSync(legacyIconRoutePath)).toBe(false);
-		expect(existsSync(appleIconRoutePath)).toBe(true);
+		expect(existsSync(new URL("./favicon.ico", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./icon.png", import.meta.url))).toBe(true);
+		expect(existsSync(new URL("./apple-icon.png", import.meta.url))).toBe(
+			false,
+		);
+		expect(existsSync(new URL("./icon.tsx", import.meta.url))).toBe(false);
+		expect(existsSync(new URL("./apple-icon.tsx", import.meta.url))).toBe(
+			false,
+		);
 		expect(rootLayoutSource).toContain("openGraph");
 		expect(rootLayoutSource).toContain("twitter");
 		expect(rootLayoutSource).toContain("robots");

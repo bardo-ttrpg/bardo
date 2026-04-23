@@ -16,7 +16,7 @@ export function resolveBillingClerkConfig({
 			secretKey,
 		}),
 		clerkPlanIds: {
-			solo: getClerkPlanId("solo", env),
+			pro: getClerkPlanId("pro", env),
 		},
 	};
 }

@@ -4,10 +4,11 @@ import { normalizePlan } from "./plan-utils";
 describe("plan utils", () => {
 	test("normalizes supported plan aliases", () => {
 		expect(normalizePlan("free")).toBe("free");
-		expect(normalizePlan(" solo ")).toBe("solo");
-		expect(normalizePlan("solo_plus")).toBe("solo");
-		expect(normalizePlan("solo-plus")).toBe("solo");
-		expect(normalizePlan("soloplus")).toBe("solo");
+		expect(normalizePlan(" pro ")).toBe("pro");
+		expect(normalizePlan("solo")).toBe("pro");
+		expect(normalizePlan("solo_plus")).toBe("pro");
+		expect(normalizePlan("solo-plus")).toBe("pro");
+		expect(normalizePlan("soloplus")).toBe("pro");
 	});
 
 	test("rejects unknown plan values", () => {

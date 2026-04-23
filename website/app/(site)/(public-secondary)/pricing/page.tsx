@@ -29,7 +29,7 @@ export default async function PricingPage() {
 			<BardoViewTransition name="bardo-page-region">
 				<PricingClient
 					clerkEnabled={billingConfig.clerkEnabled}
-					clerkPlanId={billingConfig.clerkPlanIds.solo}
+					clerkPlanId={billingConfig.clerkPlanIds.pro}
 					initialBilling={initialBilling}
 				/>
 			</BardoViewTransition>

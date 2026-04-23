@@ -2,7 +2,8 @@ import {
 	type BillingSnapshot,
 	createBillingAdminClient,
 } from "./billing-admin";
-import { resolveOptionalUserId } from "./clerk-route-auth";
+import { resolveRouteUserId } from "./clerk-route-auth";
+import { planCreditsFor } from "./user-billing";
 
 export type BillingViewState = Pick<
 	BillingSnapshot,
@@ -37,10 +38,33 @@ function toBillingViewState(snapshot: BillingSnapshot): BillingViewState {
 	};
 }
 
+function withCurrentUserProEntitlement(
+	billing: BillingViewState,
+	hasProPlan: boolean,
+): BillingViewState {
+	if (!hasProPlan || billing.plan === "pro") {
+		return billing;
+	}
+
+	const creditsTotal = planCreditsFor("pro");
+	return {
+		...billing,
+		billingInterval: billing.billingInterval ?? "month",
+		creditsRemaining: Math.max(0, creditsTotal - billing.creditsUsed),
+		creditsTotal,
+		plan: "pro",
+		subscriptionStatus:
+			billing.subscriptionStatus === "canceled"
+				? "active"
+				: billing.subscriptionStatus,
+	};
+}
+
 export async function readPricingBillingForCurrentUser(
 	route = "/pricing",
 ): Promise<BillingViewState | null> {
-	const userId = await resolveOptionalUserId(route);
+	const routeAuth = await resolveRouteUserId(route);
+	const userId = routeAuth.userId;
 	if (!userId) {
 		return null;
 	}
@@ -48,5 +72,8 @@ export async function readPricingBillingForCurrentUser(
 	const billing = toBillingViewState(
 		await createBillingAdminClient().readBillingSnapshot(userId),
 	);
-	return billing;
+	return withCurrentUserProEntitlement(
+		billing,
+		routeAuth.has?.({ plan: "pro" }) ?? false,
+	);
 }

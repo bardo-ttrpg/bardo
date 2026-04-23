@@ -43,6 +43,7 @@ const FORBIDDEN_PATTERNS = [
 
 const IGNORED_PATHS = new Set([
 	"bun.lock",
+	".vscode/knip.schema.json",
 	"scripts/forbidden-integrations.test.ts",
 ]);
 

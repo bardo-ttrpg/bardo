@@ -102,6 +102,7 @@ describe("POST /api/auth/introspect-key", () => {
 
 	test("uses verify cache on second call and avoids repeated Clerk verification", async () => {
 		let verifyCalls = 0;
+		let consumeUserCalls = 0;
 		let consumeKeyCalls = 0;
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
 		const cache = createIntrospectionVerifyCache({
@@ -121,15 +122,22 @@ describe("POST /api/auth/introspect-key", () => {
 					backend: "memory",
 				}),
 				consumeUser: async () => {
-					throw new Error("consumeUser should not be called for null subject");
+					consumeUserCalls += 1;
+					return {
+						allowed: true,
+						limit: 7_500,
+						used: 1,
+						remaining: 7_499,
+						backend: "memory",
+					};
 				},
 				consumeKey: async () => {
 					consumeKeyCalls += 1;
 					return {
 						allowed: true,
-						limit: 500,
+						limit: 2_000,
 						used: 1,
-						remaining: 499,
+						remaining: 1_999,
 						backend: "memory",
 					};
 				},
@@ -145,6 +153,7 @@ describe("POST /api/auth/introspect-key", () => {
 						verifyCalls += 1;
 						return {
 							id: "key_1",
+							subject: "user_1",
 							claims: { workspacePath: "./customers/user_1" },
 							scopes: ["mcp"],
 						};
@@ -152,10 +161,10 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "free",
+				plan: "pro",
 				billingUnavailable: false,
 			}),
-			mcpPeriodLimitResolver: () => 100,
+			mcpPeriodLimitResolver: () => 25_000,
 		});
 
 		const firstResponse = await handler(
@@ -171,6 +180,7 @@ describe("POST /api/auth/introspect-key", () => {
 		expect(secondBody.valid).toBe(true);
 		expect(secondBody.verification.cached).toBe(true);
 		expect(verifyCalls).toBe(1);
+		expect(consumeUserCalls).toBe(1);
 		expect(consumeKeyCalls).toBe(1);
 		expect(telemetry.snapshot()).toEqual({
 			cache_hit_valid: 1,
@@ -206,14 +216,14 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 				consumeUser: async (_subject, plan) => ({
 					allowed: true,
-					limit: plan === "solo" ? 7_500 : 500,
+					limit: plan === "pro" ? 7_500 : 500,
 					used: 1,
 					remaining: 7_499,
 					backend: "memory",
 				}),
 				consumeKey: async (_keyId, plan) => ({
 					allowed: true,
-					limit: plan === "solo" ? 2_000 : 500,
+					limit: plan === "pro" ? 2_000 : 500,
 					used: 1,
 					remaining: 1_999,
 					backend: "memory",
@@ -227,15 +237,15 @@ describe("POST /api/auth/introspect-key", () => {
 			createClerkClient: async () => ({
 				apiKeys: {
 					verify: async () => ({
-						id: "key_solo",
-						subject: "user_solo",
-						claims: { workspacePath: "./customers/user_solo" },
+						id: "key_pro",
+						subject: "user_pro",
+						claims: { workspacePath: "./customers/user_pro" },
 						scopes: ["mcp"],
 					}),
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "solo",
+				plan: "pro",
 				billingUnavailable: false,
 			}),
 			mcpPeriodLimitResolver: () => 25_000,
@@ -248,7 +258,7 @@ describe("POST /api/auth/introspect-key", () => {
 
 		expect(response.status).toBe(200);
 		expect(body.valid).toBe(true);
-		expect(seenPreAuthPlan === "solo").toBe(true);
+		expect(seenPreAuthPlan === "pro").toBe(true);
 	});
 
 	test("caches invalid verification errors and short-circuits repeat calls", async () => {
@@ -411,6 +421,7 @@ describe("POST /api/auth/introspect-key", () => {
 
 	test("caches budget-denied keys and prevents repeated paid verification", async () => {
 		let verifyCalls = 0;
+		let consumeUserCalls = 0;
 		let consumeKeyCalls = 0;
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
 		const cache = createIntrospectionVerifyCache({
@@ -429,14 +440,21 @@ describe("POST /api/auth/introspect-key", () => {
 					backend: "memory",
 				}),
 				consumeUser: async () => {
-					throw new Error("consumeUser should not be called for null subject");
+					consumeUserCalls += 1;
+					return {
+						allowed: true,
+						limit: 7_500,
+						used: 1,
+						remaining: 7_499,
+						backend: "memory",
+					};
 				},
 				consumeKey: async () => {
 					consumeKeyCalls += 1;
 					return {
 						allowed: false,
-						limit: 500,
-						used: 500,
+						limit: 2_000,
+						used: 2_000,
 						remaining: 0,
 						backend: "memory",
 					};
@@ -453,6 +471,7 @@ describe("POST /api/auth/introspect-key", () => {
 						verifyCalls += 1;
 						return {
 							id: "key_budget_1",
+							subject: "user_budget",
 							claims: { workspacePath: "./customers/user_budget" },
 							scopes: ["mcp"],
 						};
@@ -460,10 +479,10 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "free",
+				plan: "pro",
 				billingUnavailable: false,
 			}),
-			mcpPeriodLimitResolver: () => 100,
+			mcpPeriodLimitResolver: () => 25_000,
 		});
 
 		const firstResponse = await handler(
@@ -478,6 +497,7 @@ describe("POST /api/auth/introspect-key", () => {
 		expect(firstBody.reason).toBe("daily_key_verification_limit_reached");
 		expect(secondBody.reason).toBe("cached_invalid_api_key");
 		expect(verifyCalls).toBe(1);
+		expect(consumeUserCalls).toBe(1);
 		expect(consumeKeyCalls).toBe(1);
 		expect(telemetry.snapshot()).toEqual({
 			cache_hit_valid: 0,
@@ -566,13 +586,14 @@ describe("POST /api/auth/introspect-key", () => {
 		});
 	});
 
-	test("signals billing degradation and enforces free-tier limits when billing is unavailable", async () => {
+	test("fails closed when billing is unavailable", async () => {
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
 		const cache = createIntrospectionVerifyCache({
 			validTtlMs: 60_000,
 			invalidTtlMs: 10_000,
 		});
-		const seenPlans: string[] = [];
+		let consumeUserCalls = 0;
+		let consumeKeyCalls = 0;
 
 		const handler = createIntrospectPostHandler({
 			introspectionSecret: "shared-secret",
@@ -584,8 +605,8 @@ describe("POST /api/auth/introspect-key", () => {
 					remaining: 499,
 					backend: "memory",
 				}),
-				consumeUser: async (_subject, plan) => {
-					seenPlans.push(plan);
+				consumeUser: async () => {
+					consumeUserCalls += 1;
 					return {
 						allowed: true,
 						limit: 500,
@@ -594,8 +615,8 @@ describe("POST /api/auth/introspect-key", () => {
 						backend: "memory",
 					};
 				},
-				consumeKey: async (_keyId, plan) => {
-					seenPlans.push(plan);
+				consumeKey: async () => {
+					consumeKeyCalls += 1;
 					return {
 						allowed: true,
 						limit: 500,
@@ -633,11 +654,12 @@ describe("POST /api/auth/introspect-key", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
-		expect(body.valid).toBe(true);
-		expect(body.plan).toBe("free");
-		expect(body.billingUnavailable).toBe(true);
-		expect(body.mcpPeriodLimit).toBe(100);
-		expect(seenPlans).toEqual(["free", "free"]);
+		expect(body).toEqual({
+			valid: false,
+			reason: "active_pro_subscription_required",
+		});
+		expect(consumeUserCalls).toBe(0);
+		expect(consumeKeyCalls).toBe(0);
 	});
 
 	test("accepts a bridge token and requires a local workspace root", async () => {
@@ -655,7 +677,7 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 				consumeUser: async (_subject, plan) => ({
 					allowed: true,
-					limit: plan === "solo" ? 500 : 100,
+					limit: plan === "pro" ? 500 : 100,
 					used: 1,
 					remaining: 499,
 					backend: "memory",
@@ -678,7 +700,7 @@ describe("POST /api/auth/introspect-key", () => {
 				return {
 					sessionId: "bridge_session_123",
 					userId: "user_123",
-					plan: "solo",
+					plan: "pro",
 					accountLabel: "Armando",
 				};
 			},
@@ -690,7 +712,7 @@ describe("POST /api/auth/introspect-key", () => {
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "solo",
+				plan: "pro",
 				billingUnavailable: false,
 			}),
 			mcpPeriodLimitResolver: () => 25_000,
@@ -705,6 +727,6 @@ describe("POST /api/auth/introspect-key", () => {
 		expect(body.valid).toBe(true);
 		expect(body.campaignBasePath).toBe("/tmp/campaign-alpha");
 		expect(body.keyId).toBe("bridge:bridge_session_123");
-		expect(body.plan).toBe("solo");
+		expect(body.plan).toBe("pro");
 	});
 });

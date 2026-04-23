@@ -469,10 +469,7 @@ describe("bootstrapCampaignWorkspace", () => {
 			const snapshotIndex = JSON.parse(
 				await readFile(path.join(bardoRoot, "snapshots/index.json"), "utf8"),
 			) as {
-				snapshots?: Array<{
-					reason: string;
-					replayPosition?: { eventIndex?: number };
-				}>;
+				snapshots?: Array<{ reason: string; replayPosition?: { eventIndex?: number } }>;
 			};
 			expect(snapshotIndex.snapshots).toEqual(
 				expect.arrayContaining([
@@ -484,10 +481,7 @@ describe("bootstrapCampaignWorkspace", () => {
 			);
 
 			const eventLog = (
-				await readFile(
-					path.join(bardoRoot, "events/state-changes.ndjson"),
-					"utf8",
-				)
+				await readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8")
 			)
 				.trim()
 				.split("\n")
@@ -501,10 +495,7 @@ describe("bootstrapCampaignWorkspace", () => {
 			});
 
 			const diagnostics = JSON.parse(
-				await readFile(
-					path.join(bardoRoot, "manifests/diagnostics.json"),
-					"utf8",
-				),
+				await readFile(path.join(bardoRoot, "manifests/diagnostics.json"), "utf8"),
 			) as {
 				latestEventId?: string | null;
 				latestSnapshotPath?: string;

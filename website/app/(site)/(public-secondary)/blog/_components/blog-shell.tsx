@@ -81,10 +81,7 @@ export function BlogEmptyState() {
 					here until it adds something the docs and product pages do not already
 					explain.
 				</p>
-				<nav
-					aria-label="Blog fallback links"
-					className="mt-8 flex flex-col gap-3"
-				>
+				<nav aria-label="Blog fallback links" className="mt-8 flex flex-col gap-3">
 					<TransitionLink
 						href="/docs"
 						className="interactive-link ui-nav text-foreground"

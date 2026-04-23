@@ -12,5 +12,5 @@ export function shouldShowManageSubscription({
 	billing: PricingBillingState | null;
 	billingPeriod: "month" | "year";
 }) {
-	return billing?.plan === "solo" && billing.billingInterval === billingPeriod;
+	return billing?.plan === "pro" && billing.billingInterval === billingPeriod;
 }
