@@ -19,9 +19,7 @@ import {
 } from "../../../../../lib/connect-telemetry";
 
 type BridgeSessionApproveDeps = {
-	resolveUserId: (
-		request: Request,
-	) => Promise<{
+	resolveUserId: (request: Request) => Promise<{
 		has?: (params: { plan?: string }) => boolean;
 		userId: string | null;
 		response?: Response;
@@ -145,9 +143,8 @@ export function createBridgeSessionApprovePostHandler(
 		try {
 			const billing = await deps.readBillingSnapshot(authState.userId);
 			const hasProEntitlement = authState.has?.({ plan: "pro" }) ?? false;
-			const effectivePlan = hasSubscription(billing) || hasProEntitlement
-				? "pro"
-				: billing.plan;
+			const effectivePlan =
+				hasSubscription(billing) || hasProEntitlement ? "pro" : billing.plan;
 			if (effectivePlan !== "pro" || billing.billingUnavailable) {
 				await deps.denySession({
 					sessionId,
