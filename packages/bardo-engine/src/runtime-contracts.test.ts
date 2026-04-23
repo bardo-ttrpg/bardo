@@ -144,9 +144,7 @@ describe("runtime contracts", () => {
 			sourcePath: "user_correction",
 		});
 		expect(
-			withoutDuplicate.locations.filter(
-				(entry) => entry.name === "Ash Court",
-			),
+			withoutDuplicate.locations.filter((entry) => entry.name === "Ash Court"),
 		).toHaveLength(1);
 	});
 });

@@ -57,20 +57,24 @@ export default function TermsPage() {
 					on generated output.
 				</p>
 			</LegalSection>
-			<LegalSection id="changes-and-availability" title="Changes and availability">
+			<LegalSection
+				id="changes-and-availability"
+				title="Changes and availability"
+			>
 				<p>
 					Bardo may update, improve, or remove parts of the public website or
 					hosted account surface over time. When those changes materially affect
 					these terms, this page will be updated.
 				</p>
 				<p>
-					Bardo is provided on an <strong>AS IS</strong> and <strong>AS AVAILABLE</strong> basis.
-					No refunds apply except where the law requires otherwise. Bard Studio
-					does not promise uninterrupted service, refunds, specific
-					gameplay outcomes, or error-free operation. Except where the law does
-					not allow it, paid subscriptions are non-refundable, and Bard Studio is
-					not responsible for indirect, incidental, or consequential damages
-					arising from your use of the service.
+					Bardo is provided on an <strong>AS IS</strong> and{" "}
+					<strong>AS AVAILABLE</strong> basis. No refunds apply except where the
+					law requires otherwise. Bard Studio does not promise uninterrupted
+					service, refunds, specific gameplay outcomes, or error-free operation.
+					Except where the law does not allow it, paid subscriptions are
+					non-refundable, and Bard Studio is not responsible for indirect,
+					incidental, or consequential damages arising from your use of the
+					service.
 				</p>
 				<p>
 					If you use a third-party client, model provider, payment provider, or

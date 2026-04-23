@@ -20,7 +20,9 @@ export default function GlobalError({
 				<main className="mx-auto flex min-h-svh w-full max-w-5xl px-6 sm:px-8">
 					<section className="mx-auto flex w-full max-w-3xl flex-col justify-center gap-8 pb-12 pt-8 sm:pb-16 sm:pt-8 lg:pb-20 lg:pt-10">
 						<header className="flex flex-col gap-4 border-b border-border pb-6">
-							<p className="ui-label text-muted-foreground">Application Error</p>
+							<p className="ui-label text-muted-foreground">
+								Application Error
+							</p>
 							<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
 								Something went wrong.
 							</h1>

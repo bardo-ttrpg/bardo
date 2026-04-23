@@ -8,8 +8,7 @@ export const contentType = "image/png";
 
 const appleIconStyle = {
 	alignItems: "center",
-	background:
-		"linear-gradient(135deg, #111111 0%, #1d1d1d 60%, #2b2b2b 100%)",
+	background: "linear-gradient(135deg, #111111 0%, #1d1d1d 60%, #2b2b2b 100%)",
 	borderRadius: 42,
 	color: "#f5f1e8",
 	display: "flex",

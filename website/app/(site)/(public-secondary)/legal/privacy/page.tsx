@@ -17,10 +17,7 @@ export const metadata = createPublicMetadata({
 export default function PrivacyPage() {
 	return (
 		<LegalEntryContent entry={entry}>
-			<LegalSection
-				id="what-bardo-collects"
-				title="What Bardo collects"
-			>
+			<LegalSection id="what-bardo-collects" title="What Bardo collects">
 				<p>
 					Bardo keeps the hosted website surface intentionally small. The hosted
 					layer may process account, authentication, subscription, billing,
@@ -34,10 +31,7 @@ export default function PrivacyPage() {
 					normal part of the product.
 				</p>
 			</LegalSection>
-			<LegalSection
-				id="how-bardo-uses-data"
-				title="How Bardo uses data"
-			>
+			<LegalSection id="how-bardo-uses-data" title="How Bardo uses data">
 				<p>
 					Bardo uses hosted data to run the website, authenticate users, show
 					dashboard state, support subscription handling, meter usage-related
@@ -63,10 +57,7 @@ export default function PrivacyPage() {
 					checks.
 				</p>
 			</LegalSection>
-			<LegalSection
-				id="retention-and-requests"
-				title="Retention and requests"
-			>
+			<LegalSection id="retention-and-requests" title="Retention and requests">
 				<p>
 					Bardo retains hosted data only as needed to operate the service,
 					support accounts and subscriptions, comply with legal obligations, and

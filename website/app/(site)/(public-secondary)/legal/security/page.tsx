@@ -17,14 +17,11 @@ export const metadata = createPublicMetadata({
 export default function SecurityPage() {
 	return (
 		<LegalEntryContent entry={entry}>
-			<LegalSection
-				id="design-boundary"
-				title="Security by design boundary"
-			>
+			<LegalSection id="design-boundary" title="Security by design boundary">
 				<p>
-					Bardo&apos;s main security posture starts with product scope. The service
-					is designed to keep campaign files and workspace context local where
-					possible, while the hosted surface focuses on account access,
+					Bardo&apos;s main security posture starts with product scope. The
+					service is designed to keep campaign files and workspace context local
+					where possible, while the hosted surface focuses on account access,
 					approvals, billing, metering, and status-related workflows.
 				</p>
 				<p>
@@ -46,10 +43,7 @@ export default function SecurityPage() {
 					publish.
 				</p>
 			</LegalSection>
-			<LegalSection
-				id="user-responsibilities"
-				title="User responsibilities"
-			>
+			<LegalSection id="user-responsibilities" title="User responsibilities">
 				<p>
 					You are responsible for securing the machines, clients, credentials,
 					and local workspaces you connect to Bardo. Review generated output,

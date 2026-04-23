@@ -964,7 +964,9 @@ describe("bardo runtime", () => {
 				workspace: { initialized: boolean; bardoRoot: string };
 			};
 			expect(payload.workspace.initialized).toBe(false);
-			expect(payload.workspace.bardoRoot).toBe(path.join(workspaceRoot, ".bardo"));
+			expect(payload.workspace.bardoRoot).toBe(
+				path.join(workspaceRoot, ".bardo"),
+			);
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -1010,10 +1012,7 @@ describe("bardo runtime", () => {
 			).resolves.toContain('"workspaceRoot"');
 			await expect(
 				readFile(
-					path.join(
-						workspaceRoot,
-						".agents/skills/bardo-runtime/SKILL.md",
-					),
+					path.join(workspaceRoot, ".agents/skills/bardo-runtime/SKILL.md"),
 					"utf8",
 				),
 			).resolves.toContain("name: bardo-runtime");

@@ -7,7 +7,8 @@ import { replayCommittedState } from "../packages/bardo-engine/src/runtime-tools
 
 const REPO_ROOT = "/home/armando/projects/bardo";
 const SANDBOX_ROOT =
-	process.env.BARDO_STRESS_ROOT?.trim() || "/home/armando/projects/test-bardo-01";
+	process.env.BARDO_STRESS_ROOT?.trim() ||
+	"/home/armando/projects/test-bardo-01";
 const WORKSPACE_ROOT = path.join(SANDBOX_ROOT, "workspaces", "soak-5000");
 const BARDO_BIN =
 	process.env.BARDO_BIN?.trim() || path.join(SANDBOX_ROOT, "bin", "bardo");
@@ -177,7 +178,11 @@ function stringifyStructuredContent(value: unknown): string {
 async function createWorkspace(): Promise<void> {
 	await rm(WORKSPACE_ROOT, { recursive: true, force: true });
 	await mkdir(WORKSPACE_ROOT, { recursive: true });
-	await writeFile(path.join(WORKSPACE_ROOT, "rulebook.md"), buildRulebook(), "utf8");
+	await writeFile(
+		path.join(WORKSPACE_ROOT, "rulebook.md"),
+		buildRulebook(),
+		"utf8",
+	);
 	await writeFile(
 		path.join(WORKSPACE_ROOT, "campaign-notes.md"),
 		buildCampaignNotes(),
@@ -280,7 +285,9 @@ async function runSoak(): Promise<void> {
 					const character = CHARACTERS[simulationIndex % CHARACTERS.length];
 					const clock = CLOCKS[simulationIndex % CLOCKS.length];
 					const attitude =
-						simulationIndex % 2 === 0 ? "wary but cooperative" : "openly helpful";
+						simulationIndex % 2 === 0
+							? "wary but cooperative"
+							: "openly helpful";
 					const consequence =
 						CONSEQUENCE_MARKERS[simulationIndex % CONSEQUENCE_MARKERS.length];
 					const simulation = await client.callTool({
@@ -288,9 +295,7 @@ async function runSoak(): Promise<void> {
 						arguments: {
 							tickLabel: `long-soak-tick-${turn}`,
 							relevantFactions: [faction],
-							factionConsequences: [
-								`${faction} increases ${consequence}`,
-							],
+							factionConsequences: [`${faction} increases ${consequence}`],
 							npcAttitudes: {
 								[character]: attitude,
 							},
@@ -345,16 +350,20 @@ async function runSoak(): Promise<void> {
 	const diagnostics = JSON.parse(await readFile(diagnosticsPath, "utf8")) as {
 		latestStateHash?: string | null;
 		activeConflictIds?: string[];
-		replayStatus?: { canReplayFromEventZero?: boolean; canReplayFromLatestSnapshot?: boolean };
+		replayStatus?: {
+			canReplayFromEventZero?: boolean;
+			canReplayFromLatestSnapshot?: boolean;
+		};
 	};
 	const conflicts = JSON.parse(await readFile(conflictsPath, "utf8")) as {
 		conflicts?: Array<unknown>;
 	};
-	const currentState = JSON.parse(await readFile(currentStatePath, "utf8")) as Record<
-		string,
-		unknown
-	>;
-	const snapshotIndex = JSON.parse(await readFile(snapshotIndexPath, "utf8")) as {
+	const currentState = JSON.parse(
+		await readFile(currentStatePath, "utf8"),
+	) as Record<string, unknown>;
+	const snapshotIndex = JSON.parse(
+		await readFile(snapshotIndexPath, "utf8"),
+	) as {
 		snapshots?: Array<unknown>;
 	};
 	const eventLog = await readFile(eventLogPath, "utf8");
