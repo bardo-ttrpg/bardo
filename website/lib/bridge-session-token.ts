@@ -70,9 +70,7 @@ function ensureSecret(secret: string): string {
 	return trimmed;
 }
 
-function isValidPlan(
-	value: unknown,
-): value is DecodedPlan {
+function isValidPlan(value: unknown): value is DecodedPlan {
 	return value === "free" || value === "pro" || value === "solo";
 }
 

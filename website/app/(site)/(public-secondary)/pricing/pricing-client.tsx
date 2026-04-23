@@ -159,16 +159,15 @@ function PricingClientContent({
 		billing,
 		billingPeriod,
 	});
-	const billingStatusMessage =
-		!billing
-			? null
-			: billing.plan === "pro" && billing.subscriptionStatus === "trialing"
-				? "Your Pro trial is active."
-				: billing.plan === "pro"
-					? "Your Pro subscription is active."
-					: billing.subscriptionStatus === "canceled"
-						? "No active Pro subscription. Start Pro again to reconnect Bardo MCP."
-						: "No active Pro subscription.";
+	const billingStatusMessage = !billing
+		? null
+		: billing.plan === "pro" && billing.subscriptionStatus === "trialing"
+			? "Your Pro trial is active."
+			: billing.plan === "pro"
+				? "Your Pro subscription is active."
+				: billing.subscriptionStatus === "canceled"
+					? "No active Pro subscription. Start Pro again to reconnect Bardo MCP."
+					: "No active Pro subscription.";
 
 	return (
 		<section

@@ -85,8 +85,8 @@ export function migrateSavedConfig(raw: unknown): SavedConfig | null {
 				parsed.plan === "free"
 					? "free"
 					: parsed.plan === "pro" ||
-						  parsed.plan === "solo" ||
-						  parsed.plan === "solo_plus"
+							parsed.plan === "solo" ||
+							parsed.plan === "solo_plus"
 						? "pro"
 						: undefined,
 		};

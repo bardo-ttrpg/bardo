@@ -509,11 +509,11 @@ export function createIntrospectPostHandler(
 					);
 				}
 
-					const preliminaryKeyUsage =
-						await deps.verificationLimiter.consumePreAuthKey(
-							await hashApiKeySecret(apiKeySecret),
-							"pro",
-						);
+				const preliminaryKeyUsage =
+					await deps.verificationLimiter.consumePreAuthKey(
+						await hashApiKeySecret(apiKeySecret),
+						"pro",
+					);
 				if (!preliminaryKeyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");
 					deps.introspectionVerifyCache.setInvalid(apiKeySecret);

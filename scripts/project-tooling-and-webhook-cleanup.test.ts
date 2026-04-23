@@ -56,9 +56,7 @@ describe("project cleanup and tooling setup", () => {
 			"bun run ./scripts/bundle-audit.ts",
 		);
 		expect(websiteTurboJson.tasks?.dev?.with).toBeUndefined();
-		expect(bridgePackageJson.scripts?.dev).toBe(
-			"bun --watch run src/cli.ts",
-		);
+		expect(bridgePackageJson.scripts?.dev).toBe("bun --watch run src/cli.ts");
 		expect(knipJson.workspaces).not.toHaveProperty("mcp");
 		expect(existsSync(join(repoRoot, "mcp"))).toBe(false);
 	});
