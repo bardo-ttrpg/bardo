@@ -516,8 +516,7 @@ export function createIntrospectPostHandler(
 						"bardo.auth_introspection.unsupported_key_format",
 						{
 							"bardo.required_scope": requiredScope,
-							"bardo.workspace_override_requested":
-								workspaceOverrideRequested,
+							"bardo.workspace_override_requested": workspaceOverrideRequested,
 							"bardo.result": "invalid",
 						},
 					);
