@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { externalLinkRel, isExternalHref } from "@/lib/link-target";
 import { cn } from "@/lib/utils";
 
 function Lore({ children }: { children?: ReactNode }) {
@@ -116,11 +117,18 @@ export function useMDXComponents(
 				{...props}
 			/>
 		),
-		a: ({ href, className, ...props }: ComponentPropsWithoutRef<"a">) => {
+		a: ({
+			href,
+			className,
+			rel,
+			target,
+			...props
+		}: ComponentPropsWithoutRef<"a">) => {
 			const linkClassName = cn(
 				"font-reading-body underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground",
 				className,
 			);
+			const external = isExternalHref(href);
 
 			if (isInternalHref(href)) {
 				return (
@@ -128,6 +136,8 @@ export function useMDXComponents(
 						href={href ?? "/"}
 						prefetch={false}
 						className={linkClassName}
+						target={target}
+						rel={rel}
 						{...props}
 					/>
 				);
@@ -137,7 +147,8 @@ export function useMDXComponents(
 				<a
 					href={href}
 					className={linkClassName}
-					rel={props.target === "_blank" ? "noreferrer" : props.rel}
+					target={target ?? (external ? "_blank" : undefined)}
+					rel={external ? externalLinkRel(rel) : rel}
 					{...props}
 				/>
 			);
