@@ -5,11 +5,27 @@ import {
 } from "./proxy-config";
 
 describe("shouldUseClerkOnlyProxyPathname", () => {
-	test("keeps API and trpc requests on the clerk-only proxy path", () => {
+	test("bypasses custom-token routes and keeps the rest on the clerk-only proxy path", () => {
 		expect(shouldUseClerkOnlyProxyPathname("/api")).toBe(true);
-		expect(shouldUseClerkOnlyProxyPathname("/api/connect/runtime-status")).toBe(
-			true,
-		);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/connect/runtime-status"),
+		).toBe(false);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/auth/introspect-key"),
+		).toBe(false);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/connect/bridge-session/start"),
+		).toBe(false);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/connect/bridge-session/poll"),
+		).toBe(false);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/connect/bridge-session/refresh"),
+		).toBe(false);
+		expect(
+			shouldUseClerkOnlyProxyPathname("/api/connect/bridge-session/approve"),
+		).toBe(true);
+		expect(shouldUseClerkOnlyProxyPathname("/api/billing")).toBe(true);
 		expect(shouldUseClerkOnlyProxyPathname("/trpc")).toBe(true);
 		expect(shouldUseClerkOnlyProxyPathname("/trpc/example")).toBe(true);
 		expect(shouldUseClerkOnlyProxyPathname("/blog")).toBe(false);

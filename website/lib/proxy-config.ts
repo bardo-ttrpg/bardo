@@ -1,4 +1,16 @@
+const CLERK_PROXY_BYPASS_PATHS = new Set([
+	"/api/auth/introspect-key",
+	"/api/connect/runtime-status",
+	"/api/connect/bridge-session/start",
+	"/api/connect/bridge-session/poll",
+	"/api/connect/bridge-session/refresh",
+]);
+
 export function shouldUseClerkOnlyProxyPathname(pathname: string): boolean {
+	if (CLERK_PROXY_BYPASS_PATHS.has(pathname)) {
+		return false;
+	}
+
 	return (
 		pathname === "/api" ||
 		pathname.startsWith("/api/") ||

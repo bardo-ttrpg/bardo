@@ -340,7 +340,7 @@ $artifactPath = Join-Path ([System.IO.Path]::GetTempPath()) ('bardo-bin-' + [Sys
 try {
 \tInvoke-WebRequest -Uri "$releaseBaseUrl/$artifactFile" -OutFile $artifactPath
 \tInvoke-WebRequest -Uri "$releaseBaseUrl/SHA256SUMS.txt" -OutFile $checksumPath
-\t$expectedLine = Select-String -Path $checksumPath -Pattern [regex]::Escape($artifactFile)
+\t$expectedLine = Select-String -Path $checksumPath -Pattern ([regex]::Escape($artifactFile))
 \tif (-not $expectedLine) {
 \t\tthrow "Checksum entry for $artifactFile was not found."
 \t}
