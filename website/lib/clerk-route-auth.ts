@@ -5,6 +5,12 @@ const CLERK_MIDDLEWARE_DETECTION_FRAGMENT =
 	"auth() was called but Clerk can't detect usage of clerkMiddleware()";
 
 type AuthFn = typeof auth;
+type ClerkAuthorizationCheck = (params: {
+	feature?: string;
+	permission?: string;
+	plan?: string;
+	role?: string;
+}) => boolean;
 
 type LoggerLike = {
 	warn?(
@@ -32,13 +38,24 @@ export async function resolveRouteUserId(
 		authFn?: AuthFn;
 		logger?: LoggerLike;
 	} = {},
-): Promise<{ userId: string | null; response?: Response }> {
+): Promise<{
+	has?: ClerkAuthorizationCheck;
+	response?: Response;
+	userId: string | null;
+}> {
 	const authFn = options.authFn ?? auth;
 	const logger = options.logger ?? defaultLogger;
 
 	try {
-		const { userId } = await authFn();
-		return { userId: userId ?? null };
+		const { has, userId } = await authFn();
+		const result: {
+			has?: ClerkAuthorizationCheck;
+			userId: string | null;
+		} = { userId: userId ?? null };
+		if (typeof has === "function") {
+			result.has = has as ClerkAuthorizationCheck;
+		}
+		return result;
 	} catch (error) {
 		if (!isClerkMiddlewareDetectionError(error)) {
 			throw error;

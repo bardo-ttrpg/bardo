@@ -146,17 +146,29 @@ function PricingClientContent({
 	const [billingPeriod, setBillingPeriod] = useState<"month" | "year">("month");
 	const billing = isLoaded && isSignedIn ? initialBilling : null;
 	const monthlyPrice = 20;
-	const yearlyMonthlyEquivalent = 16;
+	const yearlyMonthlyEquivalent = 15;
 	const displayedPrice =
 		billingPeriod === "month" ? monthlyPrice : yearlyMonthlyEquivalent;
 	const pricingDescription =
 		billingPeriod === "year"
 			? "Pay annually and save more on the same plan."
 			: "Pay monthly now and switch to annual later.";
+	const trialNote =
+		"Includes a 3-day free trial for first-time subscribers. Payment method required.";
 	const shouldManageCurrentPlan = shouldShowManageSubscription({
 		billing,
 		billingPeriod,
 	});
+	const billingStatusMessage =
+		!billing
+			? null
+			: billing.plan === "pro" && billing.subscriptionStatus === "trialing"
+				? "Your Pro trial is active."
+				: billing.plan === "pro"
+					? "Your Pro subscription is active."
+					: billing.subscriptionStatus === "canceled"
+						? "No active Pro subscription. Start Pro again to reconnect Bardo MCP."
+						: "No active Pro subscription.";
 
 	return (
 		<section
@@ -203,9 +215,9 @@ function PricingClientContent({
 				<article className="w-full rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
 					<div className="flex flex-col">
 						<header className="flex flex-col gap-2">
-							<p className="ui-label">Bardo Solo</p>
+							<p className="ui-label">Bardo Pro</p>
 							<h1 id="pricing-plan-heading" className="sr-only">
-								Bardo Solo pricing
+								Bardo Pro pricing
 							</h1>
 							<AnimatedPricingValue
 								amount={displayedPrice}
@@ -247,18 +259,26 @@ function PricingClientContent({
 										<PricingCtaLabel
 											labelKey={
 												billingPeriod === "month"
-													? "subscribe-monthly"
-													: "subscribe-yearly"
+													? "start-pro-monthly"
+													: "start-pro-yearly"
 											}
 										>
 											{billingPeriod === "month"
-												? "Subscribe Monthly"
-												: "Subscribe Yearly"}
+												? "Start Pro Monthly"
+												: "Start Pro Yearly"}
 										</PricingCtaLabel>
 									}
 									className={pricingPrimaryActionClassName}
 								/>
 							)}
+							<p className="font-reading-body text-sm text-muted-foreground">
+								{trialNote}
+							</p>
+							{billingStatusMessage ? (
+								<p className="font-reading-body text-sm text-muted-foreground">
+									{billingStatusMessage}
+								</p>
+							) : null}
 
 							<section className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
 								<section className="flex flex-col gap-4">

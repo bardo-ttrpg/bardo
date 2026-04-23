@@ -7,7 +7,7 @@ type BillingRouteDeps = {
 	resolveUserId: typeof resolveRouteUserId;
 	readBillingSnapshot: (userId: string) => Promise<{
 		billingUnavailable: boolean;
-		plan: "free" | "solo";
+		plan: "free" | "pro";
 		creditsTotal: number;
 		creditsUsed: number;
 		creditsRemaining: number;
@@ -58,7 +58,7 @@ export function createBillingGetHandler(
 			{
 				billing,
 				accessPolicy: {
-					subscribed: billing.plan === "solo",
+					subscribed: billing.plan === "pro",
 					mcpPeriodLimit: mcpPeriodLimitForPlan(billing.plan),
 				},
 			},

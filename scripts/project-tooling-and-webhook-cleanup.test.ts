@@ -35,29 +35,29 @@ describe("project cleanup and tooling setup", () => {
 
 		expect(rootPackageJson.workspaces).toEqual(["website", "packages/*"]);
 		expect(rootPackageJson.scripts?.["staging:validate-env"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts validate:staging-env --filter=website',
+			"bun run ./scripts/run-turbo.ts validate:staging-env --filter=website",
 		);
 		expect(rootPackageJson.scripts?.["ga:readiness"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts ga:readiness --filter=@bardo/engine',
+			"bun run ./scripts/run-turbo.ts ga:readiness --filter=@bardo/engine",
 		);
 		expect(rootPackageJson.scripts?.["typecheck:unused-report"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts typecheck:unused-report --filter=website',
+			"bun run ./scripts/run-turbo.ts typecheck:unused-report --filter=website",
 		);
 		expect(rootPackageJson.scripts?.["dev:bridge"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/run-turbo.ts dev --filter=@bardo/mcp',
+			"bun run ./scripts/run-turbo.ts dev --filter=@bardo/mcp",
 		);
 		expect(rootPackageJson.scripts?.["stress:test-01"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/stress-bardo-test-01.ts',
+			"bun run ./scripts/stress-bardo-test-01.ts",
 		);
 		expect(rootPackageJson.scripts?.["release:candidate"]).toBe(
-			'"${npm_execpath:-bun}" run build && "${npm_execpath:-bun}" run test:release-gates && "${npm_execpath:-bun}" run bundle:audit && "${npm_execpath:-bun}" run stress:test-01',
+			"bun run build && bun run test:release-gates && bun run bundle:audit && bun run stress:test-01",
 		);
 		expect(websitePackageJson.scripts?.["bundle:audit"]).toBe(
-			'"${npm_execpath:-bun}" run ./scripts/bundle-audit.ts',
+			"bun run ./scripts/bundle-audit.ts",
 		);
 		expect(websiteTurboJson.tasks?.dev?.with).toBeUndefined();
 		expect(bridgePackageJson.scripts?.dev).toBe(
-			'"${npm_execpath:-bun}" --watch run src/cli.ts',
+			"bun --watch run src/cli.ts",
 		);
 		expect(knipJson.workspaces).not.toHaveProperty("mcp");
 		expect(existsSync(join(repoRoot, "mcp"))).toBe(false);
@@ -107,7 +107,7 @@ describe("project cleanup and tooling setup", () => {
 		expect(releaseChecklist).toContain("Draft release notes");
 		expect(recoveryRunbook).toContain("Bridge approval failure");
 		expect(recoveryRunbook).toContain("Runtime-status outage");
-		expect(stressHarness).toContain("/home/armando/projects/bardo-test-01");
+		expect(stressHarness).toContain("/home/armando/projects/test-bardo-01");
 		expect(stressHarness).toContain("stress-report.json");
 		expect(stressHarness).toContain("Skipped oversized source");
 		expect(stagingSmoke).not.toContain("world_state_overview");

@@ -1,0 +1,14 @@
+{
+	"files": [],
+	"references": [
+		{ "path": "./tsconfig.scripts.json" },
+		{ "path": "./packages/bardo-engine/tsconfig.json" },
+		{ "path": "./packages/bardo-engine/tsconfig.test.json" },
+		{ "path": "./packages/bardo-mcp/tsconfig.json" },
+		{ "path": "./packages/bardo-mcp/tsconfig.test.json" },
+		{ "path": "./packages/bardo-shared/tsconfig.json" },
+		{ "path": "./packages/bardo-shared/tsconfig.test.json" },
+		{ "path": "./website/tsconfig.json" },
+		{ "path": "./website/tsconfig.test.json" }
+	]
+}

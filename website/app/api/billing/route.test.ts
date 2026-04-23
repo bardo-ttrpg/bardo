@@ -9,7 +9,7 @@ describe("GET /api/billing", () => {
 			}),
 			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
-				plan: "solo" as const,
+				plan: "pro" as const,
 				creditsTotal: 25_000,
 				creditsUsed: 12,
 				creditsRemaining: 24_988,
@@ -29,7 +29,7 @@ describe("GET /api/billing", () => {
 
 		expect(response.status).toBe(200);
 		expect(body.billing).toMatchObject({
-			plan: "solo",
+			plan: "pro",
 			creditsTotal: 25000,
 			creditsUsed: 12,
 			creditsRemaining: 24988,

@@ -212,6 +212,13 @@ export function createRuntimeStatusGetHandler(
 			const { plan, billingUnavailable } = subjectId
 				? await deps.resolvePlanForSubject(clerk, subjectId)
 				: { plan: null, billingUnavailable: false };
+			if (!subjectId || !plan || billingUnavailable || plan === "free") {
+				deps.telemetry.increment("runtime_status_invalid");
+				return NextResponse.json(
+					{ error: "API key no longer has an active Pro subscription." },
+					{ status: 403 },
+				);
+			}
 			deps.telemetry.increment("runtime_status_success");
 
 			const response = NextResponse.json({
@@ -223,11 +230,8 @@ export function createRuntimeStatusGetHandler(
 					verifiedKey as Record<string, unknown>,
 				),
 				plan,
-				mcpPeriodLimit:
-					plan && !billingUnavailable
-						? deps.mcpPeriodLimitResolver(plan)
-						: null,
-				billingUnavailable,
+				mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+				billingUnavailable: false,
 			});
 			applyRateLimitHeaders(response.headers, budget);
 			return response;

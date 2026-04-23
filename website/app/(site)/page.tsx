@@ -20,7 +20,7 @@ export const metadata = createPublicMetadata({
 });
 
 const homeSectionClassName = "flex flex-col gap-2";
-const bodyClassName = "font-reading-body text-muted-foreground";
+const bodyClassName = "font-reading-body text-muted-foreground ";
 const homeActionClassName = "home-action-button";
 const landingPageJsonLd = JSON.stringify(getLandingPageJsonLd());
 const landingFooterLinks = [

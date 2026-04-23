@@ -7,40 +7,50 @@ import {
 } from "./api-key-verification-policy";
 
 describe("createDailyVerificationBudgetLimiter", () => {
-	test("enforces per-user cap", async () => {
+	test("enforces per-user cap for Pro accounts", async () => {
 		let now = new Date("2026-02-26T10:00:00.000Z").getTime();
 		const limiter = createDailyVerificationBudgetLimiter({
 			nowMs: () => now,
 		});
 
-		const first = await limiter.consumeUser("user_a", "free");
+		const first = await limiter.consumeUser("user_a", "pro");
 		expect(first.allowed).toBe(true);
 		expect(first.used).toBe(1);
-		expect(first.limit).toBe(500);
-		expect(first.remaining).toBe(499);
+		expect(first.limit).toBe(7_500);
+		expect(first.remaining).toBe(7_499);
 
-		for (let i = 0; i < 499; i += 1) {
-			await limiter.consumeUser("user_a", "free");
+		for (let i = 0; i < 7_499; i += 1) {
+			await limiter.consumeUser("user_a", "pro");
 		}
 
-		const blocked = await limiter.consumeUser("user_a", "free");
+		const blocked = await limiter.consumeUser("user_a", "pro");
 		expect(blocked.allowed).toBe(false);
-		expect(blocked.used).toBe(500);
+		expect(blocked.used).toBe(7_500);
 		expect(blocked.remaining).toBe(0);
 
 		now = new Date("2026-02-27T00:00:00.000Z").getTime();
-		const reset = await limiter.consumeUser("user_a", "free");
+		const reset = await limiter.consumeUser("user_a", "pro");
 		expect(reset.allowed).toBe(true);
 		expect(reset.used).toBe(1);
-		expect(reset.remaining).toBe(499);
+		expect(reset.remaining).toBe(7_499);
+	});
+
+	test("blocks the hidden free fallback tier immediately", async () => {
+		const limiter = createDailyVerificationBudgetLimiter();
+		const result = await limiter.consumeUser("user_free", "free");
+
+		expect(result.allowed).toBe(false);
+		expect(result.limit).toBe(0);
+		expect(result.used).toBe(0);
+		expect(result.remaining).toBe(0);
 	});
 
 	test("enforces per-key cap independently from user cap", async () => {
 		const limiter = createDailyVerificationBudgetLimiter();
 		const free = await limiter.consumeKey("free_key", "free");
-		const solo = await limiter.consumeKey("solo_key", "solo");
-		expect(free.limit).toBe(500);
-		expect(solo.limit).toBe(2_000);
+		const pro = await limiter.consumeKey("pro_key", "pro");
+		expect(free.limit).toBe(0);
+		expect(pro.limit).toBe(2_000);
 	});
 
 	test("uses the injected limiter when configured", async () => {
@@ -57,10 +67,11 @@ describe("createDailyVerificationBudgetLimiter", () => {
 			controlPlane,
 		});
 
-		const result = await limiter.consumeUser("user_remote", "free");
+		const result = await limiter.consumeUser("user_remote", "pro");
 		expect(result.backend).toBe("website");
 		expect(result.allowed).toBe(true);
-		expect(result.used).toBe(1);
+		expect(result.used).toBe(7_001);
+		expect(result.remaining).toBe(499);
 	});
 
 	test("falls back to memory when the control plane is unavailable and fallback is allowed", async () => {
@@ -77,8 +88,8 @@ describe("createDailyVerificationBudgetLimiter", () => {
 			controlPlane,
 		});
 
-		const first = await limiter.consumeUser("user_retry", "free");
-		const second = await limiter.consumeUser("user_retry", "free");
+		const first = await limiter.consumeUser("user_retry", "pro");
+		const second = await limiter.consumeUser("user_retry", "pro");
 
 		expect(first.allowed).toBe(true);
 		expect(second.allowed).toBe(true);
@@ -136,18 +147,18 @@ describe("createSubjectPlanCache", () => {
 
 		const lookup = async () => {
 			lookups += 1;
-			return "solo";
+			return "pro";
 		};
 
 		const first = await cache.resolve("user_1", lookup);
 		const second = await cache.resolve("user_1", lookup);
-		expect(first).toBe("solo");
-		expect(second).toBe("solo");
+		expect(first).toBe("pro");
+		expect(second).toBe("pro");
 		expect(lookups).toBe(1);
 
 		now = 20_000;
 		const third = await cache.resolve("user_1", lookup);
-		expect(third).toBe("solo");
+		expect(third).toBe("pro");
 		expect(lookups).toBe(2);
 	});
 });

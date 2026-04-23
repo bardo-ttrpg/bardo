@@ -1222,7 +1222,7 @@ function planRank(plan: PlanTier): number {
 	switch (plan) {
 		case "free":
 			return 0;
-		case "solo":
+		case "pro":
 			return 1;
 	}
 }
@@ -1237,7 +1237,7 @@ export function createRemoteToolAccessController(
 		if (options.plan === "free") {
 			return false;
 		}
-		return planRank(options.plan) >= planRank("solo");
+		return planRank(options.plan) >= planRank("pro");
 	}
 
 	return {

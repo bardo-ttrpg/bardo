@@ -6,15 +6,16 @@ import {
 } from "./user-billing";
 
 test("planCreditsFor returns expected quotas for supported plans", () => {
-	expect(planCreditsFor("free")).toBe(100);
-	expect(planCreditsFor("solo")).toBe(25_000);
+	expect(planCreditsFor("free")).toBe(0);
+	expect(planCreditsFor("pro")).toBe(25_000);
 });
 
 test("migrateLegacyPlanTier maps old plan names", () => {
 	expect(migrateLegacyPlanTier(undefined)).toBe("free");
 	expect(migrateLegacyPlanTier("free")).toBe("free");
-	expect(migrateLegacyPlanTier("pro")).toBe("solo");
-	expect(migrateLegacyPlanTier("ultra")).toBe("solo");
+	expect(migrateLegacyPlanTier("solo")).toBe("pro");
+	expect(migrateLegacyPlanTier("pro")).toBe("pro");
+	expect(migrateLegacyPlanTier("ultra")).toBe("pro");
 });
 
 test("resolveBillingState falls back to free-tier defaults for legacy users", () => {
@@ -33,7 +34,7 @@ test("resolveBillingState falls back to free-tier defaults for legacy users", ()
 
 	expect(state).toEqual({
 		plan: "free",
-		creditsTotal: 100,
+		creditsTotal: 0,
 		creditsUsed: 0,
 		periodStart: now,
 		mcpCallsTotal: 0,

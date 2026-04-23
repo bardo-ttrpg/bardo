@@ -1,9 +1,9 @@
 import type { BillingInterval } from "./user-billing";
 
-type CheckoutPlanTier = "solo";
+type CheckoutPlanTier = "pro";
 
 const CLERK_PLAN_ENV: Record<CheckoutPlanTier, string> = {
-	solo: "CLERK_BILLING_PLAN_SOLO",
+	pro: "CLERK_BILLING_PLAN_PRO",
 };
 
 export type ClerkPlanPeriod = "month" | "annual";
@@ -23,7 +23,7 @@ export function getClerkPlanId(
 export function isClerkBillingConfigured(
 	env: Record<string, string | undefined> = process.env,
 ): boolean {
-	return ["solo"].every((plan) =>
+	return ["pro"].every((plan) =>
 		Boolean(getClerkPlanId(plan as CheckoutPlanTier, env)),
 	);
 }
@@ -38,6 +38,6 @@ export function resolvePlanFromClerkPlanId(
 	planId: string,
 	env: Record<string, string | undefined> = process.env,
 ): CheckoutPlanTier | null {
-	const tiers: CheckoutPlanTier[] = ["solo"];
+	const tiers: CheckoutPlanTier[] = ["pro"];
 	return tiers.find((tier) => getClerkPlanId(tier, env) === planId) ?? null;
 }

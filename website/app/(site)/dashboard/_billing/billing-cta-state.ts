@@ -1,5 +1,41 @@
 type CheckoutRenderState = "checkout" | "disabled_unavailable" | "sign_in";
 
+export type CheckoutPlanLike = {
+	id?: string | null;
+	slug?: string | null;
+	name?: string | null;
+	isDefault?: boolean | null;
+};
+
+function normalizePlanToken(value: string | null | undefined): string {
+	return value?.trim().toLowerCase() ?? "";
+}
+
+export function resolveCheckoutPlanId({
+	configuredPlanId,
+	plans,
+	planSlug = "pro",
+}: {
+	configuredPlanId?: string | null;
+	plans?: CheckoutPlanLike[] | null;
+	planSlug?: string;
+}): string | null {
+	const configured = configuredPlanId?.trim();
+	if (configured) return configured;
+
+	const normalizedSlug = normalizePlanToken(planSlug);
+	const plan = plans?.find((candidate) => {
+		if (!candidate.id?.trim()) return false;
+		if (normalizePlanToken(candidate.slug) === normalizedSlug) return true;
+		return (
+			!candidate.isDefault &&
+			normalizePlanToken(candidate.name) === normalizedSlug
+		);
+	});
+
+	return plan?.id?.trim() ?? null;
+}
+
 export function resolveCheckoutRenderState({
 	isHydrated,
 	isLoaded,

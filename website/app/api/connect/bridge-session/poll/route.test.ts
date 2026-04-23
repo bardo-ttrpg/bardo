@@ -51,7 +51,7 @@ describe("GET /api/connect/bridge-session/poll", () => {
 						refreshUrl:
 							"https://app.bardo.ai/api/connect/bridge-session/refresh",
 						accountLabel: "Armando",
-						plan: "solo",
+						plan: "pro",
 						serverName: "bardo",
 						issuedAtISO: "2099-03-03T00:00:00.000Z",
 					},

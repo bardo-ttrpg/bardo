@@ -9,9 +9,16 @@ type BillingSubscriptionItemLike = {
 	status?: string | null;
 	planPeriod?: "month" | "annual" | null;
 	planId?: string | null;
-	periodStart?: number | null;
-	periodEnd?: number | null;
-	canceledAt?: number | null;
+	plan?: {
+		id?: string | null;
+		slug?: string | null;
+		name?: string | null;
+		isDefault?: boolean | null;
+	} | null;
+	periodStart?: Date | number | string | null;
+	periodEnd?: Date | number | string | null;
+	canceledAt?: Date | number | string | null;
+	isFreeTrial?: boolean | null;
 };
 
 type BillingSubscriptionLike = {
@@ -26,12 +33,25 @@ type ClerkBillingLike = {
 	};
 };
 
+type LiveBillingSnapshot = {
+	billingInterval: BillingInterval | null;
+	cancelAtPeriodEnd: boolean;
+	currentPeriodEnd: number | null;
+	periodStart: number;
+	plan: PlanTier;
+	subscriptionId: string | null;
+	subscriptionStatus: SubscriptionStatus;
+};
+
 const PRIORITY_ITEM_STATUSES = new Set([
 	"active",
 	"trialing",
 	"past_due",
 	"incomplete",
+	"ended",
 ]);
+
+const PAID_ACCESS_ITEM_STATUSES = new Set(["active", "trialing"]);
 
 function asSubscriptionStatus(
 	value: string | null | undefined,
@@ -46,9 +66,23 @@ function asSubscriptionStatus(
 		case "unpaid":
 		case "paused":
 			return value;
+		case "ended":
+			return "canceled";
+		case "upcoming":
+			return "incomplete";
 		default:
 			return "canceled";
 	}
+}
+
+function toEpochMs(value: Date | number | string | null | undefined) {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (value instanceof Date) return value.getTime();
+	if (typeof value === "string") {
+		const parsed = Date.parse(value);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
 }
 
 function selectSubscriptionItem(
@@ -66,10 +100,21 @@ function resolvePlanFromItem(
 	item: BillingSubscriptionItemLike | null,
 	env: Record<string, string | undefined>,
 ): PlanTier {
-	const planId = item?.planId;
-	if (!planId) return "free";
-	const resolved = resolvePlanFromClerkPlanId(planId, env);
-	return resolved === "solo" ? "solo" : "free";
+	const planIds = [item?.planId, item?.plan?.id].filter(
+		(value): value is string => Boolean(value?.trim()),
+	);
+	for (const planId of planIds) {
+		const resolved = resolvePlanFromClerkPlanId(planId, env);
+		if (resolved === "pro") return "pro";
+	}
+
+	const planSlug = item?.plan?.slug?.trim().toLowerCase();
+	if (planSlug === "pro") return "pro";
+
+	const planName = item?.plan?.name?.trim().toLowerCase();
+	if (!item?.plan?.isDefault && planName === "pro") return "pro";
+
+	return "free";
 }
 
 function resolveIntervalFromItem(
@@ -79,28 +124,67 @@ function resolveIntervalFromItem(
 	return item.planPeriod === "annual" ? "year" : "month";
 }
 
+function selectProSubscriptionItem(
+	items: BillingSubscriptionItemLike[] | null | undefined,
+	env: Record<string, string | undefined>,
+): BillingSubscriptionItemLike | null {
+	if (!items || items.length === 0) return null;
+
+	const proItems = items.filter(
+		(item) => resolvePlanFromItem(item, env) === "pro",
+	);
+	if (proItems.length === 0) return null;
+
+	const activePro = proItems.find((item) =>
+		PAID_ACCESS_ITEM_STATUSES.has(item.status ?? ""),
+	);
+	if (activePro) return activePro;
+
+	const prioritizedPro = proItems.find((item) =>
+		PRIORITY_ITEM_STATUSES.has(item.status ?? ""),
+	);
+	return prioritizedPro ?? proItems[0] ?? null;
+}
+
+function hasPaidAccess(item: BillingSubscriptionItemLike | null): boolean {
+	return PAID_ACCESS_ITEM_STATUSES.has(item?.status ?? "");
+}
+
 export function resolveLiveBillingSnapshotFromSubscription(
 	subscription: BillingSubscriptionLike | null,
 	env: Record<string, string | undefined> = process.env,
 	now = Date.now(),
-) {
-	const item = selectSubscriptionItem(subscription?.subscriptionItems);
-	const plan = resolvePlanFromItem(item, env);
-	const periodStart =
-		typeof item?.periodStart === "number" ? item.periodStart : now;
-	const currentPeriodEnd =
-		typeof item?.periodEnd === "number" ? item.periodEnd : null;
+): LiveBillingSnapshot {
+	const proItem = selectProSubscriptionItem(
+		subscription?.subscriptionItems,
+		env,
+	);
+	const fallbackItem = selectSubscriptionItem(subscription?.subscriptionItems);
+	const item = proItem ?? fallbackItem;
+	const proAccess = hasPaidAccess(proItem);
+	const plan: PlanTier = proAccess ? "pro" : "free";
+	const subscriptionStatus: SubscriptionStatus = proAccess
+		? proItem?.isFreeTrial
+			? "trialing"
+			: asSubscriptionStatus(proItem?.status ?? subscription?.status)
+		: proItem
+			? asSubscriptionStatus(proItem.status)
+			: "canceled";
+	const periodStart = toEpochMs(item?.periodStart) ?? now;
+	const currentPeriodEnd = toEpochMs(item?.periodEnd);
+	const canceledAt = toEpochMs(item?.canceledAt);
 	const cancelAtPeriodEnd =
-		typeof item?.canceledAt === "number" &&
-		typeof item?.periodEnd === "number" &&
-		item.periodEnd > now;
+		plan === "pro" &&
+		typeof canceledAt === "number" &&
+		typeof currentPeriodEnd === "number" &&
+		currentPeriodEnd > now;
 
 	return {
 		plan,
 		periodStart,
 		currentPeriodEnd,
-		billingInterval: resolveIntervalFromItem(item),
-		subscriptionStatus: asSubscriptionStatus(subscription?.status),
+		billingInterval: plan === "pro" ? resolveIntervalFromItem(item) : null,
+		subscriptionStatus,
 		subscriptionId: subscription?.id ?? null,
 		cancelAtPeriodEnd,
 	};

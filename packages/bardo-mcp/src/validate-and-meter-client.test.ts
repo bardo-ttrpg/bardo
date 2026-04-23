@@ -113,7 +113,7 @@ describe("validate-and-meter client", () => {
 							.digest("hex"),
 						validated_at: now,
 						ttl_ms: 3_600_000,
-						plan: "solo",
+						plan: "pro",
 						quota_remaining: 9,
 					},
 					null,

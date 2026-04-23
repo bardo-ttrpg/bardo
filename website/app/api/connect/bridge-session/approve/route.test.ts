@@ -8,7 +8,7 @@ describe("POST /api/connect/bridge-session/approve", () => {
 			resolveUserId: async () => ({ userId: "user_123" }),
 			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
-				plan: "solo",
+				plan: "pro",
 				creditsTotal: 25_000,
 				creditsUsed: 0,
 				creditsRemaining: 25_000,
@@ -24,14 +24,14 @@ describe("POST /api/connect/bridge-session/approve", () => {
 			createBridgeCredentials: async ({ sessionId, userId, plan }) => {
 				expect(sessionId).toBe("bridge_session_123");
 				expect(userId).toBe("user_123");
-				expect(plan).toBe("solo");
+				expect(plan).toBe("pro");
 				return {
 					accessToken: "bridge_access",
 					refreshToken: "bridge_refresh",
 					expiresAt: "2099-03-03T00:10:00.000Z",
 					statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 					refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
-					plan: "solo",
+					plan: "pro",
 					accountLabel: "Armando",
 					serverName: "bardo",
 					issuedAtISO: "2099-03-03T00:00:00.000Z",
@@ -106,7 +106,7 @@ describe("POST /api/connect/bridge-session/approve", () => {
 			resolveUserId: async () => ({ userId: "user_123" }),
 			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
-				plan: "solo",
+				plan: "pro",
 				creditsTotal: 25_000,
 				creditsUsed: 0,
 				creditsRemaining: 25_000,
@@ -143,7 +143,7 @@ describe("POST /api/connect/bridge-session/approve", () => {
 			resolveUserId: async () => ({ userId: "user_123" }),
 			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
-				plan: "solo",
+				plan: "pro",
 				creditsTotal: 25_000,
 				creditsUsed: 0,
 				creditsRemaining: 25_000,
@@ -162,7 +162,7 @@ describe("POST /api/connect/bridge-session/approve", () => {
 				expiresAt: "2099-03-03T00:10:00.000Z",
 				statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 				refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
-				plan: "solo",
+				plan: "pro",
 				accountLabel: "Armando",
 				serverName: "bardo",
 				issuedAtISO: "2099-03-03T00:00:00.000Z",

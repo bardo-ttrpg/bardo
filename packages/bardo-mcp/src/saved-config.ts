@@ -18,7 +18,7 @@ export type SavedConfigV2 = {
 	statusUrl?: string;
 	refreshUrl?: string;
 	accountLabel?: string;
-	plan?: "free" | "solo";
+	plan?: "free" | "pro";
 };
 
 export type SavedConfig = SavedConfigV1 | SavedConfigV2;
@@ -84,8 +84,10 @@ export function migrateSavedConfig(raw: unknown): SavedConfig | null {
 			plan:
 				parsed.plan === "free"
 					? "free"
-					: parsed.plan === "solo" || parsed.plan === "solo_plus"
-						? "solo"
+					: parsed.plan === "pro" ||
+						  parsed.plan === "solo" ||
+						  parsed.plan === "solo_plus"
+						? "pro"
 						: undefined,
 		};
 	}

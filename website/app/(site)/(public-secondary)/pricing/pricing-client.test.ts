@@ -6,7 +6,7 @@ describe("shouldShowManageSubscription", () => {
 		expect(
 			shouldShowManageSubscription({
 				billing: {
-					plan: "solo",
+					plan: "pro",
 					subscriptionStatus: "active",
 					billingInterval: "month",
 				},
@@ -19,7 +19,7 @@ describe("shouldShowManageSubscription", () => {
 		expect(
 			shouldShowManageSubscription({
 				billing: {
-					plan: "solo",
+					plan: "pro",
 					subscriptionStatus: "active",
 					billingInterval: "year",
 				},
@@ -32,7 +32,7 @@ describe("shouldShowManageSubscription", () => {
 		expect(
 			shouldShowManageSubscription({
 				billing: {
-					plan: "solo",
+					plan: "pro",
 					subscriptionStatus: "active",
 					billingInterval: "month",
 				},

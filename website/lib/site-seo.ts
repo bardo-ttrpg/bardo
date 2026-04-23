@@ -23,9 +23,9 @@ export const homeSeo = {
 export const pricingSeo = {
 	title: "Pricing",
 	description:
-		"Choose monthly or yearly Bardo Solo billing for a local-first tabletop RPG MCP with grounded world state, hosted account access, and bridge approvals.",
+		"Choose monthly or yearly Bardo Pro billing for a local-first tabletop RPG MCP with grounded world state, hosted account access, and bridge approvals.",
 	socialDescription:
-		"See monthly and yearly Bardo Solo pricing for a local-first tabletop RPG MCP that keeps campaign truth on your machine.",
+		"See monthly and yearly Bardo Pro pricing for a local-first tabletop RPG MCP that keeps campaign truth on your machine.",
 	keywords: [
 		...landingPageKeywords,
 		"Bardo pricing",
@@ -78,7 +78,7 @@ export function getPricingPageJsonLd() {
 	return {
 		"@context": "https://schema.org",
 		"@type": "SoftwareApplication",
-		name: `${siteConfig.name} Solo`,
+		name: `${siteConfig.name} Pro`,
 		url: absoluteUrl("/pricing"),
 		description: pricingSeo.description,
 		applicationCategory: "GameApplication",
@@ -88,7 +88,7 @@ export function getPricingPageJsonLd() {
 				"@type": "Offer",
 				priceCurrency: "USD",
 				price: "20",
-				name: "Bardo Solo Monthly",
+				name: "Bardo Pro Monthly",
 				category: "Monthly subscription",
 				url: absoluteUrl("/pricing"),
 			},
@@ -96,7 +96,7 @@ export function getPricingPageJsonLd() {
 				"@type": "Offer",
 				priceCurrency: "USD",
 				price: "192",
-				name: "Bardo Solo Yearly",
+				name: "Bardo Pro Yearly",
 				category: "Yearly subscription",
 				url: absoluteUrl("/pricing"),
 			},

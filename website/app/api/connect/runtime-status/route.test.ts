@@ -58,12 +58,12 @@ describe("GET /api/connect/runtime-status", () => {
 			resolvePlanForSubject: async (_clerk, subject) => {
 				expect(subject).toBe("user_123");
 				return {
-					plan: "solo",
+					plan: "pro",
 					billingUnavailable: false,
 				};
 			},
 			mcpPeriodLimitResolver: (plan) => {
-				expect(plan).toBe("solo");
+				expect(plan).toBe("pro");
 				return 25_000;
 			},
 		});
@@ -87,7 +87,7 @@ describe("GET /api/connect/runtime-status", () => {
 			keyId: "key_123",
 			scopes: ["mcp"],
 			workspacePath: "./customers/user_123",
-			plan: "solo",
+			plan: "pro",
 			mcpPeriodLimit: 25_000,
 			billingUnavailable: false,
 		});
@@ -107,7 +107,7 @@ describe("GET /api/connect/runtime-status", () => {
 				return {
 					sessionId: "bridge_session_123",
 					userId: "user_123",
-					plan: "solo",
+					plan: "pro",
 					accountLabel: "Armando",
 				};
 			},
@@ -121,7 +121,7 @@ describe("GET /api/connect/runtime-status", () => {
 			resolvePlanForSubject: async (_clerk, subject) => {
 				expect(subject).toBe("user_123");
 				return {
-					plan: "solo",
+					plan: "pro",
 					billingUnavailable: false,
 				};
 			},
@@ -144,7 +144,7 @@ describe("GET /api/connect/runtime-status", () => {
 			keyId: "bridge:bridge_session_123",
 			scopes: ["mcp"],
 			workspacePath: null,
-			plan: "solo",
+			plan: "pro",
 			mcpPeriodLimit: 25_000,
 			billingUnavailable: false,
 		});
@@ -188,7 +188,7 @@ describe("GET /api/connect/runtime-status", () => {
 				},
 			}),
 			resolvePlanForSubject: async () => ({
-				plan: "solo",
+				plan: "pro",
 				billingUnavailable: false,
 			}),
 			mcpPeriodLimitResolver: () => 25_000,

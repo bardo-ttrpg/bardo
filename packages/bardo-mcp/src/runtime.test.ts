@@ -192,7 +192,7 @@ describe("bardo runtime", () => {
 						refreshUrl:
 							"https://old.example.com/api/connect/bridge-session/refresh",
 						accountLabel: "Old Account",
-						plan: "solo",
+						plan: "pro",
 						updatedAtISO: "2026-03-20T00:00:00.000Z",
 					},
 					null,
@@ -397,7 +397,7 @@ describe("bardo runtime", () => {
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",
 								accountLabel: "Armando",
-								plan: "solo",
+								plan: "pro",
 								serverName: "bardo",
 								issuedAtISO: "2099-03-03T00:00:00.000Z",
 							}),
@@ -443,7 +443,7 @@ describe("bardo runtime", () => {
 				"https://www.bardo.gg/api/connect/bridge-session/refresh",
 			);
 			expect(saved.accountLabel).toBe("Armando");
-			expect(saved.plan).toBe("solo");
+			expect(saved.plan).toBe("pro");
 			expect(pollCount).toBe(2);
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -502,7 +502,7 @@ describe("bardo runtime", () => {
 								refreshUrl:
 									"http://localhost:3001/api/connect/bridge-session/refresh",
 								accountLabel: "Armando",
-								plan: "solo",
+								plan: "pro",
 								serverName: "bardo",
 							}),
 							{
@@ -1179,7 +1179,7 @@ describe("bardo runtime", () => {
 								keyId: "key_123",
 								scopes: ["mcp"],
 								workspacePath: "./customers/user_123",
-								plan: "solo",
+								plan: "pro",
 								mcpPeriodLimit: 25000,
 								billingUnavailable: false,
 							}),
@@ -1213,7 +1213,7 @@ describe("bardo runtime", () => {
 			);
 			expect(payload.account.subjectId).toBe("user_123");
 			expect(payload.account.keyId).toBe("key_123");
-			expect(payload.account.plan).toBe("solo");
+			expect(payload.account.plan).toBe("pro");
 			expect(payload.account.mcpPeriodLimit).toBe(25000);
 			expect(calls).toEqual([
 				{
@@ -1280,7 +1280,7 @@ describe("bardo runtime", () => {
 								keyId: "bridge:local",
 								scopes: ["mcp"],
 								workspacePath: null,
-								plan: "solo",
+								plan: "pro",
 								mcpPeriodLimit: 25000,
 								billingUnavailable: false,
 							}),
@@ -1483,7 +1483,7 @@ describe("bardo runtime", () => {
 										keyId: "key_123",
 										scopes: ["mcp"],
 										workspacePath: "./customers/user_123",
-										plan: "solo",
+										plan: "pro",
 										mcpPeriodLimit: 25000,
 										billingUnavailable: false,
 									}),
@@ -2014,7 +2014,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					return new Response(
 						JSON.stringify({
 							valid: true,
-							plan: "solo",
+							plan: "pro",
 						}),
 						{
 							status: 200,
@@ -2029,7 +2029,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				apiKey: "test-key",
 				url: "http://127.0.0.1:3000/mcp",
 				workspaceRoot,
-				plan: "solo",
+				plan: "pro",
 			});
 			expect(stderr.read()).toBe("");
 		} finally {
@@ -2099,7 +2099,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 								statusUrl: "http://localhost:3001/api/connect/runtime-status",
 								refreshUrl:
 									"http://localhost:3001/api/connect/bridge-session/refresh",
-								plan: "solo",
+								plan: "pro",
 								accountLabel: "Armando",
 								serverName: "bardo",
 							}),
@@ -2119,7 +2119,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					return new Response(
 						JSON.stringify({
 							valid: true,
-							plan: "solo",
+							plan: "pro",
 						}),
 						{
 							status: 200,
@@ -2134,7 +2134,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				apiKey: "refreshed-access-token",
 				url: "http://127.0.0.1:3000/mcp",
 				workspaceRoot,
-				plan: "solo",
+				plan: "pro",
 			});
 			const saved = JSON.parse(
 				await readFile(path.join(homeDir, ".config/bardo/config.json"), "utf8"),
@@ -2220,7 +2220,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 								statusUrl: "http://127.0.0.1:3001/api/connect/runtime-status",
 								refreshUrl:
 									"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
-								plan: "solo",
+								plan: "pro",
 								accountLabel: "Armando",
 								serverName: "bardo",
 							}),
@@ -2240,7 +2240,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 					return new Response(
 						JSON.stringify({
 							valid: true,
-							plan: "solo",
+							plan: "pro",
 						}),
 						{
 							status: 200,
@@ -2255,7 +2255,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				apiKey: "refreshed-config-token",
 				url: "http://127.0.0.1:3000/mcp",
 				workspaceRoot,
-				plan: "solo",
+				plan: "pro",
 			});
 			expect(stderr.read()).toBe("");
 		} finally {
@@ -3109,7 +3109,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 							"http://127.0.0.1:3001/api/connect/bridge-session/refresh",
 						serverName: "bardo",
 						accountLabel: "Armando",
-						plan: "solo",
+						plan: "pro",
 						updatedAtISO: "2026-03-20T00:00:00.000Z",
 					},
 					null,
@@ -3165,7 +3165,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				refreshUrl: "http://127.0.0.1:3001/api/connect/bridge-session/refresh",
 				serverName: "campaign-gm",
 				accountLabel: "Armando",
-				plan: "solo",
+				plan: "pro",
 			});
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
@@ -3591,7 +3591,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 								keyId: "key_123",
 								scopes: ["mcp"],
 								workspacePath: "./customers/user_123",
-								plan: "solo",
+								plan: "pro",
 								mcpPeriodLimit: 25000,
 								billingUnavailable: false,
 							}),
@@ -3612,7 +3612,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 			};
 			expect(payload.config.apiKeyRedacted).toBe(true);
 			expect(payload.config.apiKeyPreview).toContain("bardo_live");
-			expect(payload.doctor.account.plan).toBe("solo");
+			expect(payload.doctor.account.plan).toBe("pro");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });

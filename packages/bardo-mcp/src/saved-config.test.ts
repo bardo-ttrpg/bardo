@@ -19,7 +19,7 @@ describe("saved config", () => {
 		});
 	});
 
-	test("accepts version 2 bridge-session config", () => {
+	test("migrates legacy version 2 bridge-session plans to Pro", () => {
 		const migrated = migrateSavedConfig({
 			version: 2,
 			accessToken: "bridge_access_token",
@@ -45,7 +45,7 @@ describe("saved config", () => {
 			statusUrl: "https://example.com/api/connect/runtime-status",
 			refreshUrl: "https://example.com/api/connect/bridge-session/refresh",
 			accountLabel: "Armando",
-			plan: "solo",
+			plan: "pro",
 		});
 	});
 

@@ -73,7 +73,7 @@ function statusFromError(error: unknown): number {
 }
 
 function hasSubscription(snapshot: BillingSnapshot): boolean {
-	return snapshot.plan === "solo";
+	return snapshot.plan === "pro";
 }
 
 const defaultDeps: BridgeSessionApproveDeps = {

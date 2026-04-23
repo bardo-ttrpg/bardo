@@ -509,11 +509,11 @@ export function createIntrospectPostHandler(
 					);
 				}
 
-				const preliminaryKeyUsage =
-					await deps.verificationLimiter.consumePreAuthKey(
-						await hashApiKeySecret(apiKeySecret),
-						"solo",
-					);
+					const preliminaryKeyUsage =
+						await deps.verificationLimiter.consumePreAuthKey(
+							await hashApiKeySecret(apiKeySecret),
+							"pro",
+						);
 				if (!preliminaryKeyUsage.allowed) {
 					deps.telemetry.increment("budget_block_key");
 					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
@@ -605,6 +605,24 @@ export function createIntrospectPostHandler(
 					const resolvedPlan = cachedPlanResolution;
 					billingUnavailable = resolvedPlan.billingUnavailable;
 					plan = resolvedPlan.plan ?? "free";
+				}
+				if (!subject || billingUnavailable || plan === "free") {
+					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
+					return finalize(
+						NextResponse.json(
+							{
+								valid: false,
+								reason: "active_pro_subscription_required",
+							},
+							{ status: 200 },
+						),
+						{
+							result: "invalid",
+							cachedVerification: false,
+							preAuthBackend: preliminaryKeyUsage.backend,
+							plan,
+						},
+					);
 				}
 
 				const userUsage = subject

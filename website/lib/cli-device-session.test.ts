@@ -17,7 +17,7 @@ describe("cli device session service", () => {
 			expiresAt: "2026-03-03T00:10:00.000Z",
 			statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
 			refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
-			plan: "solo",
+			plan: "pro",
 			accountLabel: "Armando",
 			serverName: "bardo",
 			issuedAtISO: "2026-03-03T00:00:00.000Z",
@@ -63,7 +63,7 @@ describe("cli device session service", () => {
 			status: "approved",
 			payload: {
 				accessToken: "access-token",
-				plan: "solo",
+				plan: "pro",
 			},
 		});
 

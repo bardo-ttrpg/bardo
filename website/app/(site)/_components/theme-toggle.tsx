@@ -17,6 +17,8 @@ export function ThemeToggle({ className }: { className?: string }) {
 	const isHydrated = useHydrated();
 	const isDark = !isHydrated || resolvedTheme !== "light";
 	const nextTheme = isDark ? "light" : "dark";
+	const iconTransitionClassName =
+		"absolute size-4 transition-[transform,opacity] duration-(--motion-duration-slow) ease-(--motion-ease-standard)";
 
 	function handleToggle() {
 		const transitionDocument = document as ViewTransitionDocument;
@@ -56,14 +58,14 @@ export function ThemeToggle({ className }: { className?: string }) {
 				<SunIcon
 					aria-hidden="true"
 					className={cn(
-						"absolute size-4 [transition-duration:var(--motion-duration-slow)] [transition-property:transform,opacity] [transition-timing-function:var(--motion-ease-standard)]",
+						iconTransitionClassName,
 						isDark ? "rotate-90 opacity-0" : "rotate-0 opacity-100",
 					)}
 				/>
 				<MoonIcon
 					aria-hidden="true"
 					className={cn(
-						"absolute size-4 [transition-duration:var(--motion-duration-slow)] [transition-property:transform,opacity] [transition-timing-function:var(--motion-ease-standard)]",
+						iconTransitionClassName,
 						isDark ? "rotate-0 opacity-100" : "-rotate-90 opacity-0",
 					)}
 				/>

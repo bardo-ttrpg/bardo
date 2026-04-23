@@ -83,7 +83,7 @@ describe("bardo runtime smoke gate", () => {
 								refreshUrl:
 									"https://www.bardo.gg/api/connect/bridge-session/refresh",
 								accountLabel: "Smoke User",
-								plan: "solo",
+								plan: "pro",
 								serverName: "bardo",
 							}),
 							{
@@ -137,7 +137,7 @@ describe("bardo runtime smoke gate", () => {
 								keyId: "key_smoke",
 								scopes: ["mcp"],
 								workspacePath: "./customers/user_smoke",
-								plan: "solo",
+								plan: "pro",
 								mcpPeriodLimit: 25000,
 								billingUnavailable: false,
 							}),
@@ -163,7 +163,7 @@ describe("bardo runtime smoke gate", () => {
 			expect(doctorPayload.workspace.initialized).toBe(true);
 			expect(doctorPayload.connectivity.health.ok).toBe(true);
 			expect(doctorPayload.account.ok).toBe(true);
-			expect(doctorPayload.account.plan).toBe("solo");
+			expect(doctorPayload.account.plan).toBe("pro");
 
 			const clientsExitCode = await runCli(["clients", "list", "--json"], {
 				cwd: workspaceRoot,

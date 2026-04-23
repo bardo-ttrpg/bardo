@@ -5,7 +5,7 @@ import {
 } from "./clerk-live-billing";
 import { planCreditsFor } from "./user-billing";
 
-export type PlanTier = "free" | "solo";
+export type PlanTier = "free" | "pro";
 export type SubscriptionStatus =
 	| "incomplete"
 	| "incomplete_expired"

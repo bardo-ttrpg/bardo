@@ -146,7 +146,7 @@ describe("createWebsiteBackendClient", () => {
 					statusUrl: "https://app.example.com/api/connect/runtime-status",
 					refreshUrl:
 						"https://app.example.com/api/connect/bridge-session/refresh",
-					plan: "solo",
+					plan: "pro",
 					accountLabel: "Armando",
 					serverName: "bardo",
 					issuedAtISO: "2036-03-25T00:00:10.000Z",
@@ -200,7 +200,7 @@ describe("createWebsiteBackendClient", () => {
 					statusUrl: "https://app.example.com/api/connect/runtime-status",
 					refreshUrl:
 						"https://app.example.com/api/connect/bridge-session/refresh",
-					plan: "solo",
+					plan: "pro",
 					accountLabel: "Armando",
 					serverName: "bardo",
 					issuedAtISO: "2036-03-25T00:00:10.000Z",
