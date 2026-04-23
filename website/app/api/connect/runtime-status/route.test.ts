@@ -158,7 +158,8 @@ describe("GET /api/connect/runtime-status", () => {
 		);
 		const body = await response.json();
 
-		expect(response.status).toBe(401);
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(false);
 		expect(body.error).toContain("bridge credential");
 	});
 
@@ -235,7 +236,8 @@ describe("GET /api/connect/runtime-status", () => {
 		);
 		const body = await response.json();
 
-		expect(response.status).toBe(401);
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(false);
 		expect(body.error).toBe("Invalid bridge credential.");
 		expect(verifyCalled).toBe(false);
 	});
@@ -264,7 +266,8 @@ describe("GET /api/connect/runtime-status", () => {
 		);
 		const body = await response.json();
 
-		expect(response.status).toBe(401);
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(false);
 		expect(body.error).toBe("Invalid bridge credential.");
 	});
 });

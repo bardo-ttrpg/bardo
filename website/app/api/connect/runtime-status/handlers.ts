@@ -50,6 +50,25 @@ type RuntimeStatusDeps = {
 	telemetry: ConnectTelemetry;
 };
 
+function createInvalidRuntimeStatusResponse(args: {
+	error: string;
+	headers?: Headers;
+}): Response {
+	const response = NextResponse.json(
+		{
+			valid: false,
+			error: args.error,
+		},
+		{ status: 200 },
+	);
+	if (args.headers) {
+		for (const [key, value] of args.headers.entries()) {
+			response.headers.set(key, value);
+		}
+	}
+	return response;
+}
+
 function readApiKey(request: Request): string | null {
 	const apiKey = request.headers.get("BARDO_API_KEY")?.trim();
 	if (apiKey) {
@@ -153,13 +172,10 @@ export function createRuntimeStatusGetHandler(
 	return async function GET(request: Request) {
 		const apiKey = readApiKey(request);
 		if (!apiKey) {
-			return NextResponse.json(
-				{
-					error:
-						"Missing bridge credential. Send Authorization: Bearer <access-token>.",
-				},
-				{ status: 401 },
-			);
+			return createInvalidRuntimeStatusResponse({
+				error:
+					"Missing bridge credential. Send Authorization: Bearer <access-token>.",
+			});
 		}
 
 		try {
@@ -185,10 +201,11 @@ export function createRuntimeStatusGetHandler(
 				);
 				if (!plan || billingUnavailable || plan === "free") {
 					deps.telemetry.increment("runtime_status_invalid");
-					return NextResponse.json(
-						{ error: "Bridge session no longer has an active subscription." },
-						{ status: 403 },
-					);
+					const response = createInvalidRuntimeStatusResponse({
+						error: "Bridge session no longer has an active subscription.",
+					});
+					applyRateLimitHeaders(response.headers, budget);
+					return response;
 				}
 				deps.telemetry.increment("runtime_status_success");
 				const response = NextResponse.json({
@@ -207,10 +224,9 @@ export function createRuntimeStatusGetHandler(
 
 			if (!looksLikeClerkApiKey(apiKey)) {
 				deps.telemetry.increment("runtime_status_invalid");
-				const response = NextResponse.json(
-					{ error: "Invalid bridge credential." },
-					{ status: 401 },
-				);
+				const response = createInvalidRuntimeStatusResponse({
+					error: "Invalid bridge credential.",
+				});
 				applyRateLimitHeaders(response.headers, budget);
 				return response;
 			}
@@ -225,10 +241,11 @@ export function createRuntimeStatusGetHandler(
 				: { plan: null, billingUnavailable: false };
 			if (!subjectId || !plan || billingUnavailable || plan === "free") {
 				deps.telemetry.increment("runtime_status_invalid");
-				return NextResponse.json(
-					{ error: "API key no longer has an active Pro subscription." },
-					{ status: 403 },
-				);
+				const response = createInvalidRuntimeStatusResponse({
+					error: "API key no longer has an active Pro subscription.",
+				});
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
 			}
 			deps.telemetry.increment("runtime_status_success");
 
@@ -250,10 +267,9 @@ export function createRuntimeStatusGetHandler(
 			const status = extractErrorStatus(error);
 			if (status === 401 || status === 403 || status === 404) {
 				deps.telemetry.increment("runtime_status_invalid");
-				return NextResponse.json(
-					{ error: "Invalid bridge credential." },
-					{ status: status === 403 ? 403 : 401 },
-				);
+				return createInvalidRuntimeStatusResponse({
+					error: "Invalid bridge credential.",
+				});
 			}
 			deps.telemetry.increment("runtime_status_failed");
 			return NextResponse.json(
