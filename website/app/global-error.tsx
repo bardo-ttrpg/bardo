@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -36,9 +37,9 @@ export default function GlobalError({
 							<Button type="button" onClick={reset} variant="outline">
 								Try again
 							</Button>
-							<a href="/" className="underline underline-offset-4">
+							<Link href="/" className="underline underline-offset-4">
 								Go Back Home
-							</a>
+							</Link>
 						</footer>
 					</section>
 				</main>

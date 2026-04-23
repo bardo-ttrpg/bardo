@@ -1,9 +1,8 @@
-import { headers } from "next/headers";
-import Image from "next/image";
+import { getImageProps } from "next/image";
+import { createElement } from "react";
 import { TransitionLink } from "@/components/transition-link";
 import { Button } from "@/components/ui/button";
 import { BardoViewTransition } from "@/components/view-transition";
-import { isClerkAuthConfigured } from "@/lib/clerk-config";
 import { createPublicMetadata } from "@/lib/site-metadata";
 import { getLandingPageJsonLd, homeSeo } from "@/lib/site-seo";
 import desktopLandingImage from "../../../public/landing-page-image.png";
@@ -30,42 +29,33 @@ const landingFooterLinks = [
 	// { href: "/blog", label: "Journal" },
 	// { href: "/legal/terms", label: "Legal" },
 ] as const;
-const MOBILE_LANDING_IMAGE_USER_AGENT_PATTERN =
-	/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i;
+const desktopLandingImageProps = getImageProps({
+	src: desktopLandingImage,
+	alt: "Bardo landing page preview",
+	quality: 82,
+	loading: "eager",
+	sizes: "(max-width: 1024px) calc(100vw - 4rem), 896px",
+	width: 1000,
+}).props;
+const mobileLandingImageProps = getImageProps({
+	src: mobileLandingImage,
+	alt: "Bardo landing page preview for mobile devices",
+	quality: 82,
+	loading: "eager",
+	sizes: "calc(100vw - 3rem)",
+	width: 500,
+}).props;
 
-function shouldUseMobileLandingImage(
-	userAgentHeader: string,
-	mobileHint: string | null,
-) {
-	if (mobileHint === "?1") {
-		return true;
-	}
-
-	return MOBILE_LANDING_IMAGE_USER_AGENT_PATTERN.test(userAgentHeader);
-}
-
-const IS_CLERK_CONFIGURED = isClerkAuthConfigured({
-	publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-	secretKey: process.env.CLERK_SECRET_KEY,
-});
-
-export default async function SitePage() {
-	const requestHeaders = await headers();
-	const userAgentHeader = requestHeaders.get("user-agent") ?? "";
-	const mobileHint = requestHeaders.get("sec-ch-ua-mobile");
-	const useMobileLandingImage = shouldUseMobileLandingImage(
-		userAgentHeader,
-		mobileHint,
-	);
-	const landingImage = useMobileLandingImage
-		? mobileLandingImage
-		: desktopLandingImage;
-	const landingImageAlt = useMobileLandingImage
-		? "Bardo landing page preview for mobile devices"
-		: "Bardo landing page preview";
-	const landingImageSizes = useMobileLandingImage
-		? "calc(100vw - 3rem)"
-		: "(max-width: 1024px) calc(100vw - 4rem), 896px";
+export default function SitePage() {
+	const { srcSet: desktopSrcSet, ...desktopImageAttrs } =
+		desktopLandingImageProps;
+	const { srcSet: mobileSrcSet } = mobileLandingImageProps;
+	const landingImage = createElement("img", {
+		...desktopImageAttrs,
+		alt: "Bardo landing page preview",
+		className: "my-6 h-auto w-full rounded-sm",
+		fetchPriority: "high",
+	});
 
 	return (
 		<PublicPageShell className="max-w-5xl pt-8 text-balance lg:pt-4">
@@ -89,34 +79,24 @@ export default async function SitePage() {
 							<Button asChild size="sm" className={homeActionClassName}>
 								<TransitionLink href="/docs">Start Playing</TransitionLink>
 							</Button>
-							<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
+							<HomePrimaryAction />
 						</nav>
 					</header>
 
 					<figure>
-						{useMobileLandingImage ? (
-							<Image
-								src={landingImage}
-								alt={landingImageAlt}
-								placeholder="blur"
-								preload
-								className="my-6 rounded-sm"
-								quality={100}
-								sizes={landingImageSizes}
-								width={500}
+						<picture>
+							<source
+								media="(max-width: 767px)"
+								sizes="calc(100vw - 3rem)"
+								srcSet={mobileSrcSet}
 							/>
-						) : (
-							<Image
-								src={landingImage}
-								alt={landingImageAlt}
-								placeholder="blur"
-								preload
-								className="my-6 h-auto w-full rounded-sm"
-								quality={100}
-								sizes={landingImageSizes}
-								width={1000}
+							<source
+								media="(min-width: 768px)"
+								sizes="(max-width: 1024px) calc(100vw - 4rem), 896px"
+								srcSet={desktopSrcSet}
 							/>
-						)}
+							{landingImage}
+						</picture>
 					</figure>
 				</section>
 			</BardoViewTransition>

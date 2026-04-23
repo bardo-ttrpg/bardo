@@ -1,40 +1,14 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { BARDO_MCP_RELEASE_VERSION } from "./bardo-mcp-release";
 
 const REPO_URL = "https://github.com/armando-andre/bardo.git";
 const RELEASES_BASE_URL =
 	"https://github.com/armando-andre/bardo/releases/download";
-
-type PackageJson = {
-	version?: string;
-};
 
 type ReleaseArtifact = {
 	platform: "linux" | "darwin" | "windows";
 	arch: "x64" | "arm64";
 	filename: string;
 };
-
-function readPackageVersion(): string {
-	const currentDir = path.dirname(fileURLToPath(import.meta.url));
-	const packageJsonPath = path.join(
-		currentDir,
-		"..",
-		"..",
-		"packages",
-		"bardo-mcp",
-		"package.json",
-	);
-	const raw = readFileSync(packageJsonPath, "utf8");
-	const parsed = JSON.parse(raw) as PackageJson;
-	if (!parsed.version || parsed.version.trim().length === 0) {
-		throw new Error("packages/bardo-mcp/package.json is missing a version.");
-	}
-	return parsed.version.startsWith("v")
-		? parsed.version.trim()
-		: `v${parsed.version.trim()}`;
-}
 
 function resolveReleaseArtifacts(version: string): ReleaseArtifact[] {
 	return [
@@ -62,7 +36,7 @@ function resolveReleaseArtifacts(version: string): ReleaseArtifact[] {
 	];
 }
 
-const RELEASE_VERSION = readPackageVersion();
+const RELEASE_VERSION = BARDO_MCP_RELEASE_VERSION;
 const RELEASE_ARTIFACTS = resolveReleaseArtifacts(RELEASE_VERSION);
 
 function renderSourceFallbackFunctions(): string {

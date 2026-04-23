@@ -16,7 +16,7 @@ export function DashboardClient() {
 		<main>
 			<BardoViewTransition name="bardo-page-region" variant="fade">
 				<section
-					className="flex justify-center items-center h-[80dvh] bardo-page-region auth-clerk-frame w-full"
+					className="flex justify-center items-center my-10 md:my-20 bardo-page-region auth-clerk-frame w-full"
 					aria-label="Account dashboard"
 				>
 					<ClerkLoaded>

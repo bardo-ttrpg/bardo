@@ -1,10 +1,26 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { BARDO_MCP_PACKAGE_VERSION } from "./bardo-mcp-release";
 import {
 	renderPowerShellInstallScript,
 	renderUnixInstallScript,
 } from "./install-script";
 
+type PackageJson = {
+	version?: string;
+};
+
 describe("install scripts", () => {
+	test("keeps the bundled MCP release version synced with the package manifest", () => {
+		const raw = readFileSync(
+			new URL("../../packages/bardo-mcp/package.json", import.meta.url),
+			"utf8",
+		);
+		const parsed = JSON.parse(raw) as PackageJson;
+
+		expect(BARDO_MCP_PACKAGE_VERSION).toBe(parsed.version);
+	});
+
 	test("renders a unix installer that prefers release binaries with checksum verification", () => {
 		const script = renderUnixInstallScript();
 

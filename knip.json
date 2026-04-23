@@ -10,8 +10,7 @@
 				"*.{test,spec}.{js,jsx,ts,tsx}",
 				"app/**/*.{test,spec}.{js,jsx,ts,tsx}",
 				"lib/**/*.{test,spec}.{js,jsx,ts,tsx}",
-				"scripts/**/*.ts",
-				"instrumentation-client.test.ts"
+				"scripts/**/*.ts"
 			],
 			"project": ["**/*.{js,jsx,ts,tsx,mdx}"]
 		},

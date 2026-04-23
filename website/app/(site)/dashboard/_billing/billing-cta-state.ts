@@ -1,6 +1,6 @@
 type CheckoutRenderState = "checkout" | "disabled_unavailable" | "sign_in";
 
-export type CheckoutPlanLike = {
+type CheckoutPlanLike = {
 	id?: string | null;
 	slug?: string | null;
 	name?: string | null;
