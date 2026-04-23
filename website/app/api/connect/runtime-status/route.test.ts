@@ -43,7 +43,7 @@ describe("GET /api/connect/runtime-status", () => {
 			createClerkClient: async () => ({
 				apiKeys: {
 					verify: async (secret: string) => {
-						expect(secret).toBe("bardo_live_test");
+						expect(secret).toBe("ak_live_test");
 						return {
 							id: "key_123",
 							subject: "user_123",
@@ -71,7 +71,7 @@ describe("GET /api/connect/runtime-status", () => {
 		const response = await handler(
 			new Request("https://app.bardo.ai/api/connect/runtime-status", {
 				headers: {
-					authorization: "Bearer bardo_live_test",
+					authorization: "Bearer ak_live_test",
 				},
 			}),
 		);
@@ -197,7 +197,7 @@ describe("GET /api/connect/runtime-status", () => {
 		await handler(
 			new Request("https://app.bardo.ai/api/connect/runtime-status", {
 				headers: {
-					authorization: "Bearer good-key",
+					authorization: "Bearer ak_live_good",
 				},
 			}),
 		);
@@ -211,6 +211,33 @@ describe("GET /api/connect/runtime-status", () => {
 
 		expect(telemetry.snapshot().runtime_status_success).toBe(1);
 		expect(telemetry.snapshot().runtime_status_invalid).toBe(1);
+	});
+
+	test("rejects unsupported direct token formats before calling Clerk", async () => {
+		let verifyCalled = false;
+		const handler = createRuntimeStatusGetHandler({
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						verifyCalled = true;
+						throw new Error("should not verify unsupported token formats");
+					},
+				},
+			}),
+		});
+
+		const response = await handler(
+			new Request("https://www.bardo.gg/api/connect/runtime-status", {
+				headers: {
+					authorization: "Bearer bardo_live_saved",
+				},
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(401);
+		expect(body.error).toBe("Invalid bridge credential.");
+		expect(verifyCalled).toBe(false);
 	});
 
 	test("normalizes not-found key verification failures into a clean invalid credential response", async () => {

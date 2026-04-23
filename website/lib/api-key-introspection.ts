@@ -37,6 +37,10 @@ export function createIntrospectionSecretValidator(secret: string | undefined) {
 	};
 }
 
+export function looksLikeClerkApiKey(value: string | null | undefined): boolean {
+	return value?.trim().startsWith("ak_") ?? false;
+}
+
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 	if (!value) return fallback;
 	const normalized = value.trim().toLowerCase();

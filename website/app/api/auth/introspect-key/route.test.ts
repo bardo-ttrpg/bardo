@@ -349,6 +349,75 @@ describe("POST /api/auth/introspect-key", () => {
 		});
 	});
 
+	test("rejects unsupported direct token formats before Clerk verification", async () => {
+		let verifyCalled = false;
+		const logWarn = mock(() => {});
+		const telemetry = createIntrospectionTelemetry({ logEnabled: false });
+		const cache = createIntrospectionVerifyCache({
+			validTtlMs: 60_000,
+			invalidTtlMs: 60_000,
+		});
+
+		const handler = createIntrospectPostHandler({
+			introspectionSecret: "shared-secret",
+			verificationLimiter: {
+				consumePreAuthKey: async () => {
+					throw new Error(
+						"consumePreAuthKey should not run for unsupported token formats",
+					);
+				},
+				consumeUser: async () => {
+					throw new Error("consumeUser should not run for invalid key");
+				},
+				consumeKey: async () => {
+					throw new Error("consumeKey should not run for invalid key");
+				},
+			},
+			subjectPlanCache: {
+				resolve: async (_subject, lookup) => await lookup(),
+			},
+			introspectionVerifyCache: cache,
+			telemetry,
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						verifyCalled = true;
+						throw new Error("should not verify unsupported token formats");
+					},
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
+			mcpPeriodLimitResolver: () => 100,
+			tracing: {
+				withRequestSpan: (_args, callback) => callback({ setAttribute() {} }),
+				withClerkVerifySpan: (callback) => callback(),
+				withPlanLookupSpan: (callback) => callback(),
+				captureException: () => {},
+				logInfo: () => {},
+				logWarn,
+				logError: () => {},
+			},
+		});
+
+		const response = await handler(
+			buildRequest("shared-secret", "bardo_live_saved"),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(false);
+		expect(verifyCalled).toBe(false);
+		expect(logWarn).toHaveBeenCalledWith(
+			"bardo.auth_introspection.unsupported_key_format",
+			expect.objectContaining({
+				"bardo.result": "invalid",
+			}),
+		);
+	});
+
 	test("preserves website backend labels when invalid keys are rejected", async () => {
 		const logWarn = mock(() => {});
 		const telemetry = createIntrospectionTelemetry({ logEnabled: false });

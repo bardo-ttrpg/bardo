@@ -1,8 +1,9 @@
-import { BARDO_MCP_RELEASE_VERSION } from "./bardo-mcp-release";
+import {
+	BARDO_MCP_PUBLIC_RELEASES_BASE_URL,
+	BARDO_MCP_RELEASE_VERSION,
+} from "./bardo-mcp-release";
 
 const REPO_URL = "https://github.com/armando-andre/bardo.git";
-const RELEASES_BASE_URL =
-	"https://github.com/armando-andre/bardo/releases/download";
 
 type ReleaseArtifact = {
 	platform: "linux" | "darwin" | "windows";
@@ -38,6 +39,15 @@ function resolveReleaseArtifacts(version: string): ReleaseArtifact[] {
 
 const RELEASE_VERSION = BARDO_MCP_RELEASE_VERSION;
 const RELEASE_ARTIFACTS = resolveReleaseArtifacts(RELEASE_VERSION);
+
+function resolveInstallReleaseBaseUrl(): string {
+	const override = process.env.BARDO_INSTALL_RELEASE_BASE_URL?.trim();
+	if (override) {
+		return override;
+	}
+
+	return `${BARDO_MCP_PUBLIC_RELEASES_BASE_URL}/${RELEASE_VERSION}`;
+}
 
 function renderSourceFallbackFunctions(): string {
 	return `
@@ -101,6 +111,7 @@ EOF
 }
 
 export function renderUnixInstallScript(): string {
+	const releaseBaseUrl = resolveInstallReleaseBaseUrl();
 	const artifactCases = RELEASE_ARTIFACTS.filter(
 		(artifact) => artifact.platform !== "windows",
 	)
@@ -162,7 +173,7 @@ INSTALL_ROOT="\${BARDO_INSTALL_ROOT:-$HOME/.local/share/bardo}"
 BIN_DIR="\${BARDO_BIN_DIR:-$HOME/.local/bin}"
 INSTALL_MODE="\${BARDO_INSTALL_MODE:-binary}"
 RELEASE_VERSION="${RELEASE_VERSION}"
-RELEASE_BASE_URL="\${BARDO_INSTALL_RELEASE_BASE_URL:-${RELEASES_BASE_URL}/$RELEASE_VERSION}"
+RELEASE_BASE_URL="\${BARDO_INSTALL_RELEASE_BASE_URL:-${releaseBaseUrl}}"
 
 mkdir -p "$INSTALL_ROOT" "$BIN_DIR"
 
@@ -221,6 +232,7 @@ echo "If '$BIN_DIR' is not on your PATH, add it before running 'bardo login'."
 }
 
 export function renderPowerShellInstallScript(): string {
+	const releaseBaseUrl = resolveInstallReleaseBaseUrl();
 	const windowsArtifact = RELEASE_ARTIFACTS.find(
 		(artifact) => artifact.platform === "windows" && artifact.arch === "x64",
 	);
@@ -307,7 +319,7 @@ $binDir = if ($env:BARDO_BIN_DIR) { $env:BARDO_BIN_DIR } else { Join-Path $HOME 
 $installMode = if ($env:BARDO_INSTALL_MODE) { $env:BARDO_INSTALL_MODE } else { 'binary' }
 $repoUrl = '${REPO_URL}'
 $releaseVersion = '${RELEASE_VERSION}'
-$releaseBaseUrl = if ($env:BARDO_INSTALL_RELEASE_BASE_URL) { $env:BARDO_INSTALL_RELEASE_BASE_URL } else { '${RELEASES_BASE_URL}/${RELEASE_VERSION}' }
+$releaseBaseUrl = if ($env:BARDO_INSTALL_RELEASE_BASE_URL) { $env:BARDO_INSTALL_RELEASE_BASE_URL } else { '${releaseBaseUrl}' }
 
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null

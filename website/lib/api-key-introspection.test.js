@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	createIntrospectionSecretValidator,
+	looksLikeClerkApiKey,
 	resolveRequestedWorkspaceRoot,
 } from "./api-key-introspection";
 
@@ -93,5 +94,19 @@ describe("resolveRequestedWorkspaceRoot", () => {
 			allowlistEnv: "/home/armando/projects",
 		});
 		expect(result).toBeNull();
+	});
+});
+
+describe("looksLikeClerkApiKey", () => {
+	test("accepts Clerk API key prefixes", () => {
+		expect(looksLikeClerkApiKey("ak_live_123")).toBe(true);
+		expect(looksLikeClerkApiKey(" ak_test_123 ")).toBe(true);
+	});
+
+	test("rejects bridge tokens and legacy direct tokens", () => {
+		expect(looksLikeClerkApiKey("bardo_live_saved")).toBe(false);
+		expect(looksLikeClerkApiKey("bridge_access_token")).toBe(false);
+		expect(looksLikeClerkApiKey("")).toBe(false);
+		expect(looksLikeClerkApiKey(undefined)).toBe(false);
 	});
 });

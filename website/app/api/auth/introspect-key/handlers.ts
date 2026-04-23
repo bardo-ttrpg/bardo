@@ -2,6 +2,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import {
 	createIntrospectionSecretValidator,
+	looksLikeClerkApiKey,
 	resolveRequestedWorkspaceRoot,
 } from "@/lib/api-key-introspection";
 import {
@@ -505,6 +506,26 @@ export function createIntrospectPostHandler(
 							result: "success",
 							cachedVerification: true,
 							plan: cachedVerification.value.plan,
+						},
+					);
+				}
+
+				if (!looksLikeClerkApiKey(apiKeySecret)) {
+					deps.introspectionVerifyCache.setInvalid(apiKeySecret);
+					deps.tracing.logWarn(
+						"bardo.auth_introspection.unsupported_key_format",
+						{
+							"bardo.required_scope": requiredScope,
+							"bardo.workspace_override_requested":
+								workspaceOverrideRequested,
+							"bardo.result": "invalid",
+						},
+					);
+					return finalize(
+						NextResponse.json({ valid: false }, { status: 200 }),
+						{
+							result: "invalid",
+							cachedVerification: false,
 						},
 					);
 				}

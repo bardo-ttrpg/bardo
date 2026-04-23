@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { BARDO_MCP_PACKAGE_VERSION } from "./bardo-mcp-release";
+import {
+	BARDO_MCP_PACKAGE_VERSION,
+	BARDO_MCP_PUBLIC_RELEASES_BASE_URL,
+	BARDO_MCP_RELEASE_VERSION,
+} from "./bardo-mcp-release";
 import {
 	renderPowerShellInstallScript,
 	renderUnixInstallScript,
@@ -25,7 +29,7 @@ describe("install scripts", () => {
 		const script = renderUnixInstallScript();
 
 		expect(script).toContain(
-			"https://github.com/armando-andre/bardo/releases/download/",
+			`${BARDO_MCP_PUBLIC_RELEASES_BASE_URL}/${BARDO_MCP_RELEASE_VERSION}`,
 		);
 		expect(script).toContain("SHA256SUMS.txt");
 		expect(script).toContain("sha256sum");
@@ -39,7 +43,7 @@ describe("install scripts", () => {
 		const script = renderPowerShellInstallScript();
 
 		expect(script).toContain(
-			"https://github.com/armando-andre/bardo/releases/download/",
+			`${BARDO_MCP_PUBLIC_RELEASES_BASE_URL}/${BARDO_MCP_RELEASE_VERSION}`,
 		);
 		expect(script).toContain("SHA256SUMS.txt");
 		expect(script).toContain("Get-FileHash");

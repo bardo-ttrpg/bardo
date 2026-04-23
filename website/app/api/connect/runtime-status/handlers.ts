@@ -1,6 +1,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { mcpPeriodLimitForPlan } from "../../../../lib/api-keys";
+import { looksLikeClerkApiKey } from "../../../../lib/api-key-introspection";
 import { createBillingAdminClient } from "../../../../lib/billing-admin";
 import { decodeBridgeAccessToken } from "../../../../lib/bridge-session-auth";
 import {
@@ -200,6 +201,16 @@ export function createRuntimeStatusGetHandler(
 					mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
 					billingUnavailable: false,
 				});
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+
+			if (!looksLikeClerkApiKey(apiKey)) {
+				deps.telemetry.increment("runtime_status_invalid");
+				const response = NextResponse.json(
+					{ error: "Invalid bridge credential." },
+					{ status: 401 },
+				);
 				applyRateLimitHeaders(response.headers, budget);
 				return response;
 			}
