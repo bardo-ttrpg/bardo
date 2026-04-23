@@ -17,10 +17,7 @@ export const metadata = createPublicMetadata({
 export default function DataUsePage() {
 	return (
 		<LegalEntryContent entry={entry}>
-			<LegalSection
-				id="local-files"
-				title="Local files and workspace context"
-			>
+			<LegalSection id="local-files" title="Local files and workspace context">
 				<p>
 					Bardo is designed so your campaign files, notes, and other workspace
 					context can stay local. If a question depends on your local files, the
@@ -29,14 +26,12 @@ export default function DataUsePage() {
 				</p>
 				<p>
 					This product boundary is intentional: local campaign files stay local
-					by default. Bardo&apos;s hosted layer exists to support access and account
-					workflows, not to turn the website into a copy of your campaign data.
+					by default. Bardo&apos;s hosted layer exists to support access and
+					account workflows, not to turn the website into a copy of your
+					campaign data.
 				</p>
 			</LegalSection>
-			<LegalSection
-				id="hosted-service-data"
-				title="Hosted service data"
-			>
+			<LegalSection id="hosted-service-data" title="Hosted service data">
 				<p>
 					The hosted Bardo surface may receive and process account details,
 					session state, approval requests, subscription state, metering-related

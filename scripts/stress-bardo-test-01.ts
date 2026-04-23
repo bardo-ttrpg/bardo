@@ -19,7 +19,8 @@ type CommandResult = {
 };
 
 const SANDBOX_ROOT =
-	process.env.BARDO_STRESS_ROOT?.trim() || "/home/armando/projects/test-bardo-01";
+	process.env.BARDO_STRESS_ROOT?.trim() ||
+	"/home/armando/projects/test-bardo-01";
 const REPO_ROOT = "/home/armando/projects/bardo";
 const FIXTURE_ROOT = path.join(REPO_ROOT, "scripts", "stress-fixtures");
 const PACKAGE_JSON_PATH = path.join(
@@ -929,7 +930,7 @@ async function main() {
 				await copyFixture("ready", workspaceRoot);
 				await writeFile(
 					path.join(workspaceRoot, "oversized-notes.md"),
-					"# Oversized\n\n" + "lore ".repeat(140_000),
+					`# Oversized\n\n${"lore ".repeat(140_000)}`,
 					"utf8",
 				);
 				await writeFile(

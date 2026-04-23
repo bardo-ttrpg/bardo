@@ -14,9 +14,7 @@ export function TransitionLink({
 		<Link
 			{...props}
 			prefetch={prefetch}
-			transitionTypes={
-				transitionTypes.length > 0 ? transitionTypes : undefined
-			}
+			transitionTypes={transitionTypes.length > 0 ? transitionTypes : undefined}
 		/>
 	);
 }

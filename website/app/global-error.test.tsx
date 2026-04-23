@@ -12,7 +12,9 @@ describe("GlobalError", () => {
 		expect(globalErrorSource).not.toContain("siteReading.variable");
 		expect(globalErrorSource).not.toContain("siteUi.variable");
 		expect(globalErrorSource).not.toContain("siteCode.variable");
-		expect(globalErrorSource).toContain('className="bg-background text-foreground"');
+		expect(globalErrorSource).toContain(
+			'className="bg-background text-foreground"',
+		);
 		expect(globalErrorSource).toContain("Application Error");
 		expect(globalErrorSource).toContain("Something went wrong");
 		expect(globalErrorSource).toContain("Try again");
