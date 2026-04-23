@@ -3,7 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import NumberFlow, { continuous, NumberFlowGroup } from "@number-flow/react";
 import { CheckIcon, XIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import OptionalClerkProvider from "@/components/optional-clerk-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ const pricingToggleClassName =
 	"ui-button rounded-full px-4 py-2 text-sm transition-colors";
 const pricingPrimaryActionClassName =
 	"ui-button inline-flex w-full md:w-80 items-center justify-center rounded-full bg-primary px-5 py-2.5 text-primary-foreground transition-colors hover:bg-primary/90";
+const pricingActionSlotClassName = "flex min-h-24 flex-col justify-center";
 
 const pricingPros = [
 	"Understands your world before it acts.",
@@ -76,25 +77,6 @@ function PricingSwapText({
 				{value}
 			</span>
 		</Comp>
-	);
-}
-
-function PricingCtaLabel({
-	children,
-	labelKey,
-}: {
-	children: ReactNode;
-	labelKey: string;
-}) {
-	return (
-		<span className="relative inline-grid overflow-hidden">
-			<span
-				key={labelKey}
-				className="col-start-1 row-start-1 pricing-copy-swap"
-			>
-				{children}
-			</span>
-		</span>
 	);
 }
 
@@ -153,6 +135,8 @@ function PricingClientContent({
 		billingPeriod === "year"
 			? "Pay annually and save more on the same plan."
 			: "Pay monthly now and switch to annual later.";
+	const checkoutLabel =
+		billingPeriod === "month" ? "Start Pro Monthly" : "Start Pro Yearly";
 	const trialNote =
 		"Includes a 3-day free trial for first-time subscribers. Payment method required.";
 	const shouldManageCurrentPlan = shouldShowManageSubscription({
@@ -234,11 +218,8 @@ function PricingClientContent({
 							{shouldManageCurrentPlan ? (
 								<SubscriptionDetailsAction
 									className={pricingPrimaryActionClassName}
-									label={
-										<PricingCtaLabel labelKey={`manage-${billingPeriod}`}>
-											Manage Subscription
-										</PricingCtaLabel>
-									}
+									label="Manage Subscription"
+									slotClassName={pricingActionSlotClassName}
 								/>
 							) : !isLoaded && isSignedIn ? (
 								<Button
@@ -254,20 +235,9 @@ function PricingClientContent({
 									clerkEnabled={clerkEnabled}
 									clerkPlanId={clerkPlanId}
 									planPeriod={billingPeriod === "month" ? "month" : "annual"}
-									label={
-										<PricingCtaLabel
-											labelKey={
-												billingPeriod === "month"
-													? "start-pro-monthly"
-													: "start-pro-yearly"
-											}
-										>
-											{billingPeriod === "month"
-												? "Start Pro Monthly"
-												: "Start Pro Yearly"}
-										</PricingCtaLabel>
-									}
+									label={checkoutLabel}
 									className={pricingPrimaryActionClassName}
+									slotClassName={pricingActionSlotClassName}
 								/>
 							)}
 							<p className="font-reading-body text-sm text-muted-foreground">

@@ -7,6 +7,7 @@ import { TransitionLink } from "@/components/transition-link";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import type { ClerkPlanPeriod } from "@/lib/clerk-billing";
+import { cn } from "@/lib/utils";
 import {
 	resolveCheckoutPlanId,
 	resolveCheckoutRenderState,
@@ -19,6 +20,7 @@ type CheckoutButtonProps = {
 	planPeriod: ClerkPlanPeriod;
 	label: ReactNode;
 	className: string;
+	slotClassName?: string;
 };
 
 export default function CheckoutButton({
@@ -27,6 +29,7 @@ export default function CheckoutButton({
 	planPeriod,
 	label,
 	className,
+	slotClassName,
 }: CheckoutButtonProps) {
 	const planId = clerkPlanId ?? undefined;
 
@@ -44,6 +47,7 @@ export default function CheckoutButton({
 			planPeriod={planPeriod}
 			label={label}
 			className={className}
+			slotClassName={slotClassName}
 		/>
 	);
 }
@@ -53,11 +57,13 @@ function EnabledCheckoutButton({
 	planPeriod,
 	label,
 	className,
+	slotClassName,
 }: {
 	planId: string | undefined;
 	planPeriod: ClerkPlanPeriod;
 	label: ReactNode;
 	className: string;
+	slotClassName?: string;
 }) {
 	const { isLoaded, isSignedIn } = useAuth();
 	const {
@@ -89,7 +95,7 @@ function EnabledCheckoutButton({
 		isUnavailable,
 	});
 	return (
-		<div className="py-8">
+		<div className={cn("py-8", slotClassName)}>
 			{isResolvingPlan ? (
 				<>
 					<Button variant="ghost" className={className} disabled>

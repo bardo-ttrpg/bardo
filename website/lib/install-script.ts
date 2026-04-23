@@ -243,6 +243,51 @@ export function renderPowerShellInstallScript(): string {
 	return `Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Normalize-PathEntry {
+\tparam([string]$Value)
+\tif (-not $Value) {
+\t\treturn ''
+\t}
+\treturn ([System.IO.Path]::GetFullPath($Value)).TrimEnd('\\', '/')
+}
+
+function Test-PathListContains {
+\tparam(
+\t\t[string]$PathList,
+\t\t[Parameter(Mandatory = $true)][string]$Entry
+\t)
+\t$normalizedEntry = Normalize-PathEntry $Entry
+\tif (-not $normalizedEntry) {
+\t\treturn $false
+\t}
+\t$separatorPattern = [regex]::Escape([System.IO.Path]::PathSeparator)
+\tforeach ($candidate in (($PathList -split $separatorPattern) | Where-Object { $_ })) {
+\t\tif ((Normalize-PathEntry $candidate) -ieq $normalizedEntry) {
+\t\t\treturn $true
+\t\t}
+\t}
+\treturn $false
+}
+
+function Add-BardoBinToPath {
+\tparam([Parameter(Mandatory = $true)][string]$PathToAdd)
+\t$normalizedBinDir = Normalize-PathEntry $PathToAdd
+\t$separator = [System.IO.Path]::PathSeparator
+
+\tif (-not (Test-PathListContains $env:Path $normalizedBinDir)) {
+\t\t$env:Path = if ($env:Path) { "$normalizedBinDir$separator$env:Path" } else { $normalizedBinDir }
+\t}
+
+\t$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+\tif (-not (Test-PathListContains $userPath $normalizedBinDir)) {
+\t\t$nextUserPath = if ($userPath) { "$userPath$separator$normalizedBinDir" } else { $normalizedBinDir }
+\t\t[Environment]::SetEnvironmentVariable('Path', $nextUserPath, 'User')
+\t\tWrite-Host "Added $normalizedBinDir to your user PATH and current PowerShell session."
+\t} else {
+\t\tWrite-Host "$normalizedBinDir is already on your user PATH."
+\t}
+}
+
 function Require-Command {
 \tparam([Parameter(Mandatory = $true)][string]$Name)
 \tif (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
@@ -310,6 +355,7 @@ function Install-FromSource {
 "@
 \tSet-Content -LiteralPath (Join-Path $binDir 'bardo.cmd') -Value $wrapper -NoNewline
 \tSet-Content -LiteralPath (Join-Path $binDir 'bardo-mcp.cmd') -Value $wrapper -NoNewline
+\tAdd-BardoBinToPath $binDir
 \tWrite-Host "Bardo installed from source to $repoDir"
 \tWrite-Host "Source repository: $sourceRepo"
 }
@@ -327,7 +373,7 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 if ($installMode -eq 'source' -or $env:BARDO_INSTALL_REPO) {
 \tInstall-FromSource
 \tWrite-Host "Command shims written to $binDir"
-\tWrite-Host "If '$binDir' is not on your PATH, add it before running 'bardo login'."
+\tWrite-Host "You can run 'bardo login' in this PowerShell window. Restart other open terminals to pick up PATH changes."
 \treturn
 }
 
@@ -359,11 +405,12 @@ try {
 "@
 \tSet-Content -LiteralPath (Join-Path $binDir 'bardo.cmd') -Value $wrapper -NoNewline
 \tSet-Content -LiteralPath (Join-Path $binDir 'bardo-mcp.cmd') -Value $wrapper -NoNewline
+\tAdd-BardoBinToPath $binDir
 
 \tWrite-Host "Bardo release binary installed to $installedBinary"
 \tWrite-Host "Verified against $releaseBaseUrl/SHA256SUMS.txt"
 \tWrite-Host "Command shims written to $binDir"
-\tWrite-Host "If '$binDir' is not on your PATH, add it before running 'bardo login'."
+\tWrite-Host "You can run 'bardo login' in this PowerShell window. Restart other open terminals to pick up PATH changes."
 } finally {
 \tif (Test-Path $artifactPath) { Remove-Item -Force $artifactPath }
 \tif (Test-Path $checksumPath) { Remove-Item -Force $checksumPath }

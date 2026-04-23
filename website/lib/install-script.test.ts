@@ -51,6 +51,9 @@ describe("install scripts", () => {
 		expect(script).toContain("$repoUrl");
 		expect(script).toContain("bardo.cmd");
 		expect(script).toContain("bardo-v");
+		expect(script).toContain("Add-BardoBinToPath $binDir");
+		expect(script).toContain("[Environment]::SetEnvironmentVariable");
+		expect(script).toContain("current PowerShell session");
 	});
 
 	test("keeps the Bun source install path as an explicit fallback instead of the default path", () => {
