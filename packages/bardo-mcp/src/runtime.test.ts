@@ -312,7 +312,10 @@ describe("bardo runtime", () => {
 					if (String(input) === "https://example.com/mcp") {
 						throw new Error("Unexpected MCP fetch");
 					}
-					return new Response("ok", { status: 200 });
+					return new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					});
 				},
 			});
 
@@ -445,6 +448,110 @@ describe("bardo runtime", () => {
 			expect(saved.accountLabel).toBe("Armando");
 			expect(saved.plan).toBe("pro");
 			expect(pollCount).toBe(2);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("login refreshes stale saved credentials through browser approval", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const configPath = path.join(homeDir, ".config/bardo/config.json");
+		const stdout = createWriter();
+		let pollCount = 0;
+
+		try {
+			await mkdir(path.dirname(configPath), { recursive: true });
+			await writeFile(
+				configPath,
+				JSON.stringify(
+					{
+						version: 1,
+						apiKey: "stale-direct-key",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				env: {
+					BARDO_LOGIN_START_URL:
+						"https://www.bardo.gg/api/connect/bridge-session/start",
+				},
+				sleep: async () => {},
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "https://www.bardo.gg/api/connect/bridge-session/start") {
+						return new Response(
+							JSON.stringify({
+								sessionId: "refresh_session_123",
+								userCode: "RFRS-1234",
+								verificationUrl:
+									"https://www.bardo.gg/dashboard/connect/bridge/refresh_session_123",
+								pollUrl:
+									"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=refresh_session_123&pollSecret=poll_secret_123",
+								intervalMs: 1,
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					if (
+						url ===
+						"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=refresh_session_123&pollSecret=poll_secret_123"
+					) {
+						pollCount += 1;
+						return new Response(
+							JSON.stringify({
+								status: "approved",
+								accessToken: "fresh_bridge_access",
+								refreshToken: "fresh_bridge_refresh",
+								expiresAt: "2099-03-03T00:10:00.000Z",
+								mcpUrl: "http://127.0.0.1:3000/mcp",
+								statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
+								refreshUrl:
+									"https://www.bardo.gg/api/connect/bridge-session/refresh",
+								accountLabel: "Armando",
+								plan: "pro",
+								serverName: "bardo",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stdout.read()).toContain("refresh_session_123");
+			expect(pollCount).toBe(1);
+
+			const saved = JSON.parse(await readFile(configPath, "utf8")) as {
+				version: number;
+				accessToken?: string;
+				apiKey?: string;
+				refreshToken?: string;
+			};
+
+			expect(saved.version).toBe(2);
+			expect(saved.accessToken).toBe("fresh_bridge_access");
+			expect(saved.refreshToken).toBe("fresh_bridge_refresh");
+			expect(saved.apiKey).toBeUndefined();
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -1216,10 +1323,6 @@ describe("bardo runtime", () => {
 			expect(payload.account.mcpPeriodLimit).toBe(25000);
 			expect(calls).toEqual([
 				{
-					url: "http://127.0.0.1:3000/health",
-					auth: null,
-				},
-				{
 					url: "https://www.bardo.gg/api/connect/runtime-status",
 					auth: "Bearer test-key",
 				},
@@ -1228,6 +1331,140 @@ describe("bardo runtime", () => {
 					auth: null,
 				},
 			]);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor treats the default local MCP URL as a stdio bridge instead of an HTTP health endpoint", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "test-key",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const calls: string[] = [];
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async (input, init) => {
+					const url = String(input);
+					calls.push(url);
+					if (url === "https://www.bardo.gg/api/connect/runtime-status") {
+						const hasAuthorization = Boolean(
+							new Headers(init?.headers).get("authorization"),
+						);
+						return new Response(
+							JSON.stringify(
+								hasAuthorization
+									? {
+											valid: true,
+											subjectId: "user_123",
+											keyId: "key_123",
+											scopes: ["mcp"],
+											workspacePath: "./customers/user_123",
+											plan: "pro",
+											mcpPeriodLimit: 25000,
+											billingUnavailable: false,
+										}
+									: { valid: false, error: "Missing bridge credential." },
+							),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(0);
+			const payload = JSON.parse(stdout.read()) as {
+				connectivity: { health: { ok: boolean; status: number | null } };
+			};
+			expect(payload.connectivity.health).toMatchObject({
+				ok: true,
+				status: null,
+			});
+			expect(calls).not.toContain("http://127.0.0.1:3000/health");
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("doctor fails when runtime status rejects the saved credential", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+
+		try {
+			await mkdir(path.join(homeDir, ".config/bardo"), { recursive: true });
+			await writeFile(
+				path.join(homeDir, ".config/bardo/config.json"),
+				JSON.stringify(
+					{
+						apiKey: "stale-direct-key",
+						url: "http://127.0.0.1:3000/mcp",
+						statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
+						updatedAtISO: "2026-03-03T00:00:00.000Z",
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const exitCode = await runCli(["doctor", "--json"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr: createWriter(),
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "https://www.bardo.gg/api/connect/runtime-status") {
+						return new Response(
+							JSON.stringify({
+								valid: false,
+								error: "Invalid bridge credential.",
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(1);
+			const payload = JSON.parse(stdout.read()) as {
+				connectivity: { health: { ok: boolean } };
+				account: { ok: boolean; error: string | null };
+			};
+			expect(payload.connectivity.health.ok).toBe(true);
+			expect(payload.account.ok).toBe(false);
+			expect(payload.account.error).toBe("Invalid bridge credential.");
 		} finally {
 			await rm(homeDir, { recursive: true, force: true });
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -1833,6 +2070,15 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 				stderr: createWriter(),
 				fetch: async (input) => {
 					if (String(input) === "https://mcp-new.bardo.ai/health") {
+						return new Response(JSON.stringify({ ok: true }), {
+							status: 200,
+							headers: { "content-type": "application/json" },
+						});
+					}
+					if (
+						String(input) ===
+						"https://www.bardo.gg/api/connect/runtime-status"
+					) {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
 							headers: { "content-type": "application/json" },

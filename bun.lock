@@ -26,7 +26,7 @@
     },
     "packages/bardo-mcp": {
       "name": "@bardo/mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "bardo": "./bin/bardo.js",
         "bardo-mcp": "./bin/bardo-mcp.js",

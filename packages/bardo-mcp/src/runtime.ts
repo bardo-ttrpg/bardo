@@ -781,32 +781,18 @@ async function handleLogin(
 ): Promise<number> {
 	try {
 		const env = deps.env ?? process.env;
-		const existingConfig = await readConfig(resolveConfigPath(deps));
 		const explicitApiKey =
 			options.apiKey?.trim() || env.BARDO_API_KEY?.trim() || null;
 		const explicitRefreshToken = env.BARDO_REFRESH_TOKEN?.trim() || null;
 		const usingExplicitApiKey = explicitApiKey !== null;
-		let apiKey = explicitApiKey || resolveConfigAccessToken(existingConfig);
+		let apiKey = explicitApiKey;
 		let refreshToken = usingExplicitApiKey
 			? explicitRefreshToken
-			: explicitRefreshToken ||
-				(existingConfig?.version === 2 ? existingConfig.refreshToken : null);
-		let expiresAtISO =
-			usingExplicitApiKey || existingConfig?.version !== 2
-				? null
-				: existingConfig.expiresAtISO;
-		let refreshUrl =
-			usingExplicitApiKey || existingConfig?.version !== 2
-				? undefined
-				: existingConfig.refreshUrl;
-		let accountLabel =
-			usingExplicitApiKey || existingConfig?.version !== 2
-				? undefined
-				: existingConfig.accountLabel;
-		let plan =
-			usingExplicitApiKey || existingConfig?.version !== 2
-				? undefined
-				: existingConfig.plan;
+			: null;
+		let expiresAtISO: string | null = null;
+		let refreshUrl: string | undefined;
+		let accountLabel: string | undefined;
+		let plan: PlanTier | undefined;
 		let url =
 			options.url?.trim() || env.BARDO_MCP_URL?.trim() || DEFAULT_MCP_URL;
 		let serverName: string | undefined;
@@ -1300,8 +1286,10 @@ async function handleDoctor(
 			(report.client.configExists &&
 				report.client.configValid &&
 				report.client.hasBardoServer);
+		const accountHealthy = !report.account.fetched || report.account.ok;
 		return report.auth.configured &&
 			report.connectivity.health.ok &&
+			accountHealthy &&
 			clientHealthy
 			? 0
 			: 1;
@@ -2739,6 +2727,7 @@ async function checkAccountStatus(args: {
 			},
 		});
 		const payload = (await response.json().catch(() => ({}))) as Partial<{
+			ok: boolean;
 			valid: boolean;
 			keyId: string | null;
 			subjectId: string | null;
@@ -2750,7 +2739,8 @@ async function checkAccountStatus(args: {
 			error: string;
 		}>;
 
-		if (!response.ok || payload.valid !== true) {
+		const valid = payload.valid === true || payload.ok === true;
+		if (!response.ok || !valid) {
 			return {
 				fetched: true,
 				ok: false,
@@ -2837,6 +2827,15 @@ async function checkHealth(
 			ok: false,
 			status: null,
 			error: `MCP URL is not a valid URL: ${mcpUrl}`,
+		};
+	}
+
+	if (isLocalStdioMcpUrl(mcpUrl)) {
+		return {
+			url: mcpUrl,
+			ok: true,
+			status: null,
+			error: null,
 		};
 	}
 
@@ -2934,6 +2933,19 @@ function resolveHealthUrl(mcpUrl: string): string {
 	return url.toString();
 }
 
+function isLocalStdioMcpUrl(mcpUrl: string): boolean {
+	try {
+		const url = new URL(mcpUrl);
+		return (
+			(url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+			url.port === "3000" &&
+			url.pathname === "/mcp"
+		);
+	} catch {
+		return false;
+	}
+}
+
 function renderDoctorReport(report: DoctorOutput): string {
 	const lines = [
 		"Bardo doctor",
@@ -2946,7 +2958,9 @@ function renderDoctorReport(report: DoctorOutput): string {
 		`Workspace initialized: ${report.workspace.initialized ? "yes" : "no"}`,
 		`Health check: ${
 			report.connectivity.health.ok
-				? `ok (${report.connectivity.health.status})`
+				? report.connectivity.health.status === null
+					? "ok (local stdio)"
+					: `ok (${report.connectivity.health.status})`
 				: (report.connectivity.health.error ?? "failed")
 		}`,
 		`Website backend: ${
