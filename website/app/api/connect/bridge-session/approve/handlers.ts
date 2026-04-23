@@ -21,11 +21,19 @@ import {
 type BridgeSessionApproveDeps = {
 	resolveUserId: (
 		request: Request,
-	) => Promise<{ userId: string | null; response?: Response }>;
+	) => Promise<{
+		has?: (params: { plan?: string }) => boolean;
+		userId: string | null;
+		response?: Response;
+	}>;
 	readBillingSnapshot: (userId: string) => Promise<BillingSnapshot>;
 	approveSession: (args: {
 		sessionId: string;
 		payload: BridgeSessionCredentialBundle;
+	}) => Promise<{ ok: boolean; reason?: "missing" | "expired" | "consumed" }>;
+	denySession: (args: {
+		sessionId: string;
+		reason: string;
 	}) => Promise<{ ok: boolean; reason?: "missing" | "expired" | "consumed" }>;
 	createBridgeCredentials: (args: {
 		sessionId: string;
@@ -76,6 +84,9 @@ function hasSubscription(snapshot: BillingSnapshot): boolean {
 	return snapshot.plan === "pro";
 }
 
+const ACTIVE_PRO_REQUIRED_MESSAGE =
+	"An active Pro subscription is required before a bridge can connect to Bardo.";
+
 const defaultDeps: BridgeSessionApproveDeps = {
 	resolveUserId: async (request) => {
 		void request;
@@ -85,6 +96,11 @@ const defaultDeps: BridgeSessionApproveDeps = {
 		await createBillingAdminClient().readBillingSnapshot(userId),
 	approveSession: async (args) =>
 		getDefaultCliDeviceSessionService().approve(args),
+	denySession: async (args) =>
+		getDefaultCliDeviceSessionService().deny({
+			sessionId: args.sessionId,
+			error: args.reason,
+		}),
 	createBridgeCredentials: async (args) =>
 		await createBridgeSessionCredentialBundle({
 			sessionId: args.sessionId,
@@ -128,12 +144,19 @@ export function createBridgeSessionApprovePostHandler(
 
 		try {
 			const billing = await deps.readBillingSnapshot(authState.userId);
-			if (!hasSubscription(billing) || billing.billingUnavailable) {
+			const hasProEntitlement = authState.has?.({ plan: "pro" }) ?? false;
+			const effectivePlan = hasSubscription(billing) || hasProEntitlement
+				? "pro"
+				: billing.plan;
+			if (effectivePlan !== "pro" || billing.billingUnavailable) {
+				await deps.denySession({
+					sessionId,
+					reason: ACTIVE_PRO_REQUIRED_MESSAGE,
+				});
 				deps.telemetry.increment("bridge_session_approve_rejected");
 				return NextResponse.json(
 					{
-						error:
-							"An active subscription is required before a bridge can connect to Bardo.",
+						error: ACTIVE_PRO_REQUIRED_MESSAGE,
 					},
 					{ status: 403 },
 				);
@@ -143,7 +166,7 @@ export function createBridgeSessionApprovePostHandler(
 			const payload = await deps.createBridgeCredentials({
 				sessionId,
 				userId: authState.userId,
-				plan: billing.plan,
+				plan: effectivePlan,
 				now,
 				statusUrl: deps.resolveStatusUrl(request),
 				refreshUrl: deps.resolveRefreshUrl(request),

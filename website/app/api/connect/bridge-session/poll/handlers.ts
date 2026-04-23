@@ -25,6 +25,7 @@ type BridgeSessionPollDeps = {
 	}) => Promise<
 		| { status: "pending"; intervalMs: number }
 		| { status: "approved"; payload: Record<string, unknown> }
+		| { status: "denied"; error: string }
 		| { status: "expired" | "consumed" | "invalid" }
 	>;
 	telemetry: ConnectTelemetry;
@@ -84,6 +85,15 @@ export function createBridgeSessionPollGetHandler(
 					status: "pending",
 					intervalMs: result.intervalMs,
 				});
+				applyRateLimitHeaders(response.headers, budget);
+				return response;
+			}
+			if (result.status === "denied") {
+				deps.telemetry.increment("bridge_session_poll_rejected");
+				const response = NextResponse.json(
+					{ error: result.error },
+					{ status: 403 },
+				);
 				applyRateLimitHeaders(response.headers, budget);
 				return response;
 			}

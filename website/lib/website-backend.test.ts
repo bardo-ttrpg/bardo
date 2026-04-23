@@ -174,6 +174,44 @@ describe("createWebsiteBackendClient", () => {
 		}
 	});
 
+	test("persists device session denial so polling stops after failed browser approval", async () => {
+		const root = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-website-backend-"),
+		);
+		const sqlitePath = path.join(root, "backend.sqlite");
+
+		try {
+			const starter = createRequiredWebsiteBackendClient(sqlitePath);
+			const approver = createRequiredWebsiteBackendClient(sqlitePath);
+			const poller = createRequiredWebsiteBackendClient(sqlitePath);
+
+			const started = await starter.startCliDeviceSession({
+				now: new Date("2036-03-25T00:00:00.000Z"),
+				ttlMs: 60_000,
+				intervalMs: 3000,
+			});
+			const denied = await approver.denyCliDeviceSession({
+				sessionId: started.sessionId,
+				deniedAtISO: "2036-03-25T00:00:10.000Z",
+				error:
+					"An active Pro subscription is required before a bridge can connect to Bardo.",
+			});
+			const polled = await poller.pollCliDeviceSession({
+				sessionId: started.sessionId,
+				pollSecret: started.pollSecret,
+			});
+
+			expect(denied).toEqual({ ok: true });
+			expect(polled).toEqual({
+				status: "denied",
+				error:
+					"An active Pro subscription is required before a bridge can connect to Bardo.",
+			});
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rotates bridge refresh tokens and rejects replay of stale refresh tokens", async () => {
 		const root = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-website-backend-"),

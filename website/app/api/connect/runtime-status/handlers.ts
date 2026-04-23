@@ -199,7 +199,11 @@ export function createRuntimeStatusGetHandler(
 					clerk,
 					bridgeToken.userId,
 				);
-				if (!plan || billingUnavailable || plan === "free") {
+				const effectivePlan =
+					plan === "pro" || (!billingUnavailable && bridgeToken.plan === "pro")
+						? "pro"
+						: plan;
+				if (!effectivePlan || billingUnavailable || effectivePlan === "free") {
 					deps.telemetry.increment("runtime_status_invalid");
 					const response = createInvalidRuntimeStatusResponse({
 						error: "Bridge session no longer has an active subscription.",
@@ -214,8 +218,8 @@ export function createRuntimeStatusGetHandler(
 					keyId: `bridge:${bridgeToken.sessionId}`,
 					scopes: ["mcp"],
 					workspacePath: null,
-					plan,
-					mcpPeriodLimit: deps.mcpPeriodLimitResolver(plan),
+					plan: effectivePlan,
+					mcpPeriodLimit: deps.mcpPeriodLimitResolver(effectivePlan),
 					billingUnavailable: false,
 				});
 				applyRateLimitHeaders(response.headers, budget);

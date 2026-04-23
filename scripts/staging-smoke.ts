@@ -252,7 +252,7 @@ async function expectUnpaidBridgeDenial(args: {
 		ok:
 			approval.response.status === 403 &&
 			approval.json.error ===
-				"An active paid plan is required before a bridge can connect to Bardo.",
+				"An active Pro subscription is required before a bridge can connect to Bardo.",
 		details: `${approval.response.status} ${approval.json.error ?? "missing error"}`,
 	};
 }

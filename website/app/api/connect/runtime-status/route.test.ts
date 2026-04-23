@@ -150,6 +150,52 @@ describe("GET /api/connect/runtime-status", () => {
 		});
 	});
 
+	test("keeps a fresh pro bridge token valid when the live billing snapshot lags", async () => {
+		const handler = createRuntimeStatusGetHandler({
+			consumeBudget: async () => ({
+				allowed: true,
+				retryAfterSeconds: 60,
+				limit: 120,
+				remaining: 119,
+				resetEpochSeconds: 1_800_000_000,
+			}),
+			decodeBridgeToken: async () => ({
+				sessionId: "bridge_session_123",
+				userId: "user_123",
+				plan: "pro",
+				accountLabel: "Armando",
+			}),
+			createClerkClient: async () => ({
+				apiKeys: {
+					verify: async () => {
+						throw new Error("should not verify Clerk API keys");
+					},
+				},
+			}),
+			resolvePlanForSubject: async () => ({
+				plan: "free",
+				billingUnavailable: false,
+			}),
+			mcpPeriodLimitResolver: (plan) => {
+				expect(plan).toBe("pro");
+				return 25_000;
+			},
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/runtime-status", {
+				headers: {
+					authorization: "Bearer bridge_access_token",
+				},
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.valid).toBe(true);
+		expect(body.plan).toBe("pro");
+	});
+
 	test("rejects requests without a bridge credential", async () => {
 		const handler = createRuntimeStatusGetHandler();
 

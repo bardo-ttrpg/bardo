@@ -3,7 +3,7 @@ import { BackendAvailabilityError } from "./backend-availability";
 import type { BridgeSessionCredentialBundle } from "./bridge-session-auth";
 import { createWebsiteBackendClient } from "./website-backend";
 
-type DeviceSessionStatus = "pending" | "approved" | "consumed";
+type DeviceSessionStatus = "pending" | "approved" | "consumed" | "denied";
 
 type DeviceSessionRecord = {
 	sessionId: string;
@@ -13,6 +13,8 @@ type DeviceSessionRecord = {
 	createdAtISO: string;
 	expiresAtISO: string;
 	approvedAtISO?: string;
+	deniedAtISO?: string;
+	denialError?: string;
 	payload?: BridgeSessionCredentialBundle;
 };
 
@@ -27,9 +29,14 @@ type StartSessionResult = {
 type PollSessionResult =
 	| { status: "pending"; intervalMs: number }
 	| { status: "approved"; payload: BridgeSessionCredentialBundle }
+	| { status: "denied"; error: string }
 	| { status: "expired" | "consumed" | "invalid" };
 
 type ApproveSessionResult =
+	| { ok: true }
+	| { ok: false; reason: "missing" | "expired" | "consumed" };
+
+type DenySessionResult =
 	| { ok: true }
 	| { ok: false; reason: "missing" | "expired" | "consumed" };
 
@@ -48,6 +55,10 @@ type CliDeviceSessionStore = {
 		sessionId: string;
 		payload: BridgeSessionCredentialBundle;
 	}): Promise<ApproveSessionResult>;
+	denySession(args: {
+		sessionId: string;
+		error: string;
+	}): Promise<DenySessionResult>;
 };
 
 type CliDeviceSessionServiceOptions = {
@@ -126,6 +137,11 @@ function createDefaultStore(
 			payload: BridgeSessionCredentialBundle;
 			approvedAtISO: string;
 		}): Promise<ApproveSessionResult>;
+		denyCliDeviceSession(args: {
+			sessionId: string;
+			error: string;
+			deniedAtISO: string;
+		}): Promise<DenySessionResult>;
 	} | null;
 	if (!websiteBackend) {
 		throw new CliDeviceSessionStoreError(
@@ -145,6 +161,12 @@ function createDefaultStore(
 				sessionId: args.sessionId,
 				payload: args.payload,
 				approvedAtISO: new Date().toISOString(),
+			}),
+		denySession: async (args) =>
+			await websiteBackend.denyCliDeviceSession({
+				sessionId: args.sessionId,
+				error: args.error,
+				deniedAtISO: new Date().toISOString(),
 			}),
 	};
 }
@@ -267,6 +289,12 @@ export function createCliDeviceSessionService(
 			if (record.status === "pending") {
 				return { status: "pending", intervalMs };
 			}
+			if (record.status === "denied") {
+				return {
+					status: "denied",
+					error: record.denialError ?? "Bridge approval was denied.",
+				};
+			}
 			if (record.status === "consumed") {
 				return { status: "consumed" };
 			}
@@ -303,6 +331,35 @@ export function createCliDeviceSessionService(
 			record.status = "approved";
 			record.approvedAtISO = current.toISOString();
 			record.payload = args.payload;
+			sessions.set(args.sessionId, record);
+			return { ok: true };
+		},
+
+		async deny(args: {
+			sessionId: string;
+			error: string;
+		}): Promise<DenySessionResult> {
+			const current = now();
+			cleanupExpired(current);
+
+			if (store) {
+				return await requireStore().denySession(args);
+			}
+
+			const record = sessions.get(args.sessionId) ?? null;
+			if (!record) {
+				return { ok: false, reason: "missing" };
+			}
+			if (Date.parse(record.expiresAtISO) <= current.getTime()) {
+				sessions.delete(args.sessionId);
+				return { ok: false, reason: "expired" };
+			}
+			if (record.status === "consumed") {
+				return { ok: false, reason: "consumed" };
+			}
+			record.status = "denied";
+			record.deniedAtISO = current.toISOString();
+			record.denialError = args.error;
 			sessions.set(args.sessionId, record);
 			return { ok: true };
 		},

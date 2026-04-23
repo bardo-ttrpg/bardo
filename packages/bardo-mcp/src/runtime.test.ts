@@ -454,6 +454,75 @@ describe("bardo runtime", () => {
 		}
 	});
 
+	test("login stops polling when browser approval is denied", async () => {
+		const homeDir = await createTempDir("bardo-home-");
+		const workspaceRoot = await createTempDir("bardo-workspace-");
+		const stdout = createWriter();
+		const stderr = createWriter();
+		let pollCount = 0;
+
+		try {
+			const exitCode = await runCli(["login"], {
+				cwd: workspaceRoot,
+				homeDir,
+				stdout,
+				stderr,
+				env: {
+					BARDO_LOGIN_START_URL:
+						"https://www.bardo.gg/api/connect/bridge-session/start",
+				},
+				sleep: async () => {},
+				fetch: async (input) => {
+					const url = String(input);
+					if (url === "https://www.bardo.gg/api/connect/bridge-session/start") {
+						return new Response(
+							JSON.stringify({
+								sessionId: "cli_session_denied",
+								userCode: "DENY-1234",
+								verificationUrl:
+									"https://www.bardo.gg/dashboard/connect/bridge/cli_session_denied",
+								pollUrl:
+									"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_denied&pollSecret=poll_secret_denied",
+								intervalMs: 1,
+							}),
+							{
+								status: 200,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					if (
+						url ===
+						"https://www.bardo.gg/api/connect/bridge-session/poll?sessionId=cli_session_denied&pollSecret=poll_secret_denied"
+					) {
+						pollCount += 1;
+						return new Response(
+							JSON.stringify({
+								error:
+									"An active Pro subscription is required before a bridge can connect to Bardo.",
+							}),
+							{
+								status: 403,
+								headers: { "content-type": "application/json" },
+							},
+						);
+					}
+					throw new Error(`Unexpected URL ${url}`);
+				},
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stdout.read()).toContain(
+				"https://www.bardo.gg/dashboard/connect/bridge/cli_session_denied",
+			);
+			expect(stderr.read()).toContain("active Pro subscription");
+			expect(pollCount).toBe(1);
+		} finally {
+			await rm(homeDir, { recursive: true, force: true });
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("login refreshes stale saved credentials through browser approval", async () => {
 		const homeDir = await createTempDir("bardo-home-");
 		const workspaceRoot = await createTempDir("bardo-workspace-");

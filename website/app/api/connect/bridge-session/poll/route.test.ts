@@ -97,6 +97,26 @@ describe("GET /api/connect/bridge-session/poll", () => {
 		});
 	});
 
+	test("returns the denial reason when browser approval fails", async () => {
+		const handler = createBridgeSessionPollGetHandler({
+			pollSession: async () => ({
+				status: "denied",
+				error:
+					"An active Pro subscription is required before a bridge can connect to Bardo.",
+			}),
+		});
+
+		const response = await handler(
+			new Request(
+				"https://app.bardo.ai/api/connect/bridge-session/poll?sessionId=bridge_session_123&pollSecret=poll_secret_123",
+			),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(403);
+		expect(body.error).toContain("active Pro subscription");
+	});
+
 	test("returns a structured 500 when session polling storage fails", async () => {
 		const handler = createBridgeSessionPollGetHandler({
 			pollSession: async () => {

@@ -18,9 +18,14 @@ type LoginConsumeResult =
 type PollSessionResult =
 	| { status: "pending"; intervalMs: number }
 	| { status: "approved"; payload: BridgeSessionCredentialBundle }
+	| { status: "denied"; error: string }
 	| { status: "expired" | "consumed" | "invalid" };
 
 type ApproveSessionResult =
+	| { ok: true }
+	| { ok: false; reason: "missing" | "expired" | "consumed" };
+
+type DenySessionResult =
 	| { ok: true }
 	| { ok: false; reason: "missing" | "expired" | "consumed" };
 
@@ -48,10 +53,12 @@ type BackendState = {
 		{
 			pollSecretHash: string;
 			userCode: string;
-			status: "pending" | "approved" | "consumed";
+			status: "pending" | "approved" | "consumed" | "denied";
 			createdAtISO: string;
 			expiresAtISO: string;
 			approvedAtISO?: string;
+			deniedAtISO?: string;
+			denialError?: string;
 			payload?: BridgeSessionCredentialBundle;
 			intervalMs: number;
 		}
@@ -357,6 +364,12 @@ export function createWebsiteBackendClient(
 						intervalMs: record.intervalMs,
 					};
 				}
+				if (record.status === "denied") {
+					return {
+						status: "denied" as const,
+						error: record.denialError ?? "Bridge approval was denied.",
+					};
+				}
 				if (record.status === "consumed") {
 					return { status: "consumed" as const };
 				}
@@ -394,6 +407,29 @@ export function createWebsiteBackendClient(
 					refreshTokenHash: hashSecret(args.payload.refreshToken),
 					updatedAtISO: args.approvedAtISO,
 				};
+				return { ok: true as const };
+			});
+		},
+
+		async denyCliDeviceSession(args: {
+			sessionId: string;
+			error: string;
+			deniedAtISO: string;
+		}): Promise<DenySessionResult> {
+			return await mutateState(backendPath, (state) => {
+				const record = state.cliDeviceSessions[args.sessionId];
+				if (!record) {
+					return { ok: false, reason: "missing" as const };
+				}
+				if (Date.parse(record.expiresAtISO) <= Date.now()) {
+					return { ok: false, reason: "expired" as const };
+				}
+				if (record.status === "consumed") {
+					return { ok: false, reason: "consumed" as const };
+				}
+				record.status = "denied";
+				record.deniedAtISO = args.deniedAtISO;
+				record.denialError = args.error;
 				return { ok: true as const };
 			});
 		},

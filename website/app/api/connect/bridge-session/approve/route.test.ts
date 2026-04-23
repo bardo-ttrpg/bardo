@@ -62,9 +62,64 @@ describe("POST /api/connect/bridge-session/approve", () => {
 		expect(body.ok).toBe(true);
 	});
 
-	test("rejects approval when the user does not have an active subscription", async () => {
+	test("approves when Clerk plan entitlement is active but the billing snapshot lags", async () => {
 		const handler = createBridgeSessionApprovePostHandler({
-			resolveUserId: async () => ({ userId: "user_123" }),
+			resolveUserId: async () => ({
+				userId: "user_123",
+				has: ({ plan }) => plan === "pro",
+			}),
+			readBillingSnapshot: async () => ({
+				billingUnavailable: false,
+				plan: "free",
+				creditsTotal: 100,
+				creditsUsed: 0,
+				creditsRemaining: 100,
+				periodStart: 0,
+				mcpCallsTotal: 0,
+				mcpCallsThisPeriod: 0,
+				subscriptionStatus: "active",
+				subscriptionId: null,
+				billingInterval: null,
+				currentPeriodEnd: null,
+				cancelAtPeriodEnd: false,
+			}),
+			createBridgeCredentials: async ({ plan }) => {
+				expect(plan).toBe("pro");
+				return {
+					accessToken: "bridge_access",
+					refreshToken: "bridge_refresh",
+					expiresAt: "2099-03-03T00:10:00.000Z",
+					statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+					refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
+					plan: "pro",
+					accountLabel: "Armando",
+					serverName: "bardo",
+					issuedAtISO: "2099-03-03T00:00:00.000Z",
+				};
+			},
+			approveSession: async () => ({ ok: true }),
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/bridge-session/approve", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ sessionId: "bridge_session_123" }),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.ok).toBe(true);
+	});
+
+	test("rejects approval and denies the pending session when the user does not have an active subscription", async () => {
+		let deniedSessionId: string | null = null;
+		const handler = createBridgeSessionApprovePostHandler({
+			resolveUserId: async () => ({
+				userId: "user_123",
+				has: () => false,
+			}),
 			readBillingSnapshot: async () => ({
 				billingUnavailable: false,
 				plan: "free",
@@ -80,11 +135,16 @@ describe("POST /api/connect/bridge-session/approve", () => {
 				currentPeriodEnd: null,
 				cancelAtPeriodEnd: false,
 			}),
+			createBridgeCredentials: async () => {
+				throw new Error("should not mint bridge credentials");
+			},
 			approveSession: async () => {
 				throw new Error("should not approve");
 			},
-			createBridgeCredentials: async () => {
-				throw new Error("should not mint bridge credentials");
+			denySession: async ({ sessionId, reason }) => {
+				deniedSessionId = sessionId;
+				expect(reason).toContain("active Pro subscription");
+				return { ok: true };
 			},
 		});
 
@@ -98,7 +158,8 @@ describe("POST /api/connect/bridge-session/approve", () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(403);
-		expect(body.error).toContain("active subscription");
+		expect(body.error).toContain("active Pro subscription");
+		expect(deniedSessionId).toBe("bridge_session_123");
 	});
 
 	test("returns a structured 500 when bridge credential issuance fails", async () => {
