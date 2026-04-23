@@ -14,14 +14,34 @@ export const landingPageKeywords = [
 export const homeSeo = {
 	title: siteConfig.name,
 	description:
-		"Play solo tabletop role-playing games with an AI-guided game master replacement that keeps your campaign files local and grounded in your world.",
+		"Play solo tabletop role-playing games with a local-first AI game master that keeps campaign files on your machine and grounded in your world.",
 	socialDescription:
 		"Bardo connects your AI client to local campaign files so you can play solo tabletop RPGs with a grounded AI game master and no human GM at the table.",
 	keywords: landingPageKeywords,
 } as const;
 
+export const pricingSeo = {
+	title: "Pricing",
+	description:
+		"Choose monthly or yearly Bardo Solo billing for a local-first tabletop RPG MCP with grounded world state, hosted account access, and bridge approvals.",
+	socialDescription:
+		"See monthly and yearly Bardo Solo pricing for a local-first tabletop RPG MCP that keeps campaign truth on your machine.",
+	keywords: [
+		...landingPageKeywords,
+		"Bardo pricing",
+		"TTRPG MCP pricing",
+		"AI game master pricing",
+	],
+} as const;
+
 export function getLandingPageJsonLd() {
 	return [
+		{
+			"@context": "https://schema.org",
+			"@type": "Organization",
+			name: siteConfig.publisher,
+			url: siteConfig.url,
+		},
 		{
 			"@context": "https://schema.org",
 			"@type": "WebSite",
@@ -52,6 +72,36 @@ export function getLandingPageJsonLd() {
 			image: absoluteUrl("/opengraph-image"),
 		},
 	] as const;
+}
+
+export function getPricingPageJsonLd() {
+	return {
+		"@context": "https://schema.org",
+		"@type": "SoftwareApplication",
+		name: `${siteConfig.name} Solo`,
+		url: absoluteUrl("/pricing"),
+		description: pricingSeo.description,
+		applicationCategory: "GameApplication",
+		operatingSystem: "Web, macOS, Windows, Linux",
+		offers: [
+			{
+				"@type": "Offer",
+				priceCurrency: "USD",
+				price: "20",
+				name: "Bardo Solo Monthly",
+				category: "Monthly subscription",
+				url: absoluteUrl("/pricing"),
+			},
+			{
+				"@type": "Offer",
+				priceCurrency: "USD",
+				price: "192",
+				name: "Bardo Solo Yearly",
+				category: "Yearly subscription",
+				url: absoluteUrl("/pricing"),
+			},
+		],
+	} as const;
 }
 
 export function getDocsBreadcrumbJsonLd(entry: {

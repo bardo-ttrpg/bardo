@@ -6,6 +6,7 @@ Bardo keeps your campaign on your machine. Your workspace is the source of truth
 - Prepare the workspace with `bardo login`, `bardo init`, and `bardo connect`.
 - Build a local `.bardo/` prep layer that keeps play grounded in your files.
 - Keep account, approval, and billing logic outside your campaign files.
+- Give the connected client a local MCP endpoint plus workspace skill guidance without turning Bardo into a hosted gameplay service.
 
 ## Recommended path
 
@@ -18,6 +19,8 @@ Bardo keeps your campaign on your machine. Your workspace is the source of truth
 7. Open your AI client and start from the workspace you just prepared.
 
 Expected result: you should have a `.bardo/` folder, a readiness file, and a connected client that can work from the local campaign context instead of guessing.
+
+The browser approval and hosted website exist so Bardo can verify account access, subscription state, and bridge approvals. Your campaign truth and local runtime state still stay on your machine.
 
 `rulebook.md` on its own is enough to make Bardo safe and conservative, but not enough to create a rich world automatically. If your campaign notes are still thin, expect `ready-with-gaps` and simpler play until you add more grounded source material.
 

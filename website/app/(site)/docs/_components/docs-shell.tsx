@@ -128,7 +128,7 @@ function DocsShellFrame({
 							BARDO
 						</TransitionLink>
 					</div>
-					<div className="space-y-3">
+					<search className="flex flex-col gap-3">
 						<div className="relative">
 							<SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 							<SidebarInput
@@ -142,36 +142,37 @@ function DocsShellFrame({
 								className="h-8 rounded-sm border-sidebar-border pl-8"
 							/>
 						</div>
-					</div>
+					</search>
 				</SidebarHeader>
 				<SidebarContent>
 					{hasSearchResults ? (
 						<SidebarGroup className="px-2 py-3">
 							<SidebarGroupLabel>Search Results</SidebarGroupLabel>
-							<div className="mt-3 space-y-1">
+							<ul className="mt-3 flex flex-col gap-1">
 								{searchResults.length > 0 ? (
 									searchResults.map((entry) => (
-										<TransitionLink
-											key={entry.href}
-											href={entry.href}
-											className="block rounded-lg px-3 py-2 transition-colors hover:bg-sidebar-accent"
-										>
-											<p className="ui-nav text-sidebar-foreground">
-												{entry.matchLabel}
-											</p>
-											<p className="font-reading-body text-sm text-muted-foreground">
-												{entry.kind === "section"
-													? `${entry.description} · ${entry.groupLabel}`
-													: `${entry.groupLabel} · ${entry.description}`}
-											</p>
-										</TransitionLink>
+										<li key={entry.href}>
+											<TransitionLink
+												href={entry.href}
+												className="block rounded-lg px-3 py-2 transition-colors hover:bg-sidebar-accent"
+											>
+												<p className="ui-nav text-sidebar-foreground">
+													{entry.matchLabel}
+												</p>
+												<p className="font-reading-body text-sm text-muted-foreground">
+													{entry.kind === "section"
+														? `${entry.description} · ${entry.groupLabel}`
+														: `${entry.groupLabel} · ${entry.description}`}
+												</p>
+											</TransitionLink>
+										</li>
 									))
 								) : (
-									<p className="font-reading-body px-3 text-sm text-muted-foreground">
+									<li className="font-reading-body px-3 text-sm text-muted-foreground">
 										No docs matched that search yet.
-									</p>
+									</li>
 								)}
-							</div>
+							</ul>
 						</SidebarGroup>
 					) : (
 						groups.map((group) => (
@@ -215,23 +216,25 @@ function DocsShellFrame({
 				</SidebarContent>
 			</Sidebar>
 			<SidebarInset className="min-w-0 bg-background">
-				<div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur sm:px-6 md:hidden">
+				<header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur sm:px-6 md:hidden">
 					<SidebarTrigger />
 					<div className="min-w-0">
 						<p className="ui-label">Documentation</p>
 					</div>
-				</div>
-				<div className="mx-auto flex w-full max-w-[92rem] flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-					<div className="grid min-w-0 gap-12 xl:grid-cols-[minmax(0,48rem)_15rem] xl:items-start">
+				</header>
+				<main className="mx-auto flex w-full max-w-[92rem] flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+					<section className="grid min-w-0 gap-12 xl:grid-cols-[minmax(0,48rem)_15rem] xl:items-start">
 						<BardoViewTransition name="bardo-page-region">
-							<div className="min-w-0">{children}</div>
+							<article className="bardo-page-region min-w-0">
+								{children}
+							</article>
 						</BardoViewTransition>
 						<aside className="bardo-persistent-surface hidden xl:block">
-							<div className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
+							<section className="sticky top-8 rounded-2xl border border-border bg-muted/20 p-5">
 								<p className="ui-label">On this page</p>
 								{activeEntry?.sections.length ? (
 									<nav aria-label="On this page" className="mt-4">
-										<ul className="space-y-1.5">
+										<ul className="flex flex-col gap-1.5">
 											{activeEntry.sections.map((section) => (
 												<li key={section.id}>
 													<TransitionLink
@@ -250,10 +253,10 @@ function DocsShellFrame({
 										This page has no section links yet.
 									</p>
 								)}
-							</div>
+							</section>
 						</aside>
-					</div>
-				</div>
+					</section>
+				</main>
 			</SidebarInset>
 		</div>
 	);

@@ -28,9 +28,9 @@ export default function DataUsePage() {
 					website.
 				</p>
 				<p>
-					This product boundary is intentional: Bardo&apos;s hosted layer exists to
-					support access and account workflows, not to turn the website into a
-					copy of your local campaign data.
+					This product boundary is intentional: local campaign files stay local
+					by default. Bardo&apos;s hosted layer exists to support access and account
+					workflows, not to turn the website into a copy of your campaign data.
 				</p>
 			</LegalSection>
 			<LegalSection
@@ -68,8 +68,9 @@ export default function DataUsePage() {
 					system, or cloud platform you may choose to use alongside Bardo.
 				</p>
 				<p>
-					If you need a simpler rule, use this one: local files stay local to
-					Bardo unless you deliberately connect them to another tool or service.
+					If you need a simpler rule, use this one: local campaign files stay
+					local to Bardo unless you deliberately connect them to another tool or
+					service yourself.
 				</p>
 			</LegalSection>
 		</LegalEntryContent>

@@ -6,6 +6,8 @@ import {
 	bootstrapCampaignWorkspace,
 	type CampaignBootstrapReadiness,
 } from "./campaign-bootstrap";
+import { computeStateHash } from "./runtime-contracts";
+import { replayCommittedState } from "./runtime-tools";
 import { resolveBardoRoot } from "./workspace";
 
 describe("bootstrapCampaignWorkspace", () => {
@@ -320,6 +322,202 @@ describe("bootstrapCampaignWorkspace", () => {
 			expect(trackingProfile.light).toEqual(
 				expect.arrayContaining(["npcContinuity"]),
 			);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("writes versioned identity-rich artifacts with minimal world simulation metadata", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-campaign-bootstrap-"),
+		);
+		const bardoRoot = resolveBardoRoot(workspaceRoot);
+
+		try {
+			await mkdir(path.join(bardoRoot, "rules/normalized"), {
+				recursive: true,
+			});
+			await writeFile(
+				path.join(bardoRoot, "rules/normalized/index.json"),
+				JSON.stringify({
+					recommendedSimulationDepth: "deep",
+					sections: [{ title: "Downtime", tags: ["faction", "time"] }],
+				}),
+				"utf8",
+			);
+			await writeFile(
+				path.join(workspaceRoot, "session-14.md"),
+				[
+					"# Session 14",
+					"",
+					"Current location: Ash Court",
+					"Active quest: Find the ferryman before the eclipse.",
+					"Faction in play: Guild of Keys",
+					"Faction consequence: Guild of Keys tightened patrols in Ash Court.",
+					"NPC attitude: Mira -> wary",
+					"Clock progress: Eclipse Clock advanced to 2/6.",
+				].join("\n"),
+				"utf8",
+			);
+
+			const result = await bootstrapCampaignWorkspace({
+				workspaceRoot,
+				bardoRoot,
+				nowIso: "2026-04-10T12:00:00.000Z",
+			});
+
+			const entities = JSON.parse(
+				await readFile(path.join(bardoRoot, result.entitiesPath), "utf8"),
+			) as {
+				schemaVersion?: number;
+				records?: {
+					characters?: Array<{
+						id: string;
+						name: string;
+						aliases: string[];
+						sourcePaths: string[];
+					}>;
+					locations?: Array<{
+						id: string;
+						name: string;
+						aliases: string[];
+						sourcePaths: string[];
+					}>;
+				};
+			};
+			expect(entities.schemaVersion).toBe(2);
+			expect(entities.records?.characters).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: "character:mira",
+						name: "Mira",
+						aliases: ["Mira"],
+						sourcePaths: ["session-14.md"],
+					}),
+				]),
+			);
+			expect(entities.records?.locations).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: "location:ash-court",
+						name: "Ash Court",
+						aliases: ["Ash Court"],
+						sourcePaths: ["session-14.md"],
+					}),
+				]),
+			);
+
+			const currentState = JSON.parse(
+				await readFile(path.join(bardoRoot, result.currentStatePath), "utf8"),
+			) as {
+				schemaVersion?: number;
+				worldTime?: {
+					currentDateTimeISO: string;
+					lastAdvancedByEventId: string | null;
+				};
+				activeClocks?: Array<{
+					id: string;
+					name: string;
+					progress: string;
+					confidence: string;
+				}>;
+				unresolvedConsequences?: string[];
+				factionPressure?: Record<string, number>;
+				fieldMetadata?: {
+					currentLocation?: {
+						entityId: string;
+						confidence: string;
+						provenance: {
+							sourceType: string;
+							sourcePath: string;
+						};
+					};
+				};
+			};
+			expect(currentState.schemaVersion).toBe(2);
+			expect(currentState.worldTime).toEqual({
+				currentDateTimeISO: "2026-04-10T12:00:00.000Z",
+				lastAdvancedByEventId: null,
+			});
+			expect(currentState.activeClocks).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: "clock:eclipse-clock",
+						name: "Eclipse Clock",
+						progress: "Eclipse Clock advanced to 2/6.",
+						confidence: "validated-derived",
+					}),
+				]),
+			);
+			expect(currentState.unresolvedConsequences).toEqual(
+				expect.arrayContaining([
+					"Guild of Keys tightened patrols in Ash Court.",
+				]),
+			);
+			expect(currentState.factionPressure).toMatchObject({
+				"faction:guild-of-keys": 1,
+			});
+			expect(currentState.fieldMetadata?.currentLocation).toMatchObject({
+				entityId: "location:ash-court",
+				confidence: "confirmed",
+				provenance: {
+					sourceType: "campaign-file",
+					sourcePath: "session-14.md",
+				},
+			});
+
+			const snapshotIndex = JSON.parse(
+				await readFile(path.join(bardoRoot, "snapshots/index.json"), "utf8"),
+			) as {
+				snapshots?: Array<{ reason: string; replayPosition?: { eventIndex?: number } }>;
+			};
+			expect(snapshotIndex.snapshots).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						reason: "bootstrap",
+						replayPosition: expect.objectContaining({ eventIndex: 1 }),
+					}),
+				]),
+			);
+
+			const eventLog = (
+				await readFile(path.join(bardoRoot, "events/state-changes.ndjson"), "utf8")
+			)
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(eventLog).toHaveLength(1);
+			expect(eventLog[0]).toMatchObject({
+				eventType: "bootstrap",
+				actorType: "system-bootstrap",
+				type: "bootstrap_initialized",
+			});
+
+			const diagnostics = JSON.parse(
+				await readFile(path.join(bardoRoot, "manifests/diagnostics.json"), "utf8"),
+			) as {
+				latestEventId?: string | null;
+				latestSnapshotPath?: string;
+				recentEventIds?: string[];
+				snapshotCount?: number;
+				integrity?: { status?: string };
+			};
+			expect(diagnostics).toMatchObject({
+				latestSnapshotPath: "snapshots/000000-bootstrap.json",
+				snapshotCount: 1,
+				integrity: { status: "valid" },
+			});
+			expect(diagnostics.latestEventId).toBeTruthy();
+			expect(diagnostics.recentEventIds).toEqual([diagnostics.latestEventId]);
+
+			const replayed = await replayCommittedState({
+				bardoRoot,
+				mode: "events-only",
+				dryRun: true,
+			});
+			expect(replayed.currentState).toEqual(currentState);
+			expect(replayed.stateHash).toBe(computeStateHash(currentState));
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}

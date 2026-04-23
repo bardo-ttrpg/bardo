@@ -21,7 +21,7 @@ export function SiteLayoutChrome({ children }: { children: ReactNode }) {
 	const showHeader = shouldShowSiteHeader(pathname);
 
 	return (
-		<div className="min-h-screen">
+		<div className="min-h-svh">
 			{showHeader ? <SiteBrandHeaderFrame /> : null}
 			{children}
 		</div>

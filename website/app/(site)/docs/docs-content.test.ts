@@ -23,6 +23,10 @@ const installDocSource = readFileSync(
 	new URL("../../../content/docs/install.mdx", import.meta.url),
 	"utf8",
 );
+const connectDocSource = readFileSync(
+	new URL("../../../content/docs/connect-client.mdx", import.meta.url),
+	"utf8",
+);
 const opencodeDocSource = readFileSync(
 	new URL("../../../content/docs/clients/opencode.mdx", import.meta.url),
 	"utf8",
@@ -248,6 +252,9 @@ describe("docs content", () => {
 		);
 		expect(installDocSource).toContain("release binary");
 		expect(installDocSource).toContain("checksum");
+		expect(installDocSource).toContain("local bridge");
+		expect(installDocSource).toContain("browser approval");
+		expect(installDocSource).toContain("hosted side only handles");
 	});
 
 	test("documents client-specific Bardo setup for current supported clients", () => {
@@ -283,5 +290,8 @@ describe("docs content", () => {
 		);
 		expect(runtimeSkillsDocSource).toContain("explicit user correction");
 		expect(runtimeSkillsDocSource).toContain("safe partial answer");
+		expect(connectDocSource).toContain("local MCP endpoint");
+		expect(connectDocSource).toContain("what stays local");
+		expect(connectDocSource).toContain("why this is needed");
 	});
 });

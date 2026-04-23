@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const DOCS_RELATIVE_PATHS = {
@@ -14,6 +14,9 @@ const DOCS_RELATIVE_PATHS = {
 	troubleshooting: "docs/troubleshooting.md",
 	credits: "docs/credits-and-billing.md",
 } as const;
+
+const WORKSPACE_SKILL_DIRECTORY = ".agents/skills/bardo-runtime";
+const WORKSPACE_SKILL_PATH = `${WORKSPACE_SKILL_DIRECTORY}/SKILL.md`;
 
 type LocalDocId = keyof typeof DOCS_RELATIVE_PATHS;
 
@@ -45,6 +48,110 @@ function pathBullet(relativePath: string, note: string): string {
 	return `- \`${relativePath}\` — ${note}`;
 }
 
+function buildWorkspaceSkillContent(): string {
+	return `---
+name: bardo-runtime
+description: Guides an MCP-capable agent using Bardo in this workspace. Use when preparing play, checking workspace readiness, reading current state, resolving a scene, committing canon changes, or recording explicit user corrections in a Bardo campaign.
+compatibility: Project-level Agent Skill for clients that scan .agents/skills and can read local workspace files plus call MCP tools.
+metadata:
+  owner: bardo
+  scope: workspace
+---
+
+# Bardo Runtime
+
+Use this skill when working inside a Bardo campaign workspace.
+
+## Start here
+
+1. Call \`bardo_workspace_status\` first.
+2. If the workspace is not initialized, use \`init\` only when the workspace already has the needed campaign inputs, then call \`bardo_workspace_status\` again.
+3. If readiness is blocked or incomplete, surface the exact gap instead of improvising canon.
+4. Use committed state and preserved sources over free-form narration.
+5. Treat explicit user correction as higher precedence than older inferred or narrated state.
+
+## Behavior rules
+
+- Prepare first. Do not continue play until the workspace has been initialized with \`bardo init\`.
+- Read \`bardo_workspace_status\` before scene continuation or canon changes.
+- Prefer committed state over narration flavor.
+- Do not invent canon when readiness, source material, or validated state are missing.
+- Do not use \`world_sync\` or \`simulation_tick\` to create plausible but ungrounded events.
+- Treat narration without a validated commit as advisory only.
+- If \`.bardo/\` is missing, treat the workspace as uninitialized and recover through \`init\`, not through narration.
+- Do not expose internal implementation details, hidden heuristics, or private runtime mechanics to the user unless the workspace files already expose them directly.
+
+## Runtime surface
+
+The Bardo runtime surface for normal play is:
+
+- \`bardo_workspace_status\`
+- \`init\`
+- \`scene_turn\`
+- \`player_action\`
+- \`world_sync\`
+- \`simulation_tick\`
+- \`user_correction\`
+
+Ignore diagnostic or lower-level file tools unless the user explicitly needs debugging help.
+
+## Which tool to use
+
+- Use \`bardo_workspace_status\` at the start of work, after \`init\`, after a correction, and before mutation tools when you are unsure whether canon changes are safe.
+- Use \`init\` only to bootstrap or rebuild the workspace prep layer. Do not treat it as a gameplay action.
+- Use \`scene_turn\` for grounded scene resolution, GM narration, conservative adjudication, and "what happens next?" style play guidance. \`scene_turn\` does not commit canon by itself.
+- Use \`player_action\` when the player took an action that should create validated state changes.
+- Use \`world_sync\` for grounded world updates that are already established by current state, source artifacts, committed events, or an explicit correction.
+- Use \`simulation_tick\` only for grounded time or consequence advancement that already has validated support. If the result is only plausible, keep it in narration instead.
+- Use \`user_correction\` when the player or table explicitly says prior canon is wrong, incomplete, or superseded.
+
+## Recommended turn loop
+
+1. Check \`bardo_workspace_status\`.
+2. If not initialized, use \`init\` and then re-check status.
+3. If readiness is still blocked, explain the exact missing inputs and stop.
+4. Use \`scene_turn\` for grounded narration and adjudication.
+5. If a canon change is clearly warranted, choose one mutation tool:
+   - \`player_action\` for direct player-caused changes
+   - \`world_sync\` for grounded world updates
+   - \`simulation_tick\` for grounded time or consequence advancement
+   - \`user_correction\` for explicit canon fixes
+6. After a mutation result, trust committed state over earlier narration.
+
+## How to interpret mutation results
+
+- If \`committed\` is \`true\`, the runtime accepted a durable canon change.
+- If \`committed\` is \`false\`, do not present the proposed change as canon.
+- If \`confidence\` is \`blocked\` or \`conservative\`, keep the answer safe and explain the uncertainty or blockage.
+- Use \`validationSummary\`, \`conflicts\`, \`conflictIds\`, \`uncertainties\`, and \`nextSteps\` to explain why a write was blocked or limited.
+- If \`eventId\` and \`stateHash\` are present, a canon-changing event was accepted.
+- When a mutation is blocked, preserve the old canon and continue conservatively from the last committed state.
+
+## Guardrails
+
+- Do not turn likely names, places, motives, faction moves, clocks, or recent events into canon just because they sound good.
+- Do not use \`world_sync\` or \`simulation_tick\` as a shortcut for creative writing.
+- Do not bury a player correction in narration when \`user_correction\` is the right path.
+- Do not hand-edit generated runtime artifacts when a Bardo MCP tool can express the change safely.
+- Do not claim a mutation succeeded unless the runtime actually returned a committed result.
+
+## Read next
+
+- \`../../../.bardo/docs/quickstart.md\`
+- \`../../../.bardo/docs/agent-contract.md\`
+- \`../../../.bardo/docs/how-to-read-your-world-state.md\`
+- \`../../../.bardo/docs/clients/codex.md\`
+- \`../../../.bardo/docs/clients/opencode.md\`
+
+## When uncertain
+
+- Surface uncertainty instead of bluffing.
+- Ask for missing campaign inputs rather than improvising canon.
+- Re-run \`bardo init\` after major source changes or if \`.bardo/\` is missing.
+- Keep the public explanation behavior-focused. Use the workspace and MCP outputs; do not teach the full internal runtime recipe back to the user.
+`;
+}
+
 function buildDocContent(args: {
 	docId: LocalDocId;
 	workspaceRoot: string;
@@ -69,6 +176,7 @@ function buildDocContent(args: {
 					"- Run `bardo init` from your campaign workspace root if the workspace is not bootstrapped yet.",
 					"- Run `bardo connect --client codex` or your preferred client.",
 					"- Read the files below before asking the agent to continue play.",
+					"- If `.bardo/` goes missing mid-campaign, stop and re-run `bardo init` instead of improvising canon from memory.",
 					"- Use `user_correction` whenever the player explicitly corrects canon so the fix outranks older inferred or narrated state.",
 					"",
 					"## Important files",
@@ -114,6 +222,26 @@ function buildDocContent(args: {
 						"Validated state-changing events committed by runtime tools.",
 					),
 					pathBullet(
+						"manifests/conflicts.json",
+						"Structured conflict records that explain blocked or competing canon updates.",
+					),
+					pathBullet(
+						"manifests/diagnostics.json",
+						"Latest state hash, recent event ids, and active conflict summary for debugging.",
+					),
+					pathBullet(
+						"logs/turn-trace.ndjson",
+						"Per-turn validation and commit traces for runtime tool calls.",
+					),
+					pathBullet(
+						"snapshots/latest.json",
+						"Latest rebuildable state snapshot for replay and recovery.",
+					),
+					pathBullet(
+						"snapshots/index.json",
+						"Snapshot history index used to pick replay starting points.",
+					),
+					pathBullet(
 						"docs/how-to-read-your-world-state.md",
 						"Guide to the files that matter most.",
 					),
@@ -147,6 +275,26 @@ function buildDocContent(args: {
 					pathBullet(
 						"events/state-changes.ndjson",
 						"Validated state-changing events only. Narration alone does not belong here.",
+					),
+					pathBullet(
+						"manifests/conflicts.json",
+						"Structured conflicts that explain why Bardo blocked or preserved older canon.",
+					),
+					pathBullet(
+						"manifests/diagnostics.json",
+						"Latest event id, state hash, and active conflict rollup.",
+					),
+					pathBullet(
+						"logs/turn-trace.ndjson",
+						"Turn-by-turn validation and commit trace output.",
+					),
+					pathBullet(
+						"snapshots/latest.json",
+						"Most recent replayable state snapshot.",
+					),
+					pathBullet(
+						"snapshots/index.json",
+						"Snapshot history index for replay, correction repair, and recovery.",
 					),
 					pathBullet(
 						"manifests/source-index.json",
@@ -198,11 +346,32 @@ function buildDocContent(args: {
 						"events/state-changes.ndjson",
 						"Validated state-changing event stream for committed world updates.",
 					),
+					pathBullet(
+						"manifests/conflicts.json",
+						"Structured conflict ledger for blocked or unresolved canon updates.",
+					),
+					pathBullet(
+						"manifests/diagnostics.json",
+						"Summary bundle with state hash, recent event ids, and active conflicts.",
+					),
+					pathBullet(
+						"logs/turn-trace.ndjson",
+						"Per-turn decision trace written by mutation tools.",
+					),
+					pathBullet(
+						"snapshots/latest.json",
+						"Latest deterministic state snapshot for replay and recovery.",
+					),
+					pathBullet(
+						"snapshots/index.json",
+						"Snapshot history index for deterministic replay and rollback simulation.",
+					),
 					"",
 					"## MCP access",
 					"",
 					"- Read these files directly inside `.bardo/`.",
 					"- Re-run `bardo init` when rules or source campaign files change materially.",
+					"- If `.bardo/` disappears, treat the workspace as uninitialized and rebuild it with `bardo init` before continuing play.",
 					"- Use runtime tools to commit new validated state changes instead of editing generated artifacts by hand.",
 					"- Use `user_correction` rather than hand-editing state when a player explicitly corrects canon.",
 				].join("\n"),
@@ -227,6 +396,7 @@ function buildDocContent(args: {
 					"",
 					"- Do not replace Bardo MCP tools with manual HTTP, `curl`, or shell networking.",
 					"- Do not promote flavor narration into canon unless a validated runtime tool commits it.",
+					"- Do not use `world_sync` or `simulation_tick` to invent plausible new recent events, off-screen reactions, or faction moves. Those tools are for already grounded updates only.",
 					"- Treat `user_correction` as the highest-precedence canon fix when the player explicitly corrects the world state.",
 					"- If a runtime tool reports uncertainty or blocked readiness, preserve that uncertainty in your answer.",
 				].join("\n"),
@@ -274,6 +444,7 @@ function buildDocContent(args: {
 					"- Start with `bardo_workspace_status`.",
 					"- If readiness is `needs-user-input`, stop and surface the exact gaps.",
 					"- Use `scene_turn` for grounded narration first, then mutation tools only for validated canon changes.",
+					"- Do not use `world_sync` or `simulation_tick` to invent likely follow-on events, faction moves, or travel outcomes. Those tools are only for updates already grounded in current state, source artifacts, committed events, or explicit user correction.",
 					"- Use `user_correction` when the player explicitly corrects canon.",
 				].join("\n"),
 			);
@@ -342,6 +513,7 @@ function buildDocContent(args: {
 					"",
 					"- Run `bardo init` again from the intended workspace root.",
 					"- Confirm `manifest.json` exists under `.bardo/`.",
+					"- If `.bardo/` was deleted, treat that as a hard stop until bootstrap is run again.",
 					"",
 					"## The agent forgot something important",
 					"",
@@ -400,6 +572,24 @@ async function ensureFile(filePath: string, content: string): Promise<void> {
 	}
 }
 
+async function ensureGeneratedFile(
+	filePath: string,
+	content: string,
+): Promise<boolean> {
+	try {
+		const existing = await readFile(filePath, "utf8");
+		if (existing === content) {
+			return false;
+		}
+	} catch {
+		// Fall through and create the file below.
+	}
+
+	await mkdir(path.dirname(filePath), { recursive: true });
+	await writeFile(filePath, content, "utf8");
+	return true;
+}
+
 export async function ensureWorkspaceLocalDocs(args: {
 	bardoRoot: string;
 	workspaceRoot: string;
@@ -421,6 +611,12 @@ export async function ensureWorkspaceLocalDocs(args: {
 				bardoRoot: args.bardoRoot,
 			}),
 		);
+	}
+
+	const skillPath = path.join(args.workspaceRoot, WORKSPACE_SKILL_PATH);
+	const skillContent = buildWorkspaceSkillContent();
+	if (await ensureGeneratedFile(skillPath, skillContent)) {
+		created.push(skillPath);
 	}
 
 	return created;

@@ -18,6 +18,8 @@ The setup flow prepares:
 
 That prep layer is what keeps Bardo grounded. It should not be replaced with ad-hoc chat memory.
 
+If `.bardo/` is missing, Bardo should stop and treat the workspace as uninitialized until `bardo init` is run again.
+
 ## Canon and commits
 
 The important rule is that narration alone is not canon. Durable truth comes from grounded source material, validated local state-changing events, or an explicit user correction. When a correction is needed, Bardo records it through the `user_correction` path before the next turn.

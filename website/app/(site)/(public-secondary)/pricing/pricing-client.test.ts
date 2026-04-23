@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { shouldShowManageSubscription } from "./pricing-client";
+import { shouldShowManageSubscription } from "./pricing-helpers";
 
 describe("shouldShowManageSubscription", () => {
 	test("shows manage subscription when the active plan matches the selected monthly period", () => {

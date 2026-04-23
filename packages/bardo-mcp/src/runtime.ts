@@ -24,6 +24,7 @@ import {
 } from "./local-mcp";
 import { normalizePlan, type PlanTier } from "./plan-utils";
 import { bootstrapImportedRulebook } from "./rules-bootstrap";
+import { normalizeRuntimeManifest } from "./runtime-manifest";
 import {
 	migrateSavedConfig,
 	type SavedConfig,
@@ -760,8 +761,9 @@ Notes:
   clients list shows the supported client matrix and whether each client can be auto-installed.
   For the simplest setup, run bardo connect --client <client> from your project root.
   login starts a browser approval flow by default and stores bridge session credentials for the local bridge.
+  The local bridge exposes the local MCP endpoint your client connects to, while the hosted website only handles auth, approval, billing, and account status.
   login also supports direct API keys when you already have a bridge credential for local testing.
-  connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config.
+  connect logs in if needed, bootstraps the local workspace if missing, and installs the selected client config so the client can call the local MCP endpoint from the same workspace.
   If ./rulebook.md exists in the workspace root, init/connect import it automatically into .bardo/rules/rulebook.md as the preserved source copy.
   Rulebook import expects markdown or text input today; convert PDFs before passing --rulebook.
   install and connect only support local mode in V1; passing --mode remote returns a migration error.
@@ -1655,7 +1657,9 @@ async function ensureWorkspaceCoreFiles(args: {
 	nowIso: string;
 }): Promise<void> {
 	const manifestPath = path.join(args.bardoRoot, "manifest.json");
-	const manifest = await readExistingJson(manifestPath);
+	const manifest = normalizeRuntimeManifest(
+		await readExistingJson(manifestPath),
+	);
 	const importedRulebooks =
 		args.importedRulebooks.length > 0
 			? args.importedRulebooks
@@ -1716,12 +1720,76 @@ async function ensureWorkspaceCoreFiles(args: {
 			readinessPath: campaignBootstrap.readinessPath,
 			readiness: campaignBootstrap.readiness,
 		},
+		runtimeArtifacts: {
+			conflictsPath: "manifests/conflicts.json",
+			diagnosticsPath: "manifests/diagnostics.json",
+			turnTracePath: "logs/turn-trace.ndjson",
+			snapshotsDirectory: "snapshots",
+			snapshotIndexPath: "snapshots/index.json",
+		},
 	};
 
 	await writeJsonFile(manifestPath, nextManifest);
 	await ensureFile(
 		path.join(args.bardoRoot, "events/state-changes.ndjson"),
 		"",
+	);
+	await ensureFile(
+		path.join(args.bardoRoot, "manifests/conflicts.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				conflicts: [],
+			},
+			null,
+			2,
+		),
+	);
+	await ensureFile(
+		path.join(args.bardoRoot, "manifests/diagnostics.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				readinessStatus: campaignBootstrap.readiness.status,
+				latestEventId: null,
+				latestStateHash: null,
+				latestSnapshotId: null,
+				latestSnapshotPath: null,
+				snapshotCount: 0,
+				recentEventIds: [],
+				activeConflictIds: [],
+				correctionEventIds: [],
+				integrity: {
+					status: "valid",
+					currentStateHash: null,
+					eventLogHash: null,
+					latestSnapshotHash: null,
+				},
+				replayStatus: {
+					canReplayFromEventZero: true,
+					canReplayFromLatestSnapshot: false,
+					lastReplayMode: null,
+				},
+			},
+			null,
+			2,
+		),
+	);
+	await ensureFile(path.join(args.bardoRoot, "logs/turn-trace.ndjson"), "");
+	await mkdir(path.join(args.bardoRoot, "snapshots"), { recursive: true });
+	await ensureFile(
+		path.join(args.bardoRoot, "snapshots/index.json"),
+		JSON.stringify(
+			{
+				schemaVersion: 2,
+				updatedAtISO: args.nowIso,
+				snapshots: [],
+			},
+			null,
+			2,
+		),
 	);
 	await ensureWorkspaceLocalDocs({
 		bardoRoot: args.bardoRoot,
@@ -2194,7 +2262,9 @@ async function buildDoctorReport(
 	);
 	const bardoRoot = resolveBardoRoot(workspaceRoot, env);
 	const manifestPath = path.join(bardoRoot, "manifest.json");
-	const manifest = await readExistingJson(manifestPath);
+	const manifest = normalizeRuntimeManifest(
+		await readExistingJson(manifestPath),
+	);
 	const envApiKey =
 		env.BARDO_ACCESS_TOKEN?.trim() || env.BARDO_API_KEY?.trim() || null;
 	const envUrl = env.BARDO_MCP_URL?.trim() || null;

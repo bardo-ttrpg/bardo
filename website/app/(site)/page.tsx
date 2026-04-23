@@ -68,71 +68,75 @@ export default async function SitePage() {
 		: "(max-width: 1024px) calc(100vw - 4rem), 896px";
 
 	return (
-		<PublicPageShell className="max-w-5xl pb-8 pt-8 text-balance sm:pb-10 sm:pt-8 lg:pb-20 lg:pt-4">
+		<PublicPageShell className="max-w-5xl pt-8 text-balance lg:pt-4">
 			<script type="application/ld+json">{landingPageJsonLd}</script>
 			<BardoViewTransition name="bardo-page-region" variant="fade">
-				<section className={homeSectionClassName}>
+				<section className={`bardo-page-region ${homeSectionClassName}`}>
 					<h1 className="sr-only">Bardo tabletop role-playing MCP</h1>
 
-					<p className={bodyClassName}>
-						Bardo is the MCP for playing any tabletop role-playing game. It
-						works with many modern AI clients, keeps your campaign files
-						local, and grounds the model in your real workspace so it stays
-						far more accurate.
-					</p>
+					<header className="flex flex-col gap-2">
+						<p className={bodyClassName}>
+							Bardo is the MCP for playing any tabletop role-playing game. It
+							works with many modern AI clients, keeps your campaign files
+							local, and grounds the model in your real workspace so it stays
+							far more accurate.
+						</p>
 
-					<div className="flex flex-wrap items-center gap-4 pt-2">
-						<Button asChild size="sm" className={homeActionClassName}>
-							<TransitionLink href="/docs">
-								Start Playing
-							</TransitionLink>
-						</Button>
-						<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
-					</div>
+						<nav
+							aria-label="Primary actions"
+							className="flex flex-wrap items-center gap-4 pt-2"
+						>
+							<Button asChild size="sm" className={homeActionClassName}>
+								<TransitionLink href="/docs">Start Playing</TransitionLink>
+							</Button>
+							<HomePrimaryAction clerkEnabled={IS_CLERK_CONFIGURED} />
+						</nav>
+					</header>
 
-					{useMobileLandingImage ? (
-						<Image
-							src={landingImage}
-							alt={landingImageAlt}
-							placeholder="blur"
-							preload
-							className="my-6 rounded-sm"
-							quality={100}
-							sizes={landingImageSizes}
-							width={500}
-						/>
-					) : (
-						<Image
-							src={landingImage}
-							alt={landingImageAlt}
-							placeholder="blur"
-							preload
-							className="my-6 h-auto w-full rounded-sm"
-							quality={100}
-							sizes={landingImageSizes}
-							width={1000}
-						/>
-					)}
+					<figure>
+						{useMobileLandingImage ? (
+							<Image
+								src={landingImage}
+								alt={landingImageAlt}
+								placeholder="blur"
+								preload
+								className="my-6 rounded-sm"
+								quality={100}
+								sizes={landingImageSizes}
+								width={500}
+							/>
+						) : (
+							<Image
+								src={landingImage}
+								alt={landingImageAlt}
+								placeholder="blur"
+								preload
+								className="my-6 h-auto w-full rounded-sm"
+								quality={100}
+								sizes={landingImageSizes}
+								width={1000}
+							/>
+						)}
+					</figure>
 				</section>
 			</BardoViewTransition>
 
-			<nav
-				aria-label="Primary site links"
-				className="flex flex-row flex-wrap gap-4 text-center text-sm "
-			>
-				<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
-					{landingFooterLinks.map((link) => (
-						<li key={link.href} className="list-none grow text-center">
-							<TransitionLink
-								href={link.href}
-								className="landing-footer-link inline"
-							>
-								{link.label}
-							</TransitionLink>
-						</li>
-					))}
-				</ul>
-			</nav>
+			<footer className="text-center text-sm">
+				<nav aria-label="Primary site links">
+					<ul className="flex w-full flex-row flex-wrap gap-4 p-0">
+						{landingFooterLinks.map((link) => (
+							<li key={link.href} className="list-none grow text-center">
+								<TransitionLink
+									href={link.href}
+									className="landing-footer-link inline"
+								>
+									{link.label}
+								</TransitionLink>
+							</li>
+						))}
+					</ul>
+				</nav>
+			</footer>
 		</PublicPageShell>
 	);
 }

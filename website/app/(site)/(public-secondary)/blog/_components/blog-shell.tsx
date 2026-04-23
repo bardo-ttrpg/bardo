@@ -18,16 +18,14 @@ export function BlogLayoutShell({
 }) {
 	return (
 		<main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 pb-10 pt-8 sm:px-8 sm:pb-12 sm:pt-8 lg:pb-16 lg:pt-10">
-			<div className="flex flex-col gap-10">
-				<div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-14">
-					<aside className="bardo-persistent-surface lg:sticky lg:top-10 lg:self-start">
-						<BlogSidebarNav entries={entries} />
-					</aside>
-					<BardoViewTransition name="bardo-page-region">
-						<div className="min-w-0">{children}</div>
-					</BardoViewTransition>
-				</div>
-			</div>
+			<section className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-14">
+				<aside className="bardo-persistent-surface lg:sticky lg:top-10 lg:self-start">
+					<BlogSidebarNav entries={entries} />
+				</aside>
+				<BardoViewTransition name="bardo-page-region">
+					<section className="bardo-page-region min-w-0">{children}</section>
+				</BardoViewTransition>
+			</section>
 		</main>
 	);
 }
@@ -40,7 +38,7 @@ export function BlogEntryContent({
 	children: ReactNode;
 }) {
 	return (
-		<div className="min-w-0">
+		<section className="min-w-0">
 			<header className="flex max-w-3xl flex-col gap-5 border-b border-border pb-8">
 				<div className="flex flex-col gap-3">
 					<h1 className="font-reading-heading text-4xl text-foreground sm:text-5xl">
@@ -66,14 +64,14 @@ export function BlogEntryContent({
 			<article className="prose-reading mt-8 flex max-w-3xl flex-col gap-6 text-foreground">
 				{children}
 			</article>
-		</div>
+		</section>
 	);
 }
 
 export function BlogEmptyState() {
 	return (
-		<div className="min-w-0">
-			<div className="rounded-[2rem] border border-border bg-card/70 p-7">
+		<section className="min-w-0">
+			<article className="rounded-[2rem] border border-border bg-card/70 p-7">
 				<p className="ui-label text-muted-foreground">Current state</p>
 				<h1 className="font-reading-heading mt-5 text-4xl text-foreground sm:text-5xl">
 					No posts are published yet.
@@ -83,7 +81,7 @@ export function BlogEmptyState() {
 					here until it adds something the docs and product pages do not already
 					explain.
 				</p>
-				<div className="mt-8 flex flex-col gap-3">
+				<nav aria-label="Blog fallback links" className="mt-8 flex flex-col gap-3">
 					<TransitionLink
 						href="/docs"
 						className="interactive-link ui-nav text-foreground"
@@ -102,8 +100,8 @@ export function BlogEmptyState() {
 					>
 						Back to home
 					</TransitionLink>
-				</div>
-			</div>
-		</div>
+				</nav>
+			</article>
+		</section>
 	);
 }

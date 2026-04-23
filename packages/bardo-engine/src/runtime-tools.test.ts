@@ -27,6 +27,7 @@ async function seedRuntimeArtifacts(
 	await mkdir(path.join(bardoRoot, "state"), { recursive: true });
 	await mkdir(path.join(bardoRoot, "entities"), { recursive: true });
 	await mkdir(path.join(bardoRoot, "manifests"), { recursive: true });
+	await mkdir(path.join(bardoRoot, "simulation"), { recursive: true });
 	await mkdir(path.join(bardoRoot, "rules", "normalized"), {
 		recursive: true,
 	});
@@ -62,8 +63,19 @@ async function seedRuntimeArtifacts(
 		"utf8",
 	);
 	await writeFile(
+		path.join(bardoRoot, "simulation/tracking-profile.json"),
+		JSON.stringify({
+			schemaVersion: 2,
+			strong: ["currentLocation", "activeQuests", "recentEvents"],
+			light: ["npcContinuity"],
+			onDemand: ["sceneFlavor"],
+		}),
+		"utf8",
+	);
+	await writeFile(
 		path.join(bardoRoot, "manifests/readiness.json"),
 		JSON.stringify({
+			schemaVersion: 2,
 			status: "ready-with-gaps",
 			gaps: [],
 		}),
@@ -511,6 +523,34 @@ describe("runtime tools", () => {
 		}
 	});
 
+	test("scene_turn returns explicit mutation guardrails for generic MCP clients", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			const handlers = createRuntimeToolHandlers();
+			const result = await requireRuntimeHandler(handlers, "scene_turn")(
+				{ playerIntent: "Carefully continue the scene." },
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-04-09T05:10:00.000Z",
+				},
+			);
+
+			expect(result.mutationGuardrails).toContain(
+				"Use world_sync and simulation_tick only for facts already grounded in current state, source artifacts, committed events, or explicit user correction.",
+			);
+			expect(result.mutationGuardrails).toContain(
+				"Do not invent plausible follow-on recentEvents, faction moves, NPC reactions, or location changes just because they sound likely.",
+			);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("world_sync validates quest, faction, and event updates against campaign artifacts", async () => {
 		const workspaceRoot = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-runtime-"),
@@ -573,6 +613,202 @@ describe("runtime tools", () => {
 		}
 	});
 
+	test("world_sync commits structured event metadata and writes snapshots, diagnostics, and traces", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			const handlers = createRuntimeToolHandlers();
+			const result = await requireRuntimeHandler(handlers, "world_sync")(
+				{ currentLocation: "Ash Court" },
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-04-09T02:00:00.000Z",
+				},
+			);
+
+			expect(result).toMatchObject({
+				success: true,
+				committed: true,
+				canonChanged: true,
+				confidence: "grounded",
+				eventType: "world_sync_applied",
+				conflictIds: [],
+				validationSummary: {
+					status: "committed",
+					blockedReasons: [],
+				},
+			});
+			expect(typeof result.eventId).toBe("string");
+			expect(result.eventId).toMatch(/^evt_/);
+			expect(typeof result.stateHash).toBe("string");
+			expect((result.stateHash as string).length).toBeGreaterThan(20);
+
+			const currentState = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
+			) as {
+				schemaVersion?: number;
+				worldTime?: {
+					currentDateTimeISO: string;
+					lastAdvancedByEventId: string | null;
+				};
+				fieldMetadata?: {
+					currentLocation?: {
+						entityId: string;
+						confidence: string;
+						provenance: { sourceType: string };
+					};
+				};
+			};
+			expect(currentState.schemaVersion).toBe(2);
+			expect(currentState.worldTime).toEqual({
+				currentDateTimeISO: "2026-04-09T02:00:00.000Z",
+				lastAdvancedByEventId: result.eventId,
+			});
+			expect(currentState.fieldMetadata?.currentLocation).toMatchObject({
+				entityId: "location:ash-court",
+				confidence: "validated-derived",
+				provenance: { sourceType: "validated-event" },
+			});
+
+			const eventLog = (
+				await readFile(
+					path.join(bardoRoot, "events/state-changes.ndjson"),
+					"utf8",
+				)
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line)) as Array<{
+				schemaVersion?: number;
+				eventId?: string;
+				eventType?: string;
+				actorType?: string;
+				actorSource?: string;
+				affectedEntityIds?: string[];
+				stateHashAfter?: string;
+				beforeAfterSummary?: {
+					currentLocation?: {
+						before: string | null;
+						after: string | null;
+					};
+				};
+			}>;
+			expect(eventLog).toHaveLength(1);
+			expect(eventLog[0]).toMatchObject({
+				schemaVersion: 2,
+				eventId: result.eventId,
+				eventType: "world_sync",
+				actorType: "runtime-tool",
+				actorSource: "world_sync",
+				stateHashAfter: result.stateHash,
+				beforeAfterSummary: {
+					currentLocation: {
+						before: "River Market",
+						after: "Ash Court",
+					},
+				},
+			});
+			expect(eventLog[0]?.affectedEntityIds).toEqual(
+				expect.arrayContaining(["location:ash-court"]),
+			);
+
+			const snapshot = JSON.parse(
+				await readFile(path.join(bardoRoot, "snapshots/latest.json"), "utf8"),
+			) as {
+				schemaVersion?: number;
+				snapshotId?: string;
+				reason?: string;
+				replayPosition?: { eventId?: string };
+				stateHash?: string;
+			};
+			expect(snapshot.schemaVersion).toBe(2);
+			expect(typeof snapshot.snapshotId).toBe("string");
+			expect(snapshot.reason).toBe("commit");
+			expect(snapshot.replayPosition?.eventId).toBe(result.eventId);
+			expect(snapshot.stateHash).toBe(result.stateHash);
+			const snapshotIndex = JSON.parse(
+				await readFile(path.join(bardoRoot, "snapshots/index.json"), "utf8"),
+			) as {
+				snapshots?: Array<{
+					path?: string;
+					replayPosition?: { eventId?: string };
+				}>;
+			};
+			expect(snapshotIndex.snapshots).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						path: expect.stringContaining(result.eventId),
+						replayPosition: expect.objectContaining({
+							eventId: result.eventId,
+						}),
+					}),
+				]),
+			);
+
+			const diagnostics = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "manifests/diagnostics.json"),
+					"utf8",
+				),
+			) as {
+				schemaVersion?: number;
+				latestEventId?: string;
+				latestStateHash?: string;
+				latestSnapshotPath?: string;
+				snapshotCount?: number;
+				activeConflictIds?: string[];
+				integrity?: {
+					status?: string;
+					currentStateHash?: string;
+					eventLogHash?: string;
+				};
+			};
+			expect(diagnostics).toMatchObject({
+				schemaVersion: 2,
+				latestEventId: result.eventId,
+				latestStateHash: result.stateHash,
+				latestSnapshotPath: expect.stringContaining(result.eventId),
+				snapshotCount: 1,
+				activeConflictIds: [],
+				integrity: {
+					status: "valid",
+					currentStateHash: result.stateHash,
+					eventLogHash: expect.any(String),
+				},
+			});
+
+			const turnTrace = (
+				await readFile(path.join(bardoRoot, "logs/turn-trace.ndjson"), "utf8")
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line)) as Array<{
+				toolName?: string;
+				commitResult?: { eventId?: string; stateHash?: string };
+			}>;
+			expect(turnTrace).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						toolName: "world_sync",
+						commitResult: {
+							eventId: result.eventId,
+							stateHash: result.stateHash,
+						},
+					}),
+				]),
+			);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("world_sync fails closed on contradictory grounded proposals", async () => {
 		const workspaceRoot = await mkdtemp(
 			path.join(os.tmpdir(), "bardo-runtime-"),
@@ -623,6 +859,16 @@ describe("runtime tools", () => {
 			) as { currentLocation: string; activeQuests: string[] };
 			expect(currentState.currentLocation).toBe("River Market");
 			expect(currentState.activeQuests).toEqual(["Find the ferryman"]);
+
+			const diagnostics = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "manifests/diagnostics.json"),
+					"utf8",
+				),
+			) as { activeConflictIds?: string[] };
+			expect(diagnostics.activeConflictIds).toEqual(
+				expect.arrayContaining(result.conflictIds),
+			);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -651,6 +897,37 @@ describe("runtime tools", () => {
 					},
 				),
 			).rejects.toThrow("Runtime artifact corruption detected");
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("scene_turn fails closed on unsupported runtime schema versions", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			await writeFile(
+				path.join(bardoRoot, "state/current-state.json"),
+				JSON.stringify({
+					schemaVersion: 999,
+					currentLocation: "River Market",
+				}),
+				"utf8",
+			);
+			const handlers = createRuntimeToolHandlers();
+			await expect(
+				requireRuntimeHandler(handlers, "scene_turn")(
+					{},
+					{
+						workspaceRoot,
+						bardoRoot,
+						nowIso: "2026-04-09T07:15:00.000Z",
+					},
+				),
+			).rejects.toThrow("Unsupported runtime artifact schema version");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -761,6 +1038,173 @@ describe("runtime tools", () => {
 			);
 			expect(eventLog).toContain('"canonBasis":"explicit-user-correction"');
 			expect(eventLog).toContain('"eventType":"user_correction"');
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("user_correction can introduce corrected canon that was missing from prep artifacts", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			await writeFile(
+				path.join(bardoRoot, "entities/campaign-entities.json"),
+				JSON.stringify({
+					characters: ["Mira"],
+					locations: ["River Market"],
+					quests: ["Find the ferryman"],
+					factions: ["Guild of Keys"],
+					recentEvents: [],
+					facts: [],
+					clocks: ["Eclipse Clock"],
+				}),
+				"utf8",
+			);
+
+			const handlers = createRuntimeToolHandlers();
+			const correction = await requireRuntimeHandler(
+				handlers,
+				"user_correction",
+			)(
+				{
+					correction:
+						"The party is already at Ash Court; River Market was outdated session narration.",
+					currentLocation: "Ash Court",
+				},
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-04-09T08:00:00.000Z",
+				},
+			);
+
+			expect(correction).toMatchObject({
+				success: true,
+				committed: true,
+				canonChanged: true,
+				confidence: "corrected",
+			});
+
+			const correctedState = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
+			) as { currentLocation: string };
+			expect(correctedState.currentLocation).toBe("Ash Court");
+
+			const entities = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "entities/campaign-entities.json"),
+					"utf8",
+				),
+			) as { locations: string[] };
+			expect(entities.locations).toEqual(
+				expect.arrayContaining(["River Market", "Ash Court"]),
+			);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("blocked conflicts are recorded structurally and replay rebuilds corrected state", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			const handlers = createRuntimeToolHandlers();
+			const correction = await requireRuntimeHandler(
+				handlers,
+				"user_correction",
+			)(
+				{
+					correction:
+						"The party is already at Ash Court; River Market was outdated session narration.",
+					currentLocation: "Ash Court",
+				},
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-04-09T08:00:00.000Z",
+				},
+			);
+
+			const blocked = await requireRuntimeHandler(handlers, "world_sync")(
+				{ currentLocation: "River Market" },
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-04-09T08:30:00.000Z",
+				},
+			);
+
+			expect(blocked).toMatchObject({
+				success: true,
+				committed: false,
+				canonChanged: false,
+				confidence: "blocked",
+				validationSummary: {
+					status: "blocked",
+				},
+			});
+			expect(Array.isArray(blocked.conflictIds)).toBe(true);
+			expect((blocked.conflictIds as string[]).length).toBeGreaterThan(0);
+
+			const conflicts = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "manifests/conflicts.json"),
+					"utf8",
+				),
+			) as {
+				schemaVersion?: number;
+				conflicts?: Array<{
+					conflictId: string;
+					fieldName: string;
+					resolutionStatus: string;
+					userActionRequired: boolean;
+					competingValues: string[];
+				}>;
+			};
+			expect(conflicts.schemaVersion).toBe(2);
+			expect(conflicts.conflicts).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						conflictId: blocked.conflictIds?.[0],
+						fieldName: "currentLocation",
+						resolutionStatus: "unresolved",
+						userActionRequired: true,
+						competingValues: expect.arrayContaining([
+							"Ash Court",
+							"River Market",
+						]),
+					}),
+				]),
+			);
+
+			const mod = (await import("./runtime-tools")) as Record<string, unknown>;
+			expect(typeof mod.replayCommittedState).toBe("function");
+			const replay = await (
+				mod.replayCommittedState as (args: {
+					bardoRoot: string;
+					mode?: "events-only" | "latest-snapshot";
+				}) => Promise<{
+					currentState: { currentLocation: string | null };
+					stateHash: string;
+					lastEventId: string | null;
+				}>
+			)({
+				bardoRoot,
+				mode: "events-only",
+			});
+
+			expect(replay.currentState.currentLocation).toBe("Ash Court");
+			expect(replay.lastEventId).toBe(correction.eventId);
+			expect(typeof replay.stateHash).toBe("string");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -903,6 +1347,328 @@ describe("runtime tools", () => {
 			expect(currentState.npcAttitudes).toMatchObject({
 				Mira: "wary",
 			});
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("25-turn golden scenario preserves continuity across snapshot-backed replay", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			await writeFile(
+				path.join(bardoRoot, "entities/campaign-entities.json"),
+				JSON.stringify({
+					schemaVersion: 2,
+					characters: ["Mira"],
+					locations: ["River Market", "Ash Court"],
+					quests: ["Find the ferryman"],
+					factions: ["Guild of Keys"],
+					recentEvents: ["The bridge collapsed yesterday."],
+					facts: ["The ferryman answers to the Guild of Keys."],
+					clocks: ["Eclipse Clock"],
+				}),
+				"utf8",
+			);
+
+			const handlers = createRuntimeToolHandlers();
+			for (let turn = 1; turn <= 25; turn += 1) {
+				const location = turn % 2 === 0 ? "Ash Court" : "River Market";
+				await requireRuntimeHandler(handlers, "world_sync")(
+					{
+						currentLocation: location,
+						relevantFactions: ["Guild of Keys"],
+						activeQuests: ["Find the ferryman"],
+					},
+					{
+						workspaceRoot,
+						bardoRoot,
+						nowIso: new Date(
+							Date.UTC(2026, 3, 9 + turn, 2, 0, 0),
+						).toISOString(),
+					},
+				);
+				await requireRuntimeHandler(handlers, "simulation_tick")(
+					{
+						tickLabel: `Turn ${turn} pressure`,
+						factionConsequences: [
+							`Guild of Keys pressure increased at turn ${turn}.`,
+						],
+						clockProgress: [`Eclipse Clock advanced to ${turn}/25.`],
+					},
+					{
+						workspaceRoot,
+						bardoRoot,
+						nowIso: new Date(
+							Date.UTC(2026, 3, 9 + turn, 3, 0, 0),
+						).toISOString(),
+					},
+				);
+			}
+
+			const mod = (await import("./runtime-tools")) as {
+				replayCommittedState: typeof import("./runtime-tools").replayCommittedState;
+			};
+			const replay = await mod.replayCommittedState({
+				bardoRoot,
+				mode: "latest-snapshot",
+			});
+			const currentState = JSON.parse(
+				await readFile(
+					path.join(bardoRoot, "state/current-state.json"),
+					"utf8",
+				),
+			) as { currentLocation: string; clockProgress: string[] };
+			expect(replay.startedFromSnapshot).toBe(true);
+			expect(replay.replayedEventCount).toBeGreaterThanOrEqual(0);
+			expect(replay.currentState.currentLocation).toBe(
+				currentState.currentLocation,
+			);
+			expect(replay.currentState.clockProgress).toEqual(
+				currentState.clockProgress,
+			);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	}, 20000);
+
+	test("50-turn golden scenario keeps corrections durable through later replay", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			await writeFile(
+				path.join(bardoRoot, "entities/campaign-entities.json"),
+				JSON.stringify({
+					schemaVersion: 2,
+					characters: ["Mira"],
+					locations: ["River Market", "Ash Court"],
+					quests: ["Find the ferryman"],
+					factions: ["Guild of Keys"],
+					recentEvents: ["The bridge collapsed yesterday."],
+					facts: ["The ferryman answers to the Guild of Keys."],
+					clocks: ["Eclipse Clock"],
+				}),
+				"utf8",
+			);
+
+			const handlers = createRuntimeToolHandlers();
+			let correctionEventId: string | null = null;
+			for (let turn = 1; turn <= 50; turn += 1) {
+				if (turn === 10) {
+					const correction = await requireRuntimeHandler(
+						handlers,
+						"user_correction",
+					)(
+						{
+							correction: "The party reached Ash Court on turn 10.",
+							currentLocation: "Ash Court",
+						},
+						{
+							workspaceRoot,
+							bardoRoot,
+							nowIso: "2026-05-10T01:00:00.000Z",
+						},
+					);
+					correctionEventId = correction.eventId as string;
+				} else {
+					await requireRuntimeHandler(handlers, "world_sync")(
+						{
+							currentLocation: turn < 10 ? "River Market" : "Ash Court",
+							relevantFactions: ["Guild of Keys"],
+							activeQuests: ["Find the ferryman"],
+						},
+						{
+							workspaceRoot,
+							bardoRoot,
+							nowIso: `2026-05-${String(Math.min(turn, 28)).padStart(2, "0")}T02:00:00.000Z`,
+						},
+					);
+				}
+				await requireRuntimeHandler(handlers, "simulation_tick")(
+					{
+						tickLabel: `Turn ${turn} continuity`,
+						factionConsequences: [
+							`Guild of Keys continuity pressure at turn ${turn}.`,
+						],
+						clockProgress: [`Eclipse Clock advanced to ${turn}/50.`],
+					},
+					{
+						workspaceRoot,
+						bardoRoot,
+						nowIso: `2026-05-${String(Math.min(turn, 28)).padStart(2, "0")}T03:00:00.000Z`,
+					},
+				);
+			}
+
+			const mod = (await import("./runtime-tools")) as {
+				replayCommittedState: typeof import("./runtime-tools").replayCommittedState;
+			};
+			const replay = await mod.replayCommittedState({
+				bardoRoot,
+				mode: "latest-snapshot",
+				fromEventId: correctionEventId,
+				dryRun: true,
+			});
+			expect(correctionEventId).not.toBeNull();
+			expect(replay.startedFromSnapshot).toBe(true);
+			expect(replay.currentState.currentLocation).toBe("Ash Court");
+			expect(
+				replay.currentState.correctionSupersededEventIds.length,
+			).toBeGreaterThan(0);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	}, 20000);
+
+	test("user_correction supports merge, certainty downgrade, diagnostics bundle, and rollback simulation", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "bardo-runtime-"),
+		);
+		const { bardoRoot } = await seedRuntimeArtifacts(workspaceRoot);
+
+		try {
+			await writeFile(
+				path.join(bardoRoot, "entities/campaign-entities.json"),
+				JSON.stringify({
+					schemaVersion: 2,
+					characters: ["Mira", "Mira of Ash"],
+					locations: ["River Market", "Ash Court"],
+					quests: ["Find the ferryman"],
+					factions: ["Guild of Keys"],
+					recentEvents: [],
+					facts: [],
+					clocks: ["Eclipse Clock"],
+					records: {
+						characters: [
+							{
+								id: "character:mira",
+								name: "Mira",
+								aliases: ["Mira"],
+								sourcePaths: [],
+							},
+							{
+								id: "character:mira-of-ash",
+								name: "Mira of Ash",
+								aliases: ["Mira of Ash", "Mira"],
+								sourcePaths: [],
+							},
+						],
+						locations: [
+							{
+								id: "location:river-market",
+								name: "River Market",
+								aliases: ["River Market"],
+								sourcePaths: [],
+							},
+							{
+								id: "location:ash-court",
+								name: "Ash Court",
+								aliases: ["Ash Court"],
+								sourcePaths: [],
+							},
+						],
+						quests: [],
+						factions: [],
+						recentEvents: [],
+						facts: [],
+						clocks: [],
+					},
+				}),
+				"utf8",
+			);
+
+			const handlers = createRuntimeToolHandlers();
+			const merged = await requireRuntimeHandler(handlers, "user_correction")(
+				{
+					correction: "Merge the duplicate Mira entries.",
+					correctionType: "merge_duplicate_entities",
+					targetEntityKind: "characters",
+					targetEntityName: "Mira of Ash",
+					mergeInto: "Mira",
+					resolvedConflictIds: [],
+				},
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-05-02T01:00:00.000Z",
+				},
+			);
+			expect(merged).toMatchObject({
+				committed: true,
+				correctionType: "merge_duplicate_entities",
+			});
+
+			await requireRuntimeHandler(handlers, "world_sync")(
+				{ currentLocation: "Ash Court" },
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-05-02T02:00:00.000Z",
+				},
+			);
+
+			const downgraded = await requireRuntimeHandler(
+				handlers,
+				"user_correction",
+			)(
+				{
+					correction: "Current location should be treated as uncertain.",
+					correctionType: "downgrade_certainty",
+					fieldName: "currentLocation",
+					confidence: "unresolved",
+				},
+				{
+					workspaceRoot,
+					bardoRoot,
+					nowIso: "2026-05-02T03:00:00.000Z",
+				},
+			);
+			expect(downgraded).toMatchObject({
+				committed: true,
+				correctionType: "downgrade_certainty",
+			});
+
+			const mod = (await import("./runtime-tools")) as Record<string, unknown>;
+			expect(typeof mod.buildRuntimeDiagnosticsBundle).toBe("function");
+			expect(typeof mod.simulateRollback).toBe("function");
+
+			const bundle = await (
+				mod.buildRuntimeDiagnosticsBundle as (args: {
+					bardoRoot: string;
+					recentEventCount?: number;
+				}) => Promise<{
+					duplicateCandidates: Array<unknown>;
+					recentEvents: Array<unknown>;
+				}>
+			)({
+				bardoRoot,
+				recentEventCount: 5,
+			});
+			expect(bundle.recentEvents.length).toBeGreaterThan(0);
+			expect(Array.isArray(bundle.duplicateCandidates)).toBe(true);
+
+			const rollback = await (
+				mod.simulateRollback as (args: {
+					bardoRoot: string;
+					toEventId?: string | null;
+				}) => Promise<{
+					targetStateHash: string;
+					fromStateHash: string;
+					rollbackSummary: Record<string, unknown>;
+				}>
+			)({
+				bardoRoot,
+				toEventId: merged.eventId as string,
+			});
+			expect(typeof rollback.targetStateHash).toBe("string");
+			expect(typeof rollback.fromStateHash).toBe("string");
+			expect(typeof rollback.rollbackSummary).toBe("object");
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
