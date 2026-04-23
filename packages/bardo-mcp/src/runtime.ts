@@ -786,9 +786,7 @@ async function handleLogin(
 		const explicitRefreshToken = env.BARDO_REFRESH_TOKEN?.trim() || null;
 		const usingExplicitApiKey = explicitApiKey !== null;
 		let apiKey = explicitApiKey;
-		let refreshToken = usingExplicitApiKey
-			? explicitRefreshToken
-			: null;
+		let refreshToken = usingExplicitApiKey ? explicitRefreshToken : null;
 		let expiresAtISO: string | null = null;
 		let refreshUrl: string | undefined;
 		let accountLabel: string | undefined;

@@ -2076,8 +2076,7 @@ http_headers = { Authorization = "Bearer bardo_live_saved" }
 						});
 					}
 					if (
-						String(input) ===
-						"https://www.bardo.gg/api/connect/runtime-status"
+						String(input) === "https://www.bardo.gg/api/connect/runtime-status"
 					) {
 						return new Response(JSON.stringify({ ok: true }), {
 							status: 200,
