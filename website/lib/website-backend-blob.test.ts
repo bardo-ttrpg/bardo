@@ -1,16 +1,19 @@
 import { describe, expect, mock, test } from "bun:test";
 
 const blobs = new Map<string, string>();
+const putOptions = new Map<string, { access?: string }>();
 
 mock.module("@vercel/blob", () => ({
-	get: async (pathname: string) => {
+	get: async (pathname: string, options?: { access?: string }) => {
+		putOptions.set(`get:${pathname}`, { access: options?.access });
 		const body = blobs.get(pathname);
 		if (body === undefined) return null;
 		return {
 			text: async () => body,
 		};
 	},
-	put: async (pathname: string, body: string) => {
+	put: async (pathname: string, body: string, options?: { access?: string }) => {
+		putOptions.set(pathname, { access: options?.access });
 		blobs.set(pathname, body);
 		return {
 			pathname,
@@ -22,6 +25,7 @@ mock.module("@vercel/blob", () => ({
 describe("createWebsiteBackendClient blob driver", () => {
 	test("persists bridge approval across separate Vercel backend clients", async () => {
 		blobs.clear();
+		putOptions.clear();
 		const { createWebsiteBackendClient } = await import("./website-backend");
 		const env = {
 			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
@@ -72,10 +76,15 @@ describe("createWebsiteBackendClient blob driver", () => {
 		expect([...blobs.keys()]).toContain(
 			`test-prod/cli-device-sessions/${started.sessionId}.json`,
 		);
+		expect(
+			putOptions.get(`test-prod/cli-device-sessions/${started.sessionId}.json`)
+				?.access,
+		).toBe("public");
 	});
 
 	test("persists bridge denial and refresh rotation across separate clients", async () => {
 		blobs.clear();
+		putOptions.clear();
 		const { createWebsiteBackendClient } = await import("./website-backend");
 		const env = {
 			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
@@ -150,5 +159,35 @@ describe("createWebsiteBackendClient blob driver", () => {
 				nextRefreshToken: "refresh-token-3",
 			}),
 		).toEqual({ ok: false, reason: "invalid" });
+	});
+
+	test("uses a server-secret-derived prefix by default in hosted blob environments", async () => {
+		blobs.clear();
+		putOptions.clear();
+		const { createWebsiteBackendClient } = await import("./website-backend");
+		const client = createWebsiteBackendClient({
+			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret-for-prefix",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			VERCEL_ENV: "production",
+		});
+
+		if (!client) {
+			throw new Error("Expected blob-backed website client.");
+		}
+
+		const started = await client.startCliDeviceSession({
+			now: new Date("2036-03-25T00:00:00.000Z"),
+			ttlMs: 60_000,
+			intervalMs: 3000,
+		});
+		const [pathname] = [...blobs.keys()];
+
+		expect(pathname).toContain("website-backend/production/");
+		expect(pathname).toContain(
+			`/cli-device-sessions/${started.sessionId}.json`,
+		);
+		expect(pathname).not.toBe(
+			`website-backend/production/cli-device-sessions/${started.sessionId}.json`,
+		);
 	});
 });

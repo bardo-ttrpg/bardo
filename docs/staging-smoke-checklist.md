@@ -29,7 +29,7 @@ Run this after every meaningful staging deployment.
 
 1. Production and Vercel preview bridge sessions must use Vercel Blob or another explicitly supported durable backend.
 2. Do not promote a hosted deployment that stores website backend state under `/tmp`; Vercel compute instances do not share that directory across cold starts, regions, or concurrent instances.
-3. `BARDO_WEBSITE_BACKEND_DRIVER=blob` with `BLOB_READ_WRITE_TOKEN` is the expected Vercel path.
+3. `BARDO_WEBSITE_BACKEND_DRIVER=blob` with `BLOB_READ_WRITE_TOKEN` is the expected Vercel path. The default Blob prefix includes a server-secret-derived segment; set `BARDO_WEBSITE_BACKEND_PREFIX` only when you need an explicit isolated namespace.
 4. `BARDO_WEBSITE_BACKEND_DRIVER=file` with `BARDO_WEBSITE_BACKEND_SQLITE_PATH` is only appropriate for local development or a truly durable non-Vercel filesystem.
 5. Legacy Clerk `solo` plan IDs and `has({ plan: "solo" })` map to Pro bridge access during the billing migration.
 

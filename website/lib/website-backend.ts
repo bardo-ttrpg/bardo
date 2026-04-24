@@ -140,7 +140,10 @@ function resolveBlobPrefix(env: Record<string, string | undefined>): string {
 	}
 	const environment =
 		env.VERCEL_ENV?.trim() || env.NODE_ENV?.trim() || "development";
-	return `website-backend/${environment}`;
+	const secret =
+		env.BARDO_BRIDGE_LOGIN_SECRET?.trim() || env.BLOB_READ_WRITE_TOKEN?.trim();
+	const suffix = secret ? stablePathHash(secret).slice(0, 32) : "unconfigured";
+	return `website-backend/${environment}/${suffix}`;
 }
 
 function resolveBackendPath(
@@ -219,7 +222,7 @@ async function readBlobJson<T>(
 	pathname: string,
 ): Promise<T | null> {
 	const result = await getBlob(pathname, {
-		access: "private",
+		access: "public",
 		token: config.token,
 		useCache: false,
 	});
@@ -241,7 +244,7 @@ async function writeBlobJson<T>(
 	value: T,
 ): Promise<void> {
 	await putBlob(pathname, JSON.stringify(value, null, 2), {
-		access: "private",
+		access: "public",
 		addRandomSuffix: false,
 		allowOverwrite: true,
 		contentType: "application/json; charset=utf-8",
