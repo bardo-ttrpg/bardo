@@ -128,8 +128,7 @@ describe("createWebsiteBackendClient blob driver", () => {
 				refreshToken: "refresh-token-1",
 				expiresAt: "2036-03-25T00:10:00.000Z",
 				statusUrl: "https://www.bardo.gg/api/connect/runtime-status",
-				refreshUrl:
-					"https://www.bardo.gg/api/connect/bridge-session/refresh",
+				refreshUrl: "https://www.bardo.gg/api/connect/bridge-session/refresh",
 				plan: "pro",
 				accountLabel: "Armando",
 				serverName: "bardo",
