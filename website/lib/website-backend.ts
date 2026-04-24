@@ -224,7 +224,6 @@ async function readBlobJson<T>(
 	const result = await getBlob(pathname, {
 		access: "public",
 		token: config.token,
-		useCache: false,
 	});
 	if (!result) {
 		return null;
