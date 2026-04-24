@@ -12,7 +12,11 @@ mock.module("@vercel/blob", () => ({
 			text: async () => body,
 		};
 	},
-	put: async (pathname: string, body: string, options?: { access?: string }) => {
+	put: async (
+		pathname: string,
+		body: string,
+		options?: { access?: string },
+	) => {
 		putOptions.set(pathname, { access: options?.access });
 		blobs.set(pathname, body);
 		return {
