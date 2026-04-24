@@ -66,6 +66,26 @@ function requireHttpsUrl(
 	}
 }
 
+function backendDriver(
+	env: Record<string, string | undefined>,
+): "blob" | "file" | null {
+	const configured = normalize(env.BARDO_WEBSITE_BACKEND_DRIVER)?.toLowerCase();
+	if (configured === "blob" || configured === "file") {
+		return configured;
+	}
+	if (normalize(env.BLOB_READ_WRITE_TOKEN)) {
+		return "blob";
+	}
+	if (normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
+		return "file";
+	}
+	return null;
+}
+
+function isTmpPath(value: string): boolean {
+	return value === "/tmp" || value.startsWith("/tmp/");
+}
+
 export function isProductionDeploy(
 	env: Record<string, string | undefined>,
 ): boolean {
@@ -128,8 +148,24 @@ export function validateDeployEnv(
 	if (!normalize(env.BARDO_BRIDGE_LOGIN_SECRET)) {
 		errors.push("BARDO_BRIDGE_LOGIN_SECRET is missing");
 	}
-	if (!normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
-		errors.push("BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing");
+	const driver = backendDriver(env);
+	if (driver === "blob") {
+		if (!normalize(env.BLOB_READ_WRITE_TOKEN)) {
+			errors.push("BLOB_READ_WRITE_TOKEN is missing");
+		}
+	} else if (driver === "file") {
+		const backendPath = normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH);
+		if (!backendPath) {
+			errors.push("BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing");
+		} else if (isTmpPath(backendPath)) {
+			errors.push(
+				"BARDO_WEBSITE_BACKEND_SQLITE_PATH must not use /tmp in production",
+			);
+		}
+	} else {
+		errors.push(
+			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+		);
 	}
 	requireFalse(
 		env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK,

@@ -257,6 +257,28 @@ async function expectUnpaidBridgeDenial(args: {
 	};
 }
 
+async function expectUnauthenticatedApproveRequiresBrowserSession(args: {
+	websiteUrl: string;
+	protectionHeaders: Record<string, string>;
+}): Promise<CheckResult> {
+	const approval = await postJson<{ error?: string }>({
+		url: new URL(
+			"/api/connect/bridge-session/approve",
+			args.websiteUrl,
+		).toString(),
+		headers: args.protectionHeaders,
+		body: { sessionId: "unauthenticated-smoke-check" },
+	});
+
+	return {
+		name: "bridge-session unauthenticated approve",
+		ok:
+			approval.response.status === 401 &&
+			approval.json.error === "Unauthorized",
+		details: `${approval.response.status} ${approval.json.error ?? "missing error"}`,
+	};
+}
+
 async function main() {
 	const websiteUrl = readRequiredEnv("STAGING_WEBSITE_URL");
 	const authCookie = readOptionalEnv("STAGING_AUTH_COOKIE");
@@ -307,6 +329,12 @@ async function main() {
 				redirect: "manual",
 			},
 			expectedStatuses: [307, 308],
+		}),
+	);
+	checks.push(
+		await expectUnauthenticatedApproveRequiresBrowserSession({
+			websiteUrl,
+			protectionHeaders,
 		}),
 	);
 

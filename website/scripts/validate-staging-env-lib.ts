@@ -74,6 +74,22 @@ function requireHttpsUrl(
 	}
 }
 
+function backendDriver(
+	env: Record<string, string | undefined>,
+): "blob" | "file" | null {
+	const configured = normalize(env.BARDO_WEBSITE_BACKEND_DRIVER)?.toLowerCase();
+	if (configured === "blob" || configured === "file") {
+		return configured;
+	}
+	if (normalize(env.BLOB_READ_WRITE_TOKEN)) {
+		return "blob";
+	}
+	if (normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
+		return "file";
+	}
+	return null;
+}
+
 export function validateStagingEnv(
 	env: Record<string, string | undefined>,
 ): ValidationResult {
@@ -106,8 +122,19 @@ export function validateStagingEnv(
 	if (!normalize(env.BARDO_BRIDGE_LOGIN_SECRET)) {
 		errors.push("BARDO_BRIDGE_LOGIN_SECRET is missing");
 	}
-	if (!normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
-		errors.push("BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing");
+	const driver = backendDriver(env);
+	if (driver === "blob") {
+		if (!normalize(env.BLOB_READ_WRITE_TOKEN)) {
+			errors.push("BLOB_READ_WRITE_TOKEN is missing");
+		}
+	} else if (driver === "file") {
+		if (!normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH)) {
+			errors.push("BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing");
+		}
+	} else {
+		errors.push(
+			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+		);
 	}
 	requireFalse(
 		env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK,

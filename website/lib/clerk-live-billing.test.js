@@ -50,6 +50,33 @@ describe("clerk-live-billing", () => {
 		expect(snapshot.cancelAtPeriodEnd).toBe(false);
 	});
 
+	test("maps legacy solo Clerk plan id to pro", () => {
+		const snapshot = resolveLiveBillingSnapshotFromSubscription(
+			{
+				id: "sub_legacy_solo",
+				status: "active",
+				subscriptionItems: [
+					{
+						status: "active",
+						planId: "cplan_solo",
+						planPeriod: "month",
+						periodStart: 100,
+						periodEnd: 200,
+						canceledAt: null,
+					},
+				],
+			},
+			{
+				CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+			},
+			150,
+		);
+
+		expect(snapshot.plan).toBe("pro");
+		expect(snapshot.billingInterval).toBe("month");
+		expect(snapshot.subscriptionStatus).toBe("active");
+	});
+
 	test("maps the current Clerk subscription item plan slug to pro without env configuration", () => {
 		const periodStart = new Date("2026-04-01T00:00:00.000Z");
 		const periodEnd = new Date("2026-05-01T00:00:00.000Z");

@@ -82,6 +82,15 @@ function hasSubscription(snapshot: BillingSnapshot): boolean {
 	return snapshot.plan === "pro";
 }
 
+function hasPaidBridgeEntitlement(
+	authState: Awaited<ReturnType<BridgeSessionApproveDeps["resolveUserId"]>>,
+): boolean {
+	return (
+		authState.has?.({ plan: "pro" }) === true ||
+		authState.has?.({ plan: "solo" }) === true
+	);
+}
+
 const ACTIVE_PRO_REQUIRED_MESSAGE =
 	"An active Pro subscription is required before a bridge can connect to Bardo.";
 
@@ -142,7 +151,7 @@ export function createBridgeSessionApprovePostHandler(
 
 		try {
 			const billing = await deps.readBillingSnapshot(authState.userId);
-			const hasProEntitlement = authState.has?.({ plan: "pro" }) ?? false;
+			const hasProEntitlement = hasPaidBridgeEntitlement(authState);
 			const effectivePlan =
 				hasSubscription(billing) || hasProEntitlement ? "pro" : billing.plan;
 			if (effectivePlan !== "pro" || billing.billingUnavailable) {

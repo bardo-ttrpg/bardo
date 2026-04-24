@@ -113,6 +113,57 @@ describe("POST /api/connect/bridge-session/approve", () => {
 		expect(body.ok).toBe(true);
 	});
 
+	test("approves when legacy Clerk solo entitlement is active", async () => {
+		const handler = createBridgeSessionApprovePostHandler({
+			resolveUserId: async () => ({
+				userId: "user_legacy_solo",
+				has: ({ plan }) => plan === "solo",
+			}),
+			readBillingSnapshot: async () => ({
+				billingUnavailable: false,
+				plan: "free",
+				creditsTotal: 100,
+				creditsUsed: 0,
+				creditsRemaining: 100,
+				periodStart: 0,
+				mcpCallsTotal: 0,
+				mcpCallsThisPeriod: 0,
+				subscriptionStatus: "active",
+				subscriptionId: null,
+				billingInterval: null,
+				currentPeriodEnd: null,
+				cancelAtPeriodEnd: false,
+			}),
+			createBridgeCredentials: async ({ plan }) => {
+				expect(plan).toBe("pro");
+				return {
+					accessToken: "bridge_access",
+					refreshToken: "bridge_refresh",
+					expiresAt: "2099-03-03T00:10:00.000Z",
+					statusUrl: "https://app.bardo.ai/api/connect/runtime-status",
+					refreshUrl: "https://app.bardo.ai/api/connect/bridge-session/refresh",
+					plan: "pro",
+					accountLabel: "Armando",
+					serverName: "bardo",
+					issuedAtISO: "2099-03-03T00:00:00.000Z",
+				};
+			},
+			approveSession: async () => ({ ok: true }),
+		});
+
+		const response = await handler(
+			new Request("https://app.bardo.ai/api/connect/bridge-session/approve", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ sessionId: "bridge_session_123" }),
+			}),
+		);
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.ok).toBe(true);
+	});
+
 	test("rejects approval and denies the pending session when the user does not have an active subscription", async () => {
 		let deniedSessionId: string | null = null;
 		const handler = createBridgeSessionApprovePostHandler({

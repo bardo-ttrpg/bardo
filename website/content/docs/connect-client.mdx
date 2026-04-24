@@ -56,6 +56,10 @@ bardo init --rulebook ./rules/core-rulebook.md
 
 The browser approval confirms account access for the bridge session. The hosted side handles approvals, billing, entitlements, status checks, and token refresh. It does not own your campaign truth.
 
+Approval must happen in a signed-in browser session. A direct unauthenticated `curl` or script POST to `/api/connect/bridge-session/approve` should return `401 Unauthorized`; that protects the bridge from being approved outside your account session.
+
+Paid access is Pro. Legacy Clerk `solo` subscriptions are accepted as Pro-equivalent access while older billing records finish migrating.
+
 ## Local MCP endpoint
 
 After approval, your client talks to the local MCP endpoint exposed by the Bardo bridge. That endpoint exists so the client can use workspace files and `.bardo/` artifacts without sending your campaign into a hosted gameplay service.
@@ -76,3 +80,4 @@ Troubleshooting:
 - If the client does not see Bardo, restart the client after `bardo connect`.
 - If readiness is not `ready`, fix the missing campaign inputs before expecting richer play.
 - If the workspace lost `.bardo/`, rebuild it with `bardo init` before resuming play.
+- If `bardo login` says the bridge session expired or was not found, start a fresh login after confirming the hosted deployment is using durable bridge storage rather than `/tmp`.

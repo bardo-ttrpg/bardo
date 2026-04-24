@@ -26,7 +26,7 @@ describe("validateDeployEnv", () => {
 		);
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
-			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
 		);
 	});
 
@@ -113,5 +113,48 @@ describe("validateDeployEnv", () => {
 		expect(result.errors).toContain(
 			"BARDO_RUNTIME_STATUS_URL must not point to localhost for production",
 		);
+	});
+
+	test("rejects /tmp file backend paths in production", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_DRIVER: "file",
+			BARDO_WEBSITE_BACKEND_SQLITE_PATH: "/tmp/bardo/website-backend.json",
+		});
+
+		expect(result.errors).toContain(
+			"BARDO_WEBSITE_BACKEND_SQLITE_PATH must not use /tmp in production",
+		);
+	});
+
+	test("accepts Vercel Blob as the production backend", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+		});
+
+		expect(result.errors).toEqual([]);
 	});
 });

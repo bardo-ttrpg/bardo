@@ -23,6 +23,23 @@ describe("validateDevelopmentEnv", () => {
 		expect(result.errors).toEqual([]);
 	});
 
+	test("accepts explicit Blob backend when development fallbacks are disabled", () => {
+		const result = validateDevelopmentEnv({
+			NODE_ENV: "development",
+			NEXT_PUBLIC_APP_URL: "http://localhost:3001",
+			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+		});
+
+		expect(result.errors).toEqual([]);
+		expect(result.warnings).not.toContain(
+			"BARDO_WEBSITE_BACKEND_SQLITE_PATH is not set; development will rely on memory fallbacks where allowed.",
+		);
+	});
+
 	test("rejects production mode, non-local urls, and disabled fallbacks without a backend", () => {
 		const result = validateDevelopmentEnv({
 			NODE_ENV: "production",

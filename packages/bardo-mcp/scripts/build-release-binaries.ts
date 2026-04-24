@@ -8,6 +8,11 @@ type PackageJson = {
 };
 
 async function readPackageVersion(): Promise<string> {
+	const override = process.env.BARDO_RELEASE_VERSION_OVERRIDE?.trim();
+	if (override) {
+		return override.startsWith("v") ? override.slice(1) : override;
+	}
+
 	const packageJsonPath = path.join(import.meta.dir, "..", "package.json");
 	const raw = await readFile(packageJsonPath, "utf8");
 	const parsed = JSON.parse(raw) as Partial<PackageJson>;

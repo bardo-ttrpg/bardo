@@ -2,13 +2,13 @@ import type { BillingInterval } from "./user-billing";
 
 type CheckoutPlanTier = "pro";
 
-const CLERK_PLAN_ENV: Record<CheckoutPlanTier, string> = {
-	pro: "CLERK_BILLING_PLAN_PRO",
+const CLERK_PLAN_ENV: Record<CheckoutPlanTier, string[]> = {
+	pro: ["CLERK_BILLING_PLAN_PRO", "CLERK_BILLING_PLAN_SOLO"],
 };
 
 export type ClerkPlanPeriod = "month" | "annual";
 
-function clerkPlanEnvVar(plan: CheckoutPlanTier): string {
+function clerkPlanEnvVars(plan: CheckoutPlanTier): string[] {
 	return CLERK_PLAN_ENV[plan];
 }
 
@@ -16,8 +16,13 @@ export function getClerkPlanId(
 	plan: CheckoutPlanTier,
 	env: Record<string, string | undefined> = process.env,
 ): string | null {
-	const value = env[clerkPlanEnvVar(plan)]?.trim();
-	return value && value.length > 0 ? value : null;
+	for (const envVar of clerkPlanEnvVars(plan)) {
+		const value = env[envVar]?.trim();
+		if (value && value.length > 0) {
+			return value;
+		}
+	}
+	return null;
 }
 
 export function isClerkBillingConfigured(
@@ -39,5 +44,12 @@ export function resolvePlanFromClerkPlanId(
 	env: Record<string, string | undefined> = process.env,
 ): CheckoutPlanTier | null {
 	const tiers: CheckoutPlanTier[] = ["pro"];
-	return tiers.find((tier) => getClerkPlanId(tier, env) === planId) ?? null;
+	const normalizedPlanId = planId.trim();
+	return (
+		tiers.find((tier) =>
+			clerkPlanEnvVars(tier).some(
+				(envVar) => env[envVar]?.trim() === normalizedPlanId,
+			),
+		) ?? null
+	);
 }

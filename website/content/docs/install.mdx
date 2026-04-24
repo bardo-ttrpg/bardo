@@ -37,6 +37,8 @@ bardo connect --client codex
 
 `bardo login` opens a browser approval flow. That approval gives the local bridge the account credentials it needs to start the local MCP endpoint for your client. It does not upload your campaign into a hosted gameplay backend.
 
+The approval URL must be opened while signed in to the Bardo account that owns the subscription. A raw unauthenticated POST to the approval API returns `401 Unauthorized` by design.
+
 If `./rulebook.md` exists, `bardo init` preserves it at `.bardo/rules/rulebook.md`, normalizes it into `.bardo/rules/normalized/`, and writes `.bardo/rules/normalized/index.json`.
 
 If the rulebook lives elsewhere inside the workspace, pass it explicitly:
@@ -53,3 +55,4 @@ Troubleshooting:
 - If `bardo` is not found, open a new shell and try again.
 - If the installer reports a checksum problem, stop there and rerun the official installer instead of forcing it.
 - If you are unsure why the browser step exists, remember: the bridge is local, but account approval and billing are hosted.
+- If approval says the bridge session expired or was not found, retry `bardo login`; hosted deployments must use durable bridge storage so approval and polling can meet across Vercel instances.

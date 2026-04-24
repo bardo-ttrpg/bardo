@@ -19,6 +19,15 @@ describe("clerk-billing", () => {
 		expect(getClerkPlanId("pro", env)).toBe("cplan_pro");
 	});
 
+	test("treats legacy solo Clerk plan env as pro-equivalent", () => {
+		const env = {
+			CLERK_BILLING_PLAN_SOLO: "cplan_solo",
+		};
+
+		expect(getClerkPlanId("pro", env)).toBe("cplan_solo");
+		expect(isClerkBillingConfigured(env)).toBe(true);
+	});
+
 	test("returns null when plan id is missing", () => {
 		expect(getClerkPlanId("pro", {})).toBeNull();
 	});
