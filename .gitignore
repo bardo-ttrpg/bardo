@@ -55,3 +55,4 @@ website/.tmp-*
 .env
 .codex/
 .vercel
+.env*.local
