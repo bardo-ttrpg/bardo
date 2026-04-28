@@ -23,17 +23,14 @@ mock.module("@vercel/blob", () => ({
 
 const originalFetch = globalThis.fetch;
 
-globalThis.fetch = Object.assign(
-	async (input: RequestInfo | URL) => {
-		const url = new URL(input.toString());
-		const pathname = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-		const body = blobs.get(pathname);
-		return new Response(body ?? "not found", {
-			status: body === undefined ? 404 : 200,
-		});
-	},
-	originalFetch,
-) as typeof fetch;
+globalThis.fetch = Object.assign(async (input: RequestInfo | URL) => {
+	const url = new URL(input.toString());
+	const pathname = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+	const body = blobs.get(pathname);
+	return new Response(body ?? "not found", {
+		status: body === undefined ? 404 : 200,
+	});
+}, originalFetch) as typeof fetch;
 
 describe("createWebsiteBackendClient blob driver", () => {
 	test("persists bridge approval across separate Vercel backend clients", async () => {
