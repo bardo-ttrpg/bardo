@@ -157,4 +157,28 @@ describe("validateDeployEnv", () => {
 
 		expect(result.errors).toEqual([]);
 	});
+
+	test("allows explicit temporary memory fallback when durable storage is unavailable", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_ALLOW_MEMORY_FALLBACK: "true",
+			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "true",
+			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "true",
+			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "true",
+		});
+
+		expect(result.errors).toEqual([]);
+		expect(result.warnings).toContain(
+			"BARDO_WEBSITE_BACKEND_ALLOW_MEMORY_FALLBACK=true is temporary and not durable for production bridge sessions",
+		);
+	});
 });

@@ -1,7 +1,7 @@
 export const BARDO_MCP_PACKAGE_VERSION = "0.1.1";
 
 export const BARDO_MCP_PUBLIC_RELEASES_BASE_URL =
-	"https://rfqmhu7p5y6j0vaf.public.blob.vercel-storage.com/releases";
+	"https://www.bardo.gg/releases";
 
 export const BARDO_MCP_RELEASE_VERSION = BARDO_MCP_PACKAGE_VERSION.startsWith(
 	"v",

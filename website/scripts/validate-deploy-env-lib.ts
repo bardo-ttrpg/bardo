@@ -86,6 +86,12 @@ function isTmpPath(value: string): boolean {
 	return value === "/tmp" || value.startsWith("/tmp/");
 }
 
+function isExplicitMemoryBackendFallback(
+	env: Record<string, string | undefined>,
+): boolean {
+	return normalize(env.BARDO_WEBSITE_BACKEND_ALLOW_MEMORY_FALLBACK) === "true";
+}
+
 export function isProductionDeploy(
 	env: Record<string, string | undefined>,
 ): boolean {
@@ -149,7 +155,12 @@ export function validateDeployEnv(
 		errors.push("BARDO_BRIDGE_LOGIN_SECRET is missing");
 	}
 	const driver = backendDriver(env);
-	if (driver === "blob") {
+	const allowMemoryBackendFallback = isExplicitMemoryBackendFallback(env);
+	if (allowMemoryBackendFallback) {
+		warnings.push(
+			"BARDO_WEBSITE_BACKEND_ALLOW_MEMORY_FALLBACK=true is temporary and not durable for production bridge sessions",
+		);
+	} else if (driver === "blob") {
 		if (!normalize(env.BLOB_READ_WRITE_TOKEN)) {
 			errors.push("BLOB_READ_WRITE_TOKEN is missing");
 		}
@@ -167,21 +178,23 @@ export function validateDeployEnv(
 			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
 		);
 	}
-	requireFalse(
-		env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK,
-		"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK",
-		errors,
-	);
-	requireFalse(
-		env.BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK,
-		"BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK",
-		errors,
-	);
-	requireFalse(
-		env.BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK,
-		"BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK",
-		errors,
-	);
+	if (!allowMemoryBackendFallback) {
+		requireFalse(
+			env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK,
+			"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK",
+			errors,
+		);
+		requireFalse(
+			env.BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK,
+			"BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK",
+			errors,
+		);
+		requireFalse(
+			env.BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK,
+			"BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK",
+			errors,
+		);
+	}
 	if (
 		normalize(env.BARDO_ALLOW_WORKSPACE_ROOT_OVERRIDE) === "true" &&
 		!normalize(env.BARDO_WORKSPACE_ROOT_ALLOWLIST)

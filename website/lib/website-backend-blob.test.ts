@@ -4,13 +4,8 @@ const blobs = new Map<string, string>();
 const putOptions = new Map<string, { access?: string }>();
 
 mock.module("@vercel/blob", () => ({
-	get: async (pathname: string, options?: { access?: string }) => {
-		putOptions.set(`get:${pathname}`, { access: options?.access });
-		const body = blobs.get(pathname);
-		if (body === undefined) return null;
-		return {
-			text: async () => body,
-		};
+	get: async () => {
+		throw new Error("SDK get must not be used for public blob backend reads");
 	},
 	put: async (
 		pathname: string,
@@ -26,6 +21,20 @@ mock.module("@vercel/blob", () => ({
 	},
 }));
 
+const originalFetch = globalThis.fetch;
+
+globalThis.fetch = Object.assign(
+	async (input: RequestInfo | URL) => {
+		const url = new URL(input.toString());
+		const pathname = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+		const body = blobs.get(pathname);
+		return new Response(body ?? "not found", {
+			status: body === undefined ? 404 : 200,
+		});
+	},
+	originalFetch,
+) as typeof fetch;
+
 describe("createWebsiteBackendClient blob driver", () => {
 	test("persists bridge approval across separate Vercel backend clients", async () => {
 		blobs.clear();
@@ -34,7 +43,7 @@ describe("createWebsiteBackendClient blob driver", () => {
 		const env = {
 			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
 			BARDO_WEBSITE_BACKEND_PREFIX: "test-prod",
-			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_teststore_secret",
 			VERCEL_ENV: "production",
 		};
 		const starter = createWebsiteBackendClient(env);
@@ -93,7 +102,7 @@ describe("createWebsiteBackendClient blob driver", () => {
 		const env = {
 			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
 			BARDO_WEBSITE_BACKEND_PREFIX: "test-prod",
-			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_teststore_secret",
 			VERCEL_ENV: "production",
 		};
 		const starter = createWebsiteBackendClient(env);
@@ -171,7 +180,7 @@ describe("createWebsiteBackendClient blob driver", () => {
 		const { createWebsiteBackendClient } = await import("./website-backend");
 		const client = createWebsiteBackendClient({
 			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret-for-prefix",
-			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_teststore_secret",
 			VERCEL_ENV: "production",
 		});
 

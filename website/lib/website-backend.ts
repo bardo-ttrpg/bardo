@@ -1,7 +1,7 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { get as getBlob, put as putBlob } from "@vercel/blob";
+import { put as putBlob } from "@vercel/blob";
 import type { BridgeSessionCredentialBundle } from "./bridge-session-auth";
 
 type RateLimitBudget = {
@@ -217,24 +217,38 @@ function stablePathHash(input: string): string {
 	return createHash("sha256").update(input).digest("base64url");
 }
 
+function publicBlobUrl(
+	config: Extract<BackendResolution, { driver: "blob" }>,
+	pathname: string,
+): string {
+	const match = config.token.match(/^vercel_blob_rw_([^_]+)_/);
+	if (!match) {
+		throw new Error("Unable to resolve Vercel Blob store id from token.");
+	}
+	const storeId = match[1]?.toLowerCase();
+	if (!storeId) {
+		throw new Error("Unable to resolve Vercel Blob store id from token.");
+	}
+	return `https://${storeId}.public.blob.vercel-storage.com/${pathname
+		.split("/")
+		.map(encodeURIComponent)
+		.join("/")}`;
+}
+
 async function readBlobJson<T>(
 	config: Extract<BackendResolution, { driver: "blob" }>,
 	pathname: string,
 ): Promise<T | null> {
-	const result = await getBlob(pathname, {
-		access: "public",
-		token: config.token,
-	});
-	if (!result) {
+	const result = await fetch(publicBlobUrl(config, pathname));
+	if (result.status === 404) {
 		return null;
 	}
-	if ("text" in result && typeof result.text === "function") {
-		return JSON.parse(await result.text()) as T;
+	if (!result.ok) {
+		throw new Error(
+			`Failed to read Vercel Blob backend object ${pathname}: ${result.status}`,
+		);
 	}
-	if (result.statusCode !== 200 || !result.stream) {
-		return null;
-	}
-	return JSON.parse(await new Response(result.stream).text()) as T;
+	return JSON.parse(await result.text()) as T;
 }
 
 async function writeBlobJson<T>(

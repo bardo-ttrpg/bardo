@@ -52,6 +52,7 @@ website/.lighthouse/
 website/.bun-tmp/
 website/.bun-install/
 website/.tmp-*
+website/public/releases/
 .env
 .codex/
 .vercel
