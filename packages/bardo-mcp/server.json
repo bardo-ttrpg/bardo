@@ -1,0 +1,31 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+	"name": "io.github.armando-andre/bardo",
+	"title": "Bardo MCP",
+	"description": "Local-first tabletop campaign runtime with paid Bardo account access.",
+	"version": "0.1.1",
+	"websiteUrl": "https://bardo.gg",
+	"repository": {
+		"url": "https://github.com/armando-andre/bardo-mcp",
+		"source": "github"
+	},
+	"icons": [
+		{
+			"src": "https://www.bardo.gg/icon.png",
+			"mimeType": "image/png",
+			"sizes": [
+				"any"
+			]
+		}
+	],
+	"packages": [
+		{
+			"registryType": "npm",
+			"identifier": "@bardo/mcp",
+			"version": "0.1.1",
+			"transport": {
+				"type": "stdio"
+			}
+		}
+	]
+}

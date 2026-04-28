@@ -1,0 +1,42 @@
+<evaluation>
+  <qa_pair>
+    <question>Which command starts Bardo's browser-approved account connection before client setup?</question>
+    <answer>bardo login</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which command prepares the local .bardo workspace layer before play?</question>
+    <answer>bardo init</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which MCP transport does Bardo publish for this release?</question>
+    <answer>stdio</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the official MCP Registry server name for Bardo?</question>
+    <answer>io.github.armando-andre/bardo</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What npm package identifier is used for Bardo MCP?</question>
+    <answer>@bardo/mcp</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which tool should an agent call first to inspect readiness and guardrails?</question>
+    <answer>bardo_workspace_status</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which Bardo tool records explicit player corrections at the highest canon precedence?</question>
+    <answer>user_correction</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Where does Bardo keep prepared local campaign artifacts?</question>
+    <answer>.bardo/</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Does Bardo upload campaign truth to a hosted gameplay service in this release?</question>
+    <answer>No</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What access is required to use Bardo after installation?</question>
+    <answer>An active Bardo Pro subscription or the 3-day trial</answer>
+  </qa_pair>
+</evaluation>
