@@ -43,6 +43,9 @@ export const saveReleaseFile = mutation({
 			updatedAtMs: Date.now(),
 		};
 		if (existing) {
+			if (existing.storageId !== args.storageId) {
+				await ctx.storage.delete(existing.storageId);
+			}
 			await ctx.db.patch(existing._id, next);
 			return;
 		}

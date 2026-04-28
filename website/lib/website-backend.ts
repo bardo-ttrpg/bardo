@@ -49,7 +49,10 @@ type KeyUsageSnapshot = UsageSnapshot & {
 };
 
 type BackendState = {
-	rateLimitWindows: Record<string, { used: number; updatedAtMs: number }>;
+	rateLimitWindows: Record<
+		string,
+		{ used: number; updatedAtMs: number; expiresAtMs?: number }
+	>;
 	cliLoginTokens: Record<string, { expiresAtMs: number; usedAtMs: number }>;
 	cliDeviceSessions: Record<
 		string,
@@ -358,6 +361,7 @@ function createConvexWebsiteBackendClient(
 				};
 			}
 			await writeJson<RateLimitWindowRecord>(recordKey, {
+				expiresAtMs: windowStartMs + args.windowMs,
 				used: nextUsed,
 				updatedAtMs: nowMs,
 			});
