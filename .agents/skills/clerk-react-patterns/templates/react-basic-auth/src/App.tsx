@@ -1,4 +1,4 @@
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react"
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 
 function App() {
 	return (
@@ -13,7 +13,7 @@ function App() {
 				</Show>
 			</header>
 		</>
-	)
+	);
 }
 
-export default App
+export default App;

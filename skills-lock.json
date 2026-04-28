@@ -1,161 +1,161 @@
 {
-  "version": 1,
-  "skills": {
-    "accessibility": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/accessibility/SKILL.md",
-      "computedHash": "6462f04969f59f771150e6410e6a11fa397f2934be0b51e8650f495feed1e28d"
-    },
-    "best-practices": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/best-practices/SKILL.md",
-      "computedHash": "98dafea60ec1a7f5f70f6febcdd4b4fa3fe15723ad9c0b991c0818615bff7ba6"
-    },
-    "bun": {
-      "source": "bun.sh",
-      "sourceType": "well-known",
-      "computedHash": "bc316dd20398ba1d43069d1ebc4e429f1ba2766d51c69aa96ef815c52346cdb7"
-    },
-    "clerk": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "272e4f3c4fcac175ea7f46740f0ad1bf56167110d1bcecde5b33ecb129871d37"
-    },
-    "clerk-backend-api": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "1b8f6b94395bd00123ae80abd52c617e95585f600c1fdc84dd6813a0ce799cc8"
-    },
-    "clerk-custom-ui": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "5f73332b05fd88c5f9b3c56dd92370a12a850059fba34ec0605e4506afaddc96"
-    },
-    "clerk-nextjs-patterns": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "69c34e157c9f0c4a231a6ece2e599f74b31a008005745ffcc9eb5a625e807698"
-    },
-    "clerk-orgs": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "90ba77cb7983c132ae329d8b33bfefb38b67ed78de0fb14a657015d523930d17"
-    },
-    "clerk-react-patterns": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "456206a8bb6f71bb66225fd41844eb9c7f2ee00d58e2d4f39505dea40a8df4a4"
-    },
-    "clerk-setup": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "13ea4e20447ff8e72d8d43d87c043e2c7430379cb73fb4dbd488401b85d8c2a3"
-    },
-    "clerk-testing": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "889a8f63d333dbb09b81608d1dc240f1e32b12dd8e8a8f1e3e72323c69b41f60"
-    },
-    "clerk-webhooks": {
-      "source": "clerk/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "c766d7b021907e6b8f1e567b30d5a5d70fc313626ab0ce7a9c10fc31bf71aae7"
-    },
-    "composition-patterns": {
-      "source": "vercel-labs/agent-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "c124390cc3441844903ada94cb5820b23d922f2d0ad34e01e029e410197c8a32"
-    },
-    "core-web-vitals": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/core-web-vitals/SKILL.md",
-      "computedHash": "fa437acc2249cea2cb28f190ba7faf8fdfac829d1c1aafa9ce938c6dd9338721"
-    },
-    "deploy-to-vercel": {
-      "source": "vercel-labs/agent-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "698dfb0ec0cf3e8d97c3f181e13b37b3b8fbc872a4b031d812adb4193f66035e"
-    },
-    "frontend-design": {
-      "source": "anthropics/skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "82fb11a63fb1e35ee2469516ed02d54695f783115b1540c0e783197af4240a3a"
-    },
-    "next-best-practices": {
-      "source": "vercel-labs/next-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "22d9bba45864c4ae8acca9f6430290634343b7de91005d090e0ba201bdbbb5da"
-    },
-    "next-cache-components": {
-      "source": "vercel-labs/next-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "82a02f95879e9adf1a5a89f9ca2f51813e41ff3bab3c723cc8905f5a926bdd30"
-    },
-    "next-upgrade": {
-      "source": "vercel-labs/next-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "265833561c41038b4a626585b46186cff859b7f9b2254ae6b88d01648790a7b4"
-    },
-    "performance": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/performance/SKILL.md",
-      "computedHash": "acbafe2fcbfc3a1a67db47c2f6299d5c0e16f543c4e683e38e74a8ccb54888fb"
-    },
-    "react-best-practices": {
-      "source": "vercel-labs/agent-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "502eb06700e2c3cb1bd7f710860528f72281320bd5171a2087b05a090b573dc1"
-    },
-    "seo": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/seo/SKILL.md",
-      "computedHash": "f1fed683b76913d26fbf1aa1e008e6932f7771701fc3a79925b042236aa4681a"
-    },
-    "shadcn": {
-      "source": "shadcn/ui",
-      "sourceType": "autoskills-registry",
-      "computedHash": "1b1287f853d10e344c8e7bf8f1715ec77554b083ad48fff6a4a1c844009626cd"
-    },
-    "tailwind-css-patterns": {
-      "source": "giuseppe-trisciuoglio/developer-kit",
-      "sourceType": "autoskills-registry",
-      "computedHash": "8fd534b64b3f305ade80c207e2f9ba4338d5e409e355af9f724c36764b6709c1"
-    },
-    "tailwind-v4-shadcn": {
-      "source": "secondsky/claude-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "ccb851c374e9d60af52bf37d80481dbeec54c3cebf6a9dc67492ea2f8514e283"
-    },
-    "turborepo": {
-      "source": "vercel/turborepo",
-      "sourceType": "autoskills-registry",
-      "computedHash": "7a4fdfa6bec01e502214a0ecf54d863bbce70a5646ff41e23982ba22af431f3c"
-    },
-    "typescript-advanced-types": {
-      "source": "wshobson/agents",
-      "sourceType": "autoskills-registry",
-      "computedHash": "5ca0e177c6aaaba1889255691224daafdb7d71f317cc70bede1590d3907ded42"
-    },
-    "vercel-composition-patterns": {
-      "source": "vercel-labs/agent-skills",
-      "sourceType": "github",
-      "computedHash": "f98931159fa9c7fed043bcd18a891a46dcf89ababa38df13a4c5b7b30dc0ce07"
-    },
-    "vercel-react-best-practices": {
-      "source": "vercel-labs/agent-skills",
-      "sourceType": "github",
-      "computedHash": "12bab0ca6a45898a9b7eed06260adfb1f91cddbba02c689b680cebb5d9c2420c"
-    },
-    "web-quality-audit": {
-      "source": "addyosmani/web-quality-skills",
-      "sourceType": "github",
-      "skillPath": "skills/web-quality-audit/SKILL.md",
-      "computedHash": "1168be21aa9fe7bdc6e6e053ca05b6ca5a45675a527c103cdf77bc56ce8159af"
-    }
-  }
+	"version": 1,
+	"skills": {
+		"accessibility": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/accessibility/SKILL.md",
+			"computedHash": "6462f04969f59f771150e6410e6a11fa397f2934be0b51e8650f495feed1e28d"
+		},
+		"best-practices": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/best-practices/SKILL.md",
+			"computedHash": "98dafea60ec1a7f5f70f6febcdd4b4fa3fe15723ad9c0b991c0818615bff7ba6"
+		},
+		"bun": {
+			"source": "bun.sh",
+			"sourceType": "well-known",
+			"computedHash": "bc316dd20398ba1d43069d1ebc4e429f1ba2766d51c69aa96ef815c52346cdb7"
+		},
+		"clerk": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "272e4f3c4fcac175ea7f46740f0ad1bf56167110d1bcecde5b33ecb129871d37"
+		},
+		"clerk-backend-api": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "1b8f6b94395bd00123ae80abd52c617e95585f600c1fdc84dd6813a0ce799cc8"
+		},
+		"clerk-custom-ui": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "5f73332b05fd88c5f9b3c56dd92370a12a850059fba34ec0605e4506afaddc96"
+		},
+		"clerk-nextjs-patterns": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "69c34e157c9f0c4a231a6ece2e599f74b31a008005745ffcc9eb5a625e807698"
+		},
+		"clerk-orgs": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "90ba77cb7983c132ae329d8b33bfefb38b67ed78de0fb14a657015d523930d17"
+		},
+		"clerk-react-patterns": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "456206a8bb6f71bb66225fd41844eb9c7f2ee00d58e2d4f39505dea40a8df4a4"
+		},
+		"clerk-setup": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "13ea4e20447ff8e72d8d43d87c043e2c7430379cb73fb4dbd488401b85d8c2a3"
+		},
+		"clerk-testing": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "889a8f63d333dbb09b81608d1dc240f1e32b12dd8e8a8f1e3e72323c69b41f60"
+		},
+		"clerk-webhooks": {
+			"source": "clerk/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "c766d7b021907e6b8f1e567b30d5a5d70fc313626ab0ce7a9c10fc31bf71aae7"
+		},
+		"composition-patterns": {
+			"source": "vercel-labs/agent-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "c124390cc3441844903ada94cb5820b23d922f2d0ad34e01e029e410197c8a32"
+		},
+		"core-web-vitals": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/core-web-vitals/SKILL.md",
+			"computedHash": "fa437acc2249cea2cb28f190ba7faf8fdfac829d1c1aafa9ce938c6dd9338721"
+		},
+		"deploy-to-vercel": {
+			"source": "vercel-labs/agent-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "698dfb0ec0cf3e8d97c3f181e13b37b3b8fbc872a4b031d812adb4193f66035e"
+		},
+		"frontend-design": {
+			"source": "anthropics/skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "82fb11a63fb1e35ee2469516ed02d54695f783115b1540c0e783197af4240a3a"
+		},
+		"next-best-practices": {
+			"source": "vercel-labs/next-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "22d9bba45864c4ae8acca9f6430290634343b7de91005d090e0ba201bdbbb5da"
+		},
+		"next-cache-components": {
+			"source": "vercel-labs/next-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "82a02f95879e9adf1a5a89f9ca2f51813e41ff3bab3c723cc8905f5a926bdd30"
+		},
+		"next-upgrade": {
+			"source": "vercel-labs/next-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "265833561c41038b4a626585b46186cff859b7f9b2254ae6b88d01648790a7b4"
+		},
+		"performance": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/performance/SKILL.md",
+			"computedHash": "acbafe2fcbfc3a1a67db47c2f6299d5c0e16f543c4e683e38e74a8ccb54888fb"
+		},
+		"react-best-practices": {
+			"source": "vercel-labs/agent-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "502eb06700e2c3cb1bd7f710860528f72281320bd5171a2087b05a090b573dc1"
+		},
+		"seo": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/seo/SKILL.md",
+			"computedHash": "f1fed683b76913d26fbf1aa1e008e6932f7771701fc3a79925b042236aa4681a"
+		},
+		"shadcn": {
+			"source": "shadcn/ui",
+			"sourceType": "autoskills-registry",
+			"computedHash": "1b1287f853d10e344c8e7bf8f1715ec77554b083ad48fff6a4a1c844009626cd"
+		},
+		"tailwind-css-patterns": {
+			"source": "giuseppe-trisciuoglio/developer-kit",
+			"sourceType": "autoskills-registry",
+			"computedHash": "8fd534b64b3f305ade80c207e2f9ba4338d5e409e355af9f724c36764b6709c1"
+		},
+		"tailwind-v4-shadcn": {
+			"source": "secondsky/claude-skills",
+			"sourceType": "autoskills-registry",
+			"computedHash": "ccb851c374e9d60af52bf37d80481dbeec54c3cebf6a9dc67492ea2f8514e283"
+		},
+		"turborepo": {
+			"source": "vercel/turborepo",
+			"sourceType": "autoskills-registry",
+			"computedHash": "7a4fdfa6bec01e502214a0ecf54d863bbce70a5646ff41e23982ba22af431f3c"
+		},
+		"typescript-advanced-types": {
+			"source": "wshobson/agents",
+			"sourceType": "autoskills-registry",
+			"computedHash": "5ca0e177c6aaaba1889255691224daafdb7d71f317cc70bede1590d3907ded42"
+		},
+		"vercel-composition-patterns": {
+			"source": "vercel-labs/agent-skills",
+			"sourceType": "github",
+			"computedHash": "f98931159fa9c7fed043bcd18a891a46dcf89ababa38df13a4c5b7b30dc0ce07"
+		},
+		"vercel-react-best-practices": {
+			"source": "vercel-labs/agent-skills",
+			"sourceType": "github",
+			"computedHash": "12bab0ca6a45898a9b7eed06260adfb1f91cddbba02c689b680cebb5d9c2420c"
+		},
+		"web-quality-audit": {
+			"source": "addyosmani/web-quality-skills",
+			"sourceType": "github",
+			"skillPath": "skills/web-quality-audit/SKILL.md",
+			"computedHash": "1168be21aa9fe7bdc6e6e053ca05b6ca5a45675a527c103cdf77bc56ce8159af"
+		}
+	}
 }
