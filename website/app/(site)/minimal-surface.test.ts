@@ -38,7 +38,9 @@ describe("minimal public surface", () => {
 			false,
 		);
 		expect(
-			existsSync(new URL("./(public-secondary)/pricing/page.tsx", import.meta.url)),
+			existsSync(
+				new URL("./(public-secondary)/pricing/page.tsx", import.meta.url),
+			),
 		).toBe(true);
 		expect(
 			existsSync(new URL("./privacy-policy/page.tsx", import.meta.url)),

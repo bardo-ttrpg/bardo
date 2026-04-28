@@ -27,11 +27,12 @@ Run this after every meaningful staging deployment.
 
 ## Durable Backend
 
-1. Production and Vercel preview bridge sessions must use Vercel Blob or another explicitly supported durable backend.
+1. Production bridge sessions must use Convex or another explicitly supported durable backend.
 2. Do not promote a hosted deployment that stores website backend state under `/tmp`; Vercel compute instances do not share that directory across cold starts, regions, or concurrent instances.
-3. `BARDO_WEBSITE_BACKEND_DRIVER=blob` with `BLOB_READ_WRITE_TOKEN` is the expected Vercel path. The default Blob prefix includes a server-secret-derived segment; set `BARDO_WEBSITE_BACKEND_PREFIX` only when you need an explicit isolated namespace.
+3. `BARDO_WEBSITE_BACKEND_DRIVER=convex` with `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL` plus `BARDO_CONVEX_BACKEND_SECRET` is the expected Vercel path. Convex stores bridge sessions, replay guards, rate-limit windows, usage counters, and release-file metadata as durable records.
 4. `BARDO_WEBSITE_BACKEND_DRIVER=file` with `BARDO_WEBSITE_BACKEND_SQLITE_PATH` is only appropriate for local development or a truly durable non-Vercel filesystem.
-5. Legacy Clerk `solo` plan IDs and `has({ plan: "solo" })` map to Pro bridge access during the billing migration.
+5. Do not re-enable production memory fallback flags unless this is an explicit emergency rollback. They restore availability but reintroduce cross-instance bridge-session loss.
+6. Legacy Clerk `solo` plan IDs and `has({ plan: "solo" })` map to Pro bridge access during the billing migration.
 
 ## Local Runtime
 

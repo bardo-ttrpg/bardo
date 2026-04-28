@@ -10,7 +10,7 @@ describe("validateStagingEnv", () => {
 		);
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
-			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+			"CONVEX_URL, NEXT_PUBLIC_CONVEX_URL, BLOB_READ_WRITE_TOKEN, or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
 		);
 	});
 
@@ -41,6 +41,25 @@ describe("validateStagingEnv", () => {
 			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret",
 			BARDO_WEBSITE_BACKEND_DRIVER: "blob",
 			BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_token",
+			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+		});
+
+		expect(result.errors).toEqual([]);
+	});
+
+	test("accepts Convex for staging bridge storage", () => {
+		const result = validateStagingEnv({
+			NODE_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_123",
+			CLERK_SECRET_KEY: "sk_test_123",
+			NEXT_PUBLIC_APP_URL: "https://staging.bardo.ai",
+			BARDO_AUTH_INTROSPECTION_TOKEN: "secret",
+			BARDO_BRIDGE_LOGIN_SECRET: "bridge-secret",
+			BARDO_WEBSITE_BACKEND_DRIVER: "convex",
+			BARDO_CONVEX_BACKEND_SECRET: "convex-secret",
+			NEXT_PUBLIC_CONVEX_URL: "https://rightful-jackal-218.convex.cloud",
 			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
 			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
 			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "false",

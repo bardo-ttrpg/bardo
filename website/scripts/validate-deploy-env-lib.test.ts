@@ -26,7 +26,7 @@ describe("validateDeployEnv", () => {
 		);
 		expect(result.errors).toContain("BARDO_BRIDGE_LOGIN_SECRET is missing");
 		expect(result.errors).toContain(
-			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+			"CONVEX_URL, NEXT_PUBLIC_CONVEX_URL, BLOB_READ_WRITE_TOKEN, or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
 		);
 	});
 
@@ -156,6 +156,54 @@ describe("validateDeployEnv", () => {
 		});
 
 		expect(result.errors).toEqual([]);
+	});
+
+	test("accepts Convex as the production backend", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_DRIVER: "convex",
+			BARDO_CONVEX_BACKEND_SECRET: "convex-secret",
+			NEXT_PUBLIC_CONVEX_URL: "https://rightful-jackal-218.convex.cloud",
+			BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK: "false",
+			BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK: "false",
+		});
+
+		expect(result.errors).toEqual([]);
+	});
+
+	test("rejects invalid Convex production URLs", () => {
+		const result = validateDeployEnv({
+			VERCEL_ENV: "production",
+			NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123",
+			CLERK_SECRET_KEY: "sk_live_123",
+			NEXT_PUBLIC_APP_URL: "https://www.bardo.gg",
+			BARDO_APP_BASE_URL: "https://www.bardo.gg",
+			BARDO_RUNTIME_STATUS_URL:
+				"https://www.bardo.gg/api/connect/runtime-status",
+			BARDO_BRIDGE_SESSION_REFRESH_URL:
+				"https://www.bardo.gg/api/connect/bridge-session/refresh",
+			BARDO_BRIDGE_LOGIN_SECRET: "secret",
+			BARDO_WEBSITE_BACKEND_DRIVER: "convex",
+			NEXT_PUBLIC_CONVEX_URL: "http://localhost:3210",
+		});
+
+		expect(result.errors).toContain(
+			"CONVEX_URL or NEXT_PUBLIC_CONVEX_URL must use https for production",
+		);
+		expect(result.errors).toContain(
+			"CONVEX_URL or NEXT_PUBLIC_CONVEX_URL must not point to localhost for production",
+		);
+		expect(result.errors).toContain("BARDO_CONVEX_BACKEND_SECRET is missing");
 	});
 
 	test("allows explicit temporary memory fallback when durable storage is unavailable", () => {

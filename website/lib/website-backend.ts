@@ -2,6 +2,8 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { put as putBlob } from "@vercel/blob";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../convex/_generated/api";
 import type { BridgeSessionCredentialBundle } from "./bridge-session-auth";
 
 type RateLimitBudget = {
@@ -96,10 +98,11 @@ type CliLoginTokenRecord = BackendState["cliLoginTokens"][string];
 type McpUserUsageRecord = BackendState["mcpUserUsage"][string];
 type McpKeyUsageRecord = BackendState["mcpKeyUsage"][string];
 
-type WebsiteBackendDriver = "blob" | "file";
+type WebsiteBackendDriver = "blob" | "convex" | "file";
 
 type BackendResolution =
 	| { driver: "blob"; prefix: string; token: string }
+	| { driver: "convex"; url: string; token: string }
 	| { driver: "file"; filePath: string };
 
 function defaultState(): BackendState {
@@ -127,7 +130,11 @@ function normalizeDriver(
 	value: string | undefined,
 ): WebsiteBackendDriver | null {
 	const normalized = value?.trim().toLowerCase();
-	if (normalized === "blob" || normalized === "file") {
+	if (
+		normalized === "blob" ||
+		normalized === "convex" ||
+		normalized === "file"
+	) {
 		return normalized;
 	}
 	return null;
@@ -162,7 +169,26 @@ function resolveBackend(
 ): BackendResolution | null {
 	const explicitDriver = normalizeDriver(env.BARDO_WEBSITE_BACKEND_DRIVER);
 	const blobToken = env.BLOB_READ_WRITE_TOKEN?.trim();
+	const convexUrl =
+		env.CONVEX_URL?.trim() || env.NEXT_PUBLIC_CONVEX_URL?.trim();
+	const convexToken = env.BARDO_CONVEX_BACKEND_SECRET?.trim();
 	const hosted = isHostedVercel(env);
+
+	if (
+		(explicitDriver === "convex" || (!explicitDriver && hosted)) &&
+		convexUrl &&
+		convexToken
+	) {
+		return {
+			driver: "convex",
+			url: convexUrl,
+			token: convexToken,
+		};
+	}
+
+	if (explicitDriver === "convex") {
+		return null;
+	}
 
 	if ((explicitDriver === "blob" || (!explicitDriver && hosted)) && blobToken) {
 		return {
@@ -263,6 +289,284 @@ async function writeBlobJson<T>(
 		contentType: "application/json; charset=utf-8",
 		token: config.token,
 	});
+}
+
+function createConvexWebsiteBackendClient(
+	config: Extract<BackendResolution, { driver: "convex" }>,
+) {
+	const client = new ConvexHttpClient(config.url);
+	const sessionPath = (sessionId: string) => `cli-device-sessions/${sessionId}`;
+	const refreshPath = (sessionId: string) =>
+		`bridge-refresh-sessions/${sessionId}`;
+	const loginTokenPath = (token: string) =>
+		`cli-login-tokens/${stablePathHash(token)}`;
+	const rateLimitPath = (key: string) =>
+		`rate-limit-windows/${stablePathHash(key)}`;
+	const userUsagePath = (subjectId: string) =>
+		`mcp-user-usage/${stablePathHash(subjectId)}`;
+	const keyUsagePath = (keyId: string) =>
+		`mcp-key-usage/${stablePathHash(keyId)}`;
+	const readJson = async <T>(key: string) =>
+		(await client.query(api.websiteBackend.getRecord, {
+			key,
+			token: config.token,
+		})) as T | null;
+	const writeJson = async <T>(key: string, value: T) => {
+		await client.mutation(api.websiteBackend.putRecord, {
+			key,
+			value,
+			token: config.token,
+		});
+	};
+
+	return {
+		async consumeRateLimitWindow(args: {
+			scope: string;
+			counterKey: string;
+			limit: number;
+			windowMs: number;
+			nowMs?: number;
+		}): Promise<RateLimitBudget> {
+			const nowMs = args.nowMs ?? Date.now();
+			const windowStartMs = Math.floor(nowMs / args.windowMs) * args.windowMs;
+			const key = [
+				args.scope,
+				args.counterKey,
+				String(windowStartMs),
+				String(args.windowMs),
+			].join(":");
+			const recordKey = rateLimitPath(key);
+			const resetEpochSeconds = Math.ceil(
+				(windowStartMs + args.windowMs) / 1000,
+			);
+			const existing = await readJson<RateLimitWindowRecord>(recordKey);
+			const existingExpiresAt =
+				(existing?.updatedAtMs ?? 0) + Number(args.windowMs);
+			const used =
+				existing && existingExpiresAt > nowMs ? (existing.used ?? 0) : 0;
+			const nextUsed = used + 1;
+			if (nextUsed > args.limit) {
+				return {
+					allowed: false,
+					remaining: 0,
+					retryAfterSeconds: Math.max(
+						1,
+						Math.ceil((windowStartMs + args.windowMs - nowMs) / 1000),
+					),
+					resetEpochSeconds,
+					backend: "website" as const,
+				};
+			}
+			await writeJson<RateLimitWindowRecord>(recordKey, {
+				used: nextUsed,
+				updatedAtMs: nowMs,
+			});
+			return {
+				allowed: true,
+				remaining: Math.max(0, args.limit - nextUsed),
+				resetEpochSeconds,
+				backend: "website" as const,
+			};
+		},
+
+		async consumeCliLoginToken(args: {
+			token: string;
+			expiresAtISO: string;
+			nowMs?: number;
+		}): Promise<LoginConsumeResult> {
+			const nowMs = args.nowMs ?? Date.now();
+			const expiresAtMs = Date.parse(args.expiresAtISO);
+			if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) {
+				return { ok: false, reason: "expired" };
+			}
+			const recordKey = loginTokenPath(args.token);
+			const existing = await readJson<CliLoginTokenRecord>(recordKey);
+			if (existing && existing.expiresAtMs > nowMs) {
+				return { ok: false, reason: "already_used" };
+			}
+			await writeJson<CliLoginTokenRecord>(recordKey, {
+				expiresAtMs,
+				usedAtMs: nowMs,
+			});
+			return { ok: true };
+		},
+
+		async startCliDeviceSession(args: {
+			now: Date;
+			ttlMs: number;
+			intervalMs: number;
+		}) {
+			const sessionId = randomUUID();
+			const pollSecret = randomPollSecret();
+			const userCode = randomUserCode();
+			const createdAtISO = args.now.toISOString();
+			const expiresAtISO = new Date(
+				args.now.getTime() + args.ttlMs,
+			).toISOString();
+			await writeJson<CliDeviceSessionRecord>(sessionPath(sessionId), {
+				pollSecretHash: hashSecret(pollSecret),
+				userCode,
+				status: "pending",
+				createdAtISO,
+				expiresAtISO,
+				intervalMs: args.intervalMs,
+			});
+			return {
+				sessionId,
+				pollSecret,
+				userCode,
+				expiresAtISO,
+				intervalMs: args.intervalMs,
+			};
+		},
+
+		async pollCliDeviceSession(args: {
+			sessionId: string;
+			pollSecret: string;
+		}): Promise<PollSessionResult> {
+			const recordKey = sessionPath(args.sessionId);
+			const record = await readJson<CliDeviceSessionRecord>(recordKey);
+			if (!record) {
+				return { status: "expired" };
+			}
+			if (record.pollSecretHash !== hashSecret(args.pollSecret)) {
+				return { status: "invalid" };
+			}
+			if (Date.parse(record.expiresAtISO) <= Date.now()) {
+				return { status: "expired" };
+			}
+			if (record.status === "pending") {
+				return {
+					status: "pending",
+					intervalMs: record.intervalMs,
+				};
+			}
+			if (record.status === "denied") {
+				return {
+					status: "denied",
+					error: record.denialError ?? "Bridge approval was denied.",
+				};
+			}
+			if (record.status === "consumed") {
+				return { status: "consumed" };
+			}
+			if (!record.payload) {
+				return { status: "invalid" };
+			}
+			await writeJson<CliDeviceSessionRecord>(recordKey, {
+				...record,
+				status: "consumed",
+			});
+			return {
+				status: "approved",
+				payload: record.payload,
+			};
+		},
+
+		async approveCliDeviceSession(args: {
+			sessionId: string;
+			payload: BridgeSessionCredentialBundle;
+			approvedAtISO: string;
+		}): Promise<ApproveSessionResult> {
+			const recordKey = sessionPath(args.sessionId);
+			const record = await readJson<CliDeviceSessionRecord>(recordKey);
+			if (!record) {
+				return { ok: false, reason: "missing" };
+			}
+			if (Date.parse(record.expiresAtISO) <= Date.now()) {
+				return { ok: false, reason: "expired" };
+			}
+			if (record.status === "consumed") {
+				return { ok: false, reason: "consumed" };
+			}
+			await writeJson<CliDeviceSessionRecord>(recordKey, {
+				...record,
+				status: "approved",
+				approvedAtISO: args.approvedAtISO,
+				payload: args.payload,
+			});
+			await writeJson<BridgeRefreshSessionRecord>(refreshPath(args.sessionId), {
+				refreshTokenHash: hashSecret(args.payload.refreshToken),
+				updatedAtISO: args.approvedAtISO,
+			});
+			return { ok: true };
+		},
+
+		async denyCliDeviceSession(args: {
+			sessionId: string;
+			error: string;
+			deniedAtISO: string;
+		}): Promise<DenySessionResult> {
+			const recordKey = sessionPath(args.sessionId);
+			const record = await readJson<CliDeviceSessionRecord>(recordKey);
+			if (!record) {
+				return { ok: false, reason: "missing" };
+			}
+			if (Date.parse(record.expiresAtISO) <= Date.now()) {
+				return { ok: false, reason: "expired" };
+			}
+			if (record.status === "consumed") {
+				return { ok: false, reason: "consumed" };
+			}
+			await writeJson<CliDeviceSessionRecord>(recordKey, {
+				...record,
+				status: "denied",
+				deniedAtISO: args.deniedAtISO,
+				denialError: args.error,
+			});
+			return { ok: true };
+		},
+
+		async rotateBridgeRefreshSession(args: {
+			sessionId: string;
+			refreshToken: string;
+			nextRefreshToken: string;
+			updatedAtISO?: string;
+		}): Promise<RotateRefreshSessionResult> {
+			const recordKey = refreshPath(args.sessionId);
+			const record = await readJson<BridgeRefreshSessionRecord>(recordKey);
+			if (!record) {
+				return { ok: false, reason: "missing" };
+			}
+			if (record.refreshTokenHash !== hashSecret(args.refreshToken)) {
+				return { ok: false, reason: "invalid" };
+			}
+			await writeJson<BridgeRefreshSessionRecord>(recordKey, {
+				refreshTokenHash: hashSecret(args.nextRefreshToken),
+				updatedAtISO: args.updatedAtISO ?? new Date().toISOString(),
+			});
+			return { ok: true };
+		},
+
+		async readUserUsage(subjectId: string): Promise<UsageSnapshot> {
+			const entry = await readJson<McpUserUsageRecord>(
+				userUsagePath(subjectId),
+			);
+			return {
+				total: entry?.total ?? 0,
+				thisPeriod: 0,
+				backend: "website" as const,
+			};
+		},
+
+		async readKeyUsage(args: {
+			keyId: string;
+			periodStartMs: number;
+		}): Promise<KeyUsageSnapshot> {
+			const keyUsage = await readJson<McpKeyUsageRecord>(
+				keyUsagePath(args.keyId),
+			);
+			const period = keyUsage?.byPeriod[monthBucket(args.periodStartMs)];
+			return {
+				total: keyUsage?.total ?? 0,
+				thisPeriod: period?.total ?? 0,
+				lastUsedAt: period?.lastUsedAt ?? null,
+				lastUsedProviderId: period?.lastUsedProviderId ?? null,
+				lastUsedModelId: period?.lastUsedModelId ?? null,
+				backend: "website" as const,
+			};
+		},
+	};
 }
 
 function pruneExpiredRateLimitWindows(
@@ -913,6 +1217,9 @@ export function createWebsiteBackendClient(
 	}
 	if (backend.driver === "blob") {
 		return createBlobWebsiteBackendClient(backend);
+	}
+	if (backend.driver === "convex") {
+		return createConvexWebsiteBackendClient(backend);
 	}
 	return createFileWebsiteBackendClient(backend.filePath);
 }

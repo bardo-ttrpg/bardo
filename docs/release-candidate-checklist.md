@@ -19,7 +19,7 @@ Use this before calling a build staging-ready.
 2. Review [`/home/armando/projects/bardo/bun.lock`](/home/armando/projects/bardo/bun.lock) and confirm the lockfile diff is intentional.
 3. Run `bun run --cwd packages/bardo-mcp build:release` so the release binaries under `packages/bardo-mcp/dist/release/` are fresh for the version being shipped.
 4. Confirm `SHA256SUMS.txt` matches the freshly built binaries.
-5. Upload every file in `packages/bardo-mcp/dist/release/` to the public Vercel Blob release prefix used by `BARDO_MCP_PUBLIC_RELEASES_BASE_URL`.
+5. Upload every file in `packages/bardo-mcp/dist/release/` to Convex file storage with `bun run --cwd website ./scripts/upload-convex-release-files.ts <version>`.
 6. Confirm both installers reference the public release prefix and can fetch `SHA256SUMS.txt`, not private GitHub release assets.
 7. Draft release notes before promotion. Call out install changes, `.bardo` migration notes, any user-visible runtime behavior changes, and rollback guidance.
 

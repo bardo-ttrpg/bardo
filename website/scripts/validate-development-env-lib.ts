@@ -17,6 +17,17 @@ function usesBlobBackend(env: Record<string, string | undefined>): boolean {
 	return driver === "blob" && Boolean(normalize(env.BLOB_READ_WRITE_TOKEN));
 }
 
+function usesConvexBackend(env: Record<string, string | undefined>): boolean {
+	const driver = normalize(env.BARDO_WEBSITE_BACKEND_DRIVER)?.toLowerCase();
+	return (
+		driver === "convex" &&
+		Boolean(
+			(normalize(env.CONVEX_URL) || normalize(env.NEXT_PUBLIC_CONVEX_URL)) &&
+				normalize(env.BARDO_CONVEX_BACKEND_SECRET),
+		)
+	);
+}
+
 function validateLocalUrl(
 	value: string | undefined,
 	label: string,
@@ -59,7 +70,8 @@ export function validateDevelopmentEnv(
 	);
 
 	const backendPath = normalize(env.BARDO_WEBSITE_BACKEND_SQLITE_PATH);
-	const hasDurableBackend = Boolean(backendPath) || usesBlobBackend(env);
+	const hasDurableBackend =
+		Boolean(backendPath) || usesBlobBackend(env) || usesConvexBackend(env);
 	const needsDurableBackend =
 		isExplicitFalse(env.BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK) ||
 		isExplicitFalse(env.BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK) ||

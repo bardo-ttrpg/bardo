@@ -49,13 +49,13 @@ Symptoms:
 Checks:
 1. Confirm the website session is authenticated.
 2. Confirm the user has the required plan and entitlements. During the legacy billing migration, Clerk `solo` is treated as Pro-equivalent access.
-3. Confirm hosted bridge storage is durable. Vercel production and preview should use `BARDO_WEBSITE_BACKEND_DRIVER=blob` with `BLOB_READ_WRITE_TOKEN`; `/tmp` backend paths are not safe for bridge sessions.
+3. Confirm hosted bridge storage is durable. Vercel production should use `BARDO_WEBSITE_BACKEND_DRIVER=convex` with `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL` plus `BARDO_CONVEX_BACKEND_SECRET`; `/tmp` backend paths and in-memory fallbacks are not safe for bridge sessions.
 4. Confirm `/api/connect/bridge-session/start`, `/poll`, `/approve`, and `/refresh` are healthy in staging logs.
 5. Treat unauthenticated `curl` POSTs to `/api/connect/bridge-session/approve` returning `401 Unauthorized` as expected. That endpoint must be called by a signed-in browser session.
 
 Recovery:
 1. Retry the browser approval flow from `bardo login`.
-2. If polling says `expired` or `not found`, verify the deployment is not using `/tmp` or in-memory session state, then start a new bridge session after the durable backend is healthy.
+2. If polling says `expired` or `not found`, verify the deployment is using the Convex backend instead of `/tmp` or in-memory session state, then start a new bridge session after the durable backend is healthy.
 3. If approval reports missing subscription for a paid legacy account, verify `CLERK_BILLING_PLAN_SOLO` or Clerk `has({ plan: "solo" })` is available to the route.
 4. Do not hand-edit saved bridge tokens unless incident response explicitly calls for it.
 

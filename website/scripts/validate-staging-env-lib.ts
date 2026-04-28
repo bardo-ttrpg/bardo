@@ -76,10 +76,17 @@ function requireHttpsUrl(
 
 function backendDriver(
 	env: Record<string, string | undefined>,
-): "blob" | "file" | null {
+): "blob" | "convex" | "file" | null {
 	const configured = normalize(env.BARDO_WEBSITE_BACKEND_DRIVER)?.toLowerCase();
-	if (configured === "blob" || configured === "file") {
+	if (
+		configured === "blob" ||
+		configured === "convex" ||
+		configured === "file"
+	) {
 		return configured;
+	}
+	if (normalize(env.CONVEX_URL) || normalize(env.NEXT_PUBLIC_CONVEX_URL)) {
+		return "convex";
 	}
 	if (normalize(env.BLOB_READ_WRITE_TOKEN)) {
 		return "blob";
@@ -123,7 +130,16 @@ export function validateStagingEnv(
 		errors.push("BARDO_BRIDGE_LOGIN_SECRET is missing");
 	}
 	const driver = backendDriver(env);
-	if (driver === "blob") {
+	if (driver === "convex") {
+		requireHttpsUrl(
+			normalize(env.CONVEX_URL) ?? normalize(env.NEXT_PUBLIC_CONVEX_URL),
+			"CONVEX_URL or NEXT_PUBLIC_CONVEX_URL",
+			errors,
+		);
+		if (!normalize(env.BARDO_CONVEX_BACKEND_SECRET)) {
+			errors.push("BARDO_CONVEX_BACKEND_SECRET is missing");
+		}
+	} else if (driver === "blob") {
 		if (!normalize(env.BLOB_READ_WRITE_TOKEN)) {
 			errors.push("BLOB_READ_WRITE_TOKEN is missing");
 		}
@@ -133,7 +149,7 @@ export function validateStagingEnv(
 		}
 	} else {
 		errors.push(
-			"BLOB_READ_WRITE_TOKEN or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
+			"CONVEX_URL, NEXT_PUBLIC_CONVEX_URL, BLOB_READ_WRITE_TOKEN, or BARDO_WEBSITE_BACKEND_SQLITE_PATH is missing",
 		);
 	}
 	requireFalse(

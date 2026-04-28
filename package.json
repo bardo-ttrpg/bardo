@@ -63,10 +63,11 @@
 		"prepare": "bun run ./scripts/prepare-husky.ts"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "2.4.6",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@types/bun": "^1.3.13",
 		"@types/node": "^25.6.0",
-		"@biomejs/biome": "2.4.6",
+		"convex": "^1.36.1",
 		"husky": "^9.1.7",
 		"knip": "^6.7.0",
 		"turbo": "^2.9.6",
