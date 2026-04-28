@@ -202,8 +202,13 @@ trap 'rm -rf "$tmpdir"' EXIT INT TERM
 artifact_path="$tmpdir/$ARTIFACT_FILENAME"
 checksum_path="$tmpdir/SHA256SUMS.txt"
 
-download_file "$RELEASE_BASE_URL/$ARTIFACT_FILENAME" "$artifact_path"
-download_file "$RELEASE_BASE_URL/SHA256SUMS.txt" "$checksum_path"
+if ! download_file "$RELEASE_BASE_URL/$ARTIFACT_FILENAME" "$artifact_path" || ! download_file "$RELEASE_BASE_URL/SHA256SUMS.txt" "$checksum_path"; then
+	echo "warning: release binary download failed; falling back to source install." >&2
+	install_from_source
+	echo "Binaries written to $BIN_DIR"
+	echo "If '$BIN_DIR' is not on your PATH, add it before running 'bardo login'."
+	exit 0
+fi
 verify_checksum "$checksum_path" "$artifact_path"
 
 release_dir="$INSTALL_ROOT/releases/$RELEASE_VERSION"
@@ -409,6 +414,11 @@ try {
 
 \tWrite-Host "Bardo release binary installed to $installedBinary"
 \tWrite-Host "Verified against $releaseBaseUrl/SHA256SUMS.txt"
+\tWrite-Host "Command shims written to $binDir"
+\tWrite-Host "You can run 'bardo login' in this PowerShell window. Restart other open terminals to pick up PATH changes."
+} catch {
+\tWrite-Warning "Release binary download failed; falling back to source install. $($_.Exception.Message)"
+\tInstall-FromSource
 \tWrite-Host "Command shims written to $binDir"
 \tWrite-Host "You can run 'bardo login' in this PowerShell window. Restart other open terminals to pick up PATH changes."
 } finally {
