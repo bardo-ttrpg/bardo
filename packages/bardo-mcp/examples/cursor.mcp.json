@@ -2,10 +2,7 @@
 	"mcpServers": {
 		"bardo": {
 			"command": "bardo",
-			"args": [
-				"mcp",
-				"serve"
-			]
+			"args": ["mcp", "serve"]
 		}
 	}
 }

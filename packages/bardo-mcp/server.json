@@ -13,9 +13,7 @@
 		{
 			"src": "https://www.bardo.gg/icon.png",
 			"mimeType": "image/png",
-			"sizes": [
-				"any"
-			]
+			"sizes": ["any"]
 		}
 	],
 	"packages": [
