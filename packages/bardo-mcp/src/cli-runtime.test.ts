@@ -16,8 +16,8 @@ describe("@bardo/mcp published cli", () => {
 			readFileSync(packageJsonPath, "utf8"),
 		) as PackageJson;
 
-		expect(packageJson.bin?.bardo).toBe("./bin/bardo.js");
-		expect(packageJson.bin?.["bardo-mcp"]).toBe("./bin/bardo-mcp.js");
+		expect(packageJson.bin?.bardo).toBe("bin/bardo.js");
+		expect(packageJson.bin?.["bardo-mcp"]).toBe("bin/bardo-mcp.js");
 		expect(packageJson.engines?.node).toBe(">=18");
 	});
 

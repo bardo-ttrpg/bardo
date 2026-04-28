@@ -7,7 +7,7 @@
 	"type": "module",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/armando-andre/bardo-mcp.git"
+		"url": "git+https://github.com/armando-andre/bardo-mcp.git"
 	},
 	"homepage": "https://bardo.gg",
 	"bugs": {
@@ -23,15 +23,12 @@
 		"local-first",
 		"bardo"
 	],
-	"exports": {
-		"./client-adapters": "./src/client-adapters.ts"
-	},
 	"engines": {
 		"node": ">=18"
 	},
 	"bin": {
-		"bardo": "./bin/bardo.js",
-		"bardo-mcp": "./bin/bardo-mcp.js"
+		"bardo": "bin/bardo.js",
+		"bardo-mcp": "bin/bardo-mcp.js"
 	},
 	"files": [
 		"README.md",
