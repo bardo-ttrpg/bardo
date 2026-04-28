@@ -13,15 +13,15 @@ import type * as releaseFiles from "../releaseFiles.js";
 import type * as websiteBackend from "../websiteBackend.js";
 
 import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
+	ApiFromModules,
+	FilterApi,
+	FunctionReference,
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  maintenance: typeof maintenance;
-  releaseFiles: typeof releaseFiles;
-  websiteBackend: typeof websiteBackend;
+	maintenance: typeof maintenance;
+	releaseFiles: typeof releaseFiles;
+	websiteBackend: typeof websiteBackend;
 }>;
 
 /**
@@ -33,8 +33,8 @@ declare const fullApi: ApiFromModules<{
  * ```
  */
 export declare const api: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "public">
+	typeof fullApi,
+	FunctionReference<any, "public">
 >;
 
 /**
@@ -46,8 +46,8 @@ export declare const api: FilterApi<
  * ```
  */
 export declare const internal: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "internal">
+	typeof fullApi,
+	FunctionReference<any, "internal">
 >;
 
 export declare const components: {};
