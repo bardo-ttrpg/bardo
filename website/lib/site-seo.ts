@@ -1,14 +1,19 @@
 import { absoluteUrl, siteConfig } from "./site-config";
 
 export const landingPageKeywords = [
+	"tabletop role-playing game MCP",
+	"tabletop RPG MCP",
+	"TTRPG MCP server",
+	"AI tabletop RPG assistant",
+	"AI role-playing game assistant",
+	"AI RPG client",
+	"local campaign files",
+	"grounded AI tabletop play",
 	"solo tabletop RPG",
 	"solo tabletop role-playing game",
 	"solo RPG with AI",
 	"AI dungeon master",
-	"AI tabletop RPG assistant",
 	"GM-less RPG",
-	"tabletop RPG MCP",
-	"local campaign files",
 ] as const;
 
 export const homeSeo = {
