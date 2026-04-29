@@ -261,7 +261,9 @@ function DocsSidebarMenu({
 		entry.href.startsWith("/docs/clients/"),
 	);
 	const afterClients = entries.slice(firstClientIndex + clientEntries.length);
-	const hasActiveClient = clientEntries.some((entry) => entry.href === pathname);
+	const hasActiveClient = clientEntries.some(
+		(entry) => entry.href === pathname,
+	);
 
 	return (
 		<SidebarMenu>

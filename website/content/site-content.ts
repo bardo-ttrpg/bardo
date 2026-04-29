@@ -257,7 +257,10 @@ const rawDocsEntries = [
 			{ id: "install-kilo-code", title: "Install Kilo Code" },
 			{ id: "connect-bardo", title: "Connect Bardo" },
 			{ id: "what-bardo-writes", title: "What Bardo writes" },
-			{ id: "use-bardo-well-in-kilo-code", title: "Use Bardo well in Kilo Code" },
+			{
+				id: "use-bardo-well-in-kilo-code",
+				title: "Use Bardo well in Kilo Code",
+			},
 		],
 		lastModified: "2026-04-29T00:00:00.000Z",
 		load: () => import("@/content/docs/clients/kilo.mdx"),
