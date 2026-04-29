@@ -76,7 +76,7 @@ const rawDocsEntries = [
 		group: "get-started",
 		order: 2,
 		sections: [
-			{ id: "macos-linux", title: "macOS and Linux" },
+			{ id: "linux-and-macos", title: "Linux and macOS" },
 			{ id: "windows", title: "Windows" },
 			{ id: "custom-install-paths", title: "Custom install paths" },
 			{ id: "what-happens-next", title: "What happens next" },

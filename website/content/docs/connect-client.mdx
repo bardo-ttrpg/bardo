@@ -10,7 +10,7 @@ Connect your AI client after the workspace is prepared. This keeps the setup sim
 
 Expected result: Bardo writes the client config file for that workspace, and the client can see the local Bardo connection the next time it starts.
 
-## why this is needed
+## Why This Is Needed
 
 Bardo uses a local MCP endpoint so the client can work directly from your local workspace and `.bardo/` prep layer. The browser approval is still necessary because Bardo needs hosted account approval, billing, entitlements, and bridge-session checks before the local bridge starts serving the client.
 
@@ -64,7 +64,7 @@ Paid access is Pro. Legacy Clerk `solo` subscriptions are accepted as Pro-equiva
 
 After approval, your client talks to the local MCP endpoint exposed by the Bardo bridge. That endpoint exists so the client can use workspace files and `.bardo/` artifacts without sending your campaign into a hosted gameplay service.
 
-## what stays local
+## What Stays Local
 
 Workspace discovery, rules bootstrap, campaign bootstrap, and local play state stay on your machine. The generated `.bardo/` artifacts are the prep layer your client should rely on before continuing play.
 

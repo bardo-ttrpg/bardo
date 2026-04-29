@@ -2,7 +2,7 @@
 
 Bardo publishes as a local stdio MCP server. Client support means Bardo can write or document a local MCP configuration for that client. It does not mean every release has been manually live-smoked in every client.
 
-## Compatibility matrix
+## Compatibility Matrix
 
 | Client | Public status | Notes |
 | --- | --- | --- |

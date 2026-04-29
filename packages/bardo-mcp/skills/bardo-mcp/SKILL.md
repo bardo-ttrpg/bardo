@@ -7,7 +7,7 @@ description: Guides an MCP-capable agent using Bardo safely for local-first tabl
 
 Use Bardo as a local-first campaign runtime. Keep campaign truth grounded in the workspace and `.bardo/` artifacts, not in loose chat memory.
 
-## Safe workflow
+## Safe Workflow
 
 1. Confirm the user is in the campaign workspace.
 2. Ask the user to install Bardo if the `bardo` command is missing.
@@ -18,15 +18,15 @@ Use Bardo as a local-first campaign runtime. Keep campaign truth grounded in the
 7. Record explicit user corrections through Bardo so corrected truth outranks older inferred state.
 8. Commit only validated state changes.
 
-## Account access
+## Account Access
 
 Bardo is free to download, but use requires active Bardo Pro access or the 3-day trial. Do not suggest bypassing account checks.
 
-## Local-first boundary
+## Local-First Boundary
 
 Campaign files, rulebook prep, current state, and committed canon should stay local. Bardo account services are for sign-in, browser approval, subscription or trial verification, token refresh, and account status.
 
-## Useful links
+## Useful Links
 
 - Install: https://www.bardo.gg/docs/install
 - Connect a client: https://www.bardo.gg/docs/connect-client

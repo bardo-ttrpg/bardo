@@ -261,7 +261,7 @@ describe("docs content", () => {
 
 	test("builds lightweight local docs search data from the same source of truth", () => {
 		expect(searchDocsEntries("linux").map((entry) => entry.href)).toContain(
-			"/docs/install#macos-linux",
+			"/docs/install#linux-and-macos",
 		);
 		expect(
 			searchDocsEntries("remote service boundary").some(
@@ -353,7 +353,7 @@ describe("docs content", () => {
 		expect(runtimeSkillsDocSource).toContain("explicit user correction");
 		expect(runtimeSkillsDocSource).toContain("safe partial answer");
 		expect(connectDocSource).toContain("local MCP endpoint");
-		expect(connectDocSource).toContain("what stays local");
-		expect(connectDocSource).toContain("why this is needed");
+		expect(connectDocSource).toContain("What Stays Local");
+		expect(connectDocSource).toContain("Why This Is Needed");
 	});
 });

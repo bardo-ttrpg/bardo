@@ -10,7 +10,7 @@ Bardo is for players, GMs, and AI-assisted campaign maintainers who want an agen
 
 ## Install
 
-macOS and Linux:
+Linux and macOS:
 
 ```bash
 curl -fsSL https://bardo.gg/install | sh

@@ -2,7 +2,7 @@
 
 Bardo's public MCP surface is intentionally small. It is designed to help an agent prepare and maintain local campaign truth without turning every chat response into permanent canon.
 
-## Public capabilities
+## Public Capabilities
 
 Bardo helps an agent:
 
@@ -13,7 +13,7 @@ Bardo helps an agent:
 - Commit validated state changes.
 - Stop safely when required context is missing.
 
-## Safety model
+## Safety Model
 
 Narration alone is not canon. Durable truth should come from grounded source material, validated local state-changing events, or explicit user correction.
 

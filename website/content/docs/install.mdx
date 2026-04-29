@@ -2,7 +2,7 @@ Install Bardo on the same machine that holds your campaign files. The default in
 
 Bardo installs a local bridge. That bridge is the local MCP server your AI client talks to while you play. The website is still involved for sign-in, approval, billing, and account status, but your campaign truth and runtime state stay local. The hosted side only handles account workflows, not hosted gameplay truth.
 
-## macOS and Linux
+## Linux and macOS
 
 Run `curl -fsSL https://bardo.gg/install | sh`.
 
@@ -18,7 +18,7 @@ Expected result: PowerShell installs Bardo and `bardo --help` works in a new ter
 
 If you need custom paths, pass them into the shell that executes the installer:
 
-- macOS and Linux: `curl -fsSL https://bardo.gg/install | env BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test" BARDO_BIN_DIR="$HOME/.local/bin" sh`
+- Linux and macOS: `curl -fsSL https://bardo.gg/install | env BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test" BARDO_BIN_DIR="$HOME/.local/bin" sh`
 - Windows PowerShell: `$env:BARDO_INSTALL_ROOT="$HOME/.local/share/bardo-test"; $env:BARDO_BIN_DIR="$HOME/.local/bin"; irm https://bardo.gg/install.ps1 | iex`
 
 ## Developer fallback
