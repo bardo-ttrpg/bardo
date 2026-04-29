@@ -1,7 +1,8 @@
 "use client";
 
-import { SearchIcon } from "lucide-react";
+import { ChevronRightIcon, SearchIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { Collapsible } from "radix-ui";
 import {
 	type ReactNode,
 	useDeferredValue,
@@ -178,38 +179,7 @@ function DocsShellFrame({
 						groups.map((group) => (
 							<SidebarGroup key={group.id} className="px-2 py-2">
 								<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-								<SidebarMenu>
-									{group.entries.map((entry) => (
-										<SidebarMenuItem key={entry.href}>
-											<SidebarMenuButton
-												asChild
-												isActive={pathname === entry.href}
-												className={cn(
-													"h-auto bg-transparent transition-none hover:bg-transparent active:bg-transparent",
-													pathname === entry.href
-														? "font-medium text-foreground bg-transparent!"
-														: "text-muted-foreground hover:text-foreground",
-												)}
-											>
-												<TransitionLink
-													href={entry.href}
-													className="transition-none"
-												>
-													<span
-														className={cn(
-															"py-0 transition-none",
-															pathname === entry.href
-																? "text-foreground!"
-																: "text-muted-foreground!",
-														)}
-													>
-														{entry.navigationLabel}
-													</span>
-												</TransitionLink>
-											</SidebarMenuButton>
-										</SidebarMenuItem>
-									))}
-								</SidebarMenu>
+								<DocsSidebarMenu entries={group.entries} pathname={pathname} />
 							</SidebarGroup>
 						))
 					)}
@@ -259,5 +229,119 @@ function DocsShellFrame({
 				</main>
 			</SidebarInset>
 		</div>
+	);
+}
+
+function DocsSidebarMenu({
+	entries,
+	pathname,
+}: {
+	entries: readonly DocsNavEntry[];
+	pathname: string | null;
+}) {
+	const firstClientIndex = entries.findIndex((entry) =>
+		entry.href.startsWith("/docs/clients/"),
+	);
+	if (firstClientIndex === -1) {
+		return (
+			<SidebarMenu>
+				{entries.map((entry) => (
+					<DocsSidebarMenuEntry
+						key={entry.href}
+						entry={entry}
+						pathname={pathname}
+					/>
+				))}
+			</SidebarMenu>
+		);
+	}
+
+	const beforeClients = entries.slice(0, firstClientIndex);
+	const clientEntries = entries.filter((entry) =>
+		entry.href.startsWith("/docs/clients/"),
+	);
+	const afterClients = entries.slice(firstClientIndex + clientEntries.length);
+	const hasActiveClient = clientEntries.some((entry) => entry.href === pathname);
+
+	return (
+		<SidebarMenu>
+			{beforeClients.map((entry) => (
+				<DocsSidebarMenuEntry
+					key={entry.href}
+					entry={entry}
+					pathname={pathname}
+				/>
+			))}
+			<SidebarMenuItem>
+				<Collapsible.Root
+					defaultOpen={hasActiveClient}
+					className="group/collapsible"
+				>
+					<Collapsible.Trigger asChild>
+						<SidebarMenuButton
+							className="h-auto bg-transparent text-muted-foreground transition-none hover:bg-transparent hover:text-foreground active:bg-transparent"
+							aria-label="Toggle client docs"
+						>
+							<ChevronRightIcon className="transition-transform group-data-[state=open]/collapsible:rotate-90" />
+							<span className="py-0">Clients</span>
+						</SidebarMenuButton>
+					</Collapsible.Trigger>
+					<Collapsible.Content className="data-[state=closed]:animate-none data-[state=open]:animate-none">
+						<ul className="mt-1 ml-4 flex flex-col gap-1 border-l border-sidebar-border pl-2">
+							{clientEntries.map((entry) => (
+								<DocsSidebarMenuEntry
+									key={entry.href}
+									entry={entry}
+									pathname={pathname}
+								/>
+							))}
+						</ul>
+					</Collapsible.Content>
+				</Collapsible.Root>
+			</SidebarMenuItem>
+			{afterClients.map((entry) => (
+				<DocsSidebarMenuEntry
+					key={entry.href}
+					entry={entry}
+					pathname={pathname}
+				/>
+			))}
+		</SidebarMenu>
+	);
+}
+
+function DocsSidebarMenuEntry({
+	entry,
+	pathname,
+}: {
+	entry: DocsNavEntry;
+	pathname: string | null;
+}) {
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton
+				asChild
+				isActive={pathname === entry.href}
+				className={cn(
+					"h-auto bg-transparent transition-none hover:bg-transparent active:bg-transparent",
+					pathname === entry.href
+						? "font-medium text-foreground bg-transparent!"
+						: "text-muted-foreground hover:text-foreground",
+				)}
+			>
+				<TransitionLink href={entry.href} className="transition-none">
+					<span
+						className={cn(
+							"py-0 transition-none",
+							pathname === entry.href
+								? "text-foreground!"
+								: "text-muted-foreground!",
+						)}
+					>
+						{entry.navigationLabel}
+					</span>
+				</TransitionLink>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
 	);
 }

@@ -12,4 +12,8 @@ describe("website proxy", () => {
 		expect(proxySource).toContain("returnBackUrl: req.url");
 		expect(proxySource).not.toContain("await auth.protect()");
 	});
+
+	test("keeps common dot-git scanner requests out of the proxy matcher", () => {
+		expect(proxySource).toContain("\\.git(?:/|$)");
+	});
 });

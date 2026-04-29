@@ -35,6 +35,22 @@ const geminiDocSource = readFileSync(
 	new URL("../../../content/docs/clients/gemini-cli.mdx", import.meta.url),
 	"utf8",
 );
+const windsurfDocSource = readFileSync(
+	new URL("../../../content/docs/clients/windsurf.mdx", import.meta.url),
+	"utf8",
+);
+const kiroDocSource = readFileSync(
+	new URL("../../../content/docs/clients/kiro.mdx", import.meta.url),
+	"utf8",
+);
+const kiloDocSource = readFileSync(
+	new URL("../../../content/docs/clients/kilo.mdx", import.meta.url),
+	"utf8",
+);
+const traeDocSource = readFileSync(
+	new URL("../../../content/docs/clients/trae.mdx", import.meta.url),
+	"utf8",
+);
 const mechanicsDocSource = readFileSync(
 	new URL("../../../content/docs/ruleset-mechanics.mdx", import.meta.url),
 	"utf8",
@@ -63,6 +79,10 @@ describe("docs content", () => {
 			"/docs/clients/codex-cli-desktop",
 			"/docs/clients/gemini-cli",
 			"/docs/clients/cursor",
+			"/docs/clients/windsurf",
+			"/docs/clients/kiro",
+			"/docs/clients/kilo",
+			"/docs/clients/trae",
 			"/docs/rules-bootstrap",
 			"/docs/campaign-truth",
 			"/docs/mcp-surface",
@@ -78,6 +98,10 @@ describe("docs content", () => {
 			{ slug: ["clients", "codex-cli-desktop"] },
 			{ slug: ["clients", "gemini-cli"] },
 			{ slug: ["clients", "cursor"] },
+			{ slug: ["clients", "windsurf"] },
+			{ slug: ["clients", "kiro"] },
+			{ slug: ["clients", "kilo"] },
+			{ slug: ["clients", "trae"] },
 			{ slug: ["rules-bootstrap"] },
 			{ slug: ["campaign-truth"] },
 			{ slug: ["mcp-surface"] },
@@ -104,6 +128,10 @@ describe("docs content", () => {
 					"/docs/clients/codex-cli-desktop",
 					"/docs/clients/gemini-cli",
 					"/docs/clients/cursor",
+					"/docs/clients/windsurf",
+					"/docs/clients/kiro",
+					"/docs/clients/kilo",
+					"/docs/clients/trae",
 					"/docs/rules-bootstrap",
 				],
 			},
@@ -171,12 +199,36 @@ describe("docs content", () => {
 			{
 				href: "/docs/clients/cursor",
 				previousHref: "/docs/clients/gemini-cli",
+				nextHref: "/docs/clients/windsurf",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/windsurf",
+				previousHref: "/docs/clients/cursor",
+				nextHref: "/docs/clients/kiro",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/kiro",
+				previousHref: "/docs/clients/windsurf",
+				nextHref: "/docs/clients/kilo",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/kilo",
+				previousHref: "/docs/clients/kiro",
+				nextHref: "/docs/clients/trae",
+				sectionCount: 4,
+			},
+			{
+				href: "/docs/clients/trae",
+				previousHref: "/docs/clients/kilo",
 				nextHref: "/docs/rules-bootstrap",
 				sectionCount: 4,
 			},
 			{
 				href: "/docs/rules-bootstrap",
-				previousHref: "/docs/clients/cursor",
+				previousHref: "/docs/clients/trae",
 				nextHref: "/docs/campaign-truth",
 				sectionCount: 5,
 			},
@@ -238,6 +290,8 @@ describe("docs content", () => {
 		expect(docsShellSource).toContain("Search docs");
 		expect(docsShellSource).toContain("On this page");
 		expect(docsShellSource).toContain("const activeEntry = useMemo");
+		expect(docsShellSource).toContain("Collapsible.Root");
+		expect(docsShellSource).toContain("Clients");
 		expect(docsShellSource).toContain("isActive={pathname === entry.href}");
 		expect(docsShellSource).toContain('aria-label="On this page"');
 	});
@@ -268,6 +322,14 @@ describe("docs content", () => {
 		expect(geminiDocSource).toContain("trust the workspace");
 		expect(geminiDocSource).toContain("Restart Gemini CLI");
 		expect(geminiDocSource).toContain("missing campaign material");
+		expect(windsurfDocSource).toContain("bardo connect --client windsurf");
+		expect(windsurfDocSource).toContain(".windsurf/mcp.json");
+		expect(kiroDocSource).toContain("bardo connect --client kiro");
+		expect(kiroDocSource).toContain(".kiro/settings/mcp.json");
+		expect(kiloDocSource).toContain("bardo connect --client kilo");
+		expect(kiloDocSource).toContain(".kilocode/mcp.json");
+		expect(traeDocSource).toContain("bardo connect --client trae");
+		expect(traeDocSource).toContain(".trae/mcp.json");
 	});
 
 	test("documents the rulebook bootstrap pipeline and generated outputs", () => {
