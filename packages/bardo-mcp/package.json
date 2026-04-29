@@ -37,8 +37,10 @@
 		"LICENSE",
 		"server.json",
 		"bin",
+		"docs",
 		"examples",
 		"evals",
+		"skills",
 		"dist"
 	],
 	"publishConfig": {
