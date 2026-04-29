@@ -73,8 +73,8 @@ export default function TwitterImage() {
 					clients.
 				</div>
 				<div style={subheadStyle}>
-					Keep campaign files local and ground the model in your real
-					workspace so it stays far more accurate.
+					Keep campaign files local and ground the model in your real workspace
+					so it stays far more accurate.
 				</div>
 			</div>
 
