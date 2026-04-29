@@ -14,9 +14,9 @@ export const landingPageKeywords = [
 export const homeSeo = {
 	title: siteConfig.name,
 	description:
-		"Play solo tabletop role-playing games with a local-first AI game master that keeps campaign files on your machine and grounded in your world.",
+		"Bardo is the MCP for playing any tabletop role-playing game. It works with many modern AI clients, keeps your campaign files local, and grounds the model in your real workspace.",
 	socialDescription:
-		"Bardo connects your AI client to local campaign files so you can play solo tabletop RPGs with a grounded AI game master and no human GM at the table.",
+		"Bardo works with modern AI clients, keeps campaign files local, and grounds tabletop play in your real workspace for more accurate results.",
 	keywords: landingPageKeywords,
 } as const;
 
@@ -64,7 +64,7 @@ export function getLandingPageJsonLd() {
 			applicationCategory: "GameApplication",
 			operatingSystem: "Web, macOS, Windows, Linux",
 			featureList: [
-				"Solo tabletop RPG play with AI assistance",
+				"Play any tabletop role-playing game with AI assistance",
 				"Local campaign files stay on your machine",
 				"Grounded tabletop context through the Bardo MCP",
 				"Hosted bridge approvals and account management",

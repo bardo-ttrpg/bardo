@@ -78,6 +78,7 @@ const rawDocsEntries = [
 		sections: [
 			{ id: "linux-and-macos", title: "Linux and macOS" },
 			{ id: "windows", title: "Windows" },
+			{ id: "advanced-npm-install", title: "Advanced npm install" },
 			{ id: "custom-install-paths", title: "Custom install paths" },
 			{ id: "what-happens-next", title: "What happens next" },
 		],

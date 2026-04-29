@@ -1,12 +1,12 @@
 # Bardo MCP
 
-Bardo MCP connects MCP-capable agents to a local tabletop campaign workspace. It helps the agent prepare campaign context, check whether play is ready to continue, and keep durable campaign truth grounded in local files instead of loose chat memory.
+Bardo is the MCP for playing any tabletop role-playing game. It works with many modern AI clients, keeps your campaign files local, and grounds the model in your real workspace so it stays far more accurate.
 
 Bardo is free to download. Use requires an active Bardo Pro subscription or the included 3-day trial for new users.
 
 ## Who it is for
 
-Bardo is for players, GMs, and AI-assisted campaign maintainers who want an agent to help with tabletop preparation and play while keeping campaign state local and auditable.
+Use Bardo when you want an AI client to understand the real files in your campaign workspace instead of improvising from loose chat memory.
 
 ## Install
 
@@ -30,6 +30,14 @@ bardo login
 bardo init
 bardo connect --client cursor
 ```
+
+Advanced npm install:
+
+```bash
+npm install -g @bardo/mcp
+```
+
+The curl and PowerShell installers remain the easiest path for normal setup.
 
 ## Authentication and paid access
 
@@ -83,3 +91,4 @@ See [MCP surface docs](https://www.bardo.gg/docs/mcp-surface) for the current pu
 - Official MCP Registry name: `io.github.armando-andre/bardo`
 - Public npm package: `@bardo/mcp`
 - Public listing repository: https://github.com/armando-andre/bardo-mcp
+- Public release assets: https://github.com/armando-andre/bardo-mcp/releases

@@ -87,6 +87,42 @@ export const deleteOrphanedStorage = mutation({
 	},
 });
 
+export const deleteReleaseFilesAndStorage = mutation({
+	args: {
+		token: v.string(),
+		dryRun: v.boolean(),
+		limit: v.optional(v.number()),
+	},
+	handler: async (ctx, args) => {
+		assertBackendSecret(args.token);
+		const releaseFiles = (await ctx.db.query("releaseFiles").collect()).slice(
+			0,
+			args.limit ?? 100,
+		);
+		const totalBytes = releaseFiles.reduce((sum, file) => sum + file.size, 0);
+		if (args.dryRun) {
+			return {
+				dryRun: true,
+				scanned: releaseFiles.length,
+				deleted: 0,
+				deletedBytes: 0,
+				totalBytes,
+			};
+		}
+		for (const file of releaseFiles) {
+			await ctx.storage.delete(file.storageId);
+			await ctx.db.delete(file._id);
+		}
+		return {
+			dryRun: false,
+			scanned: releaseFiles.length,
+			deleted: releaseFiles.length,
+			deletedBytes: totalBytes,
+			totalBytes,
+		};
+	},
+});
+
 export const deleteExpiredWebsiteBackendRecords = mutation({
 	args: {
 		token: v.string(),

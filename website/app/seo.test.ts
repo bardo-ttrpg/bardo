@@ -158,6 +158,7 @@ describe("SEO and production metadata", () => {
 		expect(siteSeoSource).toContain("SoftwareApplication");
 		expect(siteSeoSource).toContain("WebSite");
 		expect(siteSeoSource).toContain("Organization");
+		expect(siteSeoSource).toContain("many modern AI clients");
 		expect(siteSeoSource).toContain("solo tabletop RPG");
 		expect(siteSeoSource).toContain("AI dungeon master");
 		expect(siteSeoSource).toContain("AI game master");

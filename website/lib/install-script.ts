@@ -1,5 +1,5 @@
 import {
-	BARDO_MCP_PUBLIC_RELEASES_BASE_URL,
+	BARDO_MCP_PUBLIC_GITHUB_RELEASES_BASE_URL,
 	BARDO_MCP_RELEASE_VERSION,
 } from "./bardo-mcp-release";
 
@@ -46,7 +46,7 @@ function resolveInstallReleaseBaseUrl(): string {
 		return override;
 	}
 
-	return `${BARDO_MCP_PUBLIC_RELEASES_BASE_URL}/${RELEASE_VERSION}`;
+	return `${BARDO_MCP_PUBLIC_GITHUB_RELEASES_BASE_URL}/${RELEASE_VERSION}`;
 }
 
 function renderSourceFallbackFunctions(): string {

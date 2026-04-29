@@ -6,9 +6,9 @@ export const siteConfig = {
 	creator: "Bardo",
 	publisher: "Bardo",
 	description:
-		"Play solo tabletop role-playing games with a local-first AI game master that keeps campaign files on your machine and grounds play in your real world state.",
+		"Bardo is the MCP for playing any tabletop role-playing game. It works with many modern AI clients, keeps your campaign files local, and grounds the model in your real workspace.",
 	ogDescription:
-		"Bardo connects your AI client to local campaign files so you can play solo tabletop RPGs with a grounded AI game master and local-first campaign truth.",
+		"Bardo works with modern AI clients, keeps campaign files local, and grounds tabletop play in your real workspace for more accurate results.",
 	keywords: [
 		"bardo",
 		"solo tabletop RPG",

@@ -13,7 +13,7 @@
 		"check:react-doctor": "bun run ./scripts/check-react-doctor.ts",
 		"check:vercel-doctor": "bun run ./scripts/check-vercel-doctor.ts",
 		"convex:cleanup": "bun run ./scripts/cleanup-convex-production.ts",
-		"release:upload-convex": "bun run ./scripts/upload-convex-release-files.ts",
+		"convex:cleanup-releases": "bun run ./scripts/cleanup-convex-release-files.ts",
 		"audit:lighthouse:home": "bun run ./scripts/run-lighthouse-home.ts",
 		"build:analyze": "NEXT_BUILD_ANALYZE_ARGS='build --turbopack --experimental-analyze' ANALYZE=true bun run ./scripts/run-build-analyze.ts",
 		"bundle:audit": "bun run ./scripts/bundle-audit.ts",

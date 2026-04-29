@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-	"Bardo - solo tabletop RPG play with AI and local campaign files";
+	"Bardo - tabletop RPG MCP for AI clients and local campaign files";
 export const size = {
 	width: 1200,
 	height: 630,
@@ -64,23 +64,23 @@ export default function TwitterImage() {
 		<div style={frameStyle}>
 			<div style={topLineStyle}>
 				<span>BARDO</span>
-				<span>NO GM REQUIRED</span>
+				<span>LOCAL FILES / GROUNDED PLAY</span>
 			</div>
 
 			<div style={bodyStackStyle}>
 				<div style={headlineStyle}>
-					Solo tabletop role-playing with an AI guide grounded in your local
-					campaign files.
+					The MCP for playing any tabletop role-playing game with modern AI
+					clients.
 				</div>
 				<div style={subheadStyle}>
-					Bring your own AI client, keep your world on your machine, and let
-					Bardo handle the tabletop context bridge.
+					Keep campaign files local and ground the model in your real
+					workspace so it stays far more accurate.
 				</div>
 			</div>
 
 			<div style={footerStyle}>
-				<span>Solo RPG</span>
-				<span>AI Assist</span>
+				<span>Any TTRPG</span>
+				<span>AI Clients</span>
 				<span>Local Files</span>
 			</div>
 		</div>,

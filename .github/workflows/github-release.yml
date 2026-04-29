@@ -6,11 +6,13 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      PUBLIC_RELEASE_REPO: armando-andre/bardo-mcp
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,9 +28,28 @@ jobs:
       - name: Build release binaries
         run: bun run --cwd packages/bardo-mcp build:release
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Publish public GitHub release assets
+        env:
+          GH_TOKEN: ${{ secrets.BARDO_PUBLIC_RELEASES_TOKEN }}
+        run: |
+          gh release delete "$GITHUB_REF_NAME" \
+            --repo "$PUBLIC_RELEASE_REPO" \
+            --yes || true
+          gh release create "$GITHUB_REF_NAME" \
+            packages/bardo-mcp/dist/release/* \
+            --repo "$PUBLIC_RELEASE_REPO" \
+            --title "Bardo MCP $GITHUB_REF_NAME" \
+            --notes "Bardo MCP $GITHUB_REF_NAME public binaries and checksums." \
+            --latest
+
+      - name: Setup Node for npm publish
+        uses: actions/setup-node@v4
         with:
-          generate_release_notes: true
-          files: |
-            packages/bardo-mcp/dist/release/*
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+        working-directory: packages/bardo-mcp

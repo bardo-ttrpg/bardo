@@ -1,6 +1,6 @@
 # Package Distribution
 
-Bardo MCP should be published as `@bardo/mcp` on the public npm registry.
+Bardo MCP uses GitHub Releases for public binaries and checksums, npm for `@bardo/mcp`, and `https://bardo.gg/install` as the friendly install wrapper.
 
 ## Recommended Registry
 
@@ -17,11 +17,12 @@ The public `bardo-mcp` repository is the public listing and documentation reposi
 Before publishing:
 
 1. Run the release build that creates all platform binaries.
-2. Run `npm publish --dry-run --access public`.
-3. Confirm the tarball includes `README.md`, `SECURITY.md`, `server.json`, docs, examples, skill files, and release binaries.
-4. Publish with `npm publish --access public` from the release package directory.
-5. Publish or update the Official MCP Registry metadata after npm is live.
+2. Upload release binaries and `SHA256SUMS.txt` to the matching public GitHub Release.
+3. Run `npm publish --dry-run --access public`.
+4. Confirm the tarball includes `README.md`, `SECURITY.md`, `server.json`, docs, examples, skill files, and release binaries.
+5. Publish with `npm publish --access public` from the release package directory.
+6. Publish or update the Official MCP Registry metadata after npm is live.
 
 ## GitHub Releases
 
-GitHub Releases are appropriate for downloadable binary assets, checksums, and changelog notes. They are not a replacement for the public npm package used by MCP registry metadata.
+GitHub Releases host the public binary assets, checksums, and changelog notes. They are not a replacement for the public npm package used by MCP registry metadata.

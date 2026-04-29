@@ -164,7 +164,7 @@ describe("docs content", () => {
 				href: "/docs/install",
 				previousHref: "/docs",
 				nextHref: "/docs/connect-client",
-				sectionCount: 4,
+				sectionCount: 5,
 			},
 			{
 				href: "/docs/connect-client",
@@ -304,6 +304,7 @@ describe("docs content", () => {
 		expect(installDocSource).toContain(
 			"irm https://bardo.gg/install.ps1 | iex",
 		);
+		expect(installDocSource).toContain("npm install -g @bardo/mcp");
 		expect(installDocSource).toContain("release binary");
 		expect(installDocSource).toContain("checksum");
 		expect(installDocSource).toContain("local bridge");

@@ -1,7 +1,7 @@
 export const BARDO_MCP_PACKAGE_VERSION = "0.1.1";
 
-export const BARDO_MCP_PUBLIC_RELEASES_BASE_URL =
-	"https://www.bardo.gg/releases";
+export const BARDO_MCP_PUBLIC_GITHUB_RELEASES_BASE_URL =
+	"https://github.com/armando-andre/bardo-mcp/releases/download";
 
 export const BARDO_MCP_RELEASE_VERSION = BARDO_MCP_PACKAGE_VERSION.startsWith(
 	"v",
