@@ -27,8 +27,29 @@ permissions:
   security-events: write
 
 jobs:
+  detect-source:
+    name: Detect source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      has-js-ts: ${{ steps.detect.outputs.has-js-ts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect JavaScript or TypeScript source
+        id: detect
+        run: |
+          if git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' | grep -v '^.github/' | grep -q .; then
+            echo "has-js-ts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-js-ts=false" >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
     name: Analyze
+    needs: detect-source
+    if: needs.detect-source.outputs.has-js-ts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
