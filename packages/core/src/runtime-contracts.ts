@@ -323,12 +323,26 @@ export function createStableEntityId(kind: EntityKind, name: string): string {
 }
 
 function slugify(value: string): string {
-	return value
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.replace(/-{2,}/g, "-");
+	let slug = "";
+	let pendingSeparator = false;
+
+	for (const character of value.toLowerCase().trim()) {
+		const isAsciiLetter = character >= "a" && character <= "z";
+		const isDigit = character >= "0" && character <= "9";
+
+		if (isAsciiLetter || isDigit) {
+			if (pendingSeparator && slug.length > 0) {
+				slug += "-";
+			}
+			slug += character;
+			pendingSeparator = false;
+			continue;
+		}
+
+		pendingSeparator = slug.length > 0;
+	}
+
+	return slug;
 }
 
 function uniqueStrings(values: string[]): string[] {

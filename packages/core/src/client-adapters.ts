@@ -327,13 +327,12 @@ function upsertTomlTable(
 	);
 
 	if (existingBlock) {
-		return `${[
+		const merged = [
 			...existingLines.slice(0, existingBlock.startLine),
 			...replacementLines,
 			...existingLines.slice(existingBlock.endLine),
-		]
-			.join("\n")
-			.replace(/\n+$/, "\n")}`;
+		].join("\n");
+		return merged.endsWith("\n") ? merged : `${merged}\n`;
 	}
 
 	const trimmed = existing.trimEnd();
