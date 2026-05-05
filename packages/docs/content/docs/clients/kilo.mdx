@@ -1,0 +1,31 @@
+Use this guide for [Kilo Code](https://kilo.ai/).
+
+## Install Kilo Code
+
+Install or update Kilo Code, then open the campaign workspace you want Bardo to manage.
+
+Kilo Code's current MCP docs describe project-level MCP configuration through `.kilocode/mcp.json`.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo init
+bardo connect --client kilo
+```
+
+Expected result: Bardo writes `.kilocode/mcp.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo writes a project MCP config under `mcpServers` that starts the local Bardo MCP server with `bardo mcp serve`.
+
+## Use Bardo well in Kilo Code
+
+Keep Kilo Code pointed at the same local workspace you prepared with Bardo.
+
+Troubleshooting:
+- Restart Kilo Code if the new MCP server is not picked up.
+- If tools appear but play is thin, improve the campaign notes and re-run `bardo init`.
+- If `.bardo/` is missing, rebuild it before asking Kilo Code to continue.

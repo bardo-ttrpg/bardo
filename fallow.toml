@@ -1,0 +1,13 @@
+# fallow.toml - Dead code analysis configuration
+
+ignore = [
+  "dist/**",
+  "coverage/**",
+]
+
+[detect]
+unused_files = true
+unused_exports = true
+unused_dependencies = true
+unused_dev_dependencies = true
+unused_types = true

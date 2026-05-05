@@ -1,0 +1,22 @@
+{
+	"name": "@bardo-ttrpg/skills",
+	"version": "0.1.0",
+	"description": "Agent Skill guidance for using Bardo as a grounded tabletop AI Game Master.",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"bardo-gm"
+	],
+	"scripts": {
+		"build": "node scripts/validate-skills.mjs",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "node scripts/validate-skills.mjs",
+		"test": "node scripts/validate-skills.mjs",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"devDependencies": {
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

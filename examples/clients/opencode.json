@@ -1,0 +1,13 @@
+{
+	"mcp": {
+		"bardo": {
+			"type": "local",
+			"command": ["bardo", "mcp", "serve"],
+			"enabled": true
+		}
+	},
+	"instructions": [
+		".bardo/docs/agent-contract.md",
+		".bardo/docs/clients/opencode.md"
+	]
+}

@@ -1,0 +1,19 @@
+Bardo turns MCP-capable AI clients into grounded tabletop role-playing Game Masters.
+
+Your workspace is the source of truth. `.bardo/` is the only Bardo-managed local folder. Local MCP and CLI usage is free and open; cloud campaign storage and hosted app integrations are paid SaaS features.
+
+## What Bardo Covers
+
+- Prepare local campaign state from rules, sessions, characters, locations, and notes.
+- Expose grounded tools through a local stdio MCP server.
+- Keep corrections and continuity in `.bardo/` artifacts.
+- Generate client configuration for supported local AI tools.
+
+## Recommended Path
+
+1. Put your campaign files in a workspace.
+2. Add `rulebook.md` if you want the default rules import path.
+3. Run `bardo init`.
+4. Run `bardo validate`.
+5. Run `bardo connect --client <your-client>`.
+6. Open your AI client in the same workspace.

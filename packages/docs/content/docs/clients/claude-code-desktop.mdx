@@ -1,0 +1,31 @@
+Use this guide for [Claude Code](https://claude.com/product/claude-code) and the [Claude desktop app](https://claude.com/download).
+
+## Install Claude
+
+- Install Claude Code from the current Claude Code product flow.
+- Install the Claude desktop app if you want the desktop experience as well.
+
+The cleanest path is to set up Claude Code first, then use the same workspace in the desktop app when you want that interface.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo init
+bardo connect --client claude
+```
+
+Expected result: Bardo writes `.mcp.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo writes the workspace-local Claude MCP config for you, so you do not need to set it up by hand.
+
+## Use Bardo well in Claude
+
+Keep Claude pointed at the same workspace where you ran `bardo connect --client claude`.
+
+Troubleshooting:
+- Restart Claude after connecting if the tools do not appear.
+- If the workspace is not ready, fix the inputs first instead of asking Claude to fill gaps by guessing.

@@ -1,0 +1,28 @@
+Ruleset mechanics in Bardo start with the normalized rulebook outputs, not with a separate hosted rules engine.
+
+## Workspace-defined rules context
+
+The normalized rules layer gives runtime tools structured access to headings, tagged sections, examples, tables, and exceptions. That makes it easier for a client to ground scene adjudication in the actual campaign rules instead of relying on a tiny built-in rules registry.
+
+## Support tiers
+
+The simulation-depth recommendation is an operational hint:
+
+- `light` means the campaign can stay sparse and selective.
+- `standard` means Bardo should keep a balanced amount of continuity structure.
+- `deep` means the rules signal that broader simulation pressure and detailed tracking matter.
+
+This is a preparation hint, not a promise that every mechanic auto-resolves.
+
+## Conservative adjudication
+
+Bardo prefers conservative adjudication over fake certainty:
+
+- use the normalized rules output as evidence
+- surface uncertainty explicitly
+- commit only validated state changes
+- avoid turning speculative narration into canon
+
+## Table authority
+
+When the rules or campaign inputs are ambiguous, the runtime should expose the uncertainty and let the table decide. The system is designed to preserve evidence and continuity, not to hide judgment calls behind false authority.
