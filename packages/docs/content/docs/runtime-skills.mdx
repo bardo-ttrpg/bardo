@@ -2,12 +2,13 @@ Runtime guidance in Bardo exists to keep local tool use disciplined and evidence
 
 ## Built-in guidance
 
-the MCP server is opinionated about a few core behaviors:
+The MCP server is opinionated about a few core behaviors:
 
 - read local prep artifacts before continuing play
 - prefer committed state over free-form narration
 - surface uncertainty instead of bluffing
 - keep campaign truth local
+- treat explicit user corrections as higher priority than older inferred state
 
 ## Client behavior
 
@@ -27,6 +28,8 @@ The agent-facing operating contract is simple:
 8. commit valid changes
 
 If the player explicitly corrects canon, use `user_correction` before continuing play.
+
+Good Bardo behavior is not just "answer quickly." It is to read the relevant state, name any gaps, resolve only what is supported, and leave table decisions visible when the evidence is incomplete.
 
 ## Precedence
 

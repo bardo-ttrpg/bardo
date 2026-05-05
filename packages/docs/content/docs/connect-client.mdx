@@ -12,3 +12,5 @@ bardo-mcp mcp serve --workspace-root .
 ```
 
 The client talks to Bardo over stdio and reads only the configured local workspace.
+
+Generated local configs should not contain bridge URLs, runtime-status URLs, bearer tokens, API keys, or hosted auth headers. If one does, regenerate it with `bardo connect --client <client>`.

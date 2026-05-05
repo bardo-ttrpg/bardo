@@ -12,7 +12,6 @@ const DOCS_RELATIVE_PATHS = {
 	gemini: "docs/clients/gemini.md",
 	cursor: "docs/clients/cursor.md",
 	troubleshooting: "docs/troubleshooting.md",
-	credits: "docs/credits-and-billing.md",
 } as const;
 
 const WORKSPACE_SKILL_DIRECTORY = ".agents/skills/bardo-runtime";
@@ -31,7 +30,6 @@ const LOCAL_DOC_ORDER = [
 	"gemini",
 	"cursor",
 	"troubleshooting",
-	"credits",
 ] as const satisfies readonly LocalDocId[];
 
 function renderMarkdown(
@@ -69,6 +67,7 @@ Use this skill when working inside a Bardo campaign workspace.
 3. If readiness is blocked or incomplete, surface the exact gap instead of improvising canon.
 4. Use committed state and preserved sources over free-form narration.
 5. Treat explicit user correction as higher precedence than older inferred or narrated state.
+6. When evidence is thin, say what is known, what is inferred, and what needs user input.
 
 ## Behavior rules
 
@@ -79,6 +78,7 @@ Use this skill when working inside a Bardo campaign workspace.
 - Do not use \`world_sync\` or \`simulation_tick\` to create plausible but ungrounded events.
 - Treat narration without a validated commit as advisory only.
 - If \`.bardo/\` is missing, treat the workspace as uninitialized and recover through \`init\`, not through narration.
+- If a tool returns conflicts, gaps, or uncertainties, report them plainly before continuing.
 - Do not expose internal implementation details, hidden heuristics, or private runtime mechanics to the user unless the workspace files already expose them directly.
 
 ## Runtime surface
@@ -167,12 +167,11 @@ function buildDocContent(args: {
 				[
 					"# Bardo Quickstart",
 					"",
-					"Bardo keeps your campaign files in the local workspace. The hosted control plane provides subscription-gated guardrails, local setup, and runtime guidance, but MCP execution and campaign truth remain local.",
+					"Bardo keeps your campaign files in the local workspace. Local MCP execution, setup, and campaign truth do not require hosted login or billing.",
 					"",
 					"## Start here",
 					"",
-					"- Install the Bardo MCP server with the command from `https://www.bardo.gg/install`.",
-					"- Run and approve the MCP server in your browser.",
+					"- Install the Bardo CLI from `https://www.bardo.gg/docs/install`.",
 					"- Run `bardo init` from your campaign workspace root if the workspace is not bootstrapped yet.",
 					"- Run `bardo connect --client codex` or your preferred client.",
 					"- Read the files below before asking the agent to continue play.",
@@ -521,40 +520,11 @@ function buildDocContent(args: {
 					"- Re-run `bardo init` if the workspace files changed outside `.bardo/` and the prep artifacts look stale.",
 					"- Use `user_correction` when the issue is a true canon correction rather than a stale bootstrap snapshot.",
 					"",
-					"## Credits do not look right",
+					"## The client config looks hosted or auth-gated",
 					"",
-					"- Only accepted MCP `tools/call` requests consume credits.",
-					"- MCP server sign-in, auth checks, and dashboard browsing do not consume credits.",
-				].join("\n"),
-			);
-		case "credits":
-			return renderMarkdown(
-				"Credits And Billing",
-				"Simple flat credit model for hosted Bardo usage.",
-				[
-					"# Credits And Billing",
-					"",
-					"Bardo uses one billing rule:",
-					"",
-					"- `1 accepted MCP tool call = 1 credit`",
-					"",
-					"## What is not billed",
-					"",
-					"- `initialize`",
-					"- MCP server sign-in and local setup",
-					"- auth and dashboard activity",
-					"- website browsing",
-					"",
-					"## What is billed",
-					"",
-					"- accepted MCP `tools/call` requests only",
-					"- a high-level Bardo tool like `scene_turn` still costs exactly one credit",
-					"- if a tool is accepted and later fails, the credit is still consumed",
-					"",
-					"## Where to check it",
-					"",
-					"- Website dashboard: remaining credits and next reset",
-					"- `bardo doctor --json`: account and plan visibility",
+					"- Re-run `bardo connect --client <client>` from the workspace root.",
+					"- The local config should start `bardo mcp serve` over stdio.",
+					"- Local configs should not contain bridge URLs, runtime-status URLs, API keys, bearer tokens, or hosted auth headers.",
 				].join("\n"),
 			);
 	}

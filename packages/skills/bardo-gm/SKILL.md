@@ -16,6 +16,15 @@ Use Bardo as a local-first campaign runtime. Keep campaign truth grounded in the
 5. Treat missing readiness as a reason to ask for source material, not a reason to invent canon.
 6. Use Bardo tools for explicit corrections so corrected truth outranks older inferred state.
 7. Commit only validated state changes.
+8. When evidence is incomplete, say what is known, what is inferred, and what needs a table decision.
+
+## Result Quality
+
+- Read state and rules before answering campaign-continuity questions.
+- Prefer a narrow grounded answer over a confident invented one.
+- Keep narration separate from committed canon unless a Bardo mutation tool validates the change.
+- Use explicit uncertainty for missing rules, missing character facts, unresolved locations, and contradicted source notes.
+- After a user correction, summarize the correction and continue from the corrected state.
 
 ## Local Boundary
 
