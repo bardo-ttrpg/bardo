@@ -1,0 +1,49 @@
+name: CodeQL
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/codeql.yml"
+      - "packages/**"
+      - "website/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/codeql.yml"
+      - "packages/**"
+      - "website/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+  schedule:
+    - cron: "23 8 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - javascript-typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
