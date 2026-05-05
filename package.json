@@ -1,0 +1,36 @@
+{
+	"name": "bardo",
+	"version": "0.1.0",
+	"private": true,
+	"packageManager": "pnpm@10.0.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "turbo dev",
+		"build": "turbo build",
+		"lint": "turbo lint",
+		"format": "biome format --write .",
+		"typecheck": "turbo typecheck",
+		"test": "turbo test",
+		"check": "pnpm biome:check && pnpm fallow && turbo check",
+		"fallow": "fallow check --quiet --fail-on-issues",
+		"fallow:audit": "fallow check --quiet --format compact",
+		"fallow:fix:dry": "fallow fix --dry-run",
+		"biome:lint": "biome lint .",
+		"biome:format": "biome format --write .",
+		"biome:check": "biome check .",
+		"biome:write": "biome check --write .",
+		"mcp:inspect": "pnpx @modelcontextprotocol/inspector bardo-mcp",
+		"client:smoke": "vitest run packages/mcp/src/client-adapters.test.ts packages/mcp/src/client-resolution.test.ts",
+		"stress:local": "pnpm build && node scripts/stress-local.mjs"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.6",
+		"@types/node": "^24.0.0",
+		"fallow": "^0.1.0",
+		"turbo": "^2.9.6",
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

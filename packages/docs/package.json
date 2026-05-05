@@ -1,0 +1,27 @@
+{
+	"name": "@bardo-ttrpg/docs",
+	"version": "0.1.0",
+	"description": "Public MDX documentation content and navigation metadata for Bardo.",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"content",
+		"src"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && node scripts/validate-docs.mjs",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "node scripts/validate-docs.mjs",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

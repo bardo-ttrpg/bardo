@@ -1,0 +1,11 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"build": {
+			"outputs": ["$TURBO_EXTENDS$", "dist/**"]
+		},
+		"test:runtime-smoke": {
+			"outputs": []
+		}
+	}
+}

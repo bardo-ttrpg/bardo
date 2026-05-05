@@ -1,0 +1,24 @@
+Bardo is strict about where authority lives so your AI client does not confuse hosted account services with campaign truth.
+
+## Local source of truth
+
+Your workspace is the source of truth. Bardo-managed artifacts live under `.bardo/`, and your original campaign files stay the primary inputs.
+
+## Hosted service boundary
+
+The hosted side is limited to:
+
+- account auth
+- billing and entitlements
+- cloud campaign storage for subscribed users
+- hosted ChatGPT and Claude integration paths
+
+The hosted side does not own campaign files, write local state, or decide the campaign for you.
+
+## How to think about the split
+
+If something depends on your campaign files, it belongs to the local workspace. If something depends on identity, local setup, or billing, it belongs to the hosted side.
+
+## Migration note
+
+`.bardo/` is the canonical managed root. Legacy `bardo/` workspaces are migrated one way into `.bardo/` and should not be treated as an ongoing dual-layout mode.

@@ -1,0 +1,33 @@
+{
+	"name": "@bardo-ttrpg/core",
+	"version": "0.1.0",
+	"description": "Local campaign runtime, workspace schema, and grounding logic for Bardo.",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		"./workspace": "./dist/workspace.js",
+		"./rules-bootstrap": "./dist/rules-bootstrap.js",
+		"./campaign-bootstrap": "./dist/campaign-bootstrap.js",
+		"./runtime-tools": "./dist/runtime-tools.js",
+		"./runtime-contracts": "./dist/runtime-contracts.js",
+		"./client-adapters": "./dist/client-adapters.js"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"scripts": {
+		"build": "tsdown src/workspace.ts src/rules-bootstrap.ts src/campaign-bootstrap.ts src/runtime-tools.ts src/runtime-contracts.ts src/client-adapters.ts --dts",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"tsdown": "^0.16.7",
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

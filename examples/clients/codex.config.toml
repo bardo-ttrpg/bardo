@@ -1,0 +1,3 @@
+[mcp_servers.bardo]
+command = "bardo"
+args = ["mcp", "serve"]

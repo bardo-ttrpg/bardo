@@ -1,0 +1,37 @@
+{
+	"name": "@bardo-ttrpg/cli",
+	"version": "0.1.0",
+	"description": "Command-line interface for local Bardo campaign workspaces and MCP setup.",
+	"license": "MIT",
+	"type": "module",
+	"bin": {
+		"bardo": "dist/cli.mjs",
+		"bardo-mcp": "dist/cli.mjs"
+	},
+	"exports": {
+		".": "./dist/cli.mjs"
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsdown src/cli.ts --dts",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "node -e \"process.exit(0)\"",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"dependencies": {
+		"@bardo-ttrpg/mcp": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"tsdown": "^0.16.7",
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

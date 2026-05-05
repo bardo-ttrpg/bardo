@@ -1,44 +1,44 @@
 # Bardo
 
-Bardo is a local-first toolkit for running tabletop roleplaying campaigns from durable workspace truth instead of fragile chat memory.
+Bardo turns MCP-capable AI clients and agents into grounded tabletop role-playing Game Masters.
 
-The public `bardo` repository is the open-source home for Bardo's community-facing tools, docs, engine work, and MCP integration. The private `bardo-app` repository is reserved for hosted product code, billing, customer data paths, deployment configuration, and other business-sensitive work.
+The public repo is intentionally transparent. It contains the local runtime, MCP server, CLI, Agent Skill, public MDX docs, client setup examples, and marketplace metadata so users can inspect what Bardo reads, writes, and runs.
+
+The private `bardo-app` repo owns hosted product code, billing, customer data paths, deployment configuration, and business-sensitive workflows.
 
 ## Who It Is For
 
 - Game masters who want campaign tools that remember the right things.
-- TTRPG groups that prefer durable notes, rules, and session state over one-off chat transcripts.
+- TTRPG groups that prefer durable notes, rules, and session state over fragile chat memory.
 - Developers interested in local-first RPG tooling, Model Context Protocol servers, and AI-assisted campaign workflows.
 - Contributors who want to help build a clear, safe, welcoming open-source TTRPG toolchain.
 
-## What Is Here
+## What Is Public
 
-- `packages/bardo-engine`: shared campaign and game-system logic.
-- `packages/bardo-mcp`: the Bardo MCP server and release tooling.
-- `packages/bardo-shared`: shared types and helpers.
-- `website`: the public website and docs experience.
-- `docs`: runbooks, release checklists, and operational notes.
+- `@bardo-ttrpg/core`: `.bardo/` workspace schema, campaign grounding, runtime state, corrections, diagnostics, and validation.
+- `@bardo-ttrpg/mcp`: local stdio MCP server exposing Bardo tools to supported clients.
+- `@bardo-ttrpg/cli`: `bardo` and `bardo-mcp` commands for init, validation, client config, doctor checks, and server startup.
+- `@bardo-ttrpg/docs`: public MDX documentation content.
+- `@bardo-ttrpg/skills`: the `bardo-gm` Agent Skill.
 
-## Quick Start
+## Local-First Model
 
-Install dependencies:
+Local Bardo use is free and open. The workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder. Cloud campaign storage and hosted ChatGPT/Claude integrations are paid SaaS features that live in the private `bardo-app` repo.
 
-```bash
-bun install
+## Commands
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm test
+pnpm check
 ```
 
-Run the website:
+Use `pnpm` and `pnpx` only. This repo does not use Bun, npm, npx, or Knip.
 
-```bash
-bun run dev
-```
+## Supported Local Clients
 
-Run checks before opening a pull request:
-
-```bash
-bun run check
-bun run test
-```
+First-class setup targets are Codex, Codex CLI, Claude Code, OpenCode, Gemini CLI, and Cursor. Additional client examples are provided where the configuration format is compatible.
 
 ## Contributing
 

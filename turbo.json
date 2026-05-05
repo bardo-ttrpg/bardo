@@ -1,0 +1,38 @@
+{
+	"$schema": "https://turborepo.com/schema.json",
+	"ui": "tui",
+	"globalDependencies": [
+		"package.json",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml",
+		"turbo.json",
+		"tsconfig.base.json",
+		"biome.json"
+	],
+	"tasks": {
+		"dev": {
+			"cache": false,
+			"persistent": true,
+			"interruptible": true
+		},
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**"]
+		},
+		"lint": {
+			"outputs": []
+		},
+		"typecheck": {
+			"dependsOn": ["^typecheck"],
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"check": {
+			"dependsOn": ["lint", "typecheck", "test"],
+			"outputs": []
+		}
+	}
+}
