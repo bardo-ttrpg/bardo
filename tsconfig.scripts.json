@@ -1,8 +1,0 @@
-{
-	"extends": "./tsconfig.base.json",
-	"compilerOptions": {
-		"types": ["bun", "node"]
-	},
-	"include": ["scripts/**/*.ts"],
-	"exclude": ["node_modules", "packages/**", "website/**"]
-}

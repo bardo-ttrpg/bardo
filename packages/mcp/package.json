@@ -1,0 +1,55 @@
+{
+	"name": "@bardo-ttrpg/mcp",
+	"version": "0.1.0",
+	"description": "Transparent local-first MCP server for grounded tabletop campaign play with Bardo.",
+	"mcpName": "io.github.bardo-ttrpg/bardo",
+	"license": "MIT",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bardo-ttrpg/bardo.git",
+		"directory": "packages/mcp"
+	},
+	"homepage": "https://bardo.gg",
+	"bugs": {
+		"url": "https://github.com/bardo-ttrpg/bardo/issues"
+	},
+	"exports": {
+		".": "./dist/local-mcp.js",
+		"./runtime": "./dist/runtime.js",
+		"./client-adapters": "./dist/client-adapters.js",
+		"./client-resolution": "./dist/client-resolution.js",
+		"./runtime-manifest": "./dist/runtime-manifest.js"
+	},
+	"files": [
+		"README.md",
+		"server.json",
+		"dist",
+		"src"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"dev": "tsx src/cli.ts",
+		"start": "node dist/cli.js",
+		"build": "tsdown src/cli.ts src/runtime.ts src/local-mcp.ts src/client-adapters.ts src/client-resolution.ts src/runtime-manifest.ts src/local-docs.ts src/file-utils.ts src/canonical-json.ts src/rules-bootstrap.ts --dts",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:runtime-smoke": "vitest run src/local-mcp.test.ts",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"dependencies": {
+		"@bardo-ttrpg/core": "workspace:*",
+		"@modelcontextprotocol/sdk": "^1.29.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"tsdown": "^0.16.7",
+		"tsx": "^4.20.0",
+		"typescript": "5.9.3",
+		"vitest": "^4.0.0"
+	}
+}

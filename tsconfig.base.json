@@ -6,7 +6,12 @@
 		"moduleDetection": "force",
 		"jsx": "react-jsx",
 		"allowJs": true,
+		"baseUrl": ".",
 		"moduleResolution": "bundler",
+		"paths": {
+			"@bardo-ttrpg/core/*": ["packages/core/src/*"],
+			"@bardo-ttrpg/mcp/*": ["packages/mcp/src/*"]
+		},
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,

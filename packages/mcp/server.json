@@ -1,0 +1,23 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+	"name": "io.github.bardo-ttrpg/bardo",
+	"description": "Local-first tabletop campaign grounding and AI Game Master tools.",
+	"status": "active",
+	"repository": {
+		"url": "https://github.com/bardo-ttrpg/bardo",
+		"source": "github"
+	},
+	"version": "0.1.0",
+	"packages": [
+		{
+			"registryType": "npm",
+			"identifier": "@bardo-ttrpg/cli",
+			"version": "0.1.0",
+			"transport": {
+				"type": "stdio",
+				"command": "bardo-mcp",
+				"args": ["mcp", "serve"]
+			}
+		}
+	]
+}

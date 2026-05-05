@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Production runbook
-    url: https://github.com/armando-andre/bardo/blob/main/docs/production-checklist.md
-    about: Check the deployment and rollout runbook before opening an operations issue.
+  - name: Security policy
+    url: https://github.com/bardo-ttrpg/bardo/blob/main/docs/security.md
+    about: Report unsafe file access or secret exposure carefully.

@@ -1,56 +1,13 @@
 {
-	"$schema": "https://turborepo.dev/schema.v2.json",
+	"$schema": "https://turborepo.com/schema.json",
 	"ui": "tui",
 	"globalDependencies": [
 		"package.json",
-		"bun.lock",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml",
 		"turbo.json",
 		"tsconfig.base.json",
 		"biome.json"
-	],
-	"globalEnv": [
-		"NODE_ENV",
-		"PORT",
-		"NEXT_PUBLIC_APP_URL",
-		"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-		"NEXT_PUBLIC_CLERK_SIGN_IN_URL",
-		"NEXT_PUBLIC_CLERK_SIGN_UP_URL",
-		"CLERK_SECRET_KEY",
-		"CLERK_BILLING_PLAN_SOLO",
-		"CLERK_BILLING_PLAN_SOLO_PLUS",
-		"BARDO_AUTH_PROVIDER",
-		"BARDO_AUTH_MODE",
-		"BARDO_AUTH_INTROSPECTION_URL",
-		"BARDO_AUTH_INTROSPECTION_TOKEN",
-		"BARDO_ALLOW_QUERY_API_KEY",
-		"BARDO_STRICT_CANONICAL_MODE",
-		"BARDO_DEFAULT_RULESET",
-		"BARDO_GUIDED_SETUP_ENABLED",
-		"BARDO_SETUP_CONTRACT_V2_REQUIRED",
-		"BARDO_BRIDGE_LOGIN_SECRET",
-		"BARDO_WEBSITE_BACKEND_SQLITE_PATH",
-		"BARDO_MCP_TRANSPORT_MODE",
-		"BARDO_MCP_ENABLE_JSON_RESPONSE",
-		"BARDO_MAX_REQUEST_BYTES",
-		"BARDO_RATE_LIMIT_WINDOW_MS",
-		"BARDO_RATE_LIMIT_MAX_REQUESTS",
-		"BARDO_RATE_LIMIT_FAIL_CLOSED",
-		"BARDO_TELEMETRY_ENABLED",
-		"BARDO_METRICS_ROUTE_ENABLED",
-		"BARDO_METRICS_REQUIRE_AUTH",
-		"BARDO_MCP_USAGE_LIMIT_ALLOW_MEMORY_FALLBACK",
-		"BARDO_CLI_DEVICE_SESSION_ALLOW_MEMORY_FALLBACK",
-		"BARDO_CLI_LOGIN_REPLAY_ALLOW_MEMORY_FALLBACK",
-		"BARDO_VERIFICATION_LIMIT_ALLOW_MEMORY_FALLBACK",
-		"BARDO_INTROSPECTION_PLAN_CACHE_TTL_MS",
-		"BARDO_INTROSPECTION_VERIFY_CACHE_TTL_MS",
-		"BARDO_INTROSPECTION_INVALID_CACHE_TTL_MS",
-		"BARDO_INTROSPECTION_TELEMETRY_LOG",
-		"BARDO_INTROSPECTION_TELEMETRY_LOG_EVERY",
-		"E2E_CLERK_EMAIL",
-		"E2E_CLERK_PASSWORD",
-		"E2E_CLERK_TEST_PHONE_NUMBER",
-		"E2E_CLERK_TEST_VERIFICATION_CODE"
 	],
 	"tasks": {
 		"dev": {
@@ -63,80 +20,18 @@
 			"outputs": ["dist/**"]
 		},
 		"lint": {
-			"dependsOn": ["^lint"],
-			"outputs": []
-		},
-		"format": {
-			"cache": false,
 			"outputs": []
 		},
 		"typecheck": {
 			"dependsOn": ["^typecheck"],
 			"outputs": []
 		},
-		"typecheck:unused-report": {
-			"dependsOn": ["^typecheck:unused-report"],
-			"outputs": []
-		},
 		"test": {
-			"dependsOn": ["^test"],
-			"outputs": []
-		},
-		"test:connect-gates": {
-			"outputs": []
-		},
-		"test:ga-gates": {
-			"dependsOn": ["^test:ga-gates"],
-			"outputs": []
-		},
-		"test:soak-gates": {
-			"dependsOn": ["^test:soak-gates"],
-			"outputs": []
-		},
-		"test:mechanics-edge-gates": {
-			"dependsOn": ["^test:mechanics-edge-gates"],
-			"outputs": []
-		},
-		"test:perf-gates": {
-			"dependsOn": ["^test:perf-gates"],
-			"outputs": []
-		},
-		"test:runtime-smoke": {
-			"dependsOn": ["^test:runtime-smoke"],
-			"outputs": []
-		},
-		"validate:env": {
-			"outputs": []
-		},
-		"validate:development-env": {
-			"outputs": []
-		},
-		"validate:deploy-env": {
-			"outputs": []
-		},
-		"validate:staging-env": {
-			"outputs": []
-		},
-		"check:release-health": {
-			"outputs": []
-		},
-		"check:react-doctor": {
-			"outputs": []
-		},
-		"check:vercel-doctor": {
-			"outputs": []
-		},
-		"build:analyze": {
-			"outputs": ["dist/**"]
-		},
-		"bundle:audit": {
-			"outputs": []
-		},
-		"ga:readiness": {
+			"dependsOn": ["^build"],
 			"outputs": []
 		},
 		"check": {
-			"dependsOn": ["lint", "typecheck"],
+			"dependsOn": ["lint", "typecheck", "test"],
 			"outputs": []
 		}
 	}

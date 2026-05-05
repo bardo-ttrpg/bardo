@@ -1,0 +1,28 @@
+Use this guide for [Cursor](https://cursor.com/).
+
+## Install Cursor
+
+Install or update Cursor, then open the campaign workspace you want Bardo to manage.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo init
+bardo connect --client cursor
+```
+
+Expected result: Bardo writes `.cursor/mcp.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo writes the local Cursor config for you. In the normal path, you do not need to edit it by hand.
+
+## Use Bardo well in Cursor
+
+Keep Cursor on the same local workspace you prepared with Bardo.
+
+Troubleshooting:
+- Restart Cursor after `bardo connect --client cursor` if the config is not picked up.
+- If Bardo is conservative or refuses to continue, check readiness instead of forcing play forward.

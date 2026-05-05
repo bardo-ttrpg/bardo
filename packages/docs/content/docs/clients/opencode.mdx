@@ -1,0 +1,29 @@
+Use this guide for [OpenCode](https://opencode.ai/). Bardo connects as a local server, leaves OpenCode on its default model, and does not set OpenCode's `model` field for you.
+
+## Install OpenCode
+
+Install or update OpenCode from [opencode.ai](https://opencode.ai/), then open the campaign workspace that owns your files.
+
+## Connect Bardo
+
+From the workspace root:
+
+```bash
+bardo init
+bardo connect --client opencode
+```
+
+Expected result: Bardo writes `opencode.json` in the workspace root.
+
+## What Bardo writes
+
+Bardo adds the workspace config OpenCode needs and keeps the setup local to this project. OpenCode talks to the local Bardo MCP server after local setup completes.
+
+## Use Bardo well in OpenCode
+
+Start OpenCode in the same workspace, let it load the Bardo connection, and begin play from the prepared campaign folder.
+
+Troubleshooting:
+- If OpenCode does not pick up the new config, restart it from the workspace root.
+- If Bardo says the workspace is incomplete, fix that first instead of trying to improvise around it.
+- If `.bardo/` disappears, rebuild it with `bardo init` before continuing.
