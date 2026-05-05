@@ -15,10 +15,10 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: List the exact steps.
+      description: List the exact steps without including secrets, private campaign data, or private URLs.
       placeholder: |
         1. Go to ...
-        2. Click ...
+        2. Run ...
         3. Observe ...
     validations:
       required: true
@@ -35,8 +35,8 @@ body:
     validations:
       required: true
   - type: input
-    id: env
+    id: environment
     attributes:
       label: Environment
-      description: local, staging, or production
-      placeholder: production
+      description: local, docs, CLI, MCP, or website
+      placeholder: local

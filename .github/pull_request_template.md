@@ -1,6 +1,7 @@
 ## Summary
 
 - Describe what changed and why.
+- Link the issue this PR closes or supports.
 
 ## Verification
 
@@ -17,4 +18,5 @@
 
 - [ ] Local file access paths are unchanged or explicitly hardened
 - [ ] No secrets, API keys, or private file paths are logged
-- [ ] Environment or infra changes are documented in `docs/production-checklist.md`
+- [ ] Public repo changes do not include private product, customer, deployment, or billing data
+- [ ] Environment or infra changes are documented in the relevant runbook

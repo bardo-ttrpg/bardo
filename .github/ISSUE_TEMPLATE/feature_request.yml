@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a product or engineering improvement.
+description: Propose a product, docs, or engineering improvement.
 title: "feat: "
 labels:
   - enhancement
@@ -22,4 +22,4 @@ body:
     id: impact
     attributes:
       label: Impact
-      description: Who benefits and what are the tradeoffs?
+      description: Who benefits, and what are the tradeoffs?
