@@ -238,6 +238,15 @@ Usage:
   bardo clients list
   bardo mcp serve [--workspace-root <path>]
 
+Common first run:
+  bardo init --rulebook ./RULEBOOK.md
+  bardo validate
+  bardo connect --client opencode
+
+Notes:
+  validate exits nonzero until required campaign inputs are present.
+  add a small campaign notes file when location or active quest is missing.
+
 Local workspace usage is free and open. Paid Bardo Pro features are limited to cloud campaign storage and hosted app integrations.
 `);
 }

@@ -15,11 +15,11 @@
 		"url": "https://github.com/bardo-ttrpg/bardo/issues"
 	},
 	"exports": {
-		".": "./dist/local-mcp.js",
-		"./runtime": "./dist/runtime.js",
-		"./client-adapters": "./dist/client-adapters.js",
-		"./client-resolution": "./dist/client-resolution.js",
-		"./runtime-manifest": "./dist/runtime-manifest.js"
+		".": "./dist/local-mcp.mjs",
+		"./runtime": "./dist/runtime.mjs",
+		"./client-adapters": "./dist/client-adapters.mjs",
+		"./client-resolution": "./dist/client-resolution.mjs",
+		"./runtime-manifest": "./dist/runtime-manifest.mjs"
 	},
 	"files": [
 		"README.md",
@@ -32,7 +32,7 @@
 	},
 	"scripts": {
 		"dev": "tsx src/cli.ts",
-		"start": "node dist/cli.js",
+		"start": "node dist/cli.mjs",
 		"build": "tsdown src/cli.ts src/runtime.ts src/local-mcp.ts src/client-adapters.ts src/client-resolution.ts src/runtime-manifest.ts src/local-docs.ts src/file-utils.ts src/canonical-json.ts src/rules-bootstrap.ts --dts",
 		"lint": "biome lint .",
 		"format": "biome format --write .",

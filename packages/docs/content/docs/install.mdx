@@ -14,3 +14,13 @@ bardo validate
 Local Bardo does not require sign-in. The CLI and MCP server read local workspace files and `.bardo/` artifacts only.
 
 If your rulebook is named `rulebook.md`, the `--rulebook` flag is optional. For other names, pass the path explicitly.
+
+Useful follow-up commands:
+
+```sh
+bardo doctor
+bardo clients list
+bardo --help
+```
+
+`bardo validate` exits nonzero when the workspace still needs campaign input. That is expected; add a small campaign notes file with the current location and active quest, then run `bardo init --rulebook ./RULEBOOK.md` again.

@@ -9,7 +9,8 @@ Follow the current install or sign-in flow from the [Codex docs](https://develop
 From the workspace root:
 
 ```bash
-bardo init
+bardo init --rulebook ./RULEBOOK.md
+bardo validate
 bardo connect --client codex
 ```
 
@@ -27,5 +28,5 @@ Start Codex in the same workspace where you ran `bardo connect --client codex`. 
 
 Troubleshooting:
 - Restart Codex after connecting if the Bardo integration does not show up right away.
-- If play feels too thin, add better campaign notes and run `bardo init` again.
-- If `.bardo/` is missing, re-run `bardo init` before asking Codex to continue play.
+- If play feels too thin, add better campaign notes and run `bardo init --rulebook ./RULEBOOK.md` again.
+- If `.bardo/` is missing, re-run `bardo init --rulebook ./RULEBOOK.md` before asking Codex to continue play.
