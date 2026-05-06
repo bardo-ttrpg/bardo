@@ -7,7 +7,7 @@
 - `.bardo/`: the canonical Bardo-managed local campaign state directory.
 - MCP runtime: the stdio server that exposes grounded tools for readiness, rules, state, corrections, diagnostics, and safe state changes.
 - Agent Skill: concise behavior guidance that keeps an AI client evidence-first inside a prepared workspace.
-- Client adapter: generated local MCP configuration for Codex, Claude Code, OpenCode, Gemini CLI, Cursor, Windsurf, Kiro, Kilo Code, Trae, and compatible clients.
+- Client adapter: generated local MCP configuration for Codex, Claude Code, OpenCode, Gemini CLI, Cursor, and compatible generic MCP clients.
 - Marketplace metadata: public packaging notes for registries and client marketplaces.
 
 ## Relationships

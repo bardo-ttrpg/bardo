@@ -55,30 +55,6 @@ export const docsEntries: DocsEntry[] = [
 		group: "Clients",
 	},
 	{
-		title: "Windsurf",
-		href: "/docs/clients/windsurf",
-		source: "content/docs/clients/windsurf.mdx",
-		group: "Clients",
-	},
-	{
-		title: "Kiro",
-		href: "/docs/clients/kiro",
-		source: "content/docs/clients/kiro.mdx",
-		group: "Clients",
-	},
-	{
-		title: "Kilo Code",
-		href: "/docs/clients/kilo",
-		source: "content/docs/clients/kilo.mdx",
-		group: "Clients",
-	},
-	{
-		title: "Trae",
-		href: "/docs/clients/trae",
-		source: "content/docs/clients/trae.mdx",
-		group: "Clients",
-	},
-	{
 		title: "Rules Bootstrap",
 		href: "/docs/rules-bootstrap",
 		source: "content/docs/rules-bootstrap.mdx",

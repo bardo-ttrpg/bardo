@@ -15,7 +15,7 @@ describe("client resolution", () => {
 	test("auto-detects a single installed client for install", async () => {
 		const workspaceRoot = await createTempDir("bardo-client-resolution-");
 		try {
-			const configPath = path.join(workspaceRoot, ".kiro/settings/mcp.json");
+			const configPath = path.join(workspaceRoot, ".gemini/settings.json");
 			await mkdir(path.dirname(configPath), { recursive: true });
 			await writeFile(configPath, "{}\n", "utf8");
 
@@ -24,7 +24,7 @@ describe("client resolution", () => {
 				workspaceRoot,
 			});
 
-			expect(resolved.client).toBe("kiro");
+			expect(resolved.client).toBe("gemini");
 			expect(resolved.detectionSource).toBe("workspace");
 			expect(resolved.configPath).toBe(configPath);
 		} finally {
@@ -55,11 +55,11 @@ describe("client resolution", () => {
 	test("rejects ambiguous workspace auto-detection", async () => {
 		const workspaceRoot = await createTempDir("bardo-client-resolution-");
 		try {
-			const kiroPath = path.join(workspaceRoot, ".kiro/settings/mcp.json");
+			const geminiPath = path.join(workspaceRoot, ".gemini/settings.json");
 			const cursorPath = path.join(workspaceRoot, ".cursor/mcp.json");
-			await mkdir(path.dirname(kiroPath), { recursive: true });
+			await mkdir(path.dirname(geminiPath), { recursive: true });
 			await mkdir(path.dirname(cursorPath), { recursive: true });
-			await writeFile(kiroPath, "{}\n", "utf8");
+			await writeFile(geminiPath, "{}\n", "utf8");
 			await writeFile(cursorPath, "{}\n", "utf8");
 
 			await expect(
