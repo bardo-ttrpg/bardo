@@ -8,9 +8,13 @@ Diagnostic file tools are hidden by default and can be enabled with `BARDO_EXPOS
 
 - `bardo_workspace_status`: check initialization, readiness, current state, and safe next steps.
 - `init`: import the rulebook and prepare `.bardo/`.
+- `bardo_workspace_bootstrap`: compatibility alias for `init`.
 - `scene_turn`: resolve a player-facing turn from local evidence.
 - `player_action`: interpret a player action without silently changing canon.
 - `world_sync`: commit grounded campaign updates.
+- `simulation_tick`: advance grounded time or consequences only when evidence supports it.
 - `user_correction`: record explicit table corrections with high precedence.
 
 Agents should call `bardo_workspace_status` before play and should not continue when readiness is `needs-user-input`.
+
+Some clients show MCP tools with extra prefixes. Prefer the Bardo workspace status tool even if the client displays a prefixed name, and use `init` instead of the compatibility alias for new setup flows.

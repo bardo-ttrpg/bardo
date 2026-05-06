@@ -95,6 +95,8 @@ The Bardo runtime surface for normal play is:
 
 Ignore diagnostic or lower-level file tools unless the user explicitly needs debugging help.
 
+Some MCP clients display Bardo tools with an extra local prefix. Still choose the Bardo workspace status tool first, then use the exact Bardo runtime tool that matches the job.
+
 ## Which tool to use
 
 - Use \`bardo_workspace_status\` at the start of work, after \`init\`, after a correction, and before mutation tools when you are unsure whether canon changes are safe.
@@ -441,6 +443,7 @@ function buildDocContent(args: {
 					"## Recommended workflow",
 					"",
 					"- Start with `bardo_workspace_status`.",
+					"- If OpenCode displays MCP tools with an extra local prefix, still choose the Bardo workspace status tool first.",
 					"- If readiness is `needs-user-input`, stop and surface the exact gaps.",
 					"- Use `scene_turn` for grounded narration first, then mutation tools only for validated canon changes.",
 					"- Do not use `world_sync` or `simulation_tick` to invent likely follow-on events, faction moves, or travel outcomes. Those tools are only for updates already grounded in current state, source artifacts, committed events, or explicit user correction.",

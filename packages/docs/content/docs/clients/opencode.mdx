@@ -24,6 +24,14 @@ Bardo adds the workspace config OpenCode needs and keeps the setup local to this
 
 Start OpenCode in the same workspace, let it load the Bardo connection, and begin play from the prepared campaign folder.
 
+Good first prompt:
+
+```text
+Use the Bardo MCP tools. Check Bardo workspace status first. If the campaign is ready, use scene_turn for the next grounded GM response. If it is not ready, tell me exactly what is missing.
+```
+
+OpenCode may display MCP tool names with a local prefix, but the Bardo tools you want are the workspace status tool, `init`, `scene_turn`, `player_action`, `world_sync`, `simulation_tick`, and `user_correction`. Use the status tool first, then choose the narrowest tool for the job.
+
 Troubleshooting:
 - If OpenCode does not pick up the new config, restart it from the workspace root.
 - If Bardo says the workspace is incomplete, fix that first instead of trying to improvise around it.
