@@ -2,12 +2,11 @@
 
 This guide describes how Bardo uses GitHub as a small professional open-source organization while staying on the GitHub Free plan.
 
-## Repository Roles
+## Repository Role
 
-- `bardo`: public open-source and community repository.
-- `bardo-app`: private hosted product repository for billing, customer data paths, deployment configuration, and business-sensitive code.
+`bardo` is the public open-source and community repository.
 
-Do not move secrets, customer data, private deployment settings, or private product logic from `bardo-app` into `bardo`.
+Do not move secrets, customer data, private deployment settings, or proprietary product logic into this repo.
 
 ## Work Flow
 
@@ -45,7 +44,7 @@ For the public `bardo` repository, `main` should require pull requests, passing 
 
 Admins may bypass only for emergencies. If that happens, document why in the related issue or pull request.
 
-For the private `bardo-app` repository on GitHub Free, do not rely on private branch protection. Use the same human workflow anyway: no direct pushes to `main`, open a pull request, squash merge, and delete the branch.
+For any private product repository on GitHub Free, do not rely on private branch protection. Use the same human workflow anyway: no direct pushes to `main`, open a pull request, squash merge, and delete the branch.
 
 ## Security On GitHub Free
 
@@ -58,7 +57,7 @@ Keep these enabled for the public `bardo` repository:
 - Push protection
 - CodeQL or other code scanning
 
-Keep these enabled for the private `bardo-app` repository when GitHub Free exposes them:
+Keep these enabled for private repositories when GitHub Free exposes them:
 
 - Dependency graph
 - Dependabot alerts
@@ -82,7 +81,7 @@ Current custom properties:
 Current values:
 
 - `bardo`: `repo_type=public-core`, `data_sensitivity=public`, `criticality=medium`, `deploy_target=none`
-- `bardo-app`: `repo_type=private-app`, `data_sensitivity=confidential`, `criticality=high`, `deploy_target=vercel`
+- private product repos: `repo_type=private-app`, `data_sensitivity=confidential`, `criticality=high`, `deploy_target=vercel`
 
 ## Third-Party Access
 

@@ -6,7 +6,7 @@ Thanks for helping Bardo grow. This project should be easy to approach, careful 
 
 - Use Issues for actionable work: bugs, features, docs, release tasks, and security-hardening tasks.
 - Use Discussions for questions, ideas, playtesting notes, showcases, and community conversation.
-- Do not put secrets, private customer data, private deployment configuration, or proprietary `bardo-app` details in the public repo.
+- Do not put secrets, private customer data, private deployment configuration, or proprietary product details in this repo.
 
 ## Recommended Flow
 
@@ -54,17 +54,17 @@ Push your branch to your fork and open a pull request against `bardo-ttrpg/bardo
 - Keep pull requests small and focused.
 - Link the issue the PR addresses.
 - Fill out the PR template.
-- Run `bun run check` and targeted tests when possible.
+- Run `pnpm check` and targeted tests when possible.
 - Add or update docs when behavior changes.
 - Never include real secrets, tokens, private file paths, or customer data.
 
 ## Development Commands
 
 ```bash
-bun install
-bun run check
-bun run test
-bun run build
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test
+pnpm build
 ```
 
 Use targeted package scripts when you are working in a specific package.
