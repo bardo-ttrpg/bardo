@@ -32,5 +32,10 @@
 		"turbo": "^2.9.6",
 		"typescript": "5.9.3",
 		"vitest": "^4.0.0"
+	},
+	"pnpm": {
+		"overrides": {
+			"ip-address": "10.1.1"
+		}
 	}
 }
