@@ -7,8 +7,10 @@ pnpm add -g @bardo-ttrpg/cli
 Then initialize a campaign workspace:
 
 ```sh
-bardo init
+bardo init --rulebook ./RULEBOOK.md
 bardo validate
 ```
 
 Local Bardo does not require sign-in. The CLI and MCP server read local workspace files and `.bardo/` artifacts only.
+
+If your rulebook is named `rulebook.md`, the `--rulebook` flag is optional. For other names, pass the path explicitly.

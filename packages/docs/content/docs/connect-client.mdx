@@ -1,16 +1,19 @@
 Connect your AI client after the workspace is prepared.
 
 ```sh
-bardo init
-bardo connect --client codex
+bardo init --rulebook ./RULEBOOK.md
+bardo validate
+bardo connect --client opencode
 ```
 
-Supported first-class targets are Codex, Codex CLI, Claude Code, OpenCode, Gemini CLI, and Cursor. Bardo writes local MCP configuration that starts:
+Supported first-class targets are Codex, Claude Code, OpenCode, Gemini CLI, and Cursor. Bardo writes local MCP configuration that starts:
 
 ```sh
-bardo-mcp mcp serve --workspace-root .
+bardo mcp serve --workspace-root .
 ```
 
 The client talks to Bardo over stdio and reads only the configured local workspace.
 
 Generated local configs should not contain bridge URLs, runtime-status URLs, bearer tokens, API keys, or hosted auth headers. If one does, regenerate it with `bardo connect --client <client>`.
+
+For compatible clients that are not first-class targets, use `bardo clients list` and configure the command manually with `bardo mcp serve --workspace-root .`.

@@ -3,3 +3,14 @@ Bardo exposes local-first MCP tools for campaign readiness, rules grounding, cur
 The MCP server runs over stdio. It does not require hosted auth for local workspace access.
 
 Diagnostic file tools are hidden by default and can be enabled with `BARDO_EXPOSE_LOCAL_TOOLS=true` for development.
+
+## Tool shape
+
+- `bardo_workspace_status`: check initialization, readiness, current state, and safe next steps.
+- `init`: import the rulebook and prepare `.bardo/`.
+- `scene_turn`: resolve a player-facing turn from local evidence.
+- `player_action`: interpret a player action without silently changing canon.
+- `world_sync`: commit grounded campaign updates.
+- `user_correction`: record explicit table corrections with high precedence.
+
+Agents should call `bardo_workspace_status` before play and should not continue when readiness is `needs-user-input`.
