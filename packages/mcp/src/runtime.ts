@@ -247,7 +247,7 @@ Notes:
   validate exits nonzero until required campaign inputs are present.
   add a small campaign notes file when location or active quest is missing.
 
-Local workspace usage is free and open. Paid Bardo Pro features are limited to cloud campaign storage and hosted app integrations.
+Local workspace usage is free and open. Bardo Pro is for subscribed cloud connections from supported external AI platforms, not for local CLI or MCP access.
 `);
 }
 

@@ -2,7 +2,7 @@
 
 Transparent local-first MCP server for Bardo.
 
-`@bardo-ttrpg/mcp` exposes grounded tabletop campaign tools over stdio. It reads the current workspace and `.bardo/` artifacts through the local MCP connection. Local usage does not require a Bardo account or subscription.
+`@bardo-ttrpg/mcp` exposes grounded tabletop campaign tools over stdio. It reads the current workspace and `.bardo/` artifacts through the local MCP connection. Local usage does not require a Bardo account or subscription. Bardo Pro is the separate cloud connection layer for subscribed access from supported external AI platforms.
 
 ## User Flow
 
