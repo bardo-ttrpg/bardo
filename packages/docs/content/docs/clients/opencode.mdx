@@ -9,7 +9,8 @@ Install or update OpenCode from [opencode.ai](https://opencode.ai/), then open t
 From the workspace root:
 
 ```bash
-bardo init
+bardo init --rulebook ./RULEBOOK.md
+bardo validate
 bardo connect --client opencode
 ```
 
@@ -26,4 +27,4 @@ Start OpenCode in the same workspace, let it load the Bardo connection, and begi
 Troubleshooting:
 - If OpenCode does not pick up the new config, restart it from the workspace root.
 - If Bardo says the workspace is incomplete, fix that first instead of trying to improvise around it.
-- If `.bardo/` disappears, rebuild it with `bardo init` before continuing.
+- If `.bardo/` disappears, rebuild it with `bardo init --rulebook ./RULEBOOK.md` before continuing.
