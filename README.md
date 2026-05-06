@@ -2,9 +2,7 @@
 
 Bardo turns MCP-capable AI clients and agents into grounded tabletop role-playing Game Masters.
 
-The public repo is intentionally transparent. It contains the local runtime, MCP server, CLI, Agent Skill, public MDX docs, client setup examples, and marketplace metadata so users can inspect what Bardo reads, writes, and runs.
-
-The private `bardo-app` repo owns hosted product code, billing, customer data paths, deployment configuration, and business-sensitive workflows.
+Bardo is local-first: your campaign workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder.
 
 ## Who It Is For
 
@@ -13,17 +11,13 @@ The private `bardo-app` repo owns hosted product code, billing, customer data pa
 - Developers interested in local-first RPG tooling, Model Context Protocol servers, and AI-assisted campaign workflows.
 - Contributors who want to help build a clear, safe, welcoming open-source TTRPG toolchain.
 
-## What Is Public
+## Packages
 
 - `@bardo-ttrpg/core`: `.bardo/` workspace schema, campaign grounding, runtime state, corrections, diagnostics, and validation.
 - `@bardo-ttrpg/mcp`: local stdio MCP server exposing Bardo tools to supported clients.
 - `@bardo-ttrpg/cli`: `bardo` and `bardo-mcp` commands for init, validation, client config, doctor checks, and server startup.
 - `@bardo-ttrpg/docs`: public MDX documentation content.
 - `@bardo-ttrpg/skills`: the `bardo-gm` Agent Skill.
-
-## Local-First Model
-
-Local Bardo use is free and open. The workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder. Cloud campaign storage and hosted ChatGPT/Claude integrations are paid SaaS features that live in the private `bardo-app` repo.
 
 ## Commands
 

@@ -5,20 +5,18 @@ on:
     paths:
       - ".github/workflows/codeql.yml"
       - "packages/**"
-      - "website/**"
       - "scripts/**"
       - "package.json"
-      - "bun.lock"
+      - "pnpm-lock.yaml"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/codeql.yml"
       - "packages/**"
-      - "website/**"
       - "scripts/**"
       - "package.json"
-      - "bun.lock"
+      - "pnpm-lock.yaml"
   schedule:
     - cron: "23 8 * * 1"
 
