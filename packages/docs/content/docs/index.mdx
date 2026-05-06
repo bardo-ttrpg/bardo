@@ -13,8 +13,10 @@ Your workspace is the source of truth. `.bardo/` is the only Bardo-managed local
 ## Recommended Path
 
 1. Put your campaign files in a workspace.
-2. Add `rulebook.md` if you want the default rules import path.
-3. Run `bardo init`.
+2. Add a Markdown rulebook, such as `RULEBOOK.md`.
+3. Run `bardo init --rulebook ./RULEBOOK.md`.
 4. Run `bardo validate`.
 5. Run `bardo connect --client <your-client>`.
 6. Open your AI client in the same workspace.
+
+Start the agent by asking it to check Bardo workspace status. If Bardo reports readiness gaps, add or update campaign notes before continuing play.

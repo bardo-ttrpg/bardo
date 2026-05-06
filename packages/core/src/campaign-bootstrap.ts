@@ -292,14 +292,19 @@ async function walkWorkspace(
 			.relative(rootPath, nextPath)
 			.replaceAll("\\", "/");
 		const role =
-			entry.name === "rulebook.md" ? "rules-source" : "campaign-file";
+			entry.name.toLowerCase() === "rulebook.md"
+				? "rules-source"
+				: "campaign-file";
 		if (details.size > MAX_CAMPAIGN_SOURCE_BYTES) {
 			results.push({
 				relativePath,
 				role,
 				status: "skipped",
 				byteSize: details.size,
-				skippedReason: `Skipped oversized source ${relativePath} (${details.size} bytes > ${MAX_CAMPAIGN_SOURCE_BYTES} byte limit).`,
+				skippedReason:
+					role === "rules-source"
+						? `Rules source ${relativePath} is handled by rules bootstrap and skipped during campaign note discovery.`
+						: `Skipped oversized source ${relativePath} (${details.size} bytes > ${MAX_CAMPAIGN_SOURCE_BYTES} byte limit).`,
 			});
 			continue;
 		}

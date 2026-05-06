@@ -1,14 +1,16 @@
-import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { bootstrapCampaignWorkspace } from "../../core/src/campaign-bootstrap";
 import {
 	type AutoInstallConnectionClient,
 	buildInstallConfigContent,
 	listConnectionClientAdapters,
 } from "./client-adapters";
 import { resolveAutoInstallClientSelection } from "./client-resolution";
-import { startLocalMcpServer } from "./local-mcp";
-import { bootstrapImportedRulebook } from "./rules-bootstrap";
+import {
+	ensureWorkspaceCoreFiles,
+	maybeImportRulebook,
+	startLocalMcpServer,
+} from "./local-mcp";
 import { resolveBardoRoot } from "./workspace-schema";
 
 type Writer = {
@@ -128,29 +130,29 @@ async function handleInit(
 ) {
 	const bardoRoot = resolveBardoRoot(command.workspaceRoot);
 	await mkdir(bardoRoot, { recursive: true });
-	const rulebookPath =
-		command.rulebook ?? path.join(command.workspaceRoot, "rulebook.md");
-	if (await exists(rulebookPath)) {
-		const sourceRelativePath = "rules/sources/rulebook/rulebook.md";
-		const targetPath = path.join(bardoRoot, sourceRelativePath);
-		await mkdir(path.dirname(targetPath), { recursive: true });
-		await copyFile(rulebookPath, targetPath);
-		await bootstrapImportedRulebook({
-			bardoRoot,
-			sourceRelativePath,
-			nowIso: new Date().toISOString(),
-		});
-	}
-	const result = await bootstrapCampaignWorkspace({
+	const importedRulebooks = await maybeImportRulebook({
 		workspaceRoot: command.workspaceRoot,
 		bardoRoot,
-		nowIso: new Date().toISOString(),
+		rulebookPath: command.rulebook,
 	});
+	const nowIso = new Date().toISOString();
+	await ensureWorkspaceCoreFiles({
+		workspaceRoot: command.workspaceRoot,
+		bardoRoot,
+		ruleset: null,
+		nowIso,
+		importedRulebooks,
+	});
+	const readinessPath = path.join(bardoRoot, "manifests/readiness.json");
+	const readiness = JSON.parse(await readFile(readinessPath, "utf8")) as {
+		status: string;
+		gaps: string[];
+	};
 	stdout.write(`Initialized Bardo workspace at ${bardoRoot}\n`);
-	stdout.write(`Readiness: ${result.readiness.status}\n`);
-	if (result.readiness.gaps.length > 0) {
+	stdout.write(`Readiness: ${readiness.status}\n`);
+	if (readiness.gaps.length > 0) {
 		stdout.write(
-			`Gaps:\n${result.readiness.gaps.map((gap) => `- ${gap}`).join("\n")}\n`,
+			`Gaps:\n${readiness.gaps.map((gap) => `- ${gap}`).join("\n")}\n`,
 		);
 	}
 	return 0;

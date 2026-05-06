@@ -16,6 +16,7 @@ If the rulebook is missing, the rules phase cannot complete. That gap is surface
 ## Recommended rulebook input
 
 - Prefer `./rulebook.md` in the workspace root.
+- If the file uses another name, such as `RULEBOOK.md`, pass `--rulebook ./RULEBOOK.md`.
 - Keep headings, tables, examples, and exception text intact.
 - Convert PDFs to Markdown before bootstrap.
 
@@ -40,6 +41,8 @@ bardo init --rulebook ./rules/core-rulebook.md
 ```
 
 The source copy is preserved. The normalized files and `index.json` are Bardo-managed derivatives.
+
+Large rulebooks are not treated as campaign notes. They are handled by rules bootstrap, then skipped during campaign note discovery so they do not create misleading oversized-source readiness gaps.
 
 ## What normalization keeps
 

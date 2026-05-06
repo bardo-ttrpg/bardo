@@ -616,7 +616,7 @@ describe("bootstrapCampaignWorkspace", () => {
 				"utf8",
 			);
 			await writeFile(
-				path.join(workspaceRoot, "rulebook.md"),
+				path.join(workspaceRoot, "RULEBOOK.md"),
 				`# Huge Rulebook\n\n${"rules ".repeat(140_000)}`,
 				"utf8",
 			);
@@ -669,7 +669,7 @@ describe("bootstrapCampaignWorkspace", () => {
 				await readFile(path.join(bardoRoot, result.readinessPath), "utf8"),
 			) as { status: CampaignBootstrapReadiness; gaps: string[] };
 			expect(readiness.status).toBe("ready");
-			expect(readiness.gaps.some((gap) => gap.includes("rulebook.md"))).toBe(
+			expect(readiness.gaps.some((gap) => gap.includes("RULEBOOK.md"))).toBe(
 				false,
 			);
 		} finally {

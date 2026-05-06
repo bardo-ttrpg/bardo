@@ -4,6 +4,18 @@ Bardo turns MCP-capable AI clients and agents into grounded tabletop role-playin
 
 Bardo is local-first: your campaign workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder.
 
+## Quick Start
+
+```sh
+pnpm add -g @bardo-ttrpg/cli
+cd path/to/your/campaign
+bardo init --rulebook ./RULEBOOK.md
+bardo validate
+bardo connect --client opencode
+```
+
+Open your MCP-capable client from the same campaign folder. Ask it to check Bardo workspace status before continuing play.
+
 ## Who It Is For
 
 - Game masters who want campaign tools that remember the right things.
@@ -32,7 +44,19 @@ Use `pnpm` and `pnpx` only. This repo does not use Bun, npm, npx, or Knip.
 
 ## Supported Local Clients
 
-First-class setup targets are Codex, Codex CLI, Claude Code, OpenCode, Gemini CLI, and Cursor. Additional client examples are provided where the configuration format is compatible.
+First-class setup targets are Codex, Claude Code, OpenCode, Gemini CLI, and Cursor. Generic MCP JSON is available for compatible clients.
+
+The local MCP server runs over stdio:
+
+```sh
+bardo mcp serve --workspace-root .
+```
+
+Local use does not require a Bardo account, hosted bridge URL, bearer token, or API key.
+
+## MCP Tools
+
+Bardo exposes tools for workspace status, initialization, scene turns, player actions, world sync, corrections, diagnostics, and local docs. Agents should call `bardo_workspace_status` first, run `init` when `.bardo/` is missing, and avoid canon writes until readiness gaps are resolved.
 
 ## Contributing
 
