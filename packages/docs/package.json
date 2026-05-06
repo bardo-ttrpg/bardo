@@ -5,12 +5,16 @@
 	"license": "MIT",
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./content/*": "./content/*"
 	},
 	"files": [
 		"content",
 		"src"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"build": "tsc --noEmit && node scripts/validate-docs.mjs",
 		"lint": "biome lint .",
