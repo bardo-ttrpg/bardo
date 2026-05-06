@@ -16,7 +16,7 @@
 		"check": "pnpm lint && pnpm typecheck && pnpm test"
 	},
 	"devDependencies": {
-		"typescript": "5.9.3",
+		"typescript": "6.0.3",
 		"vitest": "^4.0.0"
 	}
 }
