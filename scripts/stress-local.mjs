@@ -5,18 +5,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const cliPath = path.join(repoRoot, "packages", "mcp", "dist", "cli.mjs");
-const clients = [
-	"codex",
-	"claude",
-	"opencode",
-	"gemini",
-	"cursor",
-	"vscode",
-	"windsurf",
-	"kiro",
-	"kilo",
-	"trae",
-];
+const clients = ["codex", "claude", "opencode", "gemini", "cursor"];
 
 function runCli(args, options = {}) {
 	return new Promise((resolve, reject) => {
@@ -184,11 +173,6 @@ try {
 		"opencode.json",
 		".gemini/settings.json",
 		".cursor/mcp.json",
-		".vscode/settings.json",
-		".windsurf/mcp.json",
-		".kiro/settings/mcp.json",
-		".kilocode/mcp.json",
-		".trae/mcp.json",
 	];
 	for (const relativePath of generatedFiles) {
 		const content = await readFile(path.join(workspace, relativePath), "utf8");

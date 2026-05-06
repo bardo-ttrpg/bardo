@@ -4,11 +4,6 @@ export type ConnectionClient =
 	| "cursor"
 	| "codex"
 	| "gemini"
-	| "vscode"
-	| "windsurf"
-	| "kiro"
-	| "kilo"
-	| "trae"
 	| "generic";
 
 export type AutoInstallConnectionClient = Exclude<ConnectionClient, "generic">;
@@ -17,7 +12,7 @@ export type ConnectionMode = "remote" | "local";
 
 export type ClientSupportTier = "tier1" | "tier2" | "generic";
 
-type JsonConfigVariant = "mcpServers" | "vscode" | "opencode";
+type JsonConfigVariant = "mcpServers" | "opencode";
 
 export type ConnectionClientAdapter = {
 	id: ConnectionClient;
@@ -91,56 +86,6 @@ const CONNECTION_CLIENT_ADAPTERS: Record<
 		defaultConfigPath: ".gemini/settings.json",
 		installVariant: "mcpServers",
 	},
-	vscode: {
-		id: "vscode",
-		label: "VS Code / GitHub Copilot",
-		tier: "tier1",
-		autoInstall: true,
-		supportsLocal: true,
-		supportsRemote: false,
-		defaultConfigPath: ".vscode/settings.json",
-		installVariant: "vscode",
-	},
-	windsurf: {
-		id: "windsurf",
-		label: "Windsurf",
-		tier: "tier1",
-		autoInstall: true,
-		supportsLocal: true,
-		supportsRemote: false,
-		defaultConfigPath: ".windsurf/mcp.json",
-		installVariant: "mcpServers",
-	},
-	kiro: {
-		id: "kiro",
-		label: "Kiro",
-		tier: "tier1",
-		autoInstall: true,
-		supportsLocal: true,
-		supportsRemote: false,
-		defaultConfigPath: ".kiro/settings/mcp.json",
-		installVariant: "mcpServers",
-	},
-	kilo: {
-		id: "kilo",
-		label: "Kilo Code",
-		tier: "tier1",
-		autoInstall: true,
-		supportsLocal: true,
-		supportsRemote: false,
-		defaultConfigPath: ".kilocode/mcp.json",
-		installVariant: "mcpServers",
-	},
-	trae: {
-		id: "trae",
-		label: "Trae",
-		tier: "tier2",
-		autoInstall: true,
-		supportsLocal: true,
-		supportsRemote: false,
-		defaultConfigPath: ".trae/mcp.json",
-		installVariant: "mcpServers",
-	},
 	generic: {
 		id: "generic",
 		label: "Generic MCP Client",
@@ -157,12 +102,7 @@ export const SUPPORTED_CONNECTION_CLIENTS: readonly ConnectionClient[] = [
 	"cursor",
 	"codex",
 	"gemini",
-	"vscode",
 	"opencode",
-	"windsurf",
-	"kiro",
-	"kilo",
-	"trae",
 	"generic",
 ] as const;
 
@@ -349,26 +289,6 @@ function mergeJsonVariant(args: {
 	url: string;
 }): Record<string, unknown> {
 	const localArgs = buildLocalAdapterArgs(args.url);
-	if (args.variant === "vscode") {
-		const root = structuredClone(args.existing);
-		const mcp =
-			typeof root.mcp === "object" && root.mcp !== null
-				? (root.mcp as Record<string, unknown>)
-				: {};
-		const servers =
-			typeof mcp.servers === "object" && mcp.servers !== null
-				? (mcp.servers as Record<string, unknown>)
-				: {};
-		servers[args.serverName] = {
-			type: "stdio",
-			command: LOCAL_ADAPTER_COMMAND,
-			args: localArgs,
-		};
-		mcp.servers = servers;
-		root.mcp = mcp;
-		return root;
-	}
-
 	if (args.variant === "opencode") {
 		const root = structuredClone(args.existing);
 		const mcp =
@@ -463,7 +383,6 @@ export function buildInstallConfigContent(args: {
 
 	if (
 		adapter.installVariant === "mcpServers" ||
-		adapter.installVariant === "vscode" ||
 		adapter.installVariant === "opencode"
 	) {
 		let existing: Record<string, unknown> = {};
@@ -523,18 +442,6 @@ export function buildConnectionSnippet(args: {
 				null,
 				2,
 			)}`;
-		case "vscode":
-			return `${JSON.stringify(
-				mergeJsonVariant({
-					variant: "vscode",
-					existing: {},
-					mode: args.mode,
-					serverName,
-					url: baseUrl,
-				}),
-				null,
-				2,
-			)}`;
 		case "opencode":
 			return `${JSON.stringify(
 				mergeJsonVariant({
@@ -548,10 +455,6 @@ export function buildConnectionSnippet(args: {
 				2,
 			)}`;
 		case "cursor":
-		case "windsurf":
-		case "kiro":
-		case "kilo":
-		case "trae":
 			return `${JSON.stringify(
 				mergeJsonVariant({
 					variant: "mcpServers",

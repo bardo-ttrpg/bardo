@@ -8,7 +8,7 @@ describe("client adapters", () => {
 	test("reports an actionable error for malformed existing JSON config", () => {
 		expect(() =>
 			buildInstallConfigContent({
-				client: "kiro",
+				client: "gemini",
 				mode: "local",
 				serverName: "bardo",
 				url: "http://127.0.0.1:3000/mcp",

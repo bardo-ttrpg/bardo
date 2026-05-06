@@ -81,7 +81,7 @@ export async function resolveAutoInstallClientSelection(args: {
 	}
 	if (!isAutoInstallConnectionClient(normalized)) {
 		throw new Error(
-			"Unsupported client. Use claude, opencode, codex, gemini, cursor, windsurf, vscode, kiro, kilo, or trae.",
+			"Unsupported client. Use claude, opencode, codex, gemini, cursor, or auto.",
 		);
 	}
 	const adapter = getConnectionClientAdapter(normalized);
@@ -111,7 +111,7 @@ export async function resolveDoctorClientSelection(args: {
 	}
 	if (!isConnectionClient(normalized)) {
 		throw new Error(
-			"Unsupported client. Use claude, opencode, codex, gemini, cursor, windsurf, vscode, kiro, kilo, trae, generic, or auto.",
+			"Unsupported client. Use claude, opencode, codex, gemini, cursor, generic, or auto.",
 		);
 	}
 	const adapter = getConnectionClientAdapter(normalized);

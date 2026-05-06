@@ -231,7 +231,7 @@ function writeHelp(stdout: Writer) {
 Usage:
   bardo init [--workspace-root <path>] [--rulebook <path>]
   bardo validate [--workspace-root <path>]
-  bardo connect --client <codex|claude|opencode|gemini|cursor|vscode|windsurf|kiro|kilo|trae|auto> [--workspace-root <path>]
+  bardo connect --client <codex|claude|opencode|gemini|cursor|auto> [--workspace-root <path>]
   bardo doctor [--workspace-root <path>]
   bardo clients list
   bardo mcp serve [--workspace-root <path>]
