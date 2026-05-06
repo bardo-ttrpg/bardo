@@ -20,7 +20,7 @@
 		"check": "pnpm lint && pnpm typecheck && pnpm test"
 	},
 	"devDependencies": {
-		"@types/node": "^24.0.0",
+		"@types/node": "^25.6.0",
 		"typescript": "5.9.3",
 		"vitest": "^4.0.0"
 	}
