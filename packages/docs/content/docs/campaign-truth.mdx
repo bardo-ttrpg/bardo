@@ -11,13 +11,13 @@ The hosted side is limited to:
 - account auth
 - billing and entitlements
 - cloud campaign storage for subscribed users
-- hosted ChatGPT and Claude integration paths
+- subscribed connections from supported external AI platforms such as ChatGPT and Claude Web
 
 The hosted side does not own campaign files, write local state, or decide the campaign for you.
 
 ## How to think about the split
 
-If something depends on your campaign files, it belongs to the local workspace. If something depends on identity, local setup, or billing, it belongs to the hosted side.
+If something depends on your campaign files, it belongs to the local workspace. If something depends on identity, subscription status, centralized access, or a cloud connection from an external AI platform, it belongs to the hosted side.
 
 ## Migration note
 

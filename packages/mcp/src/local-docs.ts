@@ -170,6 +170,7 @@ function buildDocContent(args: {
 					"# Bardo Quickstart",
 					"",
 					"Bardo keeps your campaign files in the local workspace. Local MCP execution, setup, and campaign truth do not require hosted login or billing.",
+					"Bardo Pro is separate: it is the cloud connection layer for subscribed access from supported external AI platforms.",
 					"",
 					"## Start here",
 					"",

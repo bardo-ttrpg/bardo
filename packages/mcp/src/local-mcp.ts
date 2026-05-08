@@ -2035,7 +2035,7 @@ export async function startLocalMcpServer(
 				},
 			},
 			instructions:
-				"Use the local-first Bardo GM and world-simulation tools. Bardo reads the current workspace and .bardo artifacts through stdio; local use does not require hosted auth or billing.",
+				"Use the local-first Bardo GM and world-simulation tools. Bardo reads the current workspace and .bardo artifacts through stdio; local use does not require hosted auth or billing. Bardo Pro is the separate cloud connection layer for subscribed external AI platform access.",
 		},
 	);
 	const manager = createWorkspaceRootManager({

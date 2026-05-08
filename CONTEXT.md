@@ -15,7 +15,7 @@
 - The workspace owns campaign truth; `.bardo/` stores Bardo-managed derivatives and committed state.
 - The public repo owns transparent local tooling: core runtime, MCP server, CLI, docs content, skills, examples, and marketplace preparation.
 - Local CLI and MCP use never require hosted login, billing, bridge sessions, or token refresh.
-- Cloud campaign storage and hosted ChatGPT/Claude integrations belong in the private app repo.
+- Cloud campaign storage and subscribed external AI platform connections belong in the private app repo.
 
 ## Example Dialogue
 

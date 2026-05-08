@@ -2,7 +2,7 @@
 
 Bardo turns MCP-capable AI clients and agents into grounded tabletop role-playing Game Masters.
 
-Bardo is local-first: your campaign workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder.
+Bardo is local-first for public CLI and MCP use: your campaign workspace is the source of truth, and `.bardo/` is the only Bardo-managed local folder. Bardo Pro is separate; it provides a cloud connection layer for using Bardo from supported external AI platforms.
 
 ## Quick Start
 
@@ -21,6 +21,7 @@ Open your MCP-capable client from the same campaign folder. Ask it to check Bard
 - Game masters who want campaign tools that remember the right things.
 - TTRPG groups that prefer durable notes, rules, and session state over fragile chat memory.
 - Developers interested in local-first RPG tooling, Model Context Protocol servers, and AI-assisted campaign workflows.
+- Non-technical users who want subscribed Bardo access from supported places like ChatGPT, Claude Web, and future AI platforms without hand-editing local client config.
 - Contributors who want to help build a clear, safe, welcoming open-source TTRPG toolchain.
 
 ## Packages
@@ -52,7 +53,7 @@ The local MCP server runs over stdio:
 bardo mcp serve --workspace-root .
 ```
 
-Local use does not require a Bardo account, hosted bridge URL, bearer token, or API key.
+Local use does not require a Bardo account, hosted bridge URL, bearer token, or API key. Subscribed cloud connections for supported external AI platforms are handled by the Bardo web service, not this local runtime.
 
 ## MCP Tools
 

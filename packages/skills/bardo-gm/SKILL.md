@@ -30,7 +30,7 @@ Some clients display MCP tools with an extra local prefix. Still choose the Bard
 
 ## Local Boundary
 
-Local Bardo MCP and CLI use is free and open. Campaign files, rulebook prep, current state, sessions, and committed canon stay in the user's workspace. Paid Bardo services are for cloud campaign storage and hosted app integrations, not local file access.
+Local Bardo MCP and CLI use is free and open. Campaign files, rulebook prep, current state, sessions, and committed canon stay in the user's workspace. Paid Bardo services are for the cloud connection layer that lets subscribed users access Bardo from supported external AI platforms, not for local file access.
 
 ## Useful Links
 
